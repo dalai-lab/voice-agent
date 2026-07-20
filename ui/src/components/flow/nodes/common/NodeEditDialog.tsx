@@ -83,59 +83,68 @@ export const NodeEditDialog = ({
     }, [open, readOnly, handleSave]);
 
     return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent
-                className="max-h-[85vh] overflow-y-auto"
-                style={{ maxWidth: "1200px", width: "95vw" }}
-            >
-                <DialogHeader>
-                    <div className="flex items-center justify-between">
-                        <DialogTitle>{title}</DialogTitle>
-                        {documentationUrl && (
-                            <a
-                                href={documentationUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors pr-6"
-                            >
-                                Docs
-                                <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
+        <>
+            <Dialog open={open} onOpenChange={handleOpenChange}>
+                <DialogContent
+                    className="w-full max-w-xl bg-background border border-border/80 rounded-xl p-0 gap-0 shadow-lg"
+                >
+                    {/* Header Container */}
+                    <div className="p-5 border-b border-border/40 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <DialogTitle className="text-sm font-bold tracking-tight text-foreground">{title}</DialogTitle>
+                            {documentationUrl && (
+                                <a
+                                    href={documentationUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors pr-6"
+                                >
+                                    Docs
+                                    <ExternalLink className="h-3 w-3" />
+                                </a>
+                            )}
+                        </div>
+                        <DialogDescription className="text-xs text-muted-foreground/60">
+                            Configure the settings for this node in your workflow.
+                        </DialogDescription>
+                        {nodeData.invalid && nodeData.validationMessage && (
+                            <div className="mt-2 flex items-center gap-2 rounded-lg bg-destructive/5 p-2.5 text-xs text-destructive border border-destructive/20 font-medium">
+                                <AlertCircle className="h-3.5 w-3.5" />
+                                <span>{nodeData.validationMessage}</span>
+                            </div>
                         )}
                     </div>
-                    <DialogDescription>
-                        Configure the settings for this node in your workflow.
-                    </DialogDescription>
-                    {nodeData.invalid && nodeData.validationMessage && (
-                        <div className="mt-2 flex items-center gap-2 rounded-md bg-red-50 p-2 text-sm text-red-500 border border-red-200">
-                            <AlertCircle className="h-4 w-4" />
-                            <span>{nodeData.validationMessage}</span>
+
+                    {/* Form Content - Scrollable area */}
+                    <div className="max-h-[55vh] overflow-y-auto p-5 space-y-4">
+                        {children}
+                    </div>
+
+                    {error && (
+                        <div className="mx-5 mb-4 flex items-center gap-2 rounded-lg bg-destructive/5 p-3 text-xs text-destructive border border-destructive/20 font-medium">
+                            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span>{error}</span>
                         </div>
                     )}
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    {children}
-                </div>
-                {error && (
-                    <div className="flex items-center gap-2 rounded-md bg-red-50 p-3 text-sm text-red-600 border border-red-200">
-                        <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                        <span>{error}</span>
+
+                    {/* Footer Container */}
+                    <div className="p-4 border-t border-border/40 bg-muted/10">
+                        <div className="flex items-center justify-end gap-2.5">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="px-3.5"
+                                onClick={isDirty ? () => setShowDiscardAlert(true) : handleClose}
+                            >
+                                Cancel
+                            </Button>
+                            <Button onClick={handleSave} size="sm" className="px-3.5" disabled={readOnly}>
+                                {readOnly ? "Read Only" : "Save"}
+                            </Button>
+                        </div>
                     </div>
-                )}
-                <DialogFooter>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={isDirty ? () => setShowDiscardAlert(true) : handleClose}
-                        >
-                            Cancel
-                        </Button>
-                        <Button onClick={handleSave} disabled={readOnly}>
-                            {readOnly ? "Read Only" : "Save"}
-                        </Button>
-                    </div>
-                </DialogFooter>
-            </DialogContent>
+                </DialogContent>
+            </Dialog>
 
             {/* Discard changes confirmation dialog */}
             <AlertDialog open={showDiscardAlert} onOpenChange={setShowDiscardAlert}>
@@ -157,6 +166,6 @@ export const NodeEditDialog = ({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </Dialog>
+        </>
     );
 };

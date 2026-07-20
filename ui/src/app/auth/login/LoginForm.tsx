@@ -48,45 +48,49 @@ export function LoginForm({ signupEnabled }: { signupEnabled: boolean }) {
 
   return (
     <AuthShell enterpriseSlot={<AuthEnterpriseCTA />}>
-      <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+      <div className="space-y-2 text-center">
+        <h1 className="text-3xl font-semibold tracking-tight font-sans">Welcome back</h1>
         <p className="text-sm text-muted-foreground">
-          Enter your email and password to continue
+          Enter your details to sign in to your workspace
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email" className="text-xs font-semibold tracking-wide uppercase text-muted-foreground/80">Email address</Label>
           <Input
             id="email"
             type="email"
-            placeholder="you@example.com"
+            placeholder="you@domain.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            className="rounded-lg h-10 border-border/80 bg-background/50 focus-visible:ring-cta/20"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password" className="text-xs font-semibold tracking-wide uppercase text-muted-foreground/80">Password</Label>
+          </div>
           <Input
             id="password"
             type="password"
-            placeholder="Enter your password"
+            placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            className="rounded-lg h-10 border-border/80 bg-background/50 focus-visible:ring-cta/20"
           />
         </div>
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Signing in..." : "Sign in"}
+        <Button type="submit" className="w-full h-10 rounded-lg font-medium text-sm transition-all bg-cta hover:bg-cta/90 text-cta-foreground cursor-pointer shadow-sm" disabled={loading}>
+          {loading ? "Signing in..." : "Continue"}
         </Button>
       </form>
 
       {signupEnabled && (
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-sm text-muted-foreground/80 pt-2">
           Don&apos;t have an account?{" "}
-          <Link href="/auth/signup" className="text-primary underline-offset-4 hover:underline">
+          <Link href="/auth/signup" className="font-semibold text-foreground underline-offset-4 hover:underline hover:text-cta transition-colors">
             Sign up
           </Link>
         </p>

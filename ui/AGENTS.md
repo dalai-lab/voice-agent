@@ -50,41 +50,27 @@ npm run generate-client
 
 ## Conventions
 
-### File Uploads
+### UI Spacing & Styling Guidelines
 
-Always use a hidden `<input type="file">` with a visible `<Button>` that triggers it via `fileInputRef.current?.click()`. Never use a visible `<Input type="file">` — the native file input styling is inconsistent and confusing. Show the selected filename next to or below the button.
+To maintain a highly consistent, Vapi/ElevenLabs-style minimalist presentation, all dashboard layout changes must adhere to the following rules:
 
-### Authenticated API Calls
+1. **Spacing Scale (Padding & Margins)**:
+   - **Outer Page Padding**: Use `px-6 py-6` or `p-6` for standard views (never mix random sizes like `p-4` or `p-12`).
+   - **Gaps**: Use `gap-4` for standard elements (menus, action rows) and `gap-6` for large sections.
+   - **Form Rows**: Use `space-y-4` or `space-y-5`.
 
-Components that make API calls must wait for auth to be ready before fetching. Use `useAuth()` and guard the `useEffect` with `authLoading` and `user`:
+2. **Borders & Corners**:
+   - **Sidebar & Panels**: Use `border-r border-border/40` or `border border-border/40` to maintain clean separation lines.
+   - **Radius scale**: Use `rounded-lg` (`0.5rem`) for inputs, buttons, and small interactive states. Use `rounded-xl` (`0.75rem`) for cards and large layout panels.
 
-```tsx
-const { user, loading: authLoading } = useAuth();
-const hasFetched = useRef(false);
+3. **Typography**:
+   - **Titles**: Use `text-2xl font-bold tracking-tight text-foreground`.
+   - **Group Labels**: Use `text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50` (like Build, Manage sidebar section titles).
+   - **Body text**: Use `text-sm leading-relaxed text-muted-foreground`.
 
-useEffect(() => {
-  if (authLoading || !user || hasFetched.current) return;
-  hasFetched.current = true;
-  fetchData();
-}, [authLoading, user]);
-```
-
-The auth interceptor (which attaches the Bearer token) is only registered once auth is fully loaded. Fetching before that sends unauthenticated requests that silently fail.
-
-### API Error Handling
-
-The generated client does **not** throw on HTTP error responses — it resolves to `{ data, error }`. A `try/catch` only catches network failures, so a 4xx/5xx slips through silently if you only check `response.data`. Always check `response.error`:
-
-```tsx
-const response = await someApiCall({ ... });
-if (response.error) {
-  setError(detailFromError(response.error, "Failed to save thing"));
-  return;
-}
-// ...use response.data
-```
-
-Use `detailFromError` from `@/lib/apiError` to turn the error into a string — never render `error.detail` directly. FastAPI returns `detail` as a string for `HTTPException` but as an **array** of `{ msg, loc, ... }` objects for 422 validation errors; passing that array to React (`{error}`) crashes the page with "Objects are not valid as a React child". The helper normalizes both shapes and takes an optional fallback message.
+4. **Component Heights**:
+   - **Inputs/Buttons**: Use `h-9` for standard forms, and `h-10` for main auth/landing page actions.
+   - **Headers**: Sticky headers must be `h-16` or `py-3 px-6` to align with the sidebar header.
 
 ## Development
 

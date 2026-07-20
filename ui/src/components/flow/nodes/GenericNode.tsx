@@ -68,9 +68,30 @@ const DOC_URL_BY_SPEC: Record<string, string | undefined> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-function resolveIcon(name: string): LucideIcon {
-    const icons = LucideIcons as unknown as Record<string, LucideIcon>;
-    return icons[name] ?? Circle;
+import * as PhosphorIcons from "@phosphor-icons/react";
+
+function resolveIcon(name: string): React.ComponentType<any> {
+    // Map standard voice agent concepts to modern Phosphor icon classes
+    const lower = name.toLowerCase();
+    if (lower.includes("phone") || lower.includes("call")) return PhosphorIcons.Phone;
+    if (lower.includes("play") || lower.includes("start")) return PhosphorIcons.Play;
+    if (lower.includes("stop") || lower.includes("end")) return PhosphorIcons.PhoneDisconnect;
+    if (lower.includes("webhook")) return PhosphorIcons.GlobeHemisphereWest;
+    if (lower.includes("brain") || lower.includes("model") || lower.includes("ai")) return PhosphorIcons.Brain;
+    if (lower.includes("tool") || lower.includes("wrench")) return PhosphorIcons.Wrench;
+    if (lower.includes("file") || lower.includes("database")) return PhosphorIcons.Database;
+    if (lower.includes("campaign")) return PhosphorIcons.Megaphone;
+    if (lower.includes("history") || lower.includes("run") || lower.includes("trend")) return PhosphorIcons.TrendUp;
+    if (lower.includes("key") || lower.includes("lock")) return PhosphorIcons.Key;
+    if (lower.includes("setting")) return PhosphorIcons.Gear;
+    if (lower.includes("folder")) return PhosphorIcons.Folder;
+    if (lower.includes("qa") || lower.includes("shield")) return PhosphorIcons.ShieldCheck;
+    if (lower.includes("api") || lower.includes("trigger")) return PhosphorIcons.Lightning;
+
+    // Direct dynamic mapping or fallback
+    const key = name.charAt(0).toUpperCase() + name.slice(1);
+    const PhosphorIcon = (PhosphorIcons as any)[key];
+    return PhosphorIcon ?? PhosphorIcons.Circle;
 }
 
 function seedValues(
@@ -142,26 +163,26 @@ function getBadgeForSpec(
     variant: NodeStyleVariant,
 ): { label: string; className: string } {
     if (!spec) {
-        return { label: "Node", className: "bg-zinc-500 text-white" };
+        return { label: "Node", className: "bg-muted text-muted-foreground border border-border/40" };
     }
 
     switch (variant) {
         case "start":
-            return { label: "Start Node", className: "bg-emerald-500 text-white" };
+            return { label: "Start Node", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" };
         case "agent":
-            return { label: "Agent Node", className: "bg-blue-500 text-white" };
+            return { label: "Agent Node", className: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20" };
         case "end":
-            return { label: "End Node", className: "bg-rose-500 text-white" };
+            return { label: "End Node", className: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20" };
         case "global":
-            return { label: "Global Node", className: "bg-amber-500 text-white" };
+            return { label: "Global Node", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20" };
         case "trigger":
-            return { label: "API Trigger", className: "bg-purple-500 text-white" };
+            return { label: "API Trigger", className: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20" };
         case "webhook":
-            return { label: "Webhook", className: "bg-indigo-500 text-white" };
+            return { label: "Webhook", className: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20" };
         case "qa":
-            return { label: "QA Analysis", className: "bg-teal-500 text-white" };
+            return { label: "QA Analysis", className: "bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20" };
         case "integration":
-            return { label: spec.display_name, className: "bg-cyan-600 text-white" };
+            return { label: spec.display_name, className: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20" };
     }
 }
 

@@ -6,8 +6,11 @@ import {
     Folder as FolderIcon,
     FolderInput,
     Inbox,
-    Pencil,
+    Play,
+    Settings,
+    MoreHorizontal,
     RotateCcw,
+    Trash2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
@@ -19,7 +22,7 @@ import {
 } from '@/client/sdk.gen';
 import type { FolderResponse } from '@/client/types.gen';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -28,14 +31,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
+
 interface Workflow {
     id: number;
     name: string;
@@ -48,12 +44,7 @@ interface Workflow {
 interface WorkflowTableProps {
     workflows: Workflow[];
     showArchived: boolean;
-    /**
-     * When provided, each row gets a "Move to folder" action listing these
-     * folders. Omit it (e.g. for the archived list) to hide the control.
-     */
     folders?: FolderResponse[];
-    /** The folder this table is rendered under; null means "Uncategorized". */
     currentFolderId?: number | null;
 }
 
@@ -80,12 +71,8 @@ export function WorkflowTable({
 
         try {
             const response = await updateWorkflowStatusApiV1WorkflowWorkflowIdStatusPut({
-                path: {
-                    workflow_id: id,
-                },
-                body: {
-                    status: newStatus,
-                },
+                path: { workflow_id: id },
+                body: { status: newStatus },
             });
 
             if (response.data) {
@@ -127,134 +114,106 @@ export function WorkflowTable({
     };
 
     return (
-        <Card className="overflow-hidden">
-            <CardContent className="p-0">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="font-semibold">ID</TableHead>
-                            <TableHead className="font-semibold">Agent Name</TableHead>
-                            <TableHead className="font-semibold">Created At</TableHead>
-                            <TableHead className="font-semibold text-center">Total Runs</TableHead>
-                            <TableHead className="font-semibold text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {workflows.map((workflow) => (
-                            <TableRow
-                                key={workflow.id}
-                                className={`hover:bg-accent transition-colors ${showArchived ? 'opacity-60' : ''}`}
-                            >
-                                <TableCell className="text-muted-foreground">
-                                    {workflow.id}
-                                </TableCell>
-                                <TableCell className="font-medium">
-                                    {workflow.name}
-                                </TableCell>
-                                <TableCell>
-                                    {new Date(workflow.created_at).toLocaleDateString('en-US', {
-                                        year: 'numeric',
-                                        month: 'short',
-                                        day: 'numeric',
-                                    })}
-                                </TableCell>
-                                <TableCell className="text-center">
-                                    <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 text-sm font-semibold bg-muted rounded-full">
-                                        {workflow.total_runs || 0}
-                                    </span>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex justify-end gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleEdit(workflow.id)}
-                                            className="flex items-center gap-2"
-                                        >
-                                            <Pencil size={16} />
-                                            Edit
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {workflows.map((workflow) => (
+                <Card 
+                    key={workflow.id} 
+                    className="relative flex flex-col justify-between p-5 border border-border/40 bg-card/40 hover:bg-card/75 transition-all duration-200 group rounded-xl hover:shadow-xs hover:border-border/80"
+                >
+                    {/* Top Row: Name and Actions */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-start justify-between gap-4">
+                            <span className="font-semibold tracking-tight text-foreground text-[15px] group-hover:text-cta transition-colors">
+                                {workflow.name}
+                            </span>
+                            
+                            <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                                            <MoreHorizontal className="h-4 w-4" />
                                         </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-48">
                                         {folders && (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        disabled={movingWorkflowId === workflow.id || isPending}
-                                                        className="flex items-center gap-2"
-                                                    >
-                                                        {movingWorkflowId === workflow.id ? (
-                                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                                        ) : (
-                                                            <FolderInput size={16} />
-                                                        )}
-                                                        Move
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-52">
-                                                    <DropdownMenuLabel>Move to folder</DropdownMenuLabel>
-                                                    <DropdownMenuSeparator />
+                                            <>
+                                                <DropdownMenuLabel className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">Move Location</DropdownMenuLabel>
+                                                <DropdownMenuItem
+                                                    disabled={currentFolderId === null}
+                                                    onClick={() => handleMove(workflow.id, null)}
+                                                >
+                                                    <Inbox size={14} className="mr-2" />
+                                                    Uncategorized
+                                                    {currentFolderId === null && <Check size={14} className="ml-auto" />}
+                                                </DropdownMenuItem>
+                                                {folders.map((folder) => (
                                                     <DropdownMenuItem
-                                                        disabled={currentFolderId === null}
-                                                        onClick={() => handleMove(workflow.id, null)}
+                                                        key={folder.id}
+                                                        disabled={folder.id === currentFolderId}
+                                                        onClick={() => handleMove(workflow.id, folder.id)}
                                                     >
-                                                        <Inbox size={14} className="mr-2" />
-                                                        Uncategorized
-                                                        {currentFolderId === null && (
-                                                            <Check size={14} className="ml-auto" />
-                                                        )}
+                                                        <FolderIcon size={14} className="mr-2" />
+                                                        <span className="truncate">{folder.name}</span>
+                                                        {folder.id === currentFolderId && <Check size={14} className="ml-auto" />}
                                                     </DropdownMenuItem>
-                                                    {folders.map((folder) => (
-                                                        <DropdownMenuItem
-                                                            key={folder.id}
-                                                            disabled={folder.id === currentFolderId}
-                                                            onClick={() => handleMove(workflow.id, folder.id)}
-                                                        >
-                                                            <FolderIcon size={14} className="mr-2" />
-                                                            <span className="truncate">{folder.name}</span>
-                                                            {folder.id === currentFolderId && (
-                                                                <Check size={14} className="ml-auto shrink-0" />
-                                                            )}
-                                                        </DropdownMenuItem>
-                                                    ))}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                                ))}
+                                                <DropdownMenuSeparator />
+                                            </>
                                         )}
-                                        <Button
-                                            variant={showArchived ? "default" : "outline"}
-                                            size="sm"
+                                        
+                                        <DropdownMenuItem 
                                             onClick={() => handleArchiveToggle(workflow.id, workflow.status)}
-                                            disabled={loadingWorkflowId === workflow.id || isPending}
-                                            className="flex items-center gap-2"
+                                            className={showArchived ? "" : "text-destructive focus:text-destructive"}
                                         >
-                                            {loadingWorkflowId === workflow.id ? (
+                                            {showArchived ? (
                                                 <>
-                                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                                    {showArchived ? 'Restoring...' : 'Archiving...'}
+                                                    <RotateCcw size={14} className="mr-2" />
+                                                    Restore Agent
                                                 </>
                                             ) : (
                                                 <>
-                                                    {showArchived ? (
-                                                        <>
-                                                            <RotateCcw size={16} />
-                                                            Restore
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Archive size={16} />
-                                                            Archive
-                                                        </>
-                                                    )}
+                                                    <Archive size={14} className="mr-2" />
+                                                    Archive Agent
                                                 </>
                                             )}
-                                        </Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>ID: {workflow.id}</span>
+                            <span>•</span>
+                            <span>
+                                {new Date(workflow.created_at).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                })}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Bottom Row: Stats & Action */}
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/20">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Total Runs</span>
+                            <span className="text-sm font-semibold text-foreground mt-0.5">{workflow.total_runs || 0}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                onClick={() => handleEdit(workflow.id)}
+                            >
+                                <Settings className="h-3.5 w-3.5" />
+                                Configure
+                            </Button>
+                        </div>
+                    </div>
+                </Card>
+            ))}
+        </div>
     );
 }

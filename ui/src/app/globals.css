@@ -47,93 +47,97 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.12 0.005 240);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.12 0.005 240);
+  --primary: oklch(0.12 0.005 240);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.002 240);
+  --secondary-foreground: oklch(0.12 0.005 240);
+  --muted: oklch(0.95 0.002 240);
+  --muted-foreground: oklch(0.45 0.01 240);
+  --accent: oklch(0.95 0.002 240);
+  --accent-foreground: oklch(0.12 0.005 240);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.85 0.005 240);
+  --input: oklch(0.85 0.005 240);
+  --ring: oklch(0.52 0.18 20 / 15%);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  /* Single restrained warm accent — used only on primary CTAs + focus rings. */
-  --cta: oklch(0.72 0.15 65);
-  --cta-foreground: oklch(0.16 0.02 60);
-  /* Giant faded "dograh" wordmark (authentic Proxima Nova letterforms traced
-     from the brand logo PNG — the font is commercial, so the lettering ships
-     as static artwork in /public; fill + 0.9% opacity are baked into the
-     files). Theme-switched here; consumed by .app-surface and .auth-imprint. */
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.12 0.005 240);
+  --sidebar-primary: oklch(0.12 0.005 240);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.95 0.002 240);
+  --sidebar-accent-foreground: oklch(0.12 0.005 240);
+  --sidebar-border: oklch(0.85 0.005 240);
+  --sidebar-ring: oklch(0.52 0.18 20 / 10%);
+  --background: oklch(0.965 0.002 240);
+  --foreground: oklch(0.12 0.005 240);
+  /* Premium Rose Red accent in light mode */
+  --cta: oklch(0.52 0.18 20);
+  --cta-foreground: oklch(0.99 0.001 286);
   --brand-imprint: url("/brand-imprint-light.svg");
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.09 0.002 240);
+  --foreground: oklch(0.96 0.005 240);
+  --card: oklch(0.14 0.003 240);
+  --card-foreground: oklch(0.96 0.005 240);
+  --popover: oklch(0.14 0.003 240);
+  --popover-foreground: oklch(0.96 0.005 240);
+  --primary: oklch(0.96 0.005 240);
+  --primary-foreground: oklch(0.09 0.002 240);
+  --secondary: oklch(0.16 0.003 240);
+  --secondary-foreground: oklch(0.96 0.005 240);
+  --muted: oklch(0.16 0.003 240);
+  --muted-foreground: oklch(0.55 0.01 240);
+  --accent: oklch(0.16 0.003 240);
+  --accent-foreground: oklch(0.96 0.005 240);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: oklch(0.24 0.005 240);
+  --input: oklch(0.24 0.005 240);
+  --ring: oklch(0.60 0.18 20 / 20%);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar: oklch(0.12 0.003 240);
+  --sidebar-foreground: oklch(0.96 0.005 240);
   --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-primary-foreground: oklch(0.96 0.005 240);
+  --sidebar-accent: oklch(0.16 0.003 240);
+  --sidebar-accent-foreground: oklch(0.96 0.005 240);
+  --sidebar-border: oklch(0.22 0.005 240);
   --sidebar-ring: oklch(0.556 0 0);
-  /* Warm accent, slightly brighter against the near-black surfaces. */
-  --cta: oklch(0.78 0.16 67);
-  --cta-foreground: oklch(0.16 0.02 60);
+  /* Vibrant Rose Red accent in dark mode */
+  --cta: oklch(0.60 0.18 20);
+  --cta-foreground: oklch(0.13 0.01 240);
   --brand-imprint: url("/brand-imprint-dark.svg");
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/50 transition-colors duration-150;
   }
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Globally render Lucide and SVG icons with premium, thin hairline strokes */
+  svg:not([stroke-width]) {
+    stroke-width: 1.5px !important;
+  }
+  .lucide {
+    stroke-width: 1.5px !important;
   }
 }
 
@@ -150,11 +154,7 @@
   animation: spin-slow 3s linear infinite;
 }
 
-/* Attention pulse applied by OnboardingTooltip to the element its arrow points
-   at; removed automatically when the tooltip is dismissed. Blue matches the
-   tooltip body so the ring and the callout read as one unit. Two shadow layers:
-   a constant outline so the target stays highlighted between pulses, plus an
-   expanding wave, with a slight breathing scale on top. */
+/* Attention pulse */
 .onboarding-pulse {
   animation: onboarding-pulse 1.5s ease-out infinite;
 }
@@ -162,8 +162,8 @@
 @keyframes onboarding-pulse {
   0% {
     box-shadow:
-      0 0 0 3px rgba(59, 130, 246, 0.75),
-      0 0 0 3px rgba(59, 130, 246, 0.6);
+      0 0 0 3px rgba(124, 58, 237, 0.75),
+      0 0 0 3px rgba(124, 58, 237, 0.6);
     transform: scale(1);
   }
   40% {
@@ -171,32 +171,31 @@
   }
   70% {
     box-shadow:
-      0 0 0 3px rgba(59, 130, 246, 0.75),
-      0 0 0 18px rgba(59, 130, 246, 0);
+      0 0 0 3px rgba(124, 58, 237, 0.75),
+      0 0 0 18px rgba(124, 58, 237, 0);
     transform: scale(1);
   }
   100% {
     box-shadow:
-      0 0 0 3px rgba(59, 130, 246, 0.75),
-      0 0 0 18px rgba(59, 130, 246, 0);
+      0 0 0 3px rgba(124, 58, 237, 0.75),
+      0 0 0 18px rgba(124, 58, 237, 0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .onboarding-pulse {
     animation: none;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.6);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.6);
   }
 }
 
 @layer components {
-  /* CSS-only audio-waveform motif for the auth brand panel. A row of bars that
-     breathe at staggered intervals, evoking live voice. Decorative only. */
+  /* Minimal Vapi-style waveform */
   .auth-waveform {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
-    height: 3.5rem;
+    gap: 0.35rem;
+    height: 4rem;
   }
 
   .auth-waveform span {
@@ -205,24 +204,24 @@
     border-radius: 9999px;
     background: linear-gradient(
       to top,
-      color-mix(in oklch, var(--cta) 70%, transparent),
-      color-mix(in oklch, var(--cta) 25%, transparent)
+      var(--cta),
+      color-mix(in oklch, var(--cta) 30%, transparent)
     );
-    animation: auth-wave 1.4s ease-in-out infinite;
+    animation: auth-wave 1.6s ease-in-out infinite;
     transform-origin: center;
   }
 
   .auth-waveform span:nth-child(1) { animation-delay: 0s; height: 35%; }
-  .auth-waveform span:nth-child(2) { animation-delay: 0.15s; height: 65%; }
+  .auth-waveform span:nth-child(2) { animation-delay: 0.15s; height: 75%; }
   .auth-waveform span:nth-child(3) { animation-delay: 0.3s; height: 100%; }
-  .auth-waveform span:nth-child(4) { animation-delay: 0.45s; height: 55%; }
-  .auth-waveform span:nth-child(5) { animation-delay: 0.6s; height: 80%; }
-  .auth-waveform span:nth-child(6) { animation-delay: 0.3s; height: 45%; }
-  .auth-waveform span:nth-child(7) { animation-delay: 0.15s; height: 70%; }
-  .auth-waveform span:nth-child(8) { animation-delay: 0s; height: 30%; }
+  .auth-waveform span:nth-child(4) { animation-delay: 0.45s; height: 50%; }
+  .auth-waveform span:nth-child(5) { animation-delay: 0.6s; height: 85%; }
+  .auth-waveform span:nth-child(6) { animation-delay: 0.4s; height: 60%; }
+  .auth-waveform span:nth-child(7) { animation-delay: 0.2s; height: 70%; }
+  .auth-waveform span:nth-child(8) { animation-delay: 0.05s; height: 40%; }
 
   @keyframes auth-wave {
-    0%, 100% { transform: scaleY(0.4); opacity: 0.7; }
+    0%, 100% { transform: scaleY(0.3); opacity: 0.6; }
     50% { transform: scaleY(1); opacity: 1; }
   }
 
@@ -230,40 +229,14 @@
     .auth-waveform span { animation: none; }
   }
 
-  /* Matte app background — flat charcoal (dark) / soft paper (light), NO
-     gradients, with one subtle graphic in BOTH themes: the giant faded
-     "dograh" wordmark (--brand-imprint, defined in :root/.dark) pinned to
-     the bottom of the viewport, echoing the dograh.com footer. */
-  /* NOTE: background-attachment: fixed positions in VIEWPORT space but only
-     paints inside .app-surface, which starts right of the ~270px sidebar —
-     the +135px x-shift recentres the wordmark on the VISIBLE canvas. */
   .app-surface {
-    background-color: oklch(0.984 0.001 80);
-    background-image: var(--brand-imprint);
-    background-size: min(68vw, 980px) auto;
-    background-position: calc(50% + 135px) calc(100% - 24px);
-    background-repeat: no-repeat;
-    background-attachment: fixed;
+    background-color: var(--background);
   }
-  /* Sidebar is offcanvas on small screens — true centre there. */
-  @media (max-width: 767px) {
-    .app-surface {
-      background-position: center calc(100% - 24px);
-    }
+  .react-flow__renderer {
+    background-color: oklch(0.94 0.003 240);
   }
-  .dark .app-surface {
-    background-color: oklch(0.165 0.002 80);
-  }
-
-  /* Giant faded "dograh" imprint for the auth pages (applied to the AuthShell
-     form column, shared by Stack + OSS login/signup). Same --brand-imprint as
-     .app-surface; element-relative here (no fixed attachment), so it centers
-     and scales to whatever element carries the class. */
-  .auth-imprint {
-    background-image: var(--brand-imprint);
-    background-size: min(86%, 920px) auto;
-    background-position: center calc(100% - 32px);
-    background-repeat: no-repeat;
+  .dark .react-flow__renderer {
+    background-color: oklch(0.10 0.002 240);
   }
 
 }
@@ -277,20 +250,7 @@
 
 /* Floating-dock sidebar: detached rounded panel. Targets the shadcn sidebar's
    inner panel; applied via .app-sidebar-dock on <Sidebar variant="floating">. */
-.app-sidebar-dock [data-slot="sidebar-inner"] {
-  border-radius: 1.25rem;
-  overflow: hidden;
-}
-/* Flat carbon-charcoal panel with a soft light glow along the LEFT edge:
-   a 1px highlight line plus an inner bloom fading rightwards. */
-.dark .app-sidebar-dock [data-slot="sidebar-inner"] {
-  border-color: rgb(255 255 255 / 0.1);
-  background-color: oklch(0.18 0.002 80);
-  box-shadow:
-    inset 1px 0 0 rgb(255 255 255 / 0.1),
-    inset 3px 0 6px -4px rgb(255 255 255 / 0.08),
-    0 24px 50px -14px rgb(0 0 0 / 0.85);
-}
+/* Flat sidebar overrides */
 
 /* Card surface ("Crosshatch + Top-Lit Edge", user-approved 2026-06-11 after a
    3-round design board): a 45° hairline twill weave at 1% laid over the panel
@@ -299,12 +259,12 @@
    primitive (components/ui/card.tsx). Un-layered so border-top-color beats
    the border-border/60 utility. No gradients (user constraint). */
 .card-weave {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M0 0l12 12M12 0L0 12' stroke='%23000000' stroke-opacity='.015' fill='none'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M0 0l12 12M12 0L0 12' stroke='%23000000' stroke-opacity='.01' fill='none'/%3E%3C/svg%3E");
   background-repeat: repeat;
 }
 .dark .card-weave {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M0 0l12 12M12 0L0 12' stroke='%23ffffff' stroke-opacity='.01' fill='none'/%3E%3C/svg%3E");
-  border-top-color: rgb(255 255 255 / 0.2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M0 0l12 12M12 0L0 12' stroke='%23ffffff' stroke-opacity='.008' fill='none'/%3E%3C/svg%3E");
+  border-top-color: var(--cta);
 }
 
 /* Lead-form shell ("Ledger" treatment, user-approved 2026-06-11): neutral

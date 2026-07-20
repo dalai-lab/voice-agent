@@ -3,30 +3,16 @@
 import {
   AlertTriangle,
   ArrowUpCircle,
-  AudioLines,
-  Brain,
   ChevronLeft,
   ChevronRight,
-  CircleDollarSign,
-  Database,
-  FileText,
-  Home,
-  Key,
   LogOut,
-  type LucideIcon,
-  Megaphone,
-  Phone,
   Settings,
-  TrendingUp,
   UserRound,
-  Workflow,
-  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React from "react";
 
-import { BrandLogo } from "@/components/BrandLogo";
 import { SidebarTeamSwitcher } from "@/components/layout/SidebarTeamSwitcher";
 import ThemeToggle from "@/components/ThemeSwitcher";
 import { Button } from "@/components/ui/button";
@@ -61,10 +47,12 @@ import type { LocalUser } from "@/lib/auth";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
+import * as PhosphorIcons from "@phosphor-icons/react";
+
 type SidebarNavItem = {
   title: string;
   url: string;
-  icon: LucideIcon;
+  icon: React.ComponentType<any>;
   showsTelephonyWarning?: boolean;
 };
 
@@ -81,7 +69,7 @@ const NAV_SECTIONS: SidebarNavSection[] = [
       {
         title: "Overview",
         url: "/overview",
-        icon: Home,
+        icon: PhosphorIcons.SquaresFour,
       },
     ],
   },
@@ -91,43 +79,43 @@ const NAV_SECTIONS: SidebarNavSection[] = [
       {
         title: "Voice Agents",
         url: "/workflow",
-        icon: Workflow,
+        icon: PhosphorIcons.Robot,
       },
       {
         title: "Campaigns",
         url: "/campaigns",
-        icon: Megaphone,
+        icon: PhosphorIcons.Megaphone,
       },
       {
         title: "Models",
         url: "/model-configurations",
-        icon: Brain,
+        icon: PhosphorIcons.Brain,
       },
       {
         title: "Telephony",
         url: "/telephony-configurations",
-        icon: Phone,
+        icon: PhosphorIcons.Phone,
         showsTelephonyWarning: true,
       },
       {
         title: "Tools",
         url: "/tools",
-        icon: Wrench,
+        icon: PhosphorIcons.Wrench,
       },
       {
         title: "Files",
         url: "/files",
-        icon: Database,
+        icon: PhosphorIcons.Database,
       },
       {
         title: "Recordings",
         url: "/recordings",
-        icon: AudioLines,
+        icon: PhosphorIcons.VinylRecord,
       },
       {
         title: "Developers",
         url: "/api-keys",
-        icon: Key,
+        icon: PhosphorIcons.Key,
       },
     ],
   },
@@ -137,17 +125,17 @@ const NAV_SECTIONS: SidebarNavSection[] = [
       {
         title: "Agent Runs",
         url: "/usage",
-        icon: TrendingUp,
+        icon: PhosphorIcons.TrendUp,
       },
       {
         title: "Billing",
         url: "/billing",
-        icon: CircleDollarSign,
+        icon: PhosphorIcons.CreditCard,
       },
       {
         title: "Reports",
         url: "/reports",
-        icon: FileText,
+        icon: PhosphorIcons.FileText,
       }
     ],
   },
@@ -169,10 +157,8 @@ export function AppSidebar() {
     vonageMissingSignatureSecretCount > 0;
   const isCollapsed = !isMobile && state === "collapsed";
 
-  // Version info from app config context
   const versionInfo = config ? { ui: config.uiVersion, api: config.apiVersion } : null;
 
-  // Check for updates only on self-hosted (OSS) deployments — cloud is managed for the user.
   const { latest: latestRelease, isBehind, isLatest } = useLatestReleaseVersion(
     versionInfo?.ui,
     { enabled: config?.deploymentMode === "oss" },
@@ -195,7 +181,7 @@ export function AppSidebar() {
         <div className="notranslate" translate="no">
           <p>{item.title}</p>
           {showWarningDot && (
-            <p className="text-amber-600 dark:text-amber-400">{TELEPHONY_WARNING_COPY}</p>
+            <p className="text-rose-500">{TELEPHONY_WARNING_COPY}</p>
           )}
         </div>
       ),
@@ -204,7 +190,7 @@ export function AppSidebar() {
       <AlertTriangle
         aria-label="Action required on a telephony configuration"
         className={cn(
-          "text-amber-500",
+          "text-rose-500",
           isCollapsed ? "absolute -right-0.5 -top-0.5 h-3 w-3" : "ml-auto h-3.5 w-3.5"
         )}
       />
@@ -215,31 +201,26 @@ export function AppSidebar() {
         asChild
         tooltip={tooltip}
         className={cn(
-          "rounded-xl transition-colors hover:bg-accent hover:text-accent-foreground",
-          isItemActive &&
-            "bg-cta/15 font-semibold text-foreground hover:bg-cta/20 hover:text-foreground"
+          "rounded-md mx-2 w-[calc(100%-16px)] h-9 transition-all duration-150 text-sm font-medium border border-transparent select-none",
+          isItemActive
+            ? "bg-foreground/5 text-foreground border-border/60 shadow-xs"
+            : "hover:bg-foreground/[0.03] text-muted-foreground hover:text-foreground"
         )}
       >
         <Link
           href={item.url}
           onClick={handleMobileNavClick}
-          className={cn("relative", isCollapsed && "justify-center")}
+          className={cn("flex items-center gap-3 px-3", isCollapsed && "justify-center px-0")}
           translate="no"
         >
-          {isItemActive && !isCollapsed && (
-            <span
-              className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-cta"
-              aria-hidden
-            />
-          )}
           <Icon
             className={cn(
-              "h-4 w-4 shrink-0",
-              isItemActive && "text-cta drop-shadow-[0_0_6px_rgba(240,170,70,0.8)]"
+              "h-[16px] w-[16px] shrink-0 transition-colors",
+              isItemActive ? "text-cta" : "text-muted-foreground group-hover:text-foreground"
             )}
           />
           <span
-            className={cn("notranslate min-w-0 flex-1 truncate", isCollapsed && "sr-only")}
+            className={cn("notranslate truncate font-sans text-sm tracking-tight", isCollapsed && "hidden")}
             translate="no"
           >
             {item.title}
@@ -263,8 +244,6 @@ export function AppSidebar() {
     );
   };
 
-  // Footer identity trigger: avatar initials only (no name), in a subtle
-  // bordered circle. Same treatment expanded and collapsed.
   const displayIdentity =
     user?.displayName ||
     (user as { primaryEmail?: string } | undefined)?.primaryEmail ||
@@ -282,24 +261,23 @@ export function AppSidebar() {
     <Button
       variant="ghost"
       size="icon"
-      className="h-7 w-7 shrink-0 cursor-pointer rounded-full border border-border/80 bg-muted/40 hover:bg-muted/60"
+      className="h-8 w-8 shrink-0 cursor-pointer rounded-lg border border-border/80 bg-background/50 hover:bg-muted"
     >
-      <span className="text-xs font-medium">{userInitials}</span>
+      <span className="text-xs font-semibold">{userInitials}</span>
     </Button>
   );
 
-  // "Hire an Expert" CTA, rendered INSIDE the shared footer pill next to the
-  // profile icon. Expanded: label pill filling the row. Collapsed: icon-only.
   const hireExpertButton = isCollapsed ? (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
           size="icon"
-          className="h-7 w-7 rounded-full"
+          variant="outline"
+          className="h-8 w-8 rounded-lg border-border/80 bg-background/50 hover:bg-muted"
           onClick={() => openHireExpert("sidebar")}
           aria-label="Hire an Expert"
         >
-          <UserRound className="h-3.5 w-3.5" />
+          <UserRound className="h-4 w-4" />
         </Button>
       </TooltipTrigger>
       <TooltipContent side="right">
@@ -309,7 +287,8 @@ export function AppSidebar() {
   ) : (
     <Button
       size="sm"
-      className="h-7 gap-1.5 rounded-full px-3 text-xs"
+      variant="outline"
+      className="h-8 gap-2 rounded-lg text-xs font-medium border-border/80 bg-background/50 hover:bg-muted"
       onClick={() => openHireExpert("sidebar")}
     >
       <UserRound className="h-3.5 w-3.5" />
@@ -318,25 +297,18 @@ export function AppSidebar() {
   );
 
   return (
-    <Sidebar collapsible="icon" variant="floating" className="app-sidebar-dock py-4">
-      <SidebarHeader className="px-2 py-3 notranslate" translate="no">
+    <Sidebar collapsible="icon" variant="sidebar" className="border-r border-border/40 bg-sidebar">
+      <SidebarHeader className="px-4 py-4 notranslate border-b border-border/40" translate="no">
         <div className="flex items-center justify-between">
           <div className={cn("flex items-center gap-2", isCollapsed && "hidden")}>
-            <Link
-              href="/"
-              className="notranslate flex items-center gap-2 px-1"
-              translate="no"
-            >
-              <BrandLogo mark className="h-6" />
-              {versionInfo && (
-                <span
-                  className="notranslate text-xs font-normal text-muted-foreground"
-                  translate="no"
-                >
-                  v{versionInfo.ui}
-                </span>
-              )}
-            </Link>
+            {versionInfo && (
+              <span
+                className="notranslate text-xs font-semibold tracking-tight text-foreground"
+                translate="no"
+              >
+                Dograh <span className="text-muted-foreground/60">v{versionInfo.ui}</span>
+              </span>
+            )}
             {isBehind && latestRelease && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -369,7 +341,7 @@ export function AppSidebar() {
             )}
           </div>
 
-          <SidebarTrigger className={cn("hover:bg-accent", isCollapsed && "mx-auto")}>
+          <SidebarTrigger className={cn("hover:bg-accent h-8 w-8 rounded-lg border border-border/80 bg-background/50", isCollapsed && "mx-auto")}>
             {isCollapsed ? (
               <ChevronRight className="h-4 w-4" />
             ) : (
@@ -385,16 +357,16 @@ export function AppSidebar() {
         )}
       </SidebarHeader>
 
-      <SidebarContent className={cn("notranslate", isCollapsed && "px-0")} translate="no">
-        {NAV_SECTIONS.map((section, index) => (
+      <SidebarContent className="notranslate py-3 space-y-4" translate="no">
+        {NAV_SECTIONS.map((section) => (
           <SidebarGroup
             key={section.label ?? "overview"}
-            className={index === 0 ? "mt-2" : "mt-6"}
+            className="p-0 space-y-1.5"
           >
             {section.label && (
               <SidebarGroupLabel
                 className={cn(
-                  "notranslate text-xs font-semibold uppercase tracking-wider text-muted-foreground",
+                  "notranslate text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 px-5 h-6",
                   isCollapsed && "hidden"
                 )}
                 translate="no"
@@ -402,7 +374,7 @@ export function AppSidebar() {
                 {section.label}
               </SidebarGroupLabel>
             )}
-            <SidebarMenu>
+            <SidebarMenu className="space-y-0.5">
               {section.items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarLink item={item} />
@@ -414,17 +386,12 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter
-        className={cn("p-3 notranslate", isCollapsed && "p-2")}
+        className="p-4 border-t border-border/40 bg-sidebar"
         translate="no"
       >
         <div className="space-y-2">
           {provider !== "stack" && (
-            <div
-              className={cn(
-                "flex items-center justify-between gap-1 rounded-full border border-border/60 bg-muted/30 p-1",
-                isCollapsed && "flex-col"
-              )}
-            >
+            <div className={cn("flex items-center gap-2 justify-between", isCollapsed && "flex-col gap-3")}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   {userChipTrigger}
@@ -442,23 +409,38 @@ export function AppSidebar() {
                     <Settings className="mr-2 h-4 w-4" />
                     Platform Settings
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => logout()} className="cursor-pointer">
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => logout()} className="cursor-pointer text-red-500 focus:text-red-500">
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              {hireExpertButton}
+
+              {!isCollapsed && (
+                <div className="flex items-center gap-2">
+                  {hireExpertButton}
+                  <ThemeToggle
+                    showLabel={false}
+                    className="h-8 w-8 rounded-lg border border-border/80 bg-background/50 hover:bg-muted"
+                  />
+                </div>
+              )}
+
+              {isCollapsed && (
+                <div className="flex flex-col items-center gap-2 mt-2">
+                  {hireExpertButton}
+                  <ThemeToggle
+                    showLabel={false}
+                    className="h-8 w-8 rounded-lg border border-border/80 bg-background/50 hover:bg-muted"
+                  />
+                </div>
+              )}
             </div>
           )}
 
           {provider === "stack" && (
-            <div
-              className={cn(
-                "flex items-center justify-between gap-1 rounded-full border border-border/60 bg-muted/30 p-1",
-                isCollapsed && "flex-col"
-              )}
-            >
+            <div className={cn("flex items-center gap-2 justify-between", isCollapsed && "flex-col gap-3")}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   {userChipTrigger}
@@ -483,31 +465,35 @@ export function AppSidebar() {
                     <Settings className="mr-2 h-4 w-4" />
                     Platform Settings
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => logout()} className="cursor-pointer">
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => logout()} className="cursor-pointer text-red-500 focus:text-red-500">
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              {hireExpertButton}
-            </div>
-          )}
 
-          <div className="mt-1 flex justify-center">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="notranslate" translate="no">
+              {!isCollapsed && (
+                <div className="flex items-center gap-2">
+                  {hireExpertButton}
                   <ThemeToggle
                     showLabel={false}
-                    className="rounded-full hover:bg-accent hover:text-accent-foreground"
+                    className="h-8 w-8 rounded-lg border border-border/80 bg-background/50 hover:bg-muted"
                   />
                 </div>
-              </TooltipTrigger>
-              <TooltipContent side={isCollapsed ? "right" : "top"}>
-                <p>Toggle theme</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
+              )}
+
+              {isCollapsed && (
+                <div className="flex flex-col items-center gap-2 mt-2">
+                  {hireExpertButton}
+                  <ThemeToggle
+                    showLabel={false}
+                    className="h-8 w-8 rounded-lg border border-border/80 bg-background/50 hover:bg-muted"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </SidebarFooter>
       <SidebarRail />

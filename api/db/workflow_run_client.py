@@ -344,6 +344,72 @@ class WorkflowRunClient(BaseDBClient):
             ]
             return runs, total_count
 
+
+    async def get_workflow_runs_by_organization_id(
+        self,
+        organization_id: int,
+        limit: int = 50,
+        offset: int = 0,
+        filters: list[dict[str, Any]] | None = None,
+        sort_by: str | None = None,
+        sort_order: str | None = "desc",
+    ) -> tuple[list[WorkflowRunResponseSchema], int]:
+        async with self.async_session() as session:
+            # Build base query
+            base_query = (
+                select(WorkflowRunModel, WorkflowModel.name.label("workflow_name"))
+                .join(WorkflowModel, WorkflowRunModel.workflow_id == WorkflowModel.id)
+                .where(WorkflowModel.organization_id == organization_id)
+            )
+
+            # Apply filters
+            base_query = apply_workflow_run_filters(base_query, filters)
+
+            # Count total with filters
+            count_query = base_query.with_only_columns(func.count(WorkflowRunModel.id))
+            count_result = await session.execute(count_query)
+            total_count = count_result.scalar()
+
+            # Get paginated results with filters and sorting
+            order_clause = get_workflow_run_order_clause(sort_by, sort_order)
+            result = await session.execute(
+                base_query.order_by(order_clause).limit(limit).offset(offset)
+            )
+            
+            runs = []
+            for row in result.all():
+                run = row[0]
+                wf_name = row[1]
+                runs.append(
+                    WorkflowRunResponseSchema.model_validate(
+                        {
+                            "id": run.id,
+                            "workflow_id": run.workflow_id,
+                            "name": run.name,
+                            "workflow_name": wf_name,
+                            "mode": run.mode,
+                            "created_at": run.created_at,
+                            "is_completed": run.is_completed,
+                            "recording_url": run.recording_url,
+                            "transcript_url": run.transcript_url,
+                            "user_recording_url": get_recording_storage_key(
+                                run.extra, "user"
+                            ),
+                            "bot_recording_url": get_recording_storage_key(
+                                run.extra, "bot"
+                            ),
+                            "cost_info": format_public_cost_info(
+                                run.cost_info, run.usage_info
+                            ),
+                            "definition_id": run.definition_id,
+                            "initial_context": run.initial_context,
+                            "gathered_context": run.gathered_context,
+                            "call_type": run.call_type,
+                        }
+                    )
+                )
+            return runs, total_count
+
     async def update_workflow_run(
         self,
         run_id: int,

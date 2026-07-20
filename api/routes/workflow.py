@@ -1394,6 +1394,69 @@ class WorkflowRunsResponse(BaseModel):
     applied_filters: Optional[List[dict]] = None
 
 
+@router.get("/runs/all")
+async def get_all_workflow_runs(
+    page: int = 1,
+    limit: int = 50,
+    filters: Optional[str] = Query(None, description="JSON-encoded filter criteria"),
+    sort_by: Optional[str] = Query(
+        None, description="Field to sort by (e.g., 'duration', 'created_at')"
+    ),
+    sort_order: Optional[str] = Query(
+        "desc", description="Sort order ('asc' or 'desc')"
+    ),
+    user: UserModel = Depends(get_user),
+) -> WorkflowRunsResponse:
+    """
+    Get workflow runs across all workflows in the organization with optional filtering and sorting.
+    """
+    offset = (page - 1) * limit
+
+    # Parse filters if provided
+    filter_criteria = []
+    if filters:
+        try:
+            filter_criteria = json.loads(filters)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid filter format")
+
+        # Restrict allowed filter attributes for regular users
+        allowed_attributes = {
+            "dateRange",
+            "dispositionCode",
+            "duration",
+            "status",
+            "tokenUsage",
+            "workflowId",
+        }
+        for filter_item in filter_criteria:
+            attribute = filter_item.get("attribute")
+            if attribute and attribute not in allowed_attributes:
+                raise HTTPException(
+                    status_code=403, detail=f"Invalid attribute '{attribute}'"
+                )
+
+    runs, total_count = await db_client.get_workflow_runs_by_organization_id(
+        organization_id=user.selected_organization_id,
+        limit=limit,
+        offset=offset,
+        filters=filter_criteria if filter_criteria else None,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+
+    total_pages = (total_count + limit - 1) // limit
+
+    return WorkflowRunsResponse(
+        runs=runs,
+        total_count=total_count,
+        page=page,
+        limit=limit,
+        total_pages=total_pages,
+        applied_filters=filter_criteria if filter_criteria else None,
+    )
+
+
 @router.get("/{workflow_id}/runs")
 async def get_workflow_runs(
     workflow_id: int,

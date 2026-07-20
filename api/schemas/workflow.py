@@ -10,6 +10,7 @@ class WorkflowRunResponseSchema(BaseModel):
     id: int
     workflow_id: int
     name: str
+    workflow_name: str | None = None
     mode: str
     created_at: datetime
     is_completed: bool

@@ -47,7 +47,7 @@ export interface WorkflowRunsTableProps {
     onSort?: (field: string) => void;
 
     // Navigation & Actions
-    workflowId: number;
+    workflowId?: number;
 
     // Reload
     onReload?: () => void;
@@ -91,8 +91,8 @@ export function WorkflowRunsTable({
 
     const formatDate = (dateString: string) => new Date(dateString).toLocaleString();
 
-    const handleRowClick = (runId: number) => {
-        window.open(`/workflow/${workflowId}/run/${runId}`, '_blank');
+    const handleRowClick = (runId: number, runWorkflowId: number) => {
+        window.open(`/workflow/${runWorkflowId}/run/${runId}`, '_blank');
     };
 
     return (
@@ -155,6 +155,7 @@ export function WorkflowRunsTable({
                                 <TableHeader>
                                     <TableRow className="bg-muted/50">
                                         <TableHead className="font-semibold">ID</TableHead>
+                                        {!workflowId && <TableHead className="font-semibold">Agent</TableHead>}
                                         <TableHead className="font-semibold">Status</TableHead>
                                         <TableHead className="font-semibold">Created At</TableHead>
                                         <TableHead className="font-semibold">Call Type</TableHead>
@@ -180,9 +181,12 @@ export function WorkflowRunsTable({
                                         <TableRow
                                             key={run.id}
                                             className={`cursor-pointer hover:bg-muted/50 ${selectedRowId === run.id ? "bg-primary/20 ring-1 ring-primary/50" : ""}`}
-                                            onClick={() => handleRowClick(run.id)}
+                                            onClick={() => handleRowClick(run.id, run.workflow_id)}
                                         >
                                             <TableCell className="font-mono text-sm">#{run.id}</TableCell>
+                                            {!workflowId && (
+                                                <TableCell className="text-sm font-medium">{run.workflow_name || `Agent #${run.workflow_id}`}</TableCell>
+                                            )}
                                             <TableCell>
                                                 <Badge variant={run.is_completed ? "default" : "secondary"}>
                                                     {run.is_completed ? "Completed" : "In Progress"}
@@ -218,7 +222,7 @@ export function WorkflowRunsTable({
                                                     <Button
                                                         variant="outline"
                                                         size="icon"
-                                                        onClick={() => window.open(`/workflow/${workflowId}/run/${run.id}`, '_blank')}
+                                                        onClick={() => window.open(`/workflow/${run.workflow_id}/run/${run.id}`, '_blank')}
                                                     >
                                                         <ExternalLink className="h-4 w-4" />
                                                     </Button>

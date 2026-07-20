@@ -135,7 +135,12 @@ const NAV_SECTIONS: SidebarNavSection[] = [
     label: "MANAGE",
     items: [
       {
-        title: "Agent Runs",
+        title: "Agent Logs",
+        url: "/runs",
+        icon: TrendingUp,
+      },
+      {
+        title: "Usage",
         url: "/usage",
         icon: TrendingUp,
       },

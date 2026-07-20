@@ -6285,6 +6285,9 @@ export type UpdateWorkflowRequest = {
         [key: string]: unknown;
     } | null;
     workflow_configurations?: WorkflowConfigurationDefaults | null;
+    /**
+     * Enable Dtmf
+     */
     enable_dtmf?: boolean | null;
 };
 
@@ -6859,6 +6862,10 @@ export type WorkflowResponse = {
         [key: string]: unknown;
     } | null;
     /**
+     * Enable Dtmf
+     */
+    enable_dtmf?: boolean;
+    /**
      * Version Number
      */
     version_number?: number | null;
@@ -6870,7 +6877,6 @@ export type WorkflowResponse = {
      * Workflow Uuid
      */
     workflow_uuid?: string | null;
-    enable_dtmf?: boolean;
 };
 
 /**
@@ -6923,6 +6929,10 @@ export type WorkflowRunResponseSchema = {
      * Name
      */
     name: string;
+    /**
+     * Workflow Name
+     */
+    workflow_name?: string | null;
     /**
      * Mode
      */
@@ -7630,6 +7640,38 @@ export type HandlePlivoRingCallbackApiV1TelephonyPlivoRingCallbackWorkflowRunIdP
 export type HandlePlivoRingCallbackApiV1TelephonyPlivoRingCallbackWorkflowRunIdPostError = HandlePlivoRingCallbackApiV1TelephonyPlivoRingCallbackWorkflowRunIdPostErrors[keyof HandlePlivoRingCallbackApiV1TelephonyPlivoRingCallbackWorkflowRunIdPostErrors];
 
 export type HandlePlivoRingCallbackApiV1TelephonyPlivoRingCallbackWorkflowRunIdPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostData = {
+    body?: never;
+    path: {
+        /**
+         * Workflow Run Id
+         */
+        workflow_run_id: number;
+    };
+    query?: never;
+    url: '/api/v1/telephony/plivo/dtmf-callback/{workflow_run_id}';
+};
+
+export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostErrors = {
+    /**
+     * Not found
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostError = HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostErrors[keyof HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostErrors];
+
+export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostResponses = {
     /**
      * Successful Response
      */
@@ -8770,6 +8812,72 @@ export type GetWorkflowRunApiV1WorkflowWorkflowIdRunsRunIdGetResponses = {
 };
 
 export type GetWorkflowRunApiV1WorkflowWorkflowIdRunsRunIdGetResponse = GetWorkflowRunApiV1WorkflowWorkflowIdRunsRunIdGetResponses[keyof GetWorkflowRunApiV1WorkflowWorkflowIdRunsRunIdGetResponses];
+
+export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+        /**
+         * X-Api-Key
+         */
+        'X-API-Key'?: string | null;
+    };
+    path?: never;
+    query?: {
+        /**
+         * Page
+         */
+        page?: number;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Filters
+         *
+         * JSON-encoded filter criteria
+         */
+        filters?: string | null;
+        /**
+         * Sort By
+         *
+         * Field to sort by (e.g., 'duration', 'created_at')
+         */
+        sort_by?: string | null;
+        /**
+         * Sort Order
+         *
+         * Sort order ('asc' or 'desc')
+         */
+        sort_order?: string | null;
+    };
+    url: '/api/v1/workflow/runs/all';
+};
+
+export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetErrors = {
+    /**
+     * Not found
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetError = GetAllWorkflowRunsApiV1WorkflowRunsAllGetErrors[keyof GetAllWorkflowRunsApiV1WorkflowRunsAllGetErrors];
+
+export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkflowRunsResponse;
+};
+
+export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetResponse = GetAllWorkflowRunsApiV1WorkflowRunsAllGetResponses[keyof GetAllWorkflowRunsApiV1WorkflowRunsAllGetResponses];
 
 export type DownloadWorkflowReportApiV1WorkflowWorkflowIdReportGetData = {
     body?: never;

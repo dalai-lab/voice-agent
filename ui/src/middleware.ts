@@ -7,6 +7,9 @@ const OSS_TOKEN_COOKIE = 'dograh_auth_token';
 
 // Paths that don't require authentication in OSS mode
 const PUBLIC_PATHS = ['/auth/login', '/auth/signup'];
+const isPublicPath = (pathname: string) => {
+  return pathname === '/' || PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+};
 
 let cachedAuthProvider: string | null = null;
 
@@ -51,7 +54,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public paths without auth
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 

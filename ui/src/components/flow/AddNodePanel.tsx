@@ -42,8 +42,8 @@ function NodeSection({
 }) {
     if (specs.length === 0) return null;
     return (
-        <div className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="space-y-2">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
                 {title}
             </h3>
             <div className="space-y-2">
@@ -58,24 +58,24 @@ function NodeSection({
                         <Button
                             key={spec.name}
                             variant="outline"
-                            className="w-full justify-start p-4 h-auto hover:bg-accent/50 transition-colors"
+                            className="w-full justify-start px-3 py-2.5 h-auto hover:bg-foreground/[0.02] border border-border/40 hover:border-border/80 transition-all rounded-lg"
                             onClick={() => onNodeSelect(spec.name as NodeType)}
                             disabled={disabled}
                             title={
                                 disabled
                                     ? `${spec.display_name} limit reached for this workflow`
                                     : undefined
-                            }
+                             }
                         >
-                            <div className="flex items-center">
-                                <div className="bg-muted p-2 rounded-lg mr-3 border border-border">
-                                    <Icon className="h-5 w-5" />
+                            <div className="flex items-center gap-3 w-full">
+                                <div className="bg-muted/40 p-1.5 rounded-lg border border-border/40 shrink-0">
+                                    <Icon className="h-4 w-4 text-muted-foreground" />
                                 </div>
-                                <div className="flex flex-col items-start text-left min-w-0">
-                                    <span className="font-medium text-sm">
+                                <div className="flex flex-col items-start text-left min-w-0 flex-1">
+                                    <span className="font-semibold text-xs text-foreground leading-none">
                                         {spec.display_name}
                                     </span>
-                                    <span className="text-xs text-muted-foreground whitespace-normal">
+                                    <span className="text-[10px] text-muted-foreground whitespace-normal mt-1 leading-normal truncate w-full">
                                         {spec.description}
                                     </span>
                                 </div>
@@ -121,25 +121,25 @@ export default function AddNodePanel({ isOpen, onNodeSelect, onClose, nodes }: A
 
     return (
         <div
-            className={`fixed z-51 right-0 top-0 h-full w-80 bg-background shadow-lg transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
+            className={`fixed z-51 right-0 top-0 h-full w-80 bg-background border-l border-border transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
                 }`}
         >
-            <div className="p-4 h-full overflow-y-auto">
-                <div className="flex justify-between items-center mb-6">
-                    <div className="flex flex-col gap-1">
-                        <h2 className="text-lg font-semibold">Add New Node</h2>
+            <div className="p-5 h-full overflow-y-auto space-y-6">
+                <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                        <h2 className="text-base font-semibold tracking-tight">Nodes</h2>
                         <a
                             href="https://docs.dograh.com/voice-agent/introduction"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                         >
                             <ExternalLink className="w-3 h-3" />
-                            View Nodes Documentation
+                            View Documentation
                         </a>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={onClose}>
-                        <X className="w-5 h-5" />
+                    <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-lg">
+                        <X className="w-4 h-4" />
                     </Button>
                 </div>
 

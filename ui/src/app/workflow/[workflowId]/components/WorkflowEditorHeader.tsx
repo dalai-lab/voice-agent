@@ -2,6 +2,7 @@
 
 import { ReactFlowInstance } from "@xyflow/react";
 import { AlertCircle, ArrowLeft, Bot, Clipboard, Copy, Download, Eye, History, LoaderCircle, Menu, MoreVertical, Pencil, Phone, Rocket } from "lucide-react";
+import * as PhosphorIcons from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -231,21 +232,21 @@ export const WorkflowEditorHeader = ({
     };
 
     return (
-        <div className="flex items-center justify-between w-full h-14 px-4 bg-[#1a1a1a] border-b border-[#2a2a2a]">
+        <div className="flex items-center justify-between w-full h-14 px-4 bg-background border-b border-border select-none">
             {/* Left section: Mobile menu + Back button + Workflow name */}
             <div className="flex items-center gap-3 mr-4">
                 <button
                     onClick={toggleSidebar}
-                    className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-[#2a2a2a] transition-colors md:hidden"
+                    className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-foreground/[0.03] transition-colors md:hidden"
                     aria-label="Open menu"
                 >
-                    <Menu className="w-5 h-5 text-gray-400" />
+                    <Menu className="w-5 h-5 text-muted-foreground" />
                 </button>
                 <button
                     onClick={handleBack}
-                    className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-[#2a2a2a] transition-colors"
+                    className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-foreground/[0.03] transition-colors"
                 >
-                    <ArrowLeft className="w-5 h-5 text-gray-400" />
+                    <ArrowLeft className="w-5 h-5 text-muted-foreground" />
                 </button>
 
                 <div className="flex items-center gap-2">
@@ -255,8 +256,6 @@ export const WorkflowEditorHeader = ({
                                 ref={nameInputRef}
                                 value={rename.draft}
                                 onChange={(e) => {
-                                    // onChange can't fire while disabled (kind === "saving"),
-                                    // but the type guard is needed for the discriminated union.
                                     if (rename.kind === "editing") {
                                         setRename({ ...rename, draft: e.target.value, error: null });
                                     }
@@ -268,15 +267,15 @@ export const WorkflowEditorHeader = ({
                                 onFocus={(e) => e.currentTarget.select()}
                                 aria-label="Workflow name"
                                 aria-invalid={rename.kind === "editing" && rename.error !== null}
-                                className="h-8 max-w-xs bg-[#2a2a2a] border-[#3a3a3a] text-white text-base font-medium"
+                                className="h-8 max-w-xs bg-background border-border/60 text-foreground text-sm font-semibold"
                             />
                             {rename.kind === "editing" && rename.error && (
-                                <span className="text-xs text-red-500" role="alert">{rename.error}</span>
+                                <span className="text-xs text-destructive" role="alert">{rename.error}</span>
                             )}
                         </div>
                     ) : (
                         <>
-                            <h1 className="text-base font-medium text-white whitespace-nowrap truncate max-w-[14rem] md:max-w-md">
+                            <h1 className="text-sm font-semibold text-foreground whitespace-nowrap truncate max-w-[14rem] md:max-w-md tracking-tight">
                                 <span className="md:hidden">
                                     {workflowName.length > 8 ? `${workflowName.slice(0, 8)}…` : workflowName}
                                 </span>
@@ -288,9 +287,9 @@ export const WorkflowEditorHeader = ({
                                     type="button"
                                     onClick={enterEditMode}
                                     aria-label="Rename workflow"
-                                    className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-[#2a2a2a] transition-colors"
+                                    className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-foreground/[0.03] transition-colors"
                                 >
-                                    <Pencil className="w-4 h-4 text-gray-400" />
+                                    <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
                                 </button>
                             )}
                         </>
@@ -299,12 +298,12 @@ export const WorkflowEditorHeader = ({
             </div>
 
             {/* Right section: Version + status + tester/call actions + save */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
                 {/* Read-only banner when viewing a historical version */}
                 {isViewingHistoricalVersion && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-blue-500/30 bg-blue-500/10">
-                        <Eye className="w-4 h-4 text-blue-400" />
-                        <span className="text-sm text-blue-400">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                        <Eye className="w-4 h-4 text-blue-500" />
+                        <span className="text-xs font-semibold text-blue-500">
                             Viewing {activeVersionLabel} - Read only
                         </span>
                     </div>
@@ -314,7 +313,8 @@ export const WorkflowEditorHeader = ({
                 {isViewingHistoricalVersion && (
                     <Button
                         onClick={onBackToDraft}
-                        className="bg-teal-600 hover:bg-teal-700 text-white px-4"
+                        size="sm"
+                        className="px-3"
                     >
                         Back to Draft
                     </Button>
@@ -323,19 +323,19 @@ export const WorkflowEditorHeader = ({
                 {/* Version history button */}
                 <button
                     onClick={onHistoryClick}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-[#3a3a3a] hover:bg-[#2a2a2a] transition-colors cursor-pointer"
+                    className="flex items-center gap-2 h-9 px-3 rounded-lg border border-border/40 hover:bg-foreground/[0.03] transition-colors cursor-pointer text-xs font-semibold text-foreground bg-background/50"
                 >
-                    <History className="w-4 h-4 text-gray-400" />
+                    <History className="w-3.5 h-3.5 text-muted-foreground" />
                     {activeVersionLabel && !isViewingHistoricalVersion && (
-                        <span className="text-sm text-gray-300">{activeVersionLabel}</span>
+                        <span className="text-muted-foreground">{activeVersionLabel}</span>
                     )}
                 </button>
 
-                {/* Unsaved changes indicator (hidden when viewing history) */}
+                {/* Unsaved changes indicator */}
                 {isDirty && !isViewingHistoricalVersion && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-yellow-500/30 bg-yellow-500/10">
-                        <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                        <span className="text-sm text-yellow-500">Unsaved changes</span>
+                    <div className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        <span className="text-xs font-semibold text-amber-600">Unsaved</span>
                     </div>
                 )}
 
@@ -343,37 +343,37 @@ export const WorkflowEditorHeader = ({
                 {hasValidationErrors && (
                     <Popover>
                         <PopoverTrigger asChild>
-                            <button className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer">
-                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                <AlertCircle className="w-4 h-4 text-red-500" />
-                                <span className="text-sm text-red-500">
+                            <button className="flex items-center gap-2 h-9 px-3 rounded-lg border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors cursor-pointer">
+                                <div className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
+                                <AlertCircle className="w-3.5 h-3.5 text-destructive" />
+                                <span className="text-xs font-semibold text-destructive">
                                     {workflowValidationErrors.length} {workflowValidationErrors.length === 1 ? "error" : "errors"}
                                 </span>
                             </button>
                         </PopoverTrigger>
                         <PopoverContent
                             align="end"
-                            className="w-80 bg-[#1a1a1a] border-[#3a3a3a] p-0"
+                            className="w-80 bg-background border-border/60 p-0"
                         >
-                            <div className="px-4 py-3 border-b border-[#3a3a3a]">
-                                <h3 className="text-sm font-medium text-white">Validation Errors</h3>
+                            <div className="px-4 py-3 border-b border-border/40">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60">Validation Errors</h3>
                             </div>
                             <div className="max-h-64 overflow-y-auto">
                                 {workflowValidationErrors.map((error, index) => (
                                     <div
                                         key={index}
-                                        className="px-4 py-3 border-b border-[#2a2a2a] last:border-b-0"
+                                        className="px-4 py-3 border-b border-border/20 last:border-b-0"
                                     >
                                         <div className="flex items-start gap-2">
-                                            <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                                            <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
                                             <div className="flex-1 min-w-0">
                                                 {(error.kind === "node" || error.kind === "edge") && error.id && (
-                                                    <p className="text-xs text-gray-400 mb-1">
+                                                    <p className="text-[10px] text-muted-foreground/60 mb-0.5">
                                                         {error.kind === "node" ? "Node" : "Edge"}: {error.id}
-                                                        {error.field && <span className="text-gray-500"> • {error.field}</span>}
+                                                        {error.field && <span> • {error.field}</span>}
                                                     </p>
                                                 )}
-                                                <p className="text-sm text-white break-words">
+                                                <p className="text-xs text-foreground break-words font-medium">
                                                     {error.message}
                                                 </p>
                                             </div>
@@ -385,22 +385,23 @@ export const WorkflowEditorHeader = ({
                     </Popover>
                 )}
 
-                {/* Publish button (only when on draft with no unsaved changes) */}
+                {/* Publish button */}
                 {!isViewingHistoricalVersion && hasDraft && (
                     <Button
                         onClick={handlePublish}
                         disabled={isDirty || publishing || hasValidationErrors}
                         variant="outline"
-                        className="border-[#3a3a3a] bg-transparent hover:bg-[#2a2a2a] text-white px-4"
+                        size="sm"
+                        className="px-3"
                     >
                         {publishing ? (
                             <>
-                                <LoaderCircle className="w-4 h-4 mr-2 animate-spin" />
+                                <LoaderCircle className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                                 Publishing...
                             </>
                         ) : (
                             <>
-                                <Rocket className="w-4 h-4 mr-2" />
+                                <PhosphorIcons.Rocket className="w-4 h-4 mr-1.5" />
                                 Publish
                             </>
                         )}
@@ -410,95 +411,96 @@ export const WorkflowEditorHeader = ({
                 {!isViewingHistoricalVersion && (
                     <Button
                         variant="outline"
-                        className="flex items-center gap-2 bg-transparent border-[#3a3a3a] hover:bg-[#2a2a2a] text-white"
+                        size="sm"
+                        className="flex items-center gap-1.5 px-3"
                         disabled={isCallDisabled}
                         onClick={onPhoneCallClick}
                     >
-                        <Phone className="w-4 h-4" />
+                        <PhosphorIcons.Phone className="w-4 h-4" />
                         Phone Call
                     </Button>
                 )}
 
                 <Button
                     variant="outline"
-                    className="flex items-center gap-2 bg-transparent border-[#3a3a3a] hover:bg-[#2a2a2a] text-white"
+                    size="sm"
+                    className="flex items-center gap-1.5 px-3"
                     onClick={onTestAgentClick}
                 >
-                    <Bot className="w-4 h-4" />
+                    <PhosphorIcons.Robot className="w-4 h-4" />
                     Test Agent
                 </Button>
 
-                {/* Save button (only shown when editing the draft) */}
+                {/* Save button */}
                 {!isViewingHistoricalVersion && (
                     <Button
                         onClick={handleSave}
                         disabled={!isDirty || savingWorkflow}
-                        className="bg-teal-600 hover:bg-teal-700 text-white px-4"
+                        size="sm"
+                        className="px-3"
                     >
                         {savingWorkflow ? (
                             <>
-                                <LoaderCircle className="w-4 h-4 mr-2 animate-spin" />
+                                <LoaderCircle className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                                 Saving...
                             </>
                         ) : (
-                            "Save"
+                            <>
+                                <PhosphorIcons.FloppyDisk className="w-4 h-4 mr-1.5" />
+                                Save
+                            </>
                         )}
                     </Button>
                 )}
 
-                {/* More options dropdown */}
+                 {/* More options dropdown */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="text-gray-400 hover:text-white hover:bg-[#2a2a2a]"
+                            className="h-9 w-9 rounded-lg"
                         >
-                            <MoreVertical className="w-5 h-5" />
+                            <MoreVertical className="w-4 h-4 text-muted-foreground" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-[#1a1a1a] border-[#3a3a3a]">
+                    <DropdownMenuContent align="end" className="bg-background border-border/60">
                         <DropdownMenuItem
                             onClick={() => router.push(`/workflow/${workflowId}/runs`)}
-                            className="text-white hover:bg-[#2a2a2a] cursor-pointer"
+                            className="text-foreground hover:bg-foreground/[0.03] cursor-pointer"
                         >
-                            <History className="w-4 h-4 mr-2" />
+                            <PhosphorIcons.Clock className="w-4 h-4 mr-2" />
                             View Runs
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={handleDuplicate}
                             disabled={duplicating}
-                            className="text-white hover:bg-[#2a2a2a] cursor-pointer"
+                            className="text-foreground hover:bg-foreground/[0.03] cursor-pointer"
                         >
                             {duplicating ? (
                                 <LoaderCircle className="w-4 h-4 mr-2 animate-spin" />
                             ) : (
-                                <Copy className="w-4 h-4 mr-2" />
+                                <PhosphorIcons.Copy className="w-4 h-4 mr-2" />
                             )}
                             {duplicating ? "Duplicating..." : "Duplicate Workflow"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={handleDownloadWorkflow}
-                            className="text-white hover:bg-[#2a2a2a] cursor-pointer"
+                            className="text-foreground hover:bg-foreground/[0.03] cursor-pointer"
                         >
-                            <Download className="w-4 h-4 mr-2" />
+                            <PhosphorIcons.Download className="w-4 h-4 mr-2" />
                             Download Workflow
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={handleCopyAgentUuid}
                             disabled={!workflowUuid}
-                            className="text-white hover:bg-[#2a2a2a] cursor-pointer"
+                            className="text-foreground hover:bg-foreground/[0.03] cursor-pointer"
                         >
-                            <Clipboard className="w-4 h-4 mr-2" />
+                            <PhosphorIcons.ClipboardText className="w-4 h-4 mr-2" />
                             Copy Agent UUID
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
-
-                {/* GitHub star badge - desktop only */}
-                <div className="hidden md:block">
-                    <GitHubStarBadge className="border-[#3a3a3a] bg-[#2a2a2a] text-white [&_span]:bg-transparent" source="workflow_editor_header" />
-                </div>
             </div>
         </div>
     );

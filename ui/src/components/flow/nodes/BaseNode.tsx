@@ -15,20 +15,18 @@ export const BaseNode = forwardRef<
     <div
         ref={ref}
         className={cn(
-            // Base styling - larger with max width, uses semantic colors
-            "relative rounded-lg border bg-card text-card-foreground min-w-[320px] max-w-[400px] min-h-[120px]",
-            // Border styling
-            "border-border",
+            "relative rounded-xl border bg-card text-card-foreground min-w-[260px] max-w-[340px] min-h-[64px] shadow-sm transition-all duration-200 select-none",
+            "border-border/60",
             className,
-            // Selected state - prominent halo effect
-            selected ? "border-primary ring-2 ring-primary/40 shadow-[0_0_20px_rgba(59,130,246,0.5)]" : "",
+            // Selected state - sharp, high contrast ring, no neon glow
+            selected ? "border-foreground ring-1 ring-foreground/20 shadow-md scale-[1.01]" : "",
             // Invalid state
-            invalid ? "border-destructive shadow-[0_0_10px_rgba(239,68,68,0.3)]" : "",
-            // Hovered through edge takes precedence over selected through edge
-            hovered_through_edge ? "ring-2 ring-primary/60 shadow-[0_0_12px_rgba(96,165,250,0.3)]" : "",
-            !hovered_through_edge && selected_through_edge ? "ring-1 ring-primary/50 shadow-[0_0_8px_rgba(59,130,246,0.2)]" : "",
-            runtimeActive ? "ring-2 ring-sky-400/60 shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_0_24px_rgba(14,165,233,0.18)]" : "",
-            !selected_through_edge && !hovered_through_edge && "hover:border-muted-foreground/50",
+            invalid ? "border-destructive ring-1 ring-destructive/20" : "",
+            // Edge highlights
+            hovered_through_edge ? "border-foreground/80 ring-1 ring-foreground/10" : "",
+            !hovered_through_edge && selected_through_edge ? "border-foreground/60" : "",
+            runtimeActive ? "border-sky-500 ring-2 ring-sky-500/10" : "",
+            !selected_through_edge && !hovered_through_edge && "hover:border-border/100 hover:shadow-xs",
         )}
         tabIndex={0}
         {...props}

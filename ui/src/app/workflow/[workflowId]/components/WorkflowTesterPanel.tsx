@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, MessageSquareText, Mic, Phone, RefreshCw, X } from "lucide-react";
+import * as PhosphorIcons from "@phosphor-icons/react";
 import posthog from "posthog-js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -150,13 +150,13 @@ export function WorkflowTesterPanel({
             >
                 <div className="border-b border-border/70 px-4 py-3">
                     <div className="flex items-center gap-3">
-                        <TabsList className="grid h-9 flex-1 grid-cols-2 rounded-lg bg-muted/60 p-1">
-                            <TabsTrigger value="audio" className="rounded-md text-sm">
-                                <Mic className="h-4 w-4" />
+                        <TabsList className="h-9 flex-1 justify-start gap-4">
+                            <TabsTrigger value="audio" className="text-xs">
+                                <PhosphorIcons.Microphone className="h-4 w-4" />
                                 Test Audio
                             </TabsTrigger>
-                            <TabsTrigger value="text" className="rounded-md text-sm">
-                                <MessageSquareText className="h-4 w-4" />
+                            <TabsTrigger value="text" className="text-xs">
+                                <PhosphorIcons.ChatCircleText className="h-4 w-4" />
                                 Test Chat
                             </TabsTrigger>
                         </TabsList>
@@ -165,10 +165,10 @@ export function WorkflowTesterPanel({
                                 variant="ghost"
                                 size="icon"
                                 onClick={onClose}
-                                className="shrink-0 text-muted-foreground hover:text-foreground"
+                                className="shrink-0 text-muted-foreground hover:text-foreground h-8 w-8 rounded-lg"
                                 aria-label="Close tester panel"
                             >
-                                <X className="h-4 w-4" />
+                                <PhosphorIcons.X className="h-4 w-4" />
                             </Button>
                         ) : null}
                     </div>
@@ -198,7 +198,7 @@ export function WorkflowTesterPanel({
                             <>
                                 {effectiveDisabledReason ? <DisabledNotice reason={effectiveDisabledReason} /> : null}
                                 <EmptyState
-                                    icon={<Phone className="h-7 w-7" />}
+                                    icon={<PhosphorIcons.Phone className="h-7 w-7" />}
                                     title="Call this agent in the browser"
                                     description="Test the agent over a voice call. Some telephony-only tools, like call transfer, are not yet supported here."
                                     action={
@@ -209,12 +209,12 @@ export function WorkflowTesterPanel({
                                         >
                                             {creatingVoiceRun ? (
                                                 <>
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    <PhosphorIcons.CircleNotch className="h-4 w-4 animate-spin" />
                                                     Starting test...
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Phone className="h-4 w-4" />
+                                                    <PhosphorIcons.Play className="h-4 w-4" />
                                                     Run Test
                                                 </>
                                             )}
@@ -238,7 +238,7 @@ export function WorkflowTesterPanel({
                                     disabled={testerBlocked}
                                     className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                                 >
-                                    <RefreshCw className="h-3.5 w-3.5" />
+                                    <PhosphorIcons.ArrowsCounterClockwise className="h-3.5 w-3.5" />
                                     Reset
                                 </Button>
                             ) : null}

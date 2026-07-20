@@ -535,9 +535,9 @@ function RenderWorkflow({
                             >
                                 <Background
                                     variant={BackgroundVariant.Dots}
-                                    gap={16}
+                                    gap={18}
                                     size={1}
-                                    color="#94a3b8"
+                                    className="opacity-[0.25] dark:opacity-[0.15]"
                                 />
 
                                 {/* Top-right controls - vertical layout (hidden when viewing history) */}

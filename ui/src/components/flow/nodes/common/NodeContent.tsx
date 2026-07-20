@@ -57,42 +57,39 @@ export const NodeContent = ({
             selected_through_edge={selected_through_edge}
             hovered_through_edge={hovered_through_edge}
             runtimeActive={runtimeActive}
-            className={`p-0 ${className}`}
+            className={cn("p-3 flex flex-col justify-center gap-2 h-full", className)}
             onDoubleClick={onDoubleClick}
         >
             {hasTargetHandle && <BaseHandle type="target" position={Position.Top} />}
 
-            {/* Node type badge - positioned at top */}
-            <div className="absolute -top-3 left-4">
-                <span className={cn(
-                    "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium",
-                    badge.className
-                )}>
-                    <span className="[&>*]:w-3 [&>*]:h-3">{icon}</span>
-                    {badge.label}
-                </span>
-            </div>
-
-            {/* Header with title */}
-            <div className="px-4 pt-5 pb-2 border-b border-border">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-foreground truncate">
-                        {title}
-                        {nodeId && (
-                            <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                #{nodeId}
+            <div className="space-y-2">
+                {/* Header Row: Title, Node Type Badge, ID */}
+                <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5 min-w-0 flex-1">
+                        <h3 className="text-xs font-bold text-foreground truncate tracking-tight">
+                            {title}
+                        </h3>
+                        <div className="flex items-center gap-1 text-[9px] text-muted-foreground/60 font-semibold uppercase tracking-wider">
+                            <span className={cn(
+                                "inline-flex items-center px-1 py-0.25 rounded-md text-[8px] font-bold",
+                                badge.className
+                            )}>
+                                {badge.label}
                             </span>
-                        )}
-                    </h3>
-                </div>
-            </div>
+                        </div>
+                    </div>
 
-            {/* Content area with prompt label */}
-            <div className="p-4">
-                <div className="text-xs text-muted-foreground mb-1.5 font-medium">
-                    {contentLabel}:
+                    <div className="bg-muted/40 p-1 rounded-md border border-border/40 shrink-0 text-muted-foreground">
+                        <span className="[&>*]:w-3.5 [&>*]:h-3.5">{icon}</span>
+                    </div>
                 </div>
-                {children}
+
+                {/* Content area */}
+                {children && (
+                    <div className="text-[10px] text-muted-foreground/80 pt-1 border-t border-border/10 line-clamp-2 leading-relaxed">
+                        {children}
+                    </div>
+                )}
             </div>
 
             {hasSourceHandle && <BaseHandle type="source" position={Position.Bottom} />}

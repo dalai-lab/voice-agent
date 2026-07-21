@@ -9,6 +9,7 @@ from api.db.models import UserModel
 from api.enums import ToolCategory, ToolStatus
 from api.schemas.tool import (
     CalculatorToolDefinition,
+    WaitToolDefinition,
     CreatedByResponse,
     CreateToolRequest,
     EndCallConfig,
@@ -43,6 +44,7 @@ router = APIRouter(prefix="/tools")
 
 __all__ = [
     "CalculatorToolDefinition",
+    "WaitToolDefinition",
     "CreateToolRequest",
     "CreatedByResponse",
     "EndCallConfig",

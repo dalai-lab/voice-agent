@@ -747,6 +747,19 @@ export type BodyTranscribeAudioApiV1WorkflowRecordingsTranscribePost = {
  *
  * Tool definition for Calculator tools.
  */
+export type WaitToolDefinition = {
+    /**
+     * Schema Version
+     *
+     * Schema version.
+     */
+    schema_version?: number;
+    /**
+     * Tool Type
+     */
+    type: 'wait';
+};
+
 export type CalculatorToolDefinition = {
     /**
      * Schema Version
@@ -1516,7 +1529,7 @@ export type CreateToolRequest = {
      *
      * Tool category. Must match definition.type.
      */
-    category?: 'http_api' | 'end_call' | 'transfer_call' | 'calculator' | 'native' | 'integration' | 'mcp';
+    category?: 'http_api' | 'end_call' | 'transfer_call' | 'calculator' | 'wait' | 'native' | 'integration' | 'mcp';
     /**
      * Icon
      *
@@ -1543,6 +1556,8 @@ export type CreateToolRequest = {
     } & TransferCallToolDefinition) | ({
         type: 'calculator';
     } & CalculatorToolDefinition) | ({
+        type: 'wait';
+    } & WaitToolDefinition) | ({
         type: 'mcp';
     } & McpToolDefinition);
 };
@@ -6256,6 +6271,8 @@ export type UpdateToolRequest = {
     } & TransferCallToolDefinition) | ({
         type: 'calculator';
     } & CalculatorToolDefinition) | ({
+        type: 'wait';
+    } & WaitToolDefinition) | ({
         type: 'mcp';
     } & McpToolDefinition) | null;
     /**

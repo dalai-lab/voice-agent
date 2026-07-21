@@ -13,9 +13,10 @@ import type {
     ToolParameter,
     TransferCallConfig,
     TransferCallToolDefinition,
+    WaitToolDefinition,
 } from "@/client/types.gen";
 
-export type ToolCategory = "http_api" | "end_call" | "transfer_call" | "calculator" | "native" | "integration" | "mcp";
+export type ToolCategory = "http_api" | "end_call" | "transfer_call" | "calculator" | "wait" | "native" | "integration" | "mcp";
 
 export type EndCallMessageType = "none" | "custom" | "audio";
 export type TransferDestinationSource = "static" | "dynamic";
@@ -104,6 +105,18 @@ export const TOOL_CATEGORIES: ToolCategoryConfig[] = [
         iconColor: "#8B5CF6",
     },
     {
+        value: "wait",
+        label: "Dynamic Wait",
+        description: "Built-in dynamic wait tool to pause the agent when the user asks to wait.",
+        icon: Cog,
+        iconName: "cog",
+        iconColor: "#8B5CF6",
+        autoFill: {
+            name: "Wait",
+            description: "Wait for a specified number of seconds when the user asks you to hold on.",
+        },
+    },
+    {
         value: "native",
         label: "Native (Coming Soon)",
         description: "Built-in tools like call transfer, DTMF input",
@@ -184,6 +197,7 @@ export type ToolDefinition =
     | EndCallToolDefinition
     | TransferCallToolDefinition
     | CalculatorToolDefinition
+    | WaitToolDefinition
     | McpToolDefinition;
 
 export function createEndCallDefinition(config: EndCallConfig): EndCallToolDefinition {
@@ -217,6 +231,12 @@ export function createCalculatorDefinition(): CalculatorToolDefinition {
     return {
         schema_version: 1,
         type: "calculator",
+    };
+}
+
+export function createWaitDefinition(): WaitToolDefinition {
+    return {
+        type: "wait",
     };
 }
 

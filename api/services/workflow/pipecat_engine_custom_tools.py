@@ -27,6 +27,7 @@ from api.services.telephony.call_transfer_manager import get_call_transfer_manag
 from api.services.telephony.factory import get_telephony_provider_for_run
 from api.services.telephony.transfer_event_protocol import TransferContext
 from api.services.workflow.tools.calculator import get_calculator_tools, safe_calculator
+from api.services.workflow.tools.wait import get_wait_tools
 from api.services.workflow.tools.custom_tool import (
     execute_http_tool,
     tool_to_function_schema,
@@ -185,6 +186,20 @@ class CustomToolManager:
                         )
                     continue
 
+                if tool.category == ToolCategory.WAIT.value:
+                    # Built-in dynamic waiting tool
+                    for tool_def in get_wait_tools():
+                        func = tool_def["function"]
+                        schemas.append(
+                            get_function_schema(
+                                func["name"],
+                                func["description"],
+                                properties=func["parameters"]["properties"],
+                                required=func["parameters"]["required"],
+                            )
+                        )
+                    continue
+
                 if tool.category == ToolCategory.MCP.value:
                     session = self._engine._mcp_sessions.get(tool.tool_uuid)
                     if session is None or not session.available:
@@ -253,6 +268,14 @@ class CustomToolManager:
                     self._register_calculator_handler()
                     logger.debug(
                         f"Registered calculator tool handler "
+                        f"(tool_uuid: {tool.tool_uuid})"
+                    )
+                    continue
+
+                if tool.category == ToolCategory.WAIT.value:
+                    self._register_wait_handler()
+                    logger.debug(
+                        f"Registered wait tool handler "
                         f"(tool_uuid: {tool.tool_uuid})"
                     )
                     continue
@@ -357,6 +380,30 @@ class CustomToolManager:
             resolver_timeout = min(max(resolver_timeout, 0.5), 5.0)
 
         return float(transfer_timeout) + resolver_timeout + 15.0
+
+    def _register_wait_handler(self) -> None:
+        """Register the built-in wait function with the LLM."""
+
+        async def wait_func(function_call_params: FunctionCallParams) -> None:
+            logger.info("LLM Function Call EXECUTED: wait_for_user")
+            logger.info(f"Arguments: {function_call_params.arguments}")
+            import asyncio
+            try:
+                seconds = function_call_params.arguments.get("seconds", 60)
+                if not isinstance(seconds, int):
+                    seconds = int(seconds)
+                # Cap the wait to avoid infinite hanging if LLM hallucinates
+                seconds = min(max(seconds, 1), 300)
+                logger.info(f"Pausing for {seconds} seconds...")
+                await asyncio.sleep(seconds)
+                await function_call_params.result_callback(
+                    {"status": "success", "message": f"Waited for {seconds} seconds. You may now continue."}
+                )
+            except Exception as e:
+                logger.error(f"Wait tool error: {e}")
+                await function_call_params.result_callback({"error": str(e)})
+
+        self._engine.llm.register_function("wait_for_user", wait_func)
 
     def _register_calculator_handler(self) -> None:
         """Register the built-in calculator function with the LLM."""

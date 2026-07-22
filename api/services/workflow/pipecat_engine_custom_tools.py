@@ -394,6 +394,18 @@ class CustomToolManager:
                     seconds = int(seconds)
                 # Cap the wait to avoid infinite hanging if LLM hallucinates
                 seconds = min(max(seconds, 1), 300)
+                
+                message = function_call_params.arguments.get("message")
+                if message:
+                    logger.info(f"Playing wait acknowledgment message: {message}")
+                    await self._engine.task.queue_frame(
+                        TTSSpeakFrame(
+                            message,
+                            append_to_context=False,
+                            persist_to_logs=True,
+                        )
+                    )
+                
                 logger.info(f"Pausing for {seconds} seconds...")
                 await asyncio.sleep(seconds)
                 await function_call_params.result_callback(

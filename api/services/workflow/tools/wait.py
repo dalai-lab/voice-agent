@@ -14,9 +14,13 @@ def get_wait_tools() -> list[Dict[str, Any]]:
                         "seconds": {
                             "type": "integer",
                             "description": "The number of seconds to wait. Defaults to 60 if not specified.",
+                        },
+                        "message": {
+                            "type": "string",
+                            "description": "A brief message to acknowledge the user's request to wait, e.g., 'Okay, I will wait.' or 'Sure, take your time.'",
                         }
                     },
-                    "required": ["seconds"],
+                    "required": ["seconds", "message"],
                 },
             },
         }

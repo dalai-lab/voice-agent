@@ -270,6 +270,10 @@ export function createToolDefinition(category: ToolCategory): ToolDefinition {
             return createTransferCallDefinition(DEFAULT_TRANSFER_CALL_CONFIG);
         case "calculator":
             return createCalculatorDefinition();
+        case "wait":
+            return createWaitDefinition();
+        case "mcp":
+            return createMcpDefinition("", "", "");
         case "http_api":
         default:
             return createHttpApiDefinition();

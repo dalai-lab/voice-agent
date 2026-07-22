@@ -404,8 +404,34 @@ class CustomToolManager:
                 
                 message = function_call_params.arguments.get("message")
                 if message:
-                    from pipecat.frames.frames import TTSSpeakFrame
+                    from pipecat.frames.frames import TTSSpeakFrame, TTSStartedFrame, TTSStoppedFrame
+                    from pipecat.observers.base_observer import BaseObserver as _BaseObserver, FramePushed as _FramePushed
+
                     logger.info(f"Playing wait acknowledgment message: {message}")
+
+                    # Register a temporary observer BEFORE queuing the TTS so we
+                    # don't miss TTSStartedFrame if the pipeline is very fast.
+                    # We require TTSStartedFrame before accepting TTSStoppedFrame to
+                    # guard against stale TTSStoppedFrames from the previous response.
+                    tts_done_event = asyncio.Event()
+
+                    class _TTSDoneObserver(_BaseObserver):
+                        def __init__(self):
+                            super().__init__()
+                            self._seen_started = False
+
+                        async def on_push_frame(self, data: _FramePushed):
+                            if isinstance(data.frame, TTSStartedFrame):
+                                self._seen_started = True
+                            elif isinstance(data.frame, TTSStoppedFrame) and self._seen_started:
+                                logger.info("Wait tool: acknowledgment TTS finished (TTSStoppedFrame received).")
+                                tts_done_event.set()
+
+                    tts_done_observer = _TTSDoneObserver()
+                    _task = self._engine.task
+                    if _task:
+                        _task.add_observer(tts_done_observer)
+
                     await self._engine.task.queue_frame(
                         TTSSpeakFrame(
                             message,
@@ -413,16 +439,19 @@ class CustomToolManager:
                             persist_to_logs=True,
                         )
                     )
-                    # Issue 1 fix: wait for the acknowledgment TTS to finish before
-                    # activating the interrupt observer. Without this, a stale or
-                    # delayed TranscriptionFrame from the user's original command
-                    # (e.g. "wait for 20 seconds") can fire the observer and end
-                    # the wait in <1 second before the acknowledgment even plays.
-                    # Heuristic: ~0.07s per character + 1.5s buffer for TTS pipeline latency.
-                    tts_estimated_secs = max(len(message) * 0.07 + 1.5, 2.5)
-                    logger.info(f"Waiting ~{tts_estimated_secs:.1f}s for acknowledgment TTS to finish...")
-                    await asyncio.sleep(tts_estimated_secs)
-                
+
+                    # Wait for TTS to actually finish, with a generous fallback timeout.
+                    try:
+                        await asyncio.wait_for(tts_done_event.wait(), timeout=15.0)
+                    except asyncio.TimeoutError:
+                        logger.warning("Wait tool: TTS done event timed out after 15s — proceeding anyway.")
+
+                    if _task:
+                        try:
+                            await _task.remove_observer(tts_done_observer)
+                        except Exception as e:
+                            logger.warning(f"Could not remove TTS done observer: {e}")
+
                 logger.info(f"Pausing for {seconds} seconds...")
                 
                 stop_event = asyncio.Event()

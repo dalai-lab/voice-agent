@@ -427,32 +427,29 @@ class CustomToolManager:
                             queue_frame=self._engine._transport_output.queue_frame,
                         )
                     )
-                # Reset the interrupt flag
-                self._engine.user_spoke_during_wait = False
+                
+                user_speech_event = asyncio.Event()
+
+                async def _on_user_speech(*args):
+                    logger.info("Wait tool: user speech detected, signalling interrupt.")
+                    user_speech_event.set()
+
+                observer = getattr(self._engine.task, "turn_tracking_observer", None) if self._engine.task else None
+                if observer:
+                    observer.add_event_handler("on_user_speech_started_for_turn", _on_user_speech)
                 
                 elapsed = 0.0
-                user_interrupted = False
-                initial_msg_count = len(self._engine.context.get_messages()) if self._engine.context else 0
-                
                 try:
                     while round(elapsed, 1) < float(seconds):
                         if self._engine.is_call_disposed():
                             break
                         
-                        # Direct VAD flag check (if available/working)
-                        if getattr(self._engine, "user_spoke_during_wait", False):
-                            logger.info("Wait interrupted by VAD speech detection.")
-                            user_interrupted = True
-                            break
-                        
-                        # Context message count check (fires reliably after user finishes speaking a turn)
-                        if self._engine.context and len(self._engine.context.get_messages()) > initial_msg_count:
-                            logger.info("Wait interrupted by new user message in context.")
-                            user_interrupted = True
+                        if user_speech_event.is_set():
+                            logger.info("Wait interrupted by user speech.")
                             break
                             
-                        await asyncio.sleep(0.5)
-                        elapsed += 0.5
+                        await asyncio.sleep(0.1)
+                        elapsed += 0.1
                 finally:
                     stop_event.set()
                     if hold_music_task:
@@ -461,13 +458,19 @@ class CustomToolManager:
                             await hold_music_task
                         except asyncio.CancelledError:
                             pass
+                    
+                    if observer and hasattr(observer, "remove_event_handler"):
+                        try:
+                            observer.remove_event_handler("on_user_speech_started_for_turn", _on_user_speech)
+                        except Exception as e:
+                            logger.warning(f"Could not remove event handler: {e}")
                 
                 logger.info(f"Wait completed after {elapsed} seconds (requested {seconds}).")
                 
                 if not self._engine.is_call_disposed():
                     clean_elapsed = round(elapsed, 1)
                     msg = f"Wait finished after {clean_elapsed} seconds. "
-                    if user_interrupted:
+                    if user_speech_event.is_set():
                         msg += "The wait was INTERRUPTED early because the user spoke. You MUST now politely address their input."
                     else:
                         msg += "The wait is over. You MUST now ask the user if they are still there and if they need further assistance."

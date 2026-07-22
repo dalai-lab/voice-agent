@@ -123,9 +123,6 @@ class PipecatEngine:
         # "idle" = not muting, "waiting" = speech queued, "playing" = bot speaking it
         self._queued_speech_mute_state: str = "idle"
 
-        # Track if the user spoke during a tool wait
-        self.user_spoke_during_wait: bool = False
-
         # Tracks whether the bot is currently speaking (for allow_interrupt logic)
         self._bot_is_speaking: bool = False
 
@@ -873,9 +870,7 @@ class PipecatEngine:
             True if the user should be muted, False otherwise.
         """
         # Track bot speaking state from frames
-        if isinstance(frame, UserStartedSpeakingFrame):
-            self.user_spoke_during_wait = True
-        elif isinstance(frame, BotStartedSpeakingFrame):
+        if isinstance(frame, BotStartedSpeakingFrame):
             self._bot_is_speaking = True
             if self._queued_speech_mute_state == "waiting":
                 self._queued_speech_mute_state = "playing"

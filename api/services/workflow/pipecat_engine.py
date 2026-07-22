@@ -129,6 +129,9 @@ class PipecatEngine:
         # Custom tool manager (initialized in initialize())
         self._custom_tool_manager: Optional[CustomToolManager] = None
 
+        # User context aggregator - stored so tools can subscribe to transcript events
+        self._user_aggregator = None
+
         # Cached organization ID (resolved lazily from workflow run)
         self._organization_id: Optional[int] = None
 
@@ -938,6 +941,20 @@ class PipecatEngine:
     def set_audio_config(self, audio_config) -> None:
         """Set the audio configuration for the pipeline."""
         self._audio_config = audio_config
+
+    def set_user_aggregator(self, user_aggregator) -> None:
+        """Set the user context aggregator.
+
+        Stored so tools (e.g. wait_for_user) can subscribe to transcript
+        events such as ``on_user_turn_message_added`` even while user frames
+        are muted by the FunctionCallUserMuteStrategy.
+        """
+        self._user_aggregator = user_aggregator
+
+    @property
+    def user_aggregator(self):
+        """Return the user context aggregator, or None if not yet set."""
+        return self._user_aggregator
 
     def set_transport_output(self, transport_output) -> None:
         """Set the transport output processor for direct audio playback.

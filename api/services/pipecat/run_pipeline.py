@@ -934,6 +934,10 @@ async def _run_pipeline_impl(
     user_context_aggregator = context_aggregator.user()
     assistant_context_aggregator = context_aggregator.assistant()
 
+    # Store the user aggregator on the engine so tools (e.g. wait_for_user)
+    # can subscribe to transcript events even while user frames are muted.
+    engine.set_user_aggregator(user_context_aggregator)
+
     # Register user idle event handlers
     user_idle_handler = engine.create_user_idle_handler()
 

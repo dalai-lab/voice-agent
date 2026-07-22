@@ -430,13 +430,18 @@ class CustomToolManager:
                 
                 user_speech_event = asyncio.Event()
 
-                async def _on_user_speech(*args):
-                    logger.info("Wait tool: user speech detected, signalling interrupt.")
+                async def _on_user_turn_message(aggregator, message=None):
+                    logger.info("Wait tool: user transcription received, signalling interrupt.")
                     user_speech_event.set()
 
-                observer = getattr(self._engine.task, "turn_tracking_observer", None) if self._engine.task else None
-                if observer:
-                    observer.add_event_handler("on_user_speech_started_for_turn", _on_user_speech)
+                user_agg = self._engine.user_aggregator
+                if user_agg:
+                    user_agg.add_event_handler("on_user_turn_message_added", _on_user_turn_message)
+                else:
+                    # Fallback: use turn observer if available (may not fire during muted function calls)
+                    observer = getattr(self._engine.task, "turn_tracking_observer", None) if self._engine.task else None
+                    if observer:
+                        observer.add_event_handler("on_user_speech_started_for_turn", _on_user_turn_message)
                 
                 elapsed = 0.0
                 try:
@@ -459,11 +464,18 @@ class CustomToolManager:
                         except asyncio.CancelledError:
                             pass
                     
-                    if observer and hasattr(observer, "remove_event_handler"):
+                    if user_agg and hasattr(user_agg, "remove_event_handler"):
                         try:
-                            observer.remove_event_handler("on_user_speech_started_for_turn", _on_user_speech)
+                            user_agg.remove_event_handler("on_user_turn_message_added", _on_user_turn_message)
                         except Exception as e:
-                            logger.warning(f"Could not remove event handler: {e}")
+                            logger.warning(f"Could not remove user aggregator event handler: {e}")
+                    elif not user_agg:
+                        observer = getattr(self._engine.task, "turn_tracking_observer", None) if self._engine.task else None
+                        if observer and hasattr(observer, "remove_event_handler"):
+                            try:
+                                observer.remove_event_handler("on_user_speech_started_for_turn", _on_user_turn_message)
+                            except Exception as e:
+                                logger.warning(f"Could not remove observer event handler: {e}")
                 
                 logger.info(f"Wait completed after {elapsed} seconds (requested {seconds}).")
                 

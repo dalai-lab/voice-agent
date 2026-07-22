@@ -339,7 +339,7 @@ export default function ToolDetailPage() {
         const normalizedTransferDestination = transferDestination.trim();
 
         // Validation based on tool type
-        if (tool.category === "calculator") {
+        if (tool.category === "calculator" || tool.category === "wait") {
             // No validation needed for built-in tools
         } else if (tool.category === "transfer_call") {
             if (transferDestinationSource === "static" && !normalizedTransferDestination) {
@@ -432,6 +432,15 @@ export default function ToolDetailPage() {
                     definition: {
                         schema_version: 1,
                         type: "calculator",
+                    },
+                };
+            } else if (tool.category === "wait") {
+                // Built-in tool - only name/description, no config
+                requestBody = {
+                    name,
+                    description: description || undefined,
+                    definition: {
+                        type: "wait",
                     },
                 };
             } else if (tool.category === "end_call") {

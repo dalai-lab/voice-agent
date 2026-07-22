@@ -387,35 +387,90 @@ class CustomToolManager:
         async def wait_func(function_call_params: FunctionCallParams) -> None:
             logger.info("LLM Function Call EXECUTED: wait_for_user")
             logger.info(f"Arguments: {function_call_params.arguments}")
-            import asyncio
+            
             try:
-                seconds = function_call_params.arguments.get("seconds", 60)
-                if not isinstance(seconds, int):
-                    seconds = int(seconds)
-                # Cap the wait to avoid infinite hanging if LLM hallucinates
-                seconds = min(max(seconds, 1), 300)
+                seconds_arg = function_call_params.arguments.get("seconds", 60)
+                try:
+                    seconds = int(seconds_arg)
+                    if seconds < 0:
+                        raise ValueError("Seconds cannot be negative.")
+                except (ValueError, TypeError):
+                    await function_call_params.result_callback({"error": f"Invalid 'seconds' parameter: {seconds_arg}. Must be a positive integer."})
+                    return
                 
-                message = function_call_params.arguments.get("message")
-                if message:
-                    logger.info(f"Playing wait acknowledgment message: {message}")
-                    await self._engine.task.queue_frame(
-                        TTSSpeakFrame(
-                            message,
-                            append_to_context=False,
-                            persist_to_logs=True,
+                # Use a hard cap of 300 seconds for the built-in wait tool
+                max_wait = 300
+                seconds = min(max(seconds, 1), max_wait)
+                
+                logger.info(f"Pausing for {seconds} seconds...")
+                
+                stop_event = asyncio.Event()
+                hold_music_task = None
+                
+                if seconds >= 5 and self._engine._audio_config and self._engine._transport_output:
+                    hold_music_task = asyncio.create_task(
+                        play_audio_loop(
+                            stop_event=stop_event,
+                            sample_rate=self._engine._audio_config.pipeline_sample_rate,
+                            queue_frame=self._engine._transport_output.queue_frame,
                         )
                     )
                 
-                logger.info(f"Pausing for {seconds} seconds...")
-                await asyncio.sleep(seconds)
-                await function_call_params.result_callback(
-                    {"status": "success", "message": f"Waited for {seconds} seconds. You may now continue."}
-                )
+                user_interrupted = False
+                async def _on_user_speech(*args):
+                    nonlocal user_interrupted
+                    user_interrupted = True
+
+                observer = getattr(self._engine.task, "turn_tracking_observer", None) if self._engine.task else None
+                if observer:
+                    observer.add_event_handler("on_user_speech_started_for_turn", _on_user_speech)
+                
+                elapsed = 0.0
+                try:
+                    while round(elapsed, 1) < float(seconds):
+                        if self._engine.is_call_disposed():
+                            break
+                        
+                        if user_interrupted:
+                            logger.info("Wait interrupted by user speech.")
+                            break
+                            
+                        await asyncio.sleep(0.5)
+                        elapsed += 0.5
+                finally:
+                    stop_event.set()
+                    if hold_music_task:
+                        hold_music_task.cancel()
+                        try:
+                            await hold_music_task
+                        except asyncio.CancelledError:
+                            pass
+                    
+                    if observer and hasattr(observer, "remove_event_handler"):
+                        try:
+                            observer.remove_event_handler("on_user_speech_started_for_turn", _on_user_speech)
+                        except Exception as e:
+                            logger.warning(f"Could not remove event handler: {e}")
+                
+                logger.info(f"Wait completed after {elapsed} seconds (requested {seconds}).")
+                
+                if not self._engine.is_call_disposed():
+                    clean_elapsed = round(elapsed, 1)
+                    msg = f"Wait finished after {clean_elapsed} seconds. "
+                    if user_interrupted:
+                        msg += "The wait was INTERRUPTED early because the user spoke. You MUST now politely address their input."
+                    else:
+                        msg += "The wait is over. You MUST now ask the user if they are still there and if they need further assistance."
+                        
+                    await function_call_params.result_callback(
+                        {"status": "success", "message": msg}
+                    )
             except Exception as e:
                 logger.error(f"Wait tool error: {e}")
                 await function_call_params.result_callback({"error": str(e)})
 
-        self._engine.llm.register_function("wait_for_user", wait_func)
+        # Register with a large timeout to prevent the LLM caller from timing out the wait.
+        self._engine.llm.register_function("wait_for_user", wait_func, timeout_secs=315.0)
 
     def _register_calculator_handler(self) -> None:
         """Register the built-in calculator function with the LLM."""

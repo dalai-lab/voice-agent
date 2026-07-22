@@ -430,29 +430,35 @@ class CustomToolManager:
                 
                 user_speech_event = asyncio.Event()
 
-                async def _on_user_turn_message(aggregator, message=None):
-                    logger.info("Wait tool: user transcription received, signalling interrupt.")
-                    user_speech_event.set()
+                # We use a pipeline observer (not the mute-filtered aggregator)
+                # because FunctionCallUserMuteStrategy suppresses all
+                # TranscriptionFrames and UserStartedSpeakingFrames while a
+                # tool is executing. Pipeline observers receive frames *before*
+                # the mute strategy suppresses them.
+                from pipecat.observers.base_observer import BaseObserver, FramePushed
+                from pipecat.frames.frames import TranscriptionFrame
 
-                user_agg = self._engine.user_aggregator
-                if user_agg:
-                    user_agg.add_event_handler("on_user_turn_message_added", _on_user_turn_message)
-                else:
-                    # Fallback: use turn observer if available (may not fire during muted function calls)
-                    observer = getattr(self._engine.task, "turn_tracking_observer", None) if self._engine.task else None
-                    if observer:
-                        observer.add_event_handler("on_user_speech_started_for_turn", _on_user_turn_message)
-                
+                class _WaitInterruptObserver(BaseObserver):
+                    async def on_push_frame(self, data: FramePushed):
+                        if isinstance(data.frame, TranscriptionFrame) and data.frame.text.strip():
+                            logger.info(f"Wait tool observer: transcription received: '{data.frame.text}', signalling interrupt.")
+                            user_speech_event.set()
+
+                wait_observer = _WaitInterruptObserver()
+                task = self._engine.task
+                if task:
+                    task.add_observer(wait_observer)
+
                 elapsed = 0.0
                 try:
                     while round(elapsed, 1) < float(seconds):
                         if self._engine.is_call_disposed():
                             break
-                        
+
                         if user_speech_event.is_set():
                             logger.info("Wait interrupted by user speech.")
                             break
-                            
+
                         await asyncio.sleep(0.1)
                         elapsed += 0.1
                 finally:
@@ -463,19 +469,12 @@ class CustomToolManager:
                             await hold_music_task
                         except asyncio.CancelledError:
                             pass
-                    
-                    if user_agg and hasattr(user_agg, "remove_event_handler"):
+
+                    if task:
                         try:
-                            user_agg.remove_event_handler("on_user_turn_message_added", _on_user_turn_message)
+                            await task.remove_observer(wait_observer)
                         except Exception as e:
-                            logger.warning(f"Could not remove user aggregator event handler: {e}")
-                    elif not user_agg:
-                        observer = getattr(self._engine.task, "turn_tracking_observer", None) if self._engine.task else None
-                        if observer and hasattr(observer, "remove_event_handler"):
-                            try:
-                                observer.remove_event_handler("on_user_speech_started_for_turn", _on_user_turn_message)
-                            except Exception as e:
-                                logger.warning(f"Could not remove observer event handler: {e}")
+                            logger.warning(f"Could not remove wait observer: {e}")
                 
                 logger.info(f"Wait completed after {elapsed} seconds (requested {seconds}).")
                 

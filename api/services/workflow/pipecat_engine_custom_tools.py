@@ -482,9 +482,9 @@ class CustomToolManager:
                     clean_elapsed = round(elapsed, 1)
                     msg = f"Wait finished after {clean_elapsed} seconds. "
                     if user_speech_event.is_set():
-                        msg += "The wait was INTERRUPTED early because the user spoke. You MUST now politely address their input."
+                        msg += "The user has returned and spoken. Please respond naturally to what they just said. Do NOT thank them for waiting, because YOU were the one waiting for THEM."
                     else:
-                        msg += "The wait is over. You MUST now ask the user if they are still there and if they need further assistance."
+                        msg += "The time is up. Please ask the user if they are still there and if they need further assistance. Do NOT thank them for waiting, because YOU were the one waiting for THEM."
                         
                     await function_call_params.result_callback(
                         {"status": "success", "message": msg}

@@ -151,10 +151,6 @@ async def play_audio_loop(
     Used for hold music during call transfers and ringers during
     pre-call data fetches.
 
-    Audio is sent in 500 ms chunks so that when *stop_event* is set the
-    output queue drains within half a second, preventing hold music from
-    bleeding over the AI's next response.
-
     Args:
         stop_event: Set this event to terminate the loop.
         sample_rate: Target sample rate for audio playback.
@@ -174,39 +170,36 @@ async def play_audio_loop(
         logger.warning(f"Audio loop: failed to load {audio_file}, skipping")
         return
 
-    # 500 ms worth of 16-bit mono PCM (2 bytes per sample)
-    chunk_bytes = sample_rate * 2 // 2  # sample_rate samples/s × 2 bytes × 0.5 s
-    chunk_duration = 0.5  # seconds
+    num_samples = len(audio_data) // 2  # 16-bit PCM = 2 bytes per sample
+    duration = num_samples / sample_rate
 
-    logger.debug(f"Audio loop: playing at {sample_rate}Hz in {chunk_bytes}-byte chunks")
-    position = 0
+    logger.debug(f"Audio loop: playing at {sample_rate}Hz")
+    
+    # 500ms chunks to allow near-instant cancellation without music bleeding
+    chunk_duration_sec = 0.5
+    chunk_size = int(sample_rate * chunk_duration_sec * 2)  # 2 bytes per sample
+
     try:
         while not stop_event.is_set():
-            # Wrap around when we reach the end of the file
-            remaining = len(audio_data) - position
-            if remaining <= 0:
-                position = 0
-                remaining = len(audio_data)
-
-            chunk = audio_data[position : position + chunk_bytes]
-            position += len(chunk)
-
-            frame = OutputAudioRawFrame(
-                audio=chunk,
-                sample_rate=sample_rate,
-                num_channels=1,
-            )
-            await queue_frame(frame)
-
-            # Wait for the chunk to finish playing (or stop early if signalled)
-            actual_duration = len(chunk) / (sample_rate * 2)
-            try:
-                await asyncio.wait_for(stop_event.wait(), timeout=actual_duration)
-                break  # stop_event was set
-            except asyncio.TimeoutError:
-                pass  # chunk finished, send next one
-    except asyncio.CancelledError:
-        pass  # task was cancelled by the wait tool finaliser
+            for i in range(0, len(audio_data), chunk_size):
+                if stop_event.is_set():
+                    break
+                
+                chunk = audio_data[i:i + chunk_size]
+                frame = OutputAudioRawFrame(
+                    audio=chunk,
+                    sample_rate=sample_rate,
+                    num_channels=1,
+                )
+                await queue_frame(frame)
+                
+                chunk_play_time = (len(chunk) // 2) / sample_rate
+                
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=chunk_play_time)
+                    break
+                except asyncio.TimeoutError:
+                    pass
     except Exception as e:
         logger.error(f"Audio loop error: {e}")
     logger.debug("Audio loop: stopped")

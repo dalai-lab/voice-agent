@@ -879,8 +879,8 @@ const data = await response.json();`;
                             onNameChange={setName}
                             description={description}
                             onDescriptionChange={setDescription}
-                            title={tool.category === "wait" ? "Wait Tool Configuration" : "Calculator Configuration"}
-                            subtitle={tool.category === "wait" ? "Built-in dynamic wait tool. No additional configuration needed." : "Built-in calculator for arithmetic operations. No additional configuration needed."}
+                            title={tool.category === "wait" ? "Wait Tool" : "Calculator Tool"}
+                            subtitle={tool.category === "wait" ? "A built-in tool that forces the agent to wait for a specified duration." : "A built-in calculator for performing arithmetic operations during the conversation."}
                         />
                     ) : isEndCallTool ? (
                         <EndCallToolConfig

@@ -181,6 +181,8 @@ export function getToolTypeLabel(category: string): string {
             return "HTTP API Tool";
         case "calculator":
             return "Calculator Tool";
+        case "wait":
+            return "Wait Tool";
         case "native":
             return "Native Tool";
         case "integration":

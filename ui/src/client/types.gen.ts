@@ -1561,7 +1561,7 @@ export type CreateToolRequest = {
      *
      * Tool category. Must match definition.type.
      */
-    category?: 'http_api' | 'end_call' | 'transfer_call' | 'calculator' | 'wait' | 'native' | 'integration' | 'mcp';
+    category?: 'http_api' | 'end_call' | 'transfer_call' | 'calculator' | 'native' | 'integration' | 'mcp';
     /**
      * Icon
      *
@@ -14547,4 +14547,6 @@ export type ActiveCallsApiV1HealthActiveCallsGetResponses = {
 };
 
 export type ActiveCallsApiV1HealthActiveCallsGetResponse = ActiveCallsApiV1HealthActiveCallsGetResponses[keyof ActiveCallsApiV1HealthActiveCallsGetResponses];
+
 export type WaitToolDefinition = any;
+

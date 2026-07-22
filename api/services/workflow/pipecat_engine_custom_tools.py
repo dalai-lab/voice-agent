@@ -173,9 +173,10 @@ class CustomToolManager:
 
             schemas: list[FunctionSchema] = []
             for tool in tools:
-                if tool.category == ToolCategory.CALCULATOR.value:
-                    # Built-in calculator: return pre-defined schemas
-                    for tool_def in get_calculator_tools():
+                if tool.category == "wait":
+                    self._register_wait_handler()
+                    logger.debug(f"Registered wait tool handler (tool_uuid: {tool.tool_uuid})")
+                    for tool_def in get_wait_tools():
                         func = tool_def["function"]
                         schemas.append(
                             get_function_schema(
@@ -187,9 +188,9 @@ class CustomToolManager:
                         )
                     continue
 
-                if tool.category == ToolCategory.WAIT.value:
-                    # Built-in dynamic waiting tool
-                    for tool_def in get_wait_tools():
+                if tool.category == ToolCategory.CALCULATOR.value:
+                    # Built-in calculator: return pre-defined schemas
+                    for tool_def in get_calculator_tools():
                         func = tool_def["function"]
                         schemas.append(
                             get_function_schema(
@@ -265,18 +266,15 @@ class CustomToolManager:
             tools = await db_client.get_tools_by_uuids(tool_uuids, organization_id)
 
             for tool in tools:
+                if tool.category == "wait":
+                    self._register_wait_handler()
+                    logger.debug(f"Registered wait tool handler (tool_uuid: {tool.tool_uuid})")
+                    continue
+
                 if tool.category == ToolCategory.CALCULATOR.value:
                     self._register_calculator_handler()
                     logger.debug(
                         f"Registered calculator tool handler "
-                        f"(tool_uuid: {tool.tool_uuid})"
-                    )
-                    continue
-
-                if tool.category == ToolCategory.WAIT.value:
-                    self._register_wait_handler()
-                    logger.debug(
-                        f"Registered wait tool handler "
                         f"(tool_uuid: {tool.tool_uuid})"
                     )
                     continue
@@ -445,7 +443,7 @@ class CustomToolManager:
                     try:
                         await asyncio.wait_for(tts_done_event.wait(), timeout=15.0)
                     except asyncio.TimeoutError:
-                        logger.warning("Wait tool: TTS done event timed out after 15s — proceeding anyway.")
+                        logger.warning("Wait tool: TTS done event timed out after 15s ÔÇö proceeding anyway.")
 
                     if _task:
                         try:
@@ -560,7 +558,7 @@ class CustomToolManager:
                 await function_call_params.result_callback({"error": str(e)})
 
         # Register with a large timeout to prevent the LLM caller from timing out the wait.
-        self._engine.llm.register_function("wait_for_user", wait_func, timeout_secs=315.0)
+        self._engine.llm.register_function("wait_for_user", wait_func, timeout_secs=330.0)
 
     def _register_calculator_handler(self) -> None:
         """Register the built-in calculator function with the LLM."""
@@ -1008,7 +1006,6 @@ class CustomToolManager:
                         transfer_id=transfer_id,
                         conference_name=conference_name,
                         timeout=timeout_seconds,
-                        original_call_sid=original_call_sid,
                     )
                 except Exception as e:
                     logger.error(f"Transfer provider failed: {e}")
@@ -1166,9 +1163,6 @@ class CustomToolManager:
                 },
                 properties=response_properties,
             )
-
-            import asyncio
-            await asyncio.sleep(2.0)
 
             # End pipeline - providers complete bridge swap/conference join as final transfer leg
             await self._engine.end_call_with_reason(

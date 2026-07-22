@@ -679,7 +679,7 @@ const data = await response.json();`;
 
     const isEndCallTool = tool.category === "end_call";
     const isTransferCallTool = tool.category === "transfer_call";
-    const isBuiltinTool = tool.category === "calculator";
+    const isBuiltinTool = tool.category === "calculator" || tool.category === "wait";
     const isMcpTool = tool.category === "mcp";
     const categoryConfig = getCategoryConfig(tool.category as ToolCategory);
 
@@ -745,8 +745,8 @@ const data = await response.json();`;
                             onNameChange={setName}
                             description={description}
                             onDescriptionChange={setDescription}
-                            title="Calculator Configuration"
-                            subtitle="Built-in calculator for arithmetic operations. No additional configuration needed."
+                            title={tool.category === "wait" ? "Wait Tool Configuration" : "Calculator Configuration"}
+                            subtitle={tool.category === "wait" ? "Built-in dynamic wait tool. No additional configuration needed." : "Built-in calculator for arithmetic operations. No additional configuration needed."}
                         />
                     ) : isEndCallTool ? (
                         <EndCallToolConfig

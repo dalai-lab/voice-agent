@@ -420,11 +420,16 @@ class CustomToolManager:
                 hold_music_task = None
                 
                 if seconds >= 5 and self._engine._audio_config and self._engine._transport_output:
+                    from api.constants import APP_ROOT_DIR
+                    sample_rate = self._engine._audio_config.pipeline_sample_rate
+                    audio_file = str(APP_ROOT_DIR / "assets" / f"wait_music_{sample_rate}.wav")
+
                     hold_music_task = asyncio.create_task(
                         play_audio_loop(
                             stop_event=stop_event,
-                            sample_rate=self._engine._audio_config.pipeline_sample_rate,
+                            sample_rate=sample_rate,
                             queue_frame=self._engine._transport_output.queue_frame,
+                            audio_file=audio_file,
                         )
                     )
                 

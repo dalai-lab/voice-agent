@@ -97,6 +97,10 @@ export type AriConfigurationRequest = {
      */
     ws_client_name?: string;
     /**
+     * Optional external PBX connected through this Asterisk instance
+     */
+    external_pbx?: VicidialExternalPbxConfiguration | null;
+    /**
      * From Numbers
      *
      * List of SIP extensions/numbers for outbound calls (optional)
@@ -130,6 +134,7 @@ export type AriConfigurationResponse = {
      * Ws Client Name
      */
     ws_client_name?: string;
+    external_pbx?: VicidialExternalPbxConfiguration | null;
     /**
      * From Numbers
      */
@@ -747,19 +752,6 @@ export type BodyTranscribeAudioApiV1WorkflowRecordingsTranscribePost = {
  *
  * Tool definition for Calculator tools.
  */
-export type WaitToolDefinition = {
-    /**
-     * Schema Version
-     *
-     * Schema version.
-     */
-    schema_version?: number;
-    /**
-     * Tool Type
-     */
-    type: 'wait';
-};
-
 export type CalculatorToolDefinition = {
     /**
      * Schema Version
@@ -1343,6 +1335,46 @@ export type CloudonixConfigurationResponse = {
 };
 
 /**
+ * ContextDestinationMappingConfig
+ *
+ * Resolve an external-PBX destination from gathered context.
+ */
+export type ContextDestinationMappingConfig = {
+    /**
+     * Context Path
+     *
+     * Gathered-context path or extracted-variable name used for routing.
+     */
+    context_path: string;
+    /**
+     * Routes
+     */
+    routes: Array<ContextDestinationRoute>;
+    /**
+     * Fallback Destination
+     *
+     * Optional provider-native fallback destination.
+     */
+    fallback_destination?: string | null;
+};
+
+/**
+ * ContextDestinationRoute
+ *
+ * Map one gathered-context value to an external-PBX destination.
+ */
+export type ContextDestinationRoute = {
+    /**
+     * Context Value
+     */
+    context_value: string;
+    /**
+     * Destination
+     */
+    destination: string;
+};
+
+/**
  * CreateAPIKeyRequest
  */
 export type CreateApiKeyRequest = {
@@ -1556,8 +1588,6 @@ export type CreateToolRequest = {
     } & TransferCallToolDefinition) | ({
         type: 'calculator';
     } & CalculatorToolDefinition) | ({
-        type: 'wait';
-    } & WaitToolDefinition) | ({
         type: 'mcp';
     } & McpToolDefinition);
 };
@@ -2485,6 +2515,22 @@ export type EndCallToolDefinition = {
      * End Call configuration.
      */
     config: EndCallConfig;
+};
+
+/**
+ * ExternalPBXFieldMapping
+ *
+ * Map one gathered-context value to a provider-native field.
+ */
+export type ExternalPbxFieldMapping = {
+    /**
+     * Context Path
+     */
+    context_path: string;
+    /**
+     * Destination Field
+     */
+    destination_field: string;
 };
 
 /**
@@ -4008,6 +4054,12 @@ export type OpenAiRealtimeLlmConfiguration = {
      * Voice the model speaks in.
      */
     voice?: string;
+    /**
+     * Language
+     *
+     * ISO 639-1 language code for input audio transcription (e.g. 'pt', 'es'). Improves transcription accuracy and latency. Leave unset to auto-detect.
+     */
+    language?: string | null;
 };
 
 /**
@@ -4207,6 +4259,10 @@ export type OrganizationPreferences = {
      * Timezone
      */
     timezone?: string | null;
+    /**
+     * External Pbx Integrations Enabled
+     */
+    external_pbx_integrations_enabled?: boolean;
 };
 
 /**
@@ -5719,6 +5775,20 @@ export type TelephonyProviderMetadata = {
 };
 
 /**
+ * TelephonyProviderUICondition
+ */
+export type TelephonyProviderUiCondition = {
+    /**
+     * Field
+     */
+    field: string;
+    /**
+     * Equals
+     */
+    equals: unknown;
+};
+
+/**
  * TelephonyProviderUIField
  *
  * One form field on a telephony provider's configuration UI.
@@ -5752,6 +5822,29 @@ export type TelephonyProviderUiField = {
      * Placeholder
      */
     placeholder?: string | null;
+    /**
+     * Options
+     */
+    options?: Array<TelephonyProviderUiOption> | null;
+    visible_when?: TelephonyProviderUiCondition | null;
+    /**
+     * Section
+     */
+    section?: string | null;
+};
+
+/**
+ * TelephonyProviderUIOption
+ */
+export type TelephonyProviderUiOption = {
+    /**
+     * Value
+     */
+    value: string;
+    /**
+     * Label
+     */
+    label: string;
 };
 
 /**
@@ -5954,6 +6047,88 @@ export type ToolResponse = {
 };
 
 /**
+ * ToolTestRequest
+ *
+ * Request body for testing an HTTP API tool outside a live call.
+ */
+export type ToolTestRequest = {
+    /**
+     * Llm Params
+     *
+     * Values for parameters normally supplied by the model.
+     */
+    llm_params?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Preset Params
+     *
+     * Resolved values for parameters normally supplied from presets.
+     */
+    preset_params?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * ToolTestResponse
+ *
+ * Result of testing an HTTP API tool.
+ */
+export type ToolTestResponse = {
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Status Code
+     */
+    status_code?: number | null;
+    /**
+     * Data
+     */
+    data?: unknown | null;
+    /**
+     * Error
+     */
+    error?: string | null;
+    /**
+     * Hint
+     */
+    hint?: string | null;
+    /**
+     * Request Method
+     */
+    request_method: string;
+    /**
+     * Request Url
+     */
+    request_url: string;
+    /**
+     * Request Headers
+     */
+    request_headers?: {
+        [key: string]: string;
+    };
+    /**
+     * Request Body
+     */
+    request_body?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Request Params
+     */
+    request_params?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Duration Ms
+     */
+    duration_ms: number;
+};
+
+/**
  * TransferCallConfig
  *
  * Configuration for Transfer Call tools.
@@ -5962,9 +6137,9 @@ export type TransferCallConfig = {
     /**
      * Destination Source
      *
-     * Whether transfer destination is static/template or resolved by HTTP.
+     * Whether the destination is static/template, resolved by HTTP, or mapped from gathered context to an external-PBX destination.
      */
-    destination_source?: 'static' | 'dynamic';
+    destination_source?: 'static' | 'dynamic' | 'context_mapping';
     /**
      * Destination
      *
@@ -6005,6 +6180,10 @@ export type TransferCallConfig = {
      * Optional resolver that determines transfer routing at call time.
      */
     resolver?: HttpTransferResolverConfig | null;
+    /**
+     * Optional gathered-context to external-PBX destination mapping.
+     */
+    context_mapping?: ContextDestinationMappingConfig | null;
 };
 
 /**
@@ -6271,8 +6450,6 @@ export type UpdateToolRequest = {
     } & TransferCallToolDefinition) | ({
         type: 'calculator';
     } & CalculatorToolDefinition) | ({
-        type: 'wait';
-    } & WaitToolDefinition) | ({
         type: 'mcp';
     } & McpToolDefinition) | null;
     /**
@@ -6302,10 +6479,6 @@ export type UpdateWorkflowRequest = {
         [key: string]: unknown;
     } | null;
     workflow_configurations?: WorkflowConfigurationDefaults | null;
-    /**
-     * Enable Dtmf
-     */
-    enable_dtmf?: boolean | null;
 };
 
 /**
@@ -6472,6 +6645,88 @@ export type ValidationError = {
     ctx?: {
         [key: string]: unknown;
     };
+};
+
+/**
+ * VicidialAgentAPIConfiguration
+ *
+ * VICIdial remote-agent call-control API configuration.
+ */
+export type VicidialAgentApiConfiguration = {
+    /**
+     * Url
+     *
+     * Full URL to agc/api.php
+     */
+    url: string;
+    /**
+     * Username
+     *
+     * VICIdial agent API user
+     */
+    username: string;
+    /**
+     * Password
+     *
+     * VICIdial agent API password
+     */
+    password: string;
+    /**
+     * Source
+     *
+     * VICIdial API source tag
+     */
+    source?: string;
+};
+
+/**
+ * VicidialExternalPBXConfiguration
+ *
+ * External-PBX configuration used by the VICIdial strategy adapter.
+ */
+export type VicidialExternalPbxConfiguration = {
+    /**
+     * Type
+     */
+    type?: 'vicidial';
+    agent_api: VicidialAgentApiConfiguration;
+    non_agent_api?: VicidialNonAgentApiConfiguration | null;
+    /**
+     * Timeout Seconds
+     */
+    timeout_seconds?: number;
+};
+
+/**
+ * VicidialNonAgentAPIConfiguration
+ *
+ * Optional VICIdial non-agent API configuration for lead updates.
+ */
+export type VicidialNonAgentApiConfiguration = {
+    /**
+     * Url
+     *
+     * Full non_agent_api.php URL
+     */
+    url?: string | null;
+    /**
+     * Username
+     *
+     * Non-agent API user
+     */
+    username?: string | null;
+    /**
+     * Password
+     *
+     * Non-agent API password
+     */
+    password?: string | null;
+    /**
+     * Source
+     *
+     * Non-agent API source tag
+     */
+    source?: string;
 };
 
 /**
@@ -6739,6 +6994,10 @@ export type WorkflowConfigurationDefaults = {
      * Context Compaction Enabled
      */
     context_compaction_enabled?: boolean;
+    /**
+     * External Pbx Field Mappings
+     */
+    external_pbx_field_mappings?: Array<ExternalPbxFieldMapping>;
     [key: string]: unknown;
 };
 
@@ -6879,10 +7138,6 @@ export type WorkflowResponse = {
         [key: string]: unknown;
     } | null;
     /**
-     * Enable Dtmf
-     */
-    enable_dtmf?: boolean;
-    /**
      * Version Number
      */
     version_number?: number | null;
@@ -6946,10 +7201,6 @@ export type WorkflowRunResponseSchema = {
      * Name
      */
     name: string;
-    /**
-     * Workflow Name
-     */
-    workflow_name?: string | null;
     /**
      * Mode
      */
@@ -7657,38 +7908,6 @@ export type HandlePlivoRingCallbackApiV1TelephonyPlivoRingCallbackWorkflowRunIdP
 export type HandlePlivoRingCallbackApiV1TelephonyPlivoRingCallbackWorkflowRunIdPostError = HandlePlivoRingCallbackApiV1TelephonyPlivoRingCallbackWorkflowRunIdPostErrors[keyof HandlePlivoRingCallbackApiV1TelephonyPlivoRingCallbackWorkflowRunIdPostErrors];
 
 export type HandlePlivoRingCallbackApiV1TelephonyPlivoRingCallbackWorkflowRunIdPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
-export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostData = {
-    body?: never;
-    path: {
-        /**
-         * Workflow Run Id
-         */
-        workflow_run_id: number;
-    };
-    query?: never;
-    url: '/api/v1/telephony/plivo/dtmf-callback/{workflow_run_id}';
-};
-
-export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostErrors = {
-    /**
-     * Not found
-     */
-    404: unknown;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostError = HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostErrors[keyof HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostErrors];
-
-export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostResponses = {
     /**
      * Successful Response
      */
@@ -8688,10 +8907,14 @@ export type GetWorkflowRunsApiV1WorkflowWorkflowIdRunsGetData = {
     query?: {
         /**
          * Page
+         *
+         * Page number (starts from 1)
          */
         page?: number;
         /**
          * Limit
+         *
+         * Number of items per page
          */
         limit?: number;
         /**
@@ -8829,72 +9052,6 @@ export type GetWorkflowRunApiV1WorkflowWorkflowIdRunsRunIdGetResponses = {
 };
 
 export type GetWorkflowRunApiV1WorkflowWorkflowIdRunsRunIdGetResponse = GetWorkflowRunApiV1WorkflowWorkflowIdRunsRunIdGetResponses[keyof GetWorkflowRunApiV1WorkflowWorkflowIdRunsRunIdGetResponses];
-
-export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetData = {
-    body?: never;
-    headers?: {
-        /**
-         * Authorization
-         */
-        authorization?: string | null;
-        /**
-         * X-Api-Key
-         */
-        'X-API-Key'?: string | null;
-    };
-    path?: never;
-    query?: {
-        /**
-         * Page
-         */
-        page?: number;
-        /**
-         * Limit
-         */
-        limit?: number;
-        /**
-         * Filters
-         *
-         * JSON-encoded filter criteria
-         */
-        filters?: string | null;
-        /**
-         * Sort By
-         *
-         * Field to sort by (e.g., 'duration', 'created_at')
-         */
-        sort_by?: string | null;
-        /**
-         * Sort Order
-         *
-         * Sort order ('asc' or 'desc')
-         */
-        sort_order?: string | null;
-    };
-    url: '/api/v1/workflow/runs/all';
-};
-
-export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetErrors = {
-    /**
-     * Not found
-     */
-    404: unknown;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetError = GetAllWorkflowRunsApiV1WorkflowRunsAllGetErrors[keyof GetAllWorkflowRunsApiV1WorkflowRunsAllGetErrors];
-
-export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetResponses = {
-    /**
-     * Successful Response
-     */
-    200: WorkflowRunsResponse;
-};
-
-export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetResponse = GetAllWorkflowRunsApiV1WorkflowRunsAllGetResponses[keyof GetAllWorkflowRunsApiV1WorkflowRunsAllGetResponses];
 
 export type DownloadWorkflowReportApiV1WorkflowWorkflowIdReportGetData = {
     body?: never;
@@ -10025,10 +10182,14 @@ export type GetCampaignRunsApiV1CampaignCampaignIdRunsGetData = {
     query?: {
         /**
          * Page
+         *
+         * Page number (starts from 1)
          */
         page?: number;
         /**
          * Limit
+         *
+         * Number of items per page
          */
         limit?: number;
         /**
@@ -10790,6 +10951,50 @@ export type RefreshMcpToolsApiV1ToolsToolUuidMcpRefreshPostResponses = {
 };
 
 export type RefreshMcpToolsApiV1ToolsToolUuidMcpRefreshPostResponse = RefreshMcpToolsApiV1ToolsToolUuidMcpRefreshPostResponses[keyof RefreshMcpToolsApiV1ToolsToolUuidMcpRefreshPostResponses];
+
+export type TestToolApiV1ToolsToolUuidTestPostData = {
+    body: ToolTestRequest;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+        /**
+         * X-Api-Key
+         */
+        'X-API-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Tool Uuid
+         */
+        tool_uuid: string;
+    };
+    query?: never;
+    url: '/api/v1/tools/{tool_uuid}/test';
+};
+
+export type TestToolApiV1ToolsToolUuidTestPostErrors = {
+    /**
+     * Not found
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TestToolApiV1ToolsToolUuidTestPostError = TestToolApiV1ToolsToolUuidTestPostErrors[keyof TestToolApiV1ToolsToolUuidTestPostErrors];
+
+export type TestToolApiV1ToolsToolUuidTestPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: ToolTestResponse;
+};
+
+export type TestToolApiV1ToolsToolUuidTestPostResponse = TestToolApiV1ToolsToolUuidTestPostResponses[keyof TestToolApiV1ToolsToolUuidTestPostResponses];
 
 export type UnarchiveToolApiV1ToolsToolUuidUnarchivePostData = {
     body?: never;
@@ -14342,3 +14547,4 @@ export type ActiveCallsApiV1HealthActiveCallsGetResponses = {
 };
 
 export type ActiveCallsApiV1HealthActiveCallsGetResponse = ActiveCallsApiV1HealthActiveCallsGetResponses[keyof ActiveCallsApiV1HealthActiveCallsGetResponses];
+export type WaitToolDefinition = any;

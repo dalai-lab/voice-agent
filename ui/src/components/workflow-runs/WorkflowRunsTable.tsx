@@ -185,7 +185,7 @@ export function WorkflowRunsTable({
                                         >
                                             <TableCell className="font-mono text-sm">#{run.id}</TableCell>
                                             {!workflowId && (
-                                                <TableCell className="text-sm font-medium">{run.workflow_name || `Agent #${run.workflow_id}`}</TableCell>
+                                                <TableCell className="text-sm font-medium">{(run as any).workflow_name || `Agent #${run.workflow_id}`}</TableCell>
                                             )}
                                             <TableCell>
                                                 <Badge variant={run.is_completed ? "default" : "secondary"}>

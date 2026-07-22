@@ -432,13 +432,22 @@ class CustomToolManager:
                 
                 elapsed = 0.0
                 user_interrupted = False
+                initial_msg_count = len(self._engine.context.get_messages()) if self._engine.context else 0
+                
                 try:
                     while round(elapsed, 1) < float(seconds):
                         if self._engine.is_call_disposed():
                             break
                         
+                        # Direct VAD flag check (if available/working)
                         if getattr(self._engine, "user_spoke_during_wait", False):
-                            logger.info("Wait interrupted by user speech.")
+                            logger.info("Wait interrupted by VAD speech detection.")
+                            user_interrupted = True
+                            break
+                        
+                        # Context message count check (fires reliably after user finishes speaking a turn)
+                        if self._engine.context and len(self._engine.context.get_messages()) > initial_msg_count:
+                            logger.info("Wait interrupted by new user message in context.")
                             user_interrupted = True
                             break
                             

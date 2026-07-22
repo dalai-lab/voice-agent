@@ -2,8 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, Suspense } from "react";
-
-import { getAllWorkflowRunsApiV1WorkflowRunsAllGet } from "@/client/sdk.gen";
+import { client } from "@/client/client.gen";
 import { WorkflowRunResponseSchema } from "@/client/types.gen";
 import { WorkflowRunsTable } from "@/components/workflow-runs";
 import { useAuth } from '@/lib/auth';
@@ -67,7 +66,8 @@ function RunsView() {
                 filterParam = JSON.stringify(filterData);
             }
 
-            const response = await getAllWorkflowRunsApiV1WorkflowRunsAllGet({
+            const response = await client.get<{ runs: WorkflowRunResponseSchema[], total_pages: number, total_count: number, page: number }>({
+                url: '/api/v1/workflow/runs/all',
                 query: {
                     page: page,
                     limit: 50,
@@ -82,10 +82,11 @@ function RunsView() {
             }
 
             if (response.data) {
-                setWorkflowRuns(response.data.runs || []);
-                setTotalPages(response.data.total_pages || 1);
-                setTotalCount(response.data.total_count || 0);
-                setCurrentPage(response.data.page || 1);
+                const data = response.data as any;
+                setWorkflowRuns(data.runs || []);
+                setTotalPages(data.total_pages || 1);
+                setTotalCount(data.total_count || 0);
+                setCurrentPage(data.page || 1);
             }
             setError(null);
         } catch (err) {

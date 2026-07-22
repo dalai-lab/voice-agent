@@ -434,6 +434,8 @@ class CustomToolManager:
                     )
                 
                 user_speech_event = asyncio.Event()
+                import time
+                start_time = time.time()
 
                 # We use a pipeline observer (not the mute-filtered aggregator)
                 # because FunctionCallUserMuteStrategy suppresses all
@@ -445,6 +447,12 @@ class CustomToolManager:
 
                 class _WaitInterruptObserver(BaseObserver):
                     async def on_push_frame(self, data: FramePushed):
+                        # Ignore transcriptions for the first 1.5 seconds to prevent the 
+                        # tail-end of the user's previous command (which triggered this tool) 
+                        # from instantly interrupting the wait.
+                        if time.time() - start_time < 1.5:
+                            return
+                            
                         if isinstance(data.frame, TranscriptionFrame) and data.frame.text.strip():
                             logger.info(f"Wait tool observer: transcription received: '{data.frame.text}', signalling interrupt.")
                             user_speech_event.set()
@@ -456,7 +464,11 @@ class CustomToolManager:
 
                 elapsed = 0.0
                 try:
-                    while round(elapsed, 1) < float(seconds):
+                    # Fix #1: Never wait less than 15 seconds to avoid overlapping TTS
+                    # acknowledgment and immediate "are you still there" follow-up.
+                    effective_seconds = min(max(float(seconds), 15.0), float(max_wait))
+                    
+                    while round(elapsed, 1) < effective_seconds:
                         if self._engine.is_call_disposed():
                             break
 
@@ -483,10 +495,15 @@ class CustomToolManager:
                 
                 logger.info(f"Wait completed after {elapsed} seconds (requested {seconds}).")
                 
-                if not self._engine.is_call_disposed():
+                if function_call_params and function_call_params.result_callback:
                     clean_elapsed = round(elapsed, 1)
                     msg = f"Wait finished after {clean_elapsed} seconds. "
                     if user_speech_event.is_set():
+                        # Fix #2: Context ordering race condition.
+                        # Wait a tiny bit to ensure the TranscriptionFrame has fully
+                        # reached the aggregator and been added to the LLM context 
+                        # BEFORE we inject this tool result into the context.
+                        await asyncio.sleep(0.5)
                         msg += "The user has returned and spoken. Please respond naturally to what they just said. Do NOT thank them for waiting, because YOU were the one waiting for THEM."
                     else:
                         msg += "The time is up. Please ask the user if they are still there and if they need further assistance. Do NOT thank them for waiting, because YOU were the one waiting for THEM."

@@ -427,24 +427,19 @@ class CustomToolManager:
                             queue_frame=self._engine._transport_output.queue_frame,
                         )
                     )
-                
-                user_interrupted = False
-                async def _on_user_speech(*args):
-                    nonlocal user_interrupted
-                    user_interrupted = True
-
-                observer = getattr(self._engine.task, "turn_tracking_observer", None) if self._engine.task else None
-                if observer:
-                    observer.add_event_handler("on_user_speech_started_for_turn", _on_user_speech)
+                # Reset the interrupt flag
+                self._engine.user_spoke_during_wait = False
                 
                 elapsed = 0.0
+                user_interrupted = False
                 try:
                     while round(elapsed, 1) < float(seconds):
                         if self._engine.is_call_disposed():
                             break
                         
-                        if user_interrupted:
+                        if getattr(self._engine, "user_spoke_during_wait", False):
                             logger.info("Wait interrupted by user speech.")
+                            user_interrupted = True
                             break
                             
                         await asyncio.sleep(0.5)
@@ -457,12 +452,6 @@ class CustomToolManager:
                             await hold_music_task
                         except asyncio.CancelledError:
                             pass
-                    
-                    if observer and hasattr(observer, "remove_event_handler"):
-                        try:
-                            observer.remove_event_handler("on_user_speech_started_for_turn", _on_user_speech)
-                        except Exception as e:
-                            logger.warning(f"Could not remove event handler: {e}")
                 
                 logger.info(f"Wait completed after {elapsed} seconds (requested {seconds}).")
                 

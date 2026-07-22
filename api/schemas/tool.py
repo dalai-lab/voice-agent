@@ -25,6 +25,7 @@ ToolCategoryValue = Literal[
     "end_call",
     "transfer_call",
     "calculator",
+    "wait",
     "native",
     "integration",
     "mcp",

@@ -413,6 +413,15 @@ class CustomToolManager:
                             persist_to_logs=True,
                         )
                     )
+                    # Issue 1 fix: wait for the acknowledgment TTS to finish before
+                    # activating the interrupt observer. Without this, a stale or
+                    # delayed TranscriptionFrame from the user's original command
+                    # (e.g. "wait for 20 seconds") can fire the observer and end
+                    # the wait in <1 second before the acknowledgment even plays.
+                    # Heuristic: ~0.07s per character + 1.5s buffer for TTS pipeline latency.
+                    tts_estimated_secs = max(len(message) * 0.07 + 1.5, 2.5)
+                    logger.info(f"Waiting ~{tts_estimated_secs:.1f}s for acknowledgment TTS to finish...")
+                    await asyncio.sleep(tts_estimated_secs)
                 
                 logger.info(f"Pausing for {seconds} seconds...")
                 
@@ -434,8 +443,12 @@ class CustomToolManager:
                     )
                 
                 user_speech_event = asyncio.Event()
+                # Issue 2 fix: capture the actual transcript text so we can include it
+                # in the tool result. Without this, the TranscriptionFrame is muted by
+                # FunctionCallUserMuteStrategy and the LLM never sees what the user said,
+                # forcing the user to repeat themselves.
                 import time
-                start_time = time.time()
+                user_speech_text: list[str] = []  # mutable container for closure capture
 
                 # We use a pipeline observer (not the mute-filtered aggregator)
                 # because FunctionCallUserMuteStrategy suppresses all
@@ -447,14 +460,12 @@ class CustomToolManager:
 
                 class _WaitInterruptObserver(BaseObserver):
                     async def on_push_frame(self, data: FramePushed):
-                        # Ignore transcriptions for the first 1.5 seconds to prevent the 
-                        # tail-end of the user's previous command (which triggered this tool) 
-                        # from instantly interrupting the wait.
-                        if time.time() - start_time < 1.5:
-                            return
-                            
                         if isinstance(data.frame, TranscriptionFrame) and data.frame.text.strip():
-                            logger.info(f"Wait tool observer: transcription received: '{data.frame.text}', signalling interrupt.")
+                            text = data.frame.text.strip()
+                            logger.info(f"Wait tool observer: transcription received: '{text}', signalling interrupt.")
+                            # Capture the text (Issue 2 fix: include in tool result)
+                            if not user_speech_text:
+                                user_speech_text.append(text)
                             user_speech_event.set()
 
                 wait_observer = _WaitInterruptObserver()
@@ -499,12 +510,15 @@ class CustomToolManager:
                     clean_elapsed = round(elapsed, 1)
                     msg = f"Wait finished after {clean_elapsed} seconds. "
                     if user_speech_event.is_set():
-                        # Fix #2: Context ordering race condition.
-                        # Wait a tiny bit to ensure the TranscriptionFrame has fully
-                        # reached the aggregator and been added to the LLM context 
-                        # BEFORE we inject this tool result into the context.
-                        await asyncio.sleep(0.5)
-                        msg += "The user has returned and spoken. Please respond naturally to what they just said. Do NOT thank them for waiting, because YOU were the one waiting for THEM."
+                        # Issue 2 fix: The TranscriptionFrame was muted by
+                        # FunctionCallUserMuteStrategy so the LLM context never received
+                        # it. We inject the captured text directly into the tool result
+                        # so the LLM can respond to the user's exact words.
+                        captured = user_speech_text[0] if user_speech_text else None
+                        if captured:
+                            msg += f'The user has returned and said: "{captured}". Respond directly to what they said. Do NOT thank them for waiting, because YOU were the one waiting for THEM.'
+                        else:
+                            msg += "The user has returned and spoken. Please respond naturally to what they just said. Do NOT thank them for waiting, because YOU were the one waiting for THEM."
                     else:
                         msg += "The time is up. Please ask the user if they are still there and if they need further assistance. Do NOT thank them for waiting, because YOU were the one waiting for THEM."
                         

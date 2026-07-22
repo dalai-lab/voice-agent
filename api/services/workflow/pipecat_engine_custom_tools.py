@@ -402,6 +402,18 @@ class CustomToolManager:
                 max_wait = 300
                 seconds = min(max(seconds, 1), max_wait)
                 
+                message = function_call_params.arguments.get("message")
+                if message:
+                    from pipecat.frames.frames import TTSSpeakFrame
+                    logger.info(f"Playing wait acknowledgment message: {message}")
+                    await self._engine.task.queue_frame(
+                        TTSSpeakFrame(
+                            message,
+                            append_to_context=False,
+                            persist_to_logs=True,
+                        )
+                    )
+                
                 logger.info(f"Pausing for {seconds} seconds...")
                 
                 stop_event = asyncio.Event()

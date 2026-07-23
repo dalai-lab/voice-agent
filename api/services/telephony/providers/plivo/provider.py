@@ -286,7 +286,7 @@ class PlivoProvider(TelephonyProvider):
             "ring": TelephonyCallStatus.RINGING,
             "completed": TelephonyCallStatus.COMPLETED,
             "hangup": TelephonyCallStatus.COMPLETED,
-            "stopstream": TelephonyCallStatus.COMPLETED,
+            "stopstream": TelephonyCallStatus.IN_PROGRESS,
             "busy": TelephonyCallStatus.BUSY,
             "no-answer": TelephonyCallStatus.NO_ANSWER,
             "cancel": TelephonyCallStatus.CANCELED,

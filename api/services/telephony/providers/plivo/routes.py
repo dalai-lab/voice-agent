@@ -262,6 +262,17 @@ async def handle_plivo_transfer_xml(conference_name: str, transfer_id: str, requ
                         try:
                             async with aiohttp.ClientSession() as session:
                                 auth = aiohttp.BasicAuth(provider.auth_id, provider.auth_token)
+
+                                # Step 1: Stop the AI stream first so the aleg is in a stable
+                                # keepCallAlive state before we redirect it. This prevents the
+                                # Transfer API redirect racing with stream teardown.
+                                stop_stream_endpoint = f"{provider.base_url}/Call/{original_call_sid}/Stream/"
+                                async with session.delete(stop_stream_endpoint, auth=auth) as s_response:
+                                    s_status = s_response.status
+                                    s_text = await s_response.text()
+                                    logger.info(f"Plivo Stop Stream API called: status={s_status} body={s_text}")
+
+                                # Step 2: Now redirect the stable aleg into the conference
                                 async with session.post(transfer_endpoint, json=transfer_data, auth=auth) as t_response:
                                     t_status = t_response.status
                                     t_text = await t_response.text()
@@ -282,13 +293,6 @@ async def handle_plivo_transfer_xml(conference_name: str, transfer_id: str, requ
                                         logger.error(f"Failed to bridge original caller: status={t_status} body={t_text}")
                                         transfer_event = _create_bridge_failed_event("Failed to bridge original caller into conference.")
                                         await call_transfer_manager.publish_transfer_event(transfer_event)
-                                        
-                                # Explicitly stop the stream so Plivo is forced to execute the transfer XML immediately
-                                stop_stream_endpoint = f"{provider.base_url}/Call/{original_call_sid}/Stream/"
-                                async with session.delete(stop_stream_endpoint, auth=auth) as s_response:
-                                    s_status = s_response.status
-                                    s_text = await s_response.text()
-                                    logger.info(f"Plivo Stop Stream API called: status={s_status} body={s_text}")
                         except Exception as e:
                             logger.error(f"Error bridging original caller: {e}")
                             transfer_event = _create_bridge_failed_event(f"Failed to bridge original caller into conference due to exception: {e}")

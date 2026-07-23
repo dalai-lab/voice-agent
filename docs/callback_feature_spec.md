@@ -965,7 +965,7 @@ Build in this order. Each step depends on the previous.
 - [ ] Implement precedence resolution: org → campaign → workflow → tool args (10d)
 
 ### Phase 5 — UI
-- [ ] Agent Settings tab: add "Callback Settings" toggle + min/max delay fields
+- [x] Agent Settings tab: add "Callback Settings" toggle + min/max delay fields
 - [ ] Campaign Advanced Settings: add "Callback Settings" section with sociable hours + enable toggle
 - [ ] New "Pending Callbacks" universal menu: build UI view to list/cancel pending non-campaign callbacks from `ScheduledCallbackModel` (see 10b)
 

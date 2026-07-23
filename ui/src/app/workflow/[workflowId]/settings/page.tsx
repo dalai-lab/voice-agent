@@ -269,17 +269,20 @@ function GeneralSection({
     workflowName,
     workflowId,
     enableDtmf,
+    enableCallbacks,
     onSave,
 }: {
     workflowConfigurations: WorkflowConfigurations;
     workflowName: string;
     workflowId: number;
     enableDtmf: boolean;
-    onSave: (configurations: WorkflowConfigurations, workflowName: string, enableDtmf?: boolean) => Promise<void>;
+    enableCallbacks: boolean;
+    onSave: (configurations: WorkflowConfigurations, workflowName: string, enableDtmf?: boolean, enableCallbacks?: boolean) => Promise<void>;
 }) {
     const { externalPbxIntegrationsEnabled } = useOrgConfig();
     const [name, setName] = useState(workflowName);
     const [dtmfEnabled, setDtmfEnabled] = useState(enableDtmf);
+    const [callbacksEnabled, setCallbacksEnabled] = useState(enableCallbacks);
     const [ambientNoiseConfig, setAmbientNoiseConfig] = useState<AmbientNoiseConfiguration>(
         workflowConfigurations.ambient_noise_configuration,
     );
@@ -338,9 +341,10 @@ function GeneralSection({
             includeTranscriptEndTimestamps !==
             (workflowConfigurations.transcript_configuration?.include_end_timestamps ?? false) ||
             JSON.stringify(externalPbxFieldMappings) !==
-            JSON.stringify(workflowConfigurations.external_pbx_field_mappings)
+            JSON.stringify(workflowConfigurations.external_pbx_field_mappings) ||
+            callbacksEnabled !== enableCallbacks
         );
-    }, [name, workflowName, ambientNoiseConfig, maxCallDuration, maxUserIdleTimeout, smartTurnStopSecs, turnStartStrategy, turnStartMinWords, provisionalVadPauseSecs, turnStopStrategy, contextCompactionEnabled, includeTranscriptEndTimestamps, workflowConfigurations, dtmfEnabled, enableDtmf, externalPbxFieldMappings]);
+    }, [name, workflowName, ambientNoiseConfig, maxCallDuration, maxUserIdleTimeout, smartTurnStopSecs, turnStartStrategy, turnStartMinWords, provisionalVadPauseSecs, turnStopStrategy, contextCompactionEnabled, includeTranscriptEndTimestamps, workflowConfigurations, dtmfEnabled, enableDtmf, callbacksEnabled, enableCallbacks, externalPbxFieldMappings]);
 
     useUnsavedChanges("general", isDirty);
 
@@ -424,7 +428,8 @@ function GeneralSection({
                     external_pbx_field_mappings: externalPbxFieldMappings,
                 },
                 name,
-                dtmfEnabled
+                dtmfEnabled,
+                callbacksEnabled
             );
         } catch (error) {
             console.error("Failed to save general settings:", error);
@@ -472,6 +477,26 @@ function GeneralSection({
                             id="dtmf-enabled"
                             checked={dtmfEnabled}
                             onCheckedChange={setDtmfEnabled}
+                        />
+                    </div>
+                </div>
+
+                <Separator />
+
+                {/* Callbacks */}
+                <div className="space-y-4">
+                    <div>
+                        <h3 className="text-sm font-medium">Schedule Callbacks</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            Allows the AI to schedule a callback later if the user requests it (e.g. "Call me back in 10 minutes").
+                        </p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="callbacks-enabled" className="text-sm">Enable Callbacks</Label>
+                        <Switch
+                            id="callbacks-enabled"
+                            checked={callbacksEnabled}
+                            onCheckedChange={setCallbacksEnabled}
                         />
                     </div>
                 </div>
@@ -1694,6 +1719,7 @@ function WorkflowSettingsInner({
                                 workflowName={workflowName || workflow.name}
                                 workflowId={workflowId}
                                 enableDtmf={(workflow as any).enable_dtmf ?? false}
+                                enableCallbacks={(workflow as any).enable_callbacks ?? false}
                                 onSave={saveWorkflowConfigurations}
                             />
 

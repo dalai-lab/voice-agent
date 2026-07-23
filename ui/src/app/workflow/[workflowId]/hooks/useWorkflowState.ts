@@ -536,7 +536,7 @@ export const useWorkflowState = ({
     }, [workflowId, workflowName, user, setTemplateContextVariables]);
 
     // Save workflow configurations
-    const saveWorkflowConfigurations = useCallback(async (configurations: WorkflowConfigurations, newWorkflowName: string, enableDtmf?: boolean) => {
+    const saveWorkflowConfigurations = useCallback(async (configurations: WorkflowConfigurations, newWorkflowName: string, enableDtmf?: boolean, enableCallbacks?: boolean) => {
         if (!user?.id) return;
         // Preserve the current dictionary when saving other configurations
         const currentDictionary = useWorkflowStore.getState().dictionary;
@@ -551,6 +551,7 @@ export const useWorkflowState = ({
                     workflow_definition: null,
                     workflow_configurations: configurationsWithDictionary as Record<string, unknown>,
                     enable_dtmf: enableDtmf,
+                    enable_callbacks: enableCallbacks,
                 } as any,
             });
 

@@ -1275,7 +1275,7 @@ class CustomToolManager:
                     return
 
                 # 3. Save to DB
-                async with db_client.get_async_session() as session:
+                async with db_client.async_session() as session:
                     new_callback = ScheduledCallbackModel(
                         organization_id=organization_id,
                         workflow_id=workflow_id,

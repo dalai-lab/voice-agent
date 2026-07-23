@@ -36,7 +36,7 @@ async def execute_callback(ctx, to_number: str, from_number: str,
                 # We do this directly since we don't have a dedicated method in db_client yet
                 from api.db.models import ScheduledCallbackModel
                 from sqlalchemy import update
-                async with db_client.get_async_session() as session:
+                async with db_client.async_session() as session:
                     stmt = (
                         update(ScheduledCallbackModel)
                         .where(ScheduledCallbackModel.original_run_id == original_run_id)
@@ -78,7 +78,7 @@ async def execute_callback(ctx, to_number: str, from_number: str,
             try:
                 from api.db.models import ScheduledCallbackModel
                 from sqlalchemy import update
-                async with db_client.get_async_session() as session:
+                async with db_client.async_session() as session:
                     stmt = (
                         update(ScheduledCallbackModel)
                         .where(ScheduledCallbackModel.original_run_id == original_run_id)

@@ -1183,6 +1183,13 @@ class CustomToolManager:
                 },
                 properties=response_properties,
             )
+            # Give Plivo time to process the Transfer API redirect and seat the
+            # aleg into the conference before we tear down the WebSocket.
+            # Without this delay, the WebSocket closes before Plivo has finished
+            # redirecting the original caller, causing a 404 "call not found" on
+            # the aleg and dropping the call on both sides.
+            import asyncio
+            await asyncio.sleep(2.0)
 
             # End pipeline - providers complete bridge swap/conference join as final transfer leg
             await self._engine.end_call_with_reason(

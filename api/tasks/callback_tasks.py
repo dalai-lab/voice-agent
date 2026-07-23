@@ -18,6 +18,11 @@ async def execute_callback(ctx, to_number: str, from_number: str,
         logger.info(f"Executing scheduled callback for original run {original_run_id} to {to_number}")
         provider = await get_default_telephony_provider(organization_id)
 
+        # Fetch workflow to get user_id and resume mode
+        workflow = await db_client.get_workflow(workflow_id, organization_id=organization_id)
+        if not workflow:
+            raise ValueError(f"Workflow {workflow_id} not found in org {organization_id}")
+
         callback_context = {
             "is_callback": True,
             "callback_reason": "user_requested",
@@ -25,6 +30,7 @@ async def execute_callback(ctx, to_number: str, from_number: str,
             "conversation_summary": conversation_summary,
             "gathered_context": gathered_context,
             "callback_chain_depth": callback_chain_depth,
+            "callback_resume_mode": workflow.callback_resume_mode,
             "caller_number": from_number,
             "called_number": to_number,
             "provider": provider.PROVIDER_NAME,

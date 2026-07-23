@@ -30,7 +30,11 @@ When triggered, Vapi:
 - On callback, starts a **fresh call** with the original assistant config
 - Does NOT resume previous conversation — the conversation state is reset
 
-**Key insight:** Vapi does NOT resume conversation context on callback. It is always a fresh call with optionally injected metadata (like "this is a callback, you spoke to this person earlier about X"). Dograh can follow the same pattern or go further by injecting a conversation summary.
+**Key insight:** Vapi does NOT resume conversation context on callback. It is always a fresh call with optionally injected metadata (like "this is a callback, you spoke to this person earlier about X").
+
+Dograh improves on this by offering a **Callback Resume Mode** toggle in the workflow settings:
+- **Start Fresh (Default):** Like Vapi, the call starts at Node 1. The LLM is given a system note summarizing the previous call and instructing it to generate the first greeting. Best for most workflows.
+- **Resume from Last Node:** Dograh automatically remembers which node the user was on when the callback was requested, and drops the AI and user back into that exact node. Best for rigid, multi-step intake flows.
 
 ---
 

@@ -298,10 +298,16 @@ async def handle_plivo_transfer_xml(conference_name: str, transfer_id: str, requ
                     asyncio.create_task(_bridge_aleg())
 
     # Return XML to drop the leg into the conference
-    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+    if leg_type == "aleg":
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Conference endConferenceOnExit="true" startConferenceOnEnter="true">{conference_name}</Conference>
+</Response>"""
+    else:
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Speak>You have answered a transfer call. Connecting you now.</Speak>
-    <Conference endConferenceOnExit="true">{conference_name}</Conference>
+    <Conference endConferenceOnExit="true" startConferenceOnEnter="true">{conference_name}</Conference>
 </Response>"""
     return HTMLResponse(content=xml, media_type="application/xml")
 

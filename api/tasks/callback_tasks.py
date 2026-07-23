@@ -2,6 +2,7 @@ from loguru import logger
 from api.db import db_client
 from api.services.telephony.factory import get_default_telephony_provider
 from api.utils.common import get_backend_endpoints
+from api.services.workflow.run_creation import prepare_workflow_run_inputs
 
 async def execute_callback(ctx, to_number: str, from_number: str,
                            workflow_id: int, organization_id: int,
@@ -54,11 +55,14 @@ async def execute_callback(ctx, to_number: str, from_number: str,
         if not workflow:
             raise ValueError(f"Workflow {workflow_id} not found in org {organization_id}")
 
+        run_inputs = await prepare_workflow_run_inputs(db_client, workflow)
+
         new_run = await db_client.create_workflow_run(
             name=f"WR-CALLBACK-{original_run_id}",
             workflow_id=workflow_id,
             mode=provider.PROVIDER_NAME,
             user_id=workflow.user_id,
+            definition_id=run_inputs["definition_id"],
             initial_context=callback_context,
             campaign_id=campaign_id,
             organization_id=organization_id,

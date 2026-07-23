@@ -1256,9 +1256,9 @@ class CustomToolManager:
                 initial_context = workflow_run.initial_context or {}
                 # In outbound, we called them (called_number is user). In inbound, they called us (caller_number is user).
                 # The callback tool requires calling the user. 
-                # For Phase 1 (no campaign), we determine user number:
-                to_number = initial_context.get("called_number") if not initial_context.get("is_inbound") else initial_context.get("caller_number")
-                from_number = initial_context.get("caller_number") if not initial_context.get("is_inbound") else initial_context.get("called_number")
+                is_inbound = initial_context.get("direction") == "inbound"
+                to_number = initial_context.get("caller_number") if is_inbound else initial_context.get("called_number")
+                from_number = initial_context.get("called_number") if is_inbound else initial_context.get("caller_number")
 
                 if not to_number or to_number.startswith("anonymous"):
                     await function_call_params.result_callback({

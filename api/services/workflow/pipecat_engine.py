@@ -83,6 +83,7 @@ class PipecatEngine:
         has_recordings: bool = False,
         context_compaction_enabled: bool = False,
         enable_dtmf: bool = False,
+        enable_callbacks: bool = False,
     ):
         self.task = task
         self.llm = llm
@@ -105,6 +106,7 @@ class PipecatEngine:
         self._pending_extraction_tasks: set[asyncio.Task] = set()
         self._dtmf_subscription_task: Optional[asyncio.Task] = None
         self._enable_dtmf: bool = enable_dtmf
+        self._enable_callbacks: bool = enable_callbacks
         self._dtmf_buffer: str = ""
         self._dtmf_timer_task: Optional[asyncio.Task] = None
         self._dtmf_timeout_seconds: float = 3.0

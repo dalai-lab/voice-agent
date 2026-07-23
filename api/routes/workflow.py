@@ -239,6 +239,7 @@ class WorkflowResponse(BaseModel):
     total_runs: int | None = None
     workflow_configurations: dict | None = None
     enable_dtmf: bool = False
+    enable_callbacks: bool = False
     version_number: int | None = None
     version_status: str | None = None
     workflow_uuid: str | None = None
@@ -297,6 +298,7 @@ class UpdateWorkflowRequest(BaseModel):
     # model_configuration_v2_override intact.
     workflow_configurations: WorkflowConfigurationDefaults | None = None
     enable_dtmf: bool | None = None
+    enable_callbacks: bool | None = None
 
 
 class WorkflowVersionResponse(BaseModel):
@@ -746,6 +748,7 @@ async def get_workflow(
         "call_disposition_codes": workflow.call_disposition_codes,
         "workflow_configurations": mask_workflow_configurations(workflow_configs),
         "enable_dtmf": workflow.enable_dtmf,
+        "enable_callbacks": workflow.enable_callbacks,
         "version_number": active_def.version_number if active_def else None,
         "version_status": active_def.status if active_def else None,
         "workflow_uuid": workflow.workflow_uuid,
@@ -1215,6 +1218,7 @@ async def update_workflow(
             template_context_variables=request.template_context_variables,
             workflow_configurations=workflow_configurations,
             enable_dtmf=request.enable_dtmf,
+            enable_callbacks=request.enable_callbacks,
             organization_id=user.selected_organization_id,
         )
 
@@ -1252,6 +1256,7 @@ async def update_workflow(
             "call_disposition_codes": workflow.call_disposition_codes,
             "workflow_configurations": mask_workflow_configurations(workflow_configs),
             "enable_dtmf": workflow.enable_dtmf,
+            "enable_callbacks": workflow.enable_callbacks,
             "version_number": active_def.version_number if active_def else None,
             "version_status": active_def.status if active_def else None,
         }

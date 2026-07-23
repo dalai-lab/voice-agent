@@ -525,6 +525,7 @@ class WorkflowClient(BaseDBClient):
         template_context_variables: dict | None,
         workflow_configurations: dict | None,
         enable_dtmf: bool | None = None,
+        enable_callbacks: bool | None = None,
         user_id: int = None,
         organization_id: int = None,
     ) -> WorkflowModel:
@@ -573,6 +574,9 @@ class WorkflowClient(BaseDBClient):
 
             if enable_dtmf is not None:
                 workflow.enable_dtmf = enable_dtmf
+
+            if enable_callbacks is not None:
+                workflow.enable_callbacks = enable_callbacks
 
             try:
                 await session.commit()

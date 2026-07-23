@@ -177,26 +177,26 @@ class CustomToolManager:
             tools = await db_client.get_tools_by_uuids(tool_uuids, organization_id)
 
             schemas: list[FunctionSchema] = []
+
+            if self._engine._enable_callbacks:
+                self._register_schedule_callback_handler()
+                logger.debug("Registered native schedule_callback tool handler")
+                for tool_def in get_schedule_callback_tools():
+                    func = tool_def["function"]
+                    schemas.append(
+                        get_function_schema(
+                            func["name"],
+                            func["description"],
+                            properties=func["parameters"]["properties"],
+                            required=func["parameters"]["required"],
+                        )
+                    )
+
             for tool in tools:
                 if tool.category == "wait":
                     self._register_wait_handler()
                     logger.debug(f"Registered wait tool handler (tool_uuid: {tool.tool_uuid})")
                     for tool_def in get_wait_tools():
-                        func = tool_def["function"]
-                        schemas.append(
-                            get_function_schema(
-                                func["name"],
-                                func["description"],
-                                properties=func["parameters"]["properties"],
-                                required=func["parameters"]["required"],
-                            )
-                        )
-                    continue
-
-                if tool.category == ToolCategory.SCHEDULE_CALLBACK.value:
-                    self._register_schedule_callback_handler()
-                    logger.debug(f"Registered schedule_callback tool handler (tool_uuid: {tool.tool_uuid})")
-                    for tool_def in get_schedule_callback_tools():
                         func = tool_def["function"]
                         schemas.append(
                             get_function_schema(
@@ -284,6 +284,10 @@ class CustomToolManager:
 
         try:
             tools = await db_client.get_tools_by_uuids(tool_uuids, organization_id)
+
+            if self._engine._enable_callbacks:
+                self._register_schedule_callback_handler()
+                logger.debug("Registered native schedule_callback tool handler")
 
             for tool in tools:
                 if tool.category == "wait":
@@ -1183,14 +1187,6 @@ class CustomToolManager:
                 },
                 properties=response_properties,
             )
-            # Give Plivo time to process the Transfer API redirect and seat the
-            # aleg into the conference before we tear down the WebSocket.
-            # Without this delay, the WebSocket closes before Plivo has finished
-            # redirecting the original caller, causing a 404 "call not found" on
-            # the aleg and dropping the call on both sides.
-            import asyncio
-            await asyncio.sleep(2.0)
-
             # Give Plivo time to process the Transfer API redirect and seat the
             # aleg into the conference before we tear down the WebSocket.
             # Without this delay, the WebSocket closes before Plivo has finished

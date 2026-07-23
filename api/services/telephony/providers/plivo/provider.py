@@ -238,7 +238,7 @@ class PlivoProvider(TelephonyProvider):
         return any(hmac.compare_digest(computed, candidate) for candidate in candidates)
 
     async def get_webhook_response(
-        self, workflow_id: int, organization_id: int, workflow_run_id: int, enable_dtmf: bool = False
+        self, workflow_id: int, organization_id: int, workflow_run_id: int, enable_dtmf: bool = False, enable_callbacks: bool = False
     ) -> str:
         backend_endpoint, wss_backend_endpoint = await get_backend_endpoints()
 

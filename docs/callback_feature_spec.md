@@ -23,6 +23,7 @@ The AI agent should:
 ## Industry Standard (How Vapi Does It)
 
 Vapi treats callback as a **first-class workflow tool** called `transferCall` with a `schedule` variant.  
+In Dograh, we implement it as a **Native Workflow Setting** (`enable_callbacks`) that automatically injects the `schedule_callback` capability into the AI's context across all nodes in the workflow.
 When triggered, Vapi:
 - Ends the call immediately
 - Creates a deferred outbound job with a TTL delay
@@ -41,7 +42,7 @@ The callback tool is just a **scheduled outbound call** triggered from inside a 
 - `enqueue_job(..., _defer_by=timedelta(...))` — ARQ already supports delayed jobs natively
 - `initial_context` — already injected into every workflow run
 
-No new provider changes needed. A lightweight DB record is needed for single outbound/inbound callbacks (for durability against Redis flushes — see Section 9b).
+No new provider changes needed. A lightweight DB record is needed for single outbound/inbound callbacks (for durability against Redis flushes — see Section 9b). The setting is exposed globally as a boolean on the Workflow, rather than a node-specific Tool, ensuring the user can request a callback at any point in the conversation.
 
 ---
 
@@ -531,7 +532,7 @@ Stored in `workflow_configurations` JSON column on `WorkflowModel` — the same 
 
 | Setting | Type | Default | What it does |
 |---|---|---|---|
-| `enabled` | bool | `true` | Master toggle — disables the `schedule_callback` tool entirely for this agent |
+| `enabled` | bool | `true` | Master toggle — disables the callback capability entirely for this agent. (Stored as `enable_callbacks` natively on the Workflow) |
 | `min_delay_minutes` | int | `1` | Minimum callback delay the AI will accept. If user says "call in 10 seconds", AI says it can only go as low as this. |
 | `max_delay_minutes` | int | `480` (8 hrs) | Maximum delay allowed. If user says "call me next week", AI caps at this and asks to confirm. |
 | `max_chain_depth` | int | `2` | How many times a callback can itself request another callback before being blocked. Prevents infinite loops. |
@@ -942,7 +943,8 @@ Build in this order. Each step depends on the previous.
 - [ ] Create `api/tasks/callback_tasks.py` with `execute_callback()` function (Section 6)
 - [ ] Register `EXECUTE_CALLBACK` in `api/tasks/function_names.py`
 - [ ] Register `execute_callback` in ARQ worker functions list (`api/tasks/arq.py`)
-- [ ] Register `schedule_callback` tool in `CustomToolManager` (`pipecat_engine_custom_tools.py`)
+- [ ] Update `WorkflowModel` to include `enable_callbacks` boolean column.
+- [ ] Update `CustomToolManager` (`pipecat_engine_custom_tools.py`) to automatically inject `schedule_callback` when `enable_callbacks` is true.
 
 ### Phase 2 — Sociable Hours Enforcement
 - [ ] Create `api/services/callback_scheduler.py` with:

@@ -174,7 +174,6 @@ class ToolCategory(Enum):
     INTEGRATION = "integration"  # Third-party integrations (future: Google Calendar, Salesforce, etc.)
     MCP = "mcp"  # Customer-provided MCP server exposing a tool catalog
     WAIT = "wait"  # Built-in wait_for_user tool
-    SCHEDULE_CALLBACK = "schedule_callback"  # Built-in schedule_callback tool
 
 
 class ToolStatus(Enum):

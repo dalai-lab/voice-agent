@@ -113,9 +113,10 @@ async def handle_plivo_xml_webhook(
 
     workflow = await db_client.get_workflow_by_id(workflow_id)
     enable_dtmf = workflow.enable_dtmf if workflow else False
+    enable_callbacks = workflow.enable_callbacks if workflow else False
 
     response_content = await provider.get_webhook_response(
-        workflow_id, organization_id, workflow_run_id, enable_dtmf
+        workflow_id, organization_id, workflow_run_id, enable_dtmf, enable_callbacks
     )
     return HTMLResponse(content=response_content, media_type="application/xml")
 

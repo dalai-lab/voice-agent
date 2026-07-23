@@ -346,9 +346,10 @@ function GeneralSection({
             (workflowConfigurations.transcript_configuration?.include_end_timestamps ?? false) ||
             JSON.stringify(externalPbxFieldMappings) !==
             JSON.stringify(workflowConfigurations.external_pbx_field_mappings) ||
-            callbacksEnabled !== enableCallbacks
+            callbacksEnabled !== enableCallbacks ||
+            resumeMode !== callbackResumeMode
         );
-    }, [name, workflowName, ambientNoiseConfig, maxCallDuration, maxUserIdleTimeout, smartTurnStopSecs, turnStartStrategy, turnStartMinWords, provisionalVadPauseSecs, turnStopStrategy, contextCompactionEnabled, includeTranscriptEndTimestamps, workflowConfigurations, dtmfEnabled, enableDtmf, callbacksEnabled, enableCallbacks, externalPbxFieldMappings]);
+    }, [name, workflowName, ambientNoiseConfig, maxCallDuration, maxUserIdleTimeout, smartTurnStopSecs, turnStartStrategy, turnStartMinWords, provisionalVadPauseSecs, turnStopStrategy, contextCompactionEnabled, includeTranscriptEndTimestamps, workflowConfigurations, dtmfEnabled, enableDtmf, callbacksEnabled, enableCallbacks, externalPbxFieldMappings, resumeMode, callbackResumeMode]);
 
     useUnsavedChanges("general", isDirty);
 

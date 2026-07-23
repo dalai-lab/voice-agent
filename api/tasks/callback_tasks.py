@@ -48,10 +48,16 @@ async def execute_callback(ctx, to_number: str, from_number: str,
             except Exception as e:
                 logger.error(f"Failed to update ScheduledCallbackModel status: {e}")
 
+        # Fetch workflow to get user_id
+        workflow = await db_client.get_workflow(workflow_id, organization_id=organization_id)
+        if not workflow:
+            raise ValueError(f"Workflow {workflow_id} not found in org {organization_id}")
+
         new_run = await db_client.create_workflow_run(
             name=f"WR-CALLBACK-{original_run_id}",
             workflow_id=workflow_id,
             mode=provider.PROVIDER_NAME,
+            user_id=workflow.user_id,
             initial_context=callback_context,
             campaign_id=campaign_id,
             organization_id=organization_id,

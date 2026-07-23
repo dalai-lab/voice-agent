@@ -933,18 +933,18 @@ The DB write is still the source of truth (for durability), but the in-memory fl
 Build in this order. Each step depends on the previous.
 
 ### Phase 1 — Core Tool (no campaign support yet)
-- [ ] Create `api/services/workflow/tools/schedule_callback.py`
+- [x] Create `api/services/workflow/tools/schedule_callback.py`
   - Idempotency flag: `engine._callback_scheduled`
   - Read `called_number`, `caller_number`, `workflow_id`, `organization_id` from context
   - Capture `engine._gathered_context` at execution time
   - Validate: not WebRTC, not private number, delay within min/max, chain depth not exceeded
   - Write DB record first (durability — see 9a, 9b)
   - Enqueue ARQ job with `_defer_by`
-- [ ] Create `api/tasks/callback_tasks.py` with `execute_callback()` function (Section 6)
-- [ ] Register `EXECUTE_CALLBACK` in `api/tasks/function_names.py`
-- [ ] Register `execute_callback` in ARQ worker functions list (`api/tasks/arq.py`)
-- [ ] Update `WorkflowModel` to include `enable_callbacks` boolean column.
-- [ ] Update `CustomToolManager` (`pipecat_engine_custom_tools.py`) to automatically inject `schedule_callback` when `enable_callbacks` is true.
+- [x] Create `api/tasks/callback_tasks.py` with `execute_callback()` function (Section 6)
+- [x] Register `EXECUTE_CALLBACK` in `api/tasks/function_names.py`
+- [x] Register `execute_callback` in ARQ worker functions list (`api/tasks/arq.py`)
+- [x] Update `WorkflowModel` to include `enable_callbacks` boolean column.
+- [x] Update `CustomToolManager` (`pipecat_engine_custom_tools.py`) to automatically inject `schedule_callback` when `enable_callbacks` is true.
 
 ### Phase 2 — Sociable Hours Enforcement
 - [ ] Create `api/services/callback_scheduler.py` with:

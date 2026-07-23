@@ -1,7 +1,7 @@
 from loguru import logger
 from api.db import db_client
-from api.services.telephony.factory import get_telephony_provider_for_org
-from api.utils.env_manager import get_backend_endpoints
+from api.services.telephony.factory import get_default_telephony_provider
+from api.utils.common import get_backend_endpoints
 
 async def execute_callback(ctx, to_number: str, from_number: str,
                            workflow_id: int, organization_id: int,
@@ -15,7 +15,7 @@ async def execute_callback(ctx, to_number: str, from_number: str,
     """
     try:
         logger.info(f"Executing scheduled callback for original run {original_run_id} to {to_number}")
-        provider = await get_telephony_provider_for_org(organization_id)
+        provider = await get_default_telephony_provider(organization_id)
 
         callback_context = {
             "is_callback": True,

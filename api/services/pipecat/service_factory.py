@@ -43,7 +43,8 @@ from pipecat.services.elevenlabs.stt import (
     ElevenLabsRealtimeSTTService,
     ElevenLabsRealtimeSTTSettings,
 )
-from pipecat.services.elevenlabs.tts import ElevenLabsTTSService, ElevenLabsTTSSettings
+from api.services.pipecat.elevenlabs_http_tts import DograhElevenLabsHttpTTSService
+from pipecat.services.elevenlabs.tts import ElevenLabsHttpTTSSettings
 from pipecat.services.gladia.stt import GladiaSTTService, GladiaSTTSettings
 from pipecat.services.google.llm import GoogleLLMService, GoogleLLMSettings
 from pipecat.services.google.stt import GoogleSTTService, GoogleSTTSettings
@@ -556,16 +557,16 @@ def create_tts_service(
             voice_id = user_config.tts.voice.split(" - ")[1]
         except IndexError:
             voice_id = user_config.tts.voice
-        # ElevenLabs TTS consumes the full normalized WebSocket URL. Realtime
-        # STT uses the same normalization before adapting it to Pipecat's
-        # scheme-less base_url contract.
+        # Use the HTTP streaming endpoint instead of the WebSocket multi-stream-input
+        # endpoint. The WebSocket multi-stream-input path has a known bug where it
+        # silently returns empty audio when using BYOK (Bring Your Own Key) API keys.
+        # HTTP streaming is compatible with all voice types (pre-made, cloned, community)
+        # and all ElevenLabs subscription tiers.
         _validate_runtime_service_url(user_config.tts.base_url, "base_url")
-        elevenlabs_url = _elevenlabs_websocket_url(user_config.tts.base_url)
-        return ElevenLabsTTSService(
-            reconnect_on_error=False,
+        return DograhElevenLabsHttpTTSService(
             api_key=user_config.tts.api_key,
-            url=elevenlabs_url,
-            settings=ElevenLabsTTSSettings(
+            base_url=user_config.tts.base_url,
+            settings=ElevenLabsHttpTTSSettings(
                 voice=voice_id,
                 model=user_config.tts.model,
                 stability=0.8,

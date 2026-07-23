@@ -667,23 +667,14 @@ class PipecatEngine:
         is_callback = self._call_context_vars.get("is_callback", False)
         if is_callback and "is_callback" not in node.prompt:
             summary = self._call_context_vars.get("conversation_summary", "our previous conversation")
-            resume_mode = self._call_context_vars.get("callback_resume_mode", "fresh")
-            
-            if resume_mode == "last_node":
-                callback_injection = (
-                    f"\n\n[SYSTEM NOTE: This is a callback you are making to the user. "
-                    f"The summary of the previous conversation was: '{summary}'. "
-                    f"You are continuing from where the conversation left off. Greet the user naturally and continue.]\n"
-                )
-            elif node.is_start:
-                callback_injection = (
-                    f"\n\n[SYSTEM NOTE: This is a callback you are making to the user. "
-                    f"The summary of the previous conversation was: '{summary}'. "
-                    f"You must generate the first response to greet the user naturally and mention you are calling them back regarding the above topic.]\n"
-                )
-            else:
-                callback_injection = ""
-                
+            callback_injection = (
+                f"\n\n[SYSTEM NOTE: This is an outbound callback you are making to the user.\n"
+                f"Summary of the previous call: '{summary}'.\n"
+                f"Rules:\n"
+                f"- Do NOT re-ask for any information already in the summary.\n"
+                f"- Generate your own natural opening based on context — do not use any scripted greeting from your node prompt.\n"
+                f"- Continue the conversation as if you remember the user.]\n"
+            )
             system_prompt += callback_injection
         functions = await compose_functions_for_node(
             node=node,
@@ -779,7 +770,7 @@ class PipecatEngine:
             
             # Smart Fallback for Callbacks
             is_callback = self._call_context_vars.get("is_callback", False)
-            if is_callback and node.is_start and "is_callback" not in greeting_text:
+            if is_callback and "is_callback" not in greeting_text:
                 # Return None to skip the static TTS greeting and let the LLM generate the first turn
                 return None
                 

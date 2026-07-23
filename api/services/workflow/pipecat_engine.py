@@ -665,7 +665,7 @@ class PipecatEngine:
 
         # Callback Context Override — prepended so it takes priority over node instructions
         is_callback = self._call_context_vars.get("is_callback", False)
-        logger.debug(f"[CALLBACK DEBUG] is_callback={is_callback!r}, node_id={node.id!r}, node_is_start={node.is_start!r}")
+        logger.info(f"[CALLBACK DEBUG] is_callback={is_callback!r}, node_id={node.id!r}, node_is_start={node.is_start!r}")
         if is_callback and "is_callback" not in node.prompt:
             summary = self._call_context_vars.get("conversation_summary", "our previous conversation")
             callback_injection = (
@@ -680,7 +680,7 @@ class PipecatEngine:
                 f"[END OF CALLBACK OVERRIDE]\n\n"
             )
             system_prompt = callback_injection + system_prompt
-            logger.debug(f"[CALLBACK DEBUG] Injected callback override. Prompt starts with: {system_prompt[:120]!r}")
+            logger.info(f"[CALLBACK DEBUG] Injected. Prompt first 150 chars: {system_prompt[:150]!r}")
         functions = await compose_functions_for_node(
             node=node,
             custom_tool_manager=self._custom_tool_manager,

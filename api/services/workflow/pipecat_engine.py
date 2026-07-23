@@ -663,24 +663,19 @@ class PipecatEngine:
             has_recordings=self._has_recordings,
         )
 
-        # Callback Context Override — prepended so it takes priority over node instructions
+        # Callback context note — appended last so it's the final instruction the LLM reads
         is_callback = self._call_context_vars.get("is_callback", False)
-        logger.info(f"[CALLBACK DEBUG] is_callback={is_callback!r}, node_id={node.id!r}, node_is_start={node.is_start!r}")
+        logger.info(f"[CALLBACK DEBUG] is_callback={is_callback!r}, node_id={node.id!r}")
         if is_callback and "is_callback" not in node.prompt:
             summary = self._call_context_vars.get("conversation_summary", "our previous conversation")
             callback_injection = (
-                f"[CALLBACK OVERRIDE — READ THIS FIRST, BEFORE ALL OTHER INSTRUCTIONS]\n"
-                f"This is an outbound callback you are making. The user called earlier.\n"
-                f"Summary of the previous call: '{summary}'.\n"
-                f"STRICT RULES:\n"
-                f"- Do NOT greet the user as if this is a new inbound call.\n"
-                f"- Do NOT ask for their name or any information already in the summary.\n"
-                f"- Open naturally by acknowledging you are calling them back, referencing what they needed.\n"
-                f"- Then continue the conversation from where it left off.\n"
-                f"[END OF CALLBACK OVERRIDE]\n\n"
+                f"\n\n[SYSTEM NOTE: This is an outbound callback you are making to the user. "
+                f"Summary of the previous call: '{summary}'. "
+                f"Open the call by naturally referencing the callback and what the user needed — do not treat this as a new inbound call. "
+                f"Do not ask for information already covered in the summary.]\n"
             )
-            system_prompt = callback_injection + system_prompt
-            logger.info(f"[CALLBACK DEBUG] Injected. Prompt first 150 chars: {system_prompt[:150]!r}")
+            system_prompt += callback_injection
+            logger.info(f"[CALLBACK DEBUG] Injected (appended). Prompt last 150 chars: {system_prompt[-150:]!r}")
         functions = await compose_functions_for_node(
             node=node,
             custom_tool_manager=self._custom_tool_manager,

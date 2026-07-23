@@ -662,6 +662,17 @@ class PipecatEngine:
             format_prompt=self._format_prompt,
             has_recordings=self._has_recordings,
         )
+
+        # Smart Fallback for Callback Context in LLM
+        is_callback = self._call_context_vars.get("is_callback", False)
+        if is_callback and node.is_start and "is_callback" not in node.prompt:
+            summary = self._call_context_vars.get("conversation_summary", "our previous conversation")
+            callback_injection = (
+                f"\n\n[SYSTEM NOTE: This is a callback you are making to the user. "
+                f"The summary of the previous conversation was: '{summary}'. "
+                f"You must generate the first response to greet the user naturally and mention you are calling them back regarding the above topic.]\n"
+            )
+            system_prompt += callback_injection
         functions = await compose_functions_for_node(
             node=node,
             custom_tool_manager=self._custom_tool_manager,
@@ -757,8 +768,8 @@ class PipecatEngine:
             # Smart Fallback for Callbacks
             is_callback = self._call_context_vars.get("is_callback", False)
             if is_callback and node.is_start and "is_callback" not in greeting_text:
-                fallback_greeting = "Hi! I'm calling you back as promised. How can I help you today?"
-                return ("text", fallback_greeting)
+                # Return None to skip the static TTS greeting and let the LLM generate the first turn
+                return None
                 
             return ("text", self._format_prompt(greeting_text))
 

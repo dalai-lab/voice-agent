@@ -29,6 +29,11 @@ from api.services.telephony.factory import get_telephony_provider_for_run
 from api.services.telephony.transfer_event_protocol import TransferContext
 from api.services.workflow.tools.calculator import get_calculator_tools, safe_calculator
 from api.services.workflow.tools.wait import get_wait_tools
+from api.services.workflow.tools.schedule_callback import get_schedule_callback_tools
+from api.tasks.arq import enqueue_job
+from api.tasks.function_names import FunctionNames
+from api.db.models import ScheduledCallbackModel
+from datetime import datetime, timedelta, UTC
 from api.services.workflow.tools.custom_tool import (
     execute_http_tool,
     tool_to_function_schema,
@@ -177,6 +182,21 @@ class CustomToolManager:
                     self._register_wait_handler()
                     logger.debug(f"Registered wait tool handler (tool_uuid: {tool.tool_uuid})")
                     for tool_def in get_wait_tools():
+                        func = tool_def["function"]
+                        schemas.append(
+                            get_function_schema(
+                                func["name"],
+                                func["description"],
+                                properties=func["parameters"]["properties"],
+                                required=func["parameters"]["required"],
+                            )
+                        )
+                    continue
+
+                if tool.category == ToolCategory.SCHEDULE_CALLBACK.value:
+                    self._register_schedule_callback_handler()
+                    logger.debug(f"Registered schedule_callback tool handler (tool_uuid: {tool.tool_uuid})")
+                    for tool_def in get_schedule_callback_tools():
                         func = tool_def["function"]
                         schemas.append(
                             get_function_schema(
@@ -1185,3 +1205,120 @@ class CustomToolManager:
             # Unknown action, treat as generic success
             logger.warning(f"Unknown transfer action: {action}, treating as success")
             await function_call_params.result_callback(result)
+
+    def _register_schedule_callback_handler(self) -> None:
+        """Register the built-in schedule_callback function with the LLM."""
+        properties = FunctionCallResultProperties(run_llm=False)
+
+        async def schedule_callback_func(function_call_params: FunctionCallParams) -> None:
+            logger.info("LLM Function Call EXECUTED: schedule_callback")
+            logger.info(f"Arguments: {function_call_params.arguments}")
+
+            # 1. Idempotency Check
+            if getattr(self._engine, "_callback_scheduled", False):
+                logger.info("Callback already scheduled in this session. Returning silent success.")
+                await function_call_params.result_callback(
+                    {"status": "already_scheduled"}, properties=properties
+                )
+                await self._play_farewell_and_end(function_call_params)
+                return
+
+            try:
+                # 2. Extract configuration & context
+                args = function_call_params.arguments
+                minutes = min(max(args.get("minutes", 60), 1), 480)
+                conversation_summary = args.get("conversation_summary", "")
+                
+                workflow_run_id = self._engine._workflow_run_id
+                organization_id = await self.get_organization_id()
+                workflow_run = await db_client.get_workflow_run_by_id(workflow_run_id)
+                workflow_id = workflow_run.workflow_id
+                
+                # Check WebRTC
+                if workflow_run.mode in [WorkflowRunMode.WEBRTC.value, WorkflowRunMode.SMALLWEBRTC.value, WorkflowRunMode.TEXTCHAT.value]:
+                    await function_call_params.result_callback({
+                        "error": "I'm sorry, callbacks are only available for phone calls."
+                    })
+                    return
+
+                # Get numbers
+                initial_context = workflow_run.initial_context or {}
+                # In outbound, we called them (called_number is user). In inbound, they called us (caller_number is user).
+                # The callback tool requires calling the user. 
+                # For Phase 1 (no campaign), we determine user number:
+                to_number = initial_context.get("called_number") if not initial_context.get("is_inbound") else initial_context.get("caller_number")
+                from_number = initial_context.get("caller_number") if not initial_context.get("is_inbound") else initial_context.get("called_number")
+
+                if not to_number or to_number.startswith("anonymous"):
+                    await function_call_params.result_callback({
+                        "error": "I'm sorry, I can't schedule a callback as your number is private."
+                    })
+                    return
+
+                # Check chain depth
+                chain_depth = initial_context.get("callback_chain_depth", 0) + 1
+                if chain_depth > 2:
+                    await function_call_params.result_callback({
+                        "error": "I'm unable to schedule another callback. Please call us back when you're ready."
+                    })
+                    return
+
+                # 3. Save to DB
+                async with db_client.get_async_session() as session:
+                    new_callback = ScheduledCallbackModel(
+                        organization_id=organization_id,
+                        workflow_id=workflow_id,
+                        original_run_id=workflow_run_id,
+                        status="pending",
+                        scheduled_for=datetime.now(UTC) + timedelta(minutes=minutes),
+                        to_number=to_number,
+                        from_number=from_number,
+                        conversation_summary=conversation_summary,
+                        gathered_context=self._engine._gathered_context,
+                        callback_chain_depth=chain_depth
+                    )
+                    session.add(new_callback)
+                    await session.commit()
+                
+                # 4. Enqueue ARQ Job
+                await enqueue_job(
+                    FunctionNames.EXECUTE_CALLBACK,
+                    to_number=to_number,
+                    from_number=from_number,
+                    workflow_id=workflow_id,
+                    organization_id=organization_id,
+                    original_run_id=workflow_run_id,
+                    conversation_summary=conversation_summary,
+                    gathered_context=self._engine._gathered_context,
+                    callback_chain_depth=chain_depth,
+                    _defer_by=timedelta(minutes=minutes)
+                )
+
+                self._engine._callback_scheduled = True
+                await function_call_params.result_callback(
+                    {"status": "scheduled", "callback_in_minutes": minutes},
+                    properties=properties
+                )
+                await self._play_farewell_and_end(function_call_params)
+
+            except Exception as e:
+                logger.error(f"Schedule callback tool error: {e}")
+                await function_call_params.result_callback({"error": str(e)})
+
+        self._engine.llm.register_function(
+            "schedule_callback", schedule_callback_func, timeout_secs=10.0, is_node_transition=True
+        )
+
+    async def _play_farewell_and_end(self, function_call_params: FunctionCallParams):
+        """Helper to play the farewell message and end the call."""
+        farewell_message = function_call_params.arguments.get("farewell_message", "Okay, I will call you back. Goodbye!")
+        self._engine._queued_speech_mute_state = "waiting"
+        await self._engine.task.queue_frame(
+            TTSSpeakFrame(
+                farewell_message,
+                append_to_context=True,
+                persist_to_logs=True,
+            )
+        )
+        await self._engine.end_call_with_reason(EndTaskReason.END_CALL_TOOL_REASON.value, abort_immediately=False)
+

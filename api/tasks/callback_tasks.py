@@ -26,6 +26,7 @@ async def execute_callback(ctx, to_number: str, from_number: str,
             "callback_chain_depth": callback_chain_depth,
             "caller_number": from_number,
             "called_number": to_number,
+            "provider": provider.PROVIDER_NAME,
         }
         if campaign_id:
             callback_context["campaign_id"] = campaign_id

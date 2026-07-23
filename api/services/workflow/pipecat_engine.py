@@ -752,7 +752,16 @@ class PipecatEngine:
             return ("audio", node.greeting_recording_id)
 
         if node.greeting:
-            return ("text", self._format_prompt(node.greeting))
+            greeting_text = node.greeting
+            
+            # Smart Fallback for Callbacks
+            is_callback = self._call_context_vars.get("is_callback", False)
+            if is_callback and node.is_start and "is_callback" not in greeting_text:
+                summary = self._call_context_vars.get("conversation_summary", "our previous conversation")
+                fallback_greeting = f"Hi! I'm calling you back as promised regarding {summary}."
+                return ("text", fallback_greeting)
+                
+            return ("text", self._format_prompt(greeting_text))
 
         return None
 

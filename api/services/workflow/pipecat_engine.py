@@ -663,19 +663,22 @@ class PipecatEngine:
             has_recordings=self._has_recordings,
         )
 
-        # Smart Fallback for Callback Context in LLM
+        # Callback Context Override — prepended so it takes priority over node instructions
         is_callback = self._call_context_vars.get("is_callback", False)
         if is_callback and "is_callback" not in node.prompt:
             summary = self._call_context_vars.get("conversation_summary", "our previous conversation")
             callback_injection = (
-                f"\n\n[SYSTEM NOTE: This is an outbound callback you are making to the user.\n"
+                f"[CALLBACK OVERRIDE — READ THIS FIRST, BEFORE ALL OTHER INSTRUCTIONS]\n"
+                f"This is an outbound callback you are making. The user called earlier.\n"
                 f"Summary of the previous call: '{summary}'.\n"
-                f"Rules:\n"
-                f"- Do NOT re-ask for any information already in the summary.\n"
-                f"- Generate your own natural opening based on context — do not use any scripted greeting from your node prompt.\n"
-                f"- Continue the conversation as if you remember the user.]\n"
+                f"STRICT RULES:\n"
+                f"- Do NOT greet the user as if this is a new inbound call.\n"
+                f"- Do NOT ask for their name or any information already in the summary.\n"
+                f"- Open naturally by acknowledging you are calling them back, referencing what they needed.\n"
+                f"- Then continue the conversation from where it left off.\n"
+                f"[END OF CALLBACK OVERRIDE]\n\n"
             )
-            system_prompt += callback_injection
+            system_prompt = callback_injection + system_prompt
         functions = await compose_functions_for_node(
             node=node,
             custom_tool_manager=self._custom_tool_manager,

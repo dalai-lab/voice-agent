@@ -1222,6 +1222,7 @@ async def update_workflow(
             workflow_configurations=workflow_configurations,
             enable_dtmf=request.enable_dtmf,
             enable_callbacks=request.enable_callbacks,
+            callback_resume_mode=request.callback_resume_mode,
             organization_id=user.selected_organization_id,
         )
 

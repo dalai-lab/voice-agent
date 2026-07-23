@@ -461,6 +461,9 @@ class WorkflowModel(Base):
     enable_callbacks = Column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )
+    callback_resume_mode = Column(
+        String, nullable=False, default="fresh", server_default=text("'fresh'")
+    )
     runs = relationship("WorkflowRunModel", back_populates="workflow")
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 

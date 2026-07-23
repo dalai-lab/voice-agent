@@ -156,11 +156,23 @@ def register_event_handlers(
                         f"{list(fetch_result.keys())}"
                     )
 
-            # Set the start node now (after pre-call fetch data is merged)
-            # so that render_template() has the complete _call_context_vars.
-            await engine.set_node(engine.workflow.start_node_id)
+            # Determine which node to start at based on callback_resume_mode
+            resume_mode = engine._call_context_vars.get("callback_resume_mode", "fresh")
+            is_callback = engine._call_context_vars.get("is_callback", False)
+            nodes_visited = engine._call_context_vars.get("gathered_context", {}).get("nodes_visited", [])
+
+            if is_callback and resume_mode == "last_node" and nodes_visited:
+                # Find the last visited node that still exists in the workflow graph
+                start_node_id = next(
+                    (n for n in reversed(nodes_visited) if n in engine.workflow.nodes),
+                    engine.workflow.start_node_id
+                )
+            else:
+                start_node_id = engine.workflow.start_node_id
+
+            await engine.set_node(start_node_id)
             await engine.queue_node_opening(
-                node_id=engine.workflow.start_node_id,
+                node_id=start_node_id,
                 previous_node_id=None,
                 generate_if_no_greeting=True,
             )

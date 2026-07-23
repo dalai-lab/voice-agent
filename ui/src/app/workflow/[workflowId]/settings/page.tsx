@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -270,6 +271,7 @@ function GeneralSection({
     workflowId,
     enableDtmf,
     enableCallbacks,
+    callbackResumeMode,
     onSave,
 }: {
     workflowConfigurations: WorkflowConfigurations;
@@ -277,12 +279,14 @@ function GeneralSection({
     workflowId: number;
     enableDtmf: boolean;
     enableCallbacks: boolean;
-    onSave: (configurations: WorkflowConfigurations, workflowName: string, enableDtmf?: boolean, enableCallbacks?: boolean) => Promise<void>;
+    callbackResumeMode: "fresh" | "last_node";
+    onSave: (configurations: WorkflowConfigurations, workflowName: string, enableDtmf?: boolean, enableCallbacks?: boolean, callbackResumeMode?: "fresh" | "last_node") => Promise<void>;
 }) {
     const { externalPbxIntegrationsEnabled } = useOrgConfig();
     const [name, setName] = useState(workflowName);
     const [dtmfEnabled, setDtmfEnabled] = useState(enableDtmf);
     const [callbacksEnabled, setCallbacksEnabled] = useState(enableCallbacks);
+    const [resumeMode, setResumeMode] = useState(callbackResumeMode);
     const [ambientNoiseConfig, setAmbientNoiseConfig] = useState<AmbientNoiseConfiguration>(
         workflowConfigurations.ambient_noise_configuration,
     );
@@ -429,7 +433,8 @@ function GeneralSection({
                 },
                 name,
                 dtmfEnabled,
-                callbacksEnabled
+                callbacksEnabled,
+                resumeMode
             );
         } catch (error) {
             console.error("Failed to save general settings:", error);
@@ -499,6 +504,30 @@ function GeneralSection({
                             onCheckedChange={setCallbacksEnabled}
                         />
                     </div>
+                    {callbacksEnabled && (
+                        <div className="mt-4 pl-4 border-l-2 space-y-4 border-muted">
+                            <div className="space-y-1">
+                                <Label className="text-xs">Callback Resume Mode</Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Determines where the workflow starts when calling the user back.
+                                </p>
+                            </div>
+                            <RadioGroup
+                                value={resumeMode}
+                                onValueChange={(value) => setResumeMode(value as "fresh" | "last_node")}
+                                className="flex flex-col space-y-1"
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="fresh" id="resume-fresh" />
+                                    <Label htmlFor="resume-fresh" className="text-sm font-normal">Start Fresh (Default)</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="last_node" id="resume-last-node" />
+                                    <Label htmlFor="resume-last-node" className="text-sm font-normal">Resume from Last Node</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+                    )}
                 </div>
 
                 <Separator />
@@ -1720,6 +1749,7 @@ function WorkflowSettingsInner({
                                 workflowId={workflowId}
                                 enableDtmf={(workflow as any).enable_dtmf ?? false}
                                 enableCallbacks={(workflow as any).enable_callbacks ?? false}
+                                callbackResumeMode={(workflow as any).callback_resume_mode ?? "fresh"}
                                 onSave={saveWorkflowConfigurations}
                             />
 

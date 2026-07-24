@@ -39,6 +39,10 @@ def get_schedule_callback_tools() -> list[Dict[str, Any]]:
                         "conversation_summary": {
                             "type": "string",
                             "description": "A 1-2 sentence summary of the conversation so far, to be injected as context on the callback call.",
+                        },
+                        "force_schedule": {
+                            "type": "boolean",
+                            "description": "Set to true ONLY if you are explicitly confirming a system-adjusted time (e.g. pushed to next morning).",
                         }
                     },
                     "required": ["minutes", "farewell_message", "conversation_summary"],

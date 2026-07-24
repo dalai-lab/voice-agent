@@ -149,6 +149,33 @@ class CircuitBreakerConfigResponse(BaseModel):
     min_calls_in_window: int = 5
 
 
+class CallbackConfigRequest(BaseModel):
+    enabled: bool = True
+    sociable_hours_start: str = Field(default="08:00", pattern=r"^\d{2}:\d{2}$")
+    sociable_hours_end: str = Field(default="21:00", pattern=r"^\d{2}:\d{2}$")
+    sociable_hours_timezone: str = "UTC"
+    honor_campaign_window_for_long_callbacks: bool = True
+    long_callback_threshold_minutes: int = Field(default=120, ge=0)
+
+    @field_validator("sociable_hours_timezone")
+    @classmethod
+    def validate_timezone(cls, v: str) -> str:
+        try:
+            ZoneInfo(v)
+        except (KeyError, Exception):
+            raise ValueError(f"Invalid timezone: {v}")
+        return v
+
+
+class CallbackConfigResponse(BaseModel):
+    enabled: bool = True
+    sociable_hours_start: str = "08:00"
+    sociable_hours_end: str = "21:00"
+    sociable_hours_timezone: str = "UTC"
+    honor_campaign_window_for_long_callbacks: bool = True
+    long_callback_threshold_minutes: int = 120
+
+
 class CreateCampaignRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     workflow_id: int
@@ -162,6 +189,7 @@ class CreateCampaignRequest(BaseModel):
     max_concurrency: Optional[int] = Field(default=None, ge=1, le=100)
     schedule_config: Optional[ScheduleConfigRequest] = None
     circuit_breaker: Optional[CircuitBreakerConfigRequest] = None
+    callback_config: Optional[CallbackConfigRequest] = None
 
 
 class UpdateCampaignRequest(BaseModel):
@@ -170,6 +198,7 @@ class UpdateCampaignRequest(BaseModel):
     max_concurrency: Optional[int] = Field(default=None, ge=1, le=100)
     schedule_config: Optional[ScheduleConfigRequest] = None
     circuit_breaker: Optional[CircuitBreakerConfigRequest] = None
+    callback_config: Optional[CallbackConfigRequest] = None
 
 
 class CampaignLogEntryResponse(BaseModel):
@@ -204,6 +233,7 @@ class CampaignResponse(BaseModel):
     max_concurrency: Optional[int] = None
     schedule_config: Optional[ScheduleConfigResponse] = None
     circuit_breaker: Optional[CircuitBreakerConfigResponse] = None
+    callback_config: Optional[CallbackConfigResponse] = None
     executed_count: int = 0
     total_queued_count: int = 0
     parent_campaign_id: Optional[int] = None
@@ -270,6 +300,7 @@ def _build_campaign_response(
     max_concurrency = None
     schedule_config = None
     circuit_breaker_config = CircuitBreakerConfigResponse()
+    callback_config = None
     parent_campaign_id = None
     redialed_campaign_id = None
     if campaign.orchestrator_metadata:
@@ -284,6 +315,9 @@ def _build_campaign_response(
         cb = campaign.orchestrator_metadata.get("circuit_breaker")
         if cb:
             circuit_breaker_config = CircuitBreakerConfigResponse(**cb)
+        cc = campaign.orchestrator_metadata.get("callback_config")
+        if cc:
+            callback_config = CallbackConfigResponse(**cc)
         parent_campaign_id = campaign.orchestrator_metadata.get("parent_campaign_id")
         redialed_campaign_id = campaign.orchestrator_metadata.get(
             "redialed_campaign_id"
@@ -307,6 +341,7 @@ def _build_campaign_response(
         max_concurrency=max_concurrency,
         schedule_config=schedule_config,
         circuit_breaker=circuit_breaker_config,
+        callback_config=callback_config,
         executed_count=executed_count,
         total_queued_count=total_queued_count,
         parent_campaign_id=parent_campaign_id,
@@ -666,6 +701,10 @@ async def update_campaign(
 
     if request.circuit_breaker is not None:
         metadata["circuit_breaker"] = request.circuit_breaker.model_dump()
+        metadata_changed = True
+
+    if request.callback_config is not None:
+        metadata["callback_config"] = request.callback_config.model_dump()
         metadata_changed = True
 
     if metadata_changed:

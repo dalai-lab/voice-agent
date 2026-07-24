@@ -61,6 +61,14 @@ export default function EditCampaignPage() {
     const [circuitBreakerWindowSeconds, setCircuitBreakerWindowSeconds] = useState<string>('120');
     const [circuitBreakerMinCalls, setCircuitBreakerMinCalls] = useState<string>('5');
 
+    // Callback config state
+    const [callbackEnabled, setCallbackEnabled] = useState(true);
+    const [callbackSociableHoursStart, setCallbackSociableHoursStart] = useState<string>('08:00');
+    const [callbackSociableHoursEnd, setCallbackSociableHoursEnd] = useState<string>('21:00');
+    const [callbackSociableHoursTimezone, setCallbackSociableHoursTimezone] = useState<ITimezoneOption | string>('UTC');
+    const [callbackHonorCampaignWindowForLongCallbacks, setCallbackHonorCampaignWindowForLongCallbacks] = useState(true);
+    const [callbackLongCallbackThresholdMinutes, setCallbackLongCallbackThresholdMinutes] = useState<string>('120');
+
     // Redirect if not authenticated
     useEffect(() => {
         if (!loading && !user) {
@@ -117,6 +125,17 @@ export default function EditCampaignPage() {
                     setCircuitBreakerFailureThreshold(String(Math.round(cb.failure_threshold * 100)));
                     setCircuitBreakerWindowSeconds(String(cb.window_seconds));
                     setCircuitBreakerMinCalls(String(cb.min_calls_in_window));
+                }
+
+                // Callback config
+                const cc = (c as unknown as { callback_config?: { enabled: boolean; sociable_hours_start: string; sociable_hours_end: string; sociable_hours_timezone: string; honor_campaign_window_for_long_callbacks: boolean; long_callback_threshold_minutes: number } }).callback_config;
+                if (cc) {
+                    setCallbackEnabled(cc.enabled);
+                    setCallbackSociableHoursStart(cc.sociable_hours_start);
+                    setCallbackSociableHoursEnd(cc.sociable_hours_end);
+                    setCallbackSociableHoursTimezone(cc.sociable_hours_timezone);
+                    setCallbackHonorCampaignWindowForLongCallbacks(cc.honor_campaign_window_for_long_callbacks);
+                    setCallbackLongCallbackThresholdMinutes(String(cc.long_callback_threshold_minutes));
                 }
             }
         } catch (error) {
@@ -234,6 +253,15 @@ export default function EditCampaignPage() {
                 min_calls_in_window: parseInt(circuitBreakerMinCalls) || 5,
             };
 
+            const callbackConfig = {
+                enabled: callbackEnabled,
+                sociable_hours_start: callbackSociableHoursStart,
+                sociable_hours_end: callbackSociableHoursEnd,
+                sociable_hours_timezone: getTimezoneValue(callbackSociableHoursTimezone),
+                honor_campaign_window_for_long_callbacks: callbackHonorCampaignWindowForLongCallbacks,
+                long_callback_threshold_minutes: parseInt(callbackLongCallbackThresholdMinutes) || 120,
+            };
+
 
             const response = await updateCampaignApiV1CampaignCampaignIdPatch({
                 path: { campaign_id: campaignId },
@@ -243,6 +271,7 @@ export default function EditCampaignPage() {
                     max_concurrency: maxConcurrencyValue,
                     schedule_config: scheduleConfig,
                     circuit_breaker: circuitBreakerConfig,
+                    callback_config: callbackConfig,
                 },
                 headers: { 'Authorization': `Bearer ${accessToken}` },
             });
@@ -363,6 +392,18 @@ export default function EditCampaignPage() {
                             onCircuitBreakerWindowSecondsChange={setCircuitBreakerWindowSeconds}
                             circuitBreakerMinCalls={circuitBreakerMinCalls}
                             onCircuitBreakerMinCallsChange={setCircuitBreakerMinCalls}
+                            callbackEnabled={callbackEnabled}
+                            onCallbackEnabledChange={setCallbackEnabled}
+                            callbackSociableHoursStart={callbackSociableHoursStart}
+                            onCallbackSociableHoursStartChange={setCallbackSociableHoursStart}
+                            callbackSociableHoursEnd={callbackSociableHoursEnd}
+                            onCallbackSociableHoursEndChange={setCallbackSociableHoursEnd}
+                            callbackSociableHoursTimezone={callbackSociableHoursTimezone}
+                            onCallbackSociableHoursTimezoneChange={setCallbackSociableHoursTimezone}
+                            callbackHonorCampaignWindowForLongCallbacks={callbackHonorCampaignWindowForLongCallbacks}
+                            onCallbackHonorCampaignWindowForLongCallbacksChange={setCallbackHonorCampaignWindowForLongCallbacks}
+                            callbackLongCallbackThresholdMinutes={callbackLongCallbackThresholdMinutes}
+                            onCallbackLongCallbackThresholdMinutesChange={setCallbackLongCallbackThresholdMinutes}
                         />
 
                         {submitError && (

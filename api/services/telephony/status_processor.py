@@ -174,17 +174,30 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
                 reason=normalized_status.value if is_failure else None,
             )
 
+        # Check if this is a callback run
+        is_callback = workflow_run.initial_context and workflow_run.initial_context.get("is_callback")
+        
+        # Get call disposition to check for user_hangup
+        call_disposition = None
+        if workflow_run.gathered_context:
+            call_disposition = workflow_run.gathered_context.get("call_disposition")
+
         if (
             normalized_status in RETRYABLE_NOT_CONNECTED_STATUSES
             and workflow_run.campaign_id
         ):
-            publisher = await get_campaign_event_publisher()
-            await publisher.publish_retry_needed(
-                workflow_run_id=workflow_run_id,
-                reason=normalized_status.value.replace("-", "_"),
-                campaign_id=workflow_run.campaign_id,
-                queued_run_id=workflow_run.queued_run_id,
-            )
+            # Skip RetryNeededEvent publication for user_hangup on callbacks
+            # and generally for callbacks since they have special retry logic (e.g. ARQ deferral for busy)
+            if is_callback and (call_disposition == "user_hangup" or normalized_status.value == "user_hangup" or is_callback):
+                logger.info(f"[run {workflow_run_id}] Skipping RetryNeededEvent for callback run (disposition: {call_disposition})")
+            else:
+                publisher = await get_campaign_event_publisher()
+                await publisher.publish_retry_needed(
+                    workflow_run_id=workflow_run_id,
+                    reason=normalized_status.value.replace("-", "_"),
+                    campaign_id=workflow_run.campaign_id,
+                    queued_run_id=workflow_run.queued_run_id,
+                )
 
         call_tags = (
             workflow_run.gathered_context.get("call_tags", [])

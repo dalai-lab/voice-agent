@@ -964,14 +964,14 @@ Build in this order. Each step depends on the previous.
 - [ ] In callback `execute_callback`: handle `campaign completed/failed` state — fire anyway (3e)
 
 ### Phase 4 — Configurable Settings
-- [ ] Read `workflow_configurations.callback` in tool handler (Section 9a settings)
-- [ ] Read `orchestrator_metadata.callback_config` for campaign context (Section 9b settings)
-- [ ] Implement precedence resolution: org → campaign → workflow → tool args (10d)
+- [x] Read `workflow_configurations.callback` in tool handler (Section 9a settings)
+- [x] Read `orchestrator_metadata.callback_config` for campaign context (Section 9b settings)
+- [x] Implement precedence resolution: org → campaign → workflow → tool args (10d)
 
 ### Phase 5 — UI
 - [x] Agent Settings tab: add "Callback Settings" toggle + min/max delay fields
-- [ ] Campaign Advanced Settings: add "Callback Settings" section with sociable hours + enable toggle
-- [ ] New "Pending Callbacks" universal menu: build UI view to list/cancel pending non-campaign callbacks from `ScheduledCallbackModel` (see 10b)
+- [x] Campaign Advanced Settings: add "Callback Settings" section with sociable hours + enable toggle
+- [x] New "Pending Callbacks" universal menu: build UI view to list/cancel pending non-campaign callbacks from `ScheduledCallbackModel` (see 10b)
 
 ### Phase 6 — Validation / Testing
 - [ ] Unit test: tool rejects WebRTC calls

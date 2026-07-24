@@ -57,7 +57,7 @@ class CampaignCallDispatcher:
         """Get the concurrent call limit for an organization."""
         return await call_concurrency.get_org_concurrent_limit(organization_id)
 
-    async def process_batch(self, campaign_id: int, batch_size: int = 10) -> int:
+    async def process_batch(self, campaign_id: int, batch_size: int = 10, callbacks_only: bool = False) -> int:
         """
         Processes a batch of queued runs with priority for scheduled retries.
         Thread-safe: uses SELECT FOR UPDATE SKIP LOCKED to prevent concurrent processing.
@@ -69,7 +69,7 @@ class CampaignCallDispatcher:
             raise ValueError(f"Campaign {campaign_id} not found")
 
         # Check if campaign is in running state
-        if campaign.state != "running":
+        if campaign.state != "running" and not callbacks_only:
             logger.info(
                 f"Campaign {campaign_id} is not in running state: {campaign.state}"
             )
@@ -81,6 +81,7 @@ class CampaignCallDispatcher:
             campaign_id=campaign_id,
             scheduled_before=datetime.now(UTC),
             limit=batch_size,
+            callbacks_only=callbacks_only,
         )
 
         if not queued_runs:

@@ -12,6 +12,7 @@ import {
   FileText,
   Home,
   Key,
+  CalendarClock,
   LogOut,
   type LucideIcon,
   Megaphone,
@@ -97,6 +98,11 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         title: "Campaigns",
         url: "/campaigns",
         icon: Megaphone,
+      },
+      {
+        title: "Callbacks",
+        url: "/callbacks",
+        icon: CalendarClock,
       },
       {
         title: "Models",

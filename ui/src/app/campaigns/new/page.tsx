@@ -82,6 +82,19 @@ export default function NewCampaignPage() {
     const [circuitBreakerFailureThreshold, setCircuitBreakerFailureThreshold] = useState<string>('50');
     const [circuitBreakerWindowSeconds, setCircuitBreakerWindowSeconds] = useState<string>('120');
     const [circuitBreakerMinCalls, setCircuitBreakerMinCalls] = useState<string>('5');
+    // Callback config state
+    const [callbackEnabled, setCallbackEnabled] = useState(true);
+    const [callbackSociableHoursStart, setCallbackSociableHoursStart] = useState<string>('08:00');
+    const [callbackSociableHoursEnd, setCallbackSociableHoursEnd] = useState<string>('21:00');
+    const [callbackSociableHoursTimezone, setCallbackSociableHoursTimezone] = useState<ITimezoneOption | string>(() => {
+        try {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone;
+        } catch {
+            return 'UTC';
+        }
+    });
+    const [callbackHonorCampaignWindowForLongCallbacks, setCallbackHonorCampaignWindowForLongCallbacks] = useState(true);
+    const [callbackLongCallbackThresholdMinutes, setCallbackLongCallbackThresholdMinutes] = useState<string>('120');
 
     // Redirect if not authenticated
     useEffect(() => {
@@ -293,6 +306,15 @@ export default function NewCampaignPage() {
                 min_calls_in_window: parseInt(circuitBreakerMinCalls) || 5,
             };
 
+            // Build callback_config
+            const callbackConfig = {
+                enabled: callbackEnabled,
+                sociable_hours_start: callbackSociableHoursStart,
+                sociable_hours_end: callbackSociableHoursEnd,
+                sociable_hours_timezone: getTimezoneValue(callbackSociableHoursTimezone),
+                honor_campaign_window_for_long_callbacks: callbackHonorCampaignWindowForLongCallbacks,
+                long_callback_threshold_minutes: parseInt(callbackLongCallbackThresholdMinutes) || 120,
+            };
 
             const response = await createCampaignApiV1CampaignCreatePost({
                 body: {
@@ -305,6 +327,7 @@ export default function NewCampaignPage() {
                     max_concurrency: maxConcurrencyValue,
                     schedule_config: scheduleConfig,
                     circuit_breaker: circuitBreakerConfig,
+                    callback_config: callbackConfig,
                 },
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -313,8 +336,13 @@ export default function NewCampaignPage() {
 
             if (response.error) {
                 // Extract error message from API response
-                const errorDetail = (response.error as { detail?: string })?.detail;
-                const errorMessage = errorDetail || 'Failed to create campaign';
+                let errorDetail = (response.error as any)?.detail;
+                if (Array.isArray(errorDetail)) {
+                    errorDetail = errorDetail.map((e: any) => `${e.loc?.join('.') || 'Field'}: ${e.msg}`).join(', ');
+                } else if (typeof errorDetail === 'object' && errorDetail !== null) {
+                    errorDetail = JSON.stringify(errorDetail);
+                }
+                const errorMessage = typeof errorDetail === 'string' ? errorDetail : 'Failed to create campaign';
                 setCreateError(errorMessage);
                 toast.error(errorMessage);
                 return;
@@ -542,6 +570,18 @@ export default function NewCampaignPage() {
                                         onCircuitBreakerWindowSecondsChange={setCircuitBreakerWindowSeconds}
                                         circuitBreakerMinCalls={circuitBreakerMinCalls}
                                         onCircuitBreakerMinCallsChange={setCircuitBreakerMinCalls}
+                                        callbackEnabled={callbackEnabled}
+                                        onCallbackEnabledChange={setCallbackEnabled}
+                                        callbackSociableHoursStart={callbackSociableHoursStart}
+                                        onCallbackSociableHoursStartChange={setCallbackSociableHoursStart}
+                                        callbackSociableHoursEnd={callbackSociableHoursEnd}
+                                        onCallbackSociableHoursEndChange={setCallbackSociableHoursEnd}
+                                        callbackSociableHoursTimezone={callbackSociableHoursTimezone}
+                                        onCallbackSociableHoursTimezoneChange={setCallbackSociableHoursTimezone}
+                                        callbackHonorCampaignWindowForLongCallbacks={callbackHonorCampaignWindowForLongCallbacks}
+                                        onCallbackHonorCampaignWindowForLongCallbacksChange={setCallbackHonorCampaignWindowForLongCallbacks}
+                                        callbackLongCallbackThresholdMinutes={callbackLongCallbackThresholdMinutes}
+                                        onCallbackLongCallbackThresholdMinutesChange={setCallbackLongCallbackThresholdMinutes}
                                     />
                                 </CollapsibleContent>
                             </Collapsible>

@@ -44,9 +44,15 @@ from api.services.mps_service_key_client import mps_service_key_client
 from api.services.posthog_client import capture_event
 from api.services.reports import generate_workflow_report_csv
 from api.services.storage import storage_fs
+from api.services.workflow.configuration_policy import (
+    ExternalPBXConfigurationDisabledError,
+    WorkflowConfigurationNotFoundError,
+    apply_external_pbx_mapping_policy,
+)
 from api.services.workflow.dto import ReactFlowDTO, sanitize_workflow_definition
 from api.services.workflow.duplicate import duplicate_workflow
 from api.services.workflow.errors import ItemKind, WorkflowError
+from api.services.workflow.run_creation import prepare_workflow_run_inputs
 from api.services.workflow.run_usage_response import (
     format_public_cost_info,
     format_public_usage_info,
@@ -233,6 +239,8 @@ class WorkflowResponse(BaseModel):
     total_runs: int | None = None
     workflow_configurations: dict | None = None
     enable_dtmf: bool = False
+    enable_callbacks: bool = False
+    callback_resume_mode: str = "fresh"
     version_number: int | None = None
     version_status: str | None = None
     workflow_uuid: str | None = None
@@ -291,6 +299,8 @@ class UpdateWorkflowRequest(BaseModel):
     # model_configuration_v2_override intact.
     workflow_configurations: WorkflowConfigurationDefaults | None = None
     enable_dtmf: bool | None = None
+    enable_callbacks: bool | None = None
+    callback_resume_mode: str | None = None
 
 
 class WorkflowVersionResponse(BaseModel):
@@ -740,6 +750,8 @@ async def get_workflow(
         "call_disposition_codes": workflow.call_disposition_codes,
         "workflow_configurations": mask_workflow_configurations(workflow_configs),
         "enable_dtmf": workflow.enable_dtmf,
+        "enable_callbacks": workflow.enable_callbacks,
+        "callback_resume_mode": workflow.callback_resume_mode,
         "version_number": active_def.version_number if active_def else None,
         "version_status": active_def.status if active_def else None,
         "workflow_uuid": workflow.workflow_uuid,
@@ -1053,6 +1065,16 @@ async def update_workflow(
             if request.workflow_configurations is not None
             else None
         )
+        try:
+            workflow_configurations = await apply_external_pbx_mapping_policy(
+                workflow_configurations,
+                workflow_id=workflow_id,
+                organization_id=user.selected_organization_id,
+            )
+        except WorkflowConfigurationNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ExternalPBXConfigurationDisabledError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
         if workflow_configurations and workflow_configurations.get(
             WORKFLOW_MODEL_CONFIGURATION_V2_OVERRIDE_KEY
         ):
@@ -1199,6 +1221,8 @@ async def update_workflow(
             template_context_variables=request.template_context_variables,
             workflow_configurations=workflow_configurations,
             enable_dtmf=request.enable_dtmf,
+            enable_callbacks=request.enable_callbacks,
+            callback_resume_mode=request.callback_resume_mode,
             organization_id=user.selected_organization_id,
         )
 
@@ -1236,6 +1260,8 @@ async def update_workflow(
             "call_disposition_codes": workflow.call_disposition_codes,
             "workflow_configurations": mask_workflow_configurations(workflow_configs),
             "enable_dtmf": workflow.enable_dtmf,
+            "enable_callbacks": workflow.enable_callbacks,
+            "callback_resume_mode": workflow.callback_resume_mode,
             "version_number": active_def.version_number if active_def else None,
             "version_status": active_def.status if active_def else None,
         }
@@ -1307,13 +1333,27 @@ async def create_workflow_run(
         request: The create workflow run request
         user: The user to create the workflow run for
     """
+    workflow = await db_client.get_workflow(
+        workflow_id, organization_id=user.selected_organization_id
+    )
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    run_inputs = await prepare_workflow_run_inputs(
+        db_client,
+        workflow,
+        use_draft=True,
+        include_template_context=True,
+    )
+
     run = await db_client.create_workflow_run(
         request.name,
         workflow_id,
         request.mode,
         user.id,
-        use_draft=True,
         organization_id=user.selected_organization_id,
+        definition_id=run_inputs.definition_id,
+        initial_context=run_inputs.initial_context,
     )
     return {
         "id": run.id,
@@ -1394,11 +1434,74 @@ class WorkflowRunsResponse(BaseModel):
     applied_filters: Optional[List[dict]] = None
 
 
+@router.get("/runs/all")
+async def get_all_workflow_runs(
+    page: int = 1,
+    limit: int = 50,
+    filters: Optional[str] = Query(None, description="JSON-encoded filter criteria"),
+    sort_by: Optional[str] = Query(
+        None, description="Field to sort by (e.g., 'duration', 'created_at')"
+    ),
+    sort_order: Optional[str] = Query(
+        "desc", description="Sort order ('asc' or 'desc')"
+    ),
+    user: UserModel = Depends(get_user),
+) -> WorkflowRunsResponse:
+    """
+    Get workflow runs across all workflows in the organization with optional filtering and sorting.
+    """
+    offset = (page - 1) * limit
+
+    # Parse filters if provided
+    filter_criteria = []
+    if filters:
+        try:
+            filter_criteria = json.loads(filters)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid filter format")
+
+        # Restrict allowed filter attributes for regular users
+        allowed_attributes = {
+            "dateRange",
+            "dispositionCode",
+            "duration",
+            "status",
+            "tokenUsage",
+            "workflowId",
+        }
+        for filter_item in filter_criteria:
+            attribute = filter_item.get("attribute")
+            if attribute and attribute not in allowed_attributes:
+                raise HTTPException(
+                    status_code=403, detail=f"Invalid attribute '{attribute}'"
+                )
+
+    runs, total_count = await db_client.get_workflow_runs_by_organization_id(
+        organization_id=user.selected_organization_id,
+        limit=limit,
+        offset=offset,
+        filters=filter_criteria if filter_criteria else None,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+
+    total_pages = (total_count + limit - 1) // limit
+
+    return WorkflowRunsResponse(
+        runs=runs,
+        total_count=total_count,
+        page=page,
+        limit=limit,
+        total_pages=total_pages,
+        applied_filters=filter_criteria if filter_criteria else None,
+    )
+
+
 @router.get("/{workflow_id}/runs")
 async def get_workflow_runs(
     workflow_id: int,
-    page: int = 1,
-    limit: int = 50,
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    limit: int = Query(50, ge=1, le=100, description="Number of items per page"),
     filters: Optional[str] = Query(None, description="JSON-encoded filter criteria"),
     sort_by: Optional[str] = Query(
         None, description="Field to sort by (e.g., 'duration', 'created_at')"

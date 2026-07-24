@@ -10,6 +10,7 @@ import asyncio
 import time
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
@@ -24,9 +25,16 @@ from api.db import db_client
 from api.enums import ToolCategory, WorkflowRunMode
 from api.services.pipecat.audio_playback import play_audio, play_audio_loop
 from api.services.telephony.call_transfer_manager import get_call_transfer_manager
+from api.services.telephony.external_pbx import resolve_external_pbx_field_mappings
 from api.services.telephony.factory import get_telephony_provider_for_run
 from api.services.telephony.transfer_event_protocol import TransferContext
 from api.services.workflow.tools.calculator import get_calculator_tools, safe_calculator
+from api.services.workflow.tools.wait import get_wait_tools
+from api.services.workflow.tools.schedule_callback import get_schedule_callback_tools
+from api.tasks.arq import enqueue_job
+from api.tasks.function_names import FunctionNames
+from api.db.models import ScheduledCallbackModel, QueuedRunModel
+from datetime import datetime, timedelta, UTC
 from api.services.workflow.tools.custom_tool import (
     execute_http_tool,
     tool_to_function_schema,
@@ -34,6 +42,11 @@ from api.services.workflow.tools.custom_tool import (
 from api.services.workflow.tools.transfer_resolver import (
     TransferResolutionError,
     resolve_transfer_config,
+)
+from api.services.workflow.tools.callback_settings import (
+    resolve_callback_settings,
+    adjust_for_sociable_hours,
+    get_timezone_for_number,
 )
 from api.utils.template_renderer import render_template
 
@@ -170,7 +183,37 @@ class CustomToolManager:
             tools = await db_client.get_tools_by_uuids(tool_uuids, organization_id)
 
             schemas: list[FunctionSchema] = []
+
+            if self._engine._enable_callbacks:
+                self._register_schedule_callback_handler()
+                logger.debug("Registered native schedule_callback tool handler")
+                for tool_def in get_schedule_callback_tools():
+                    func = tool_def["function"]
+                    schemas.append(
+                        get_function_schema(
+                            func["name"],
+                            func["description"],
+                            properties=func["parameters"]["properties"],
+                            required=func["parameters"]["required"],
+                        )
+                    )
+
             for tool in tools:
+                if tool.category == "wait":
+                    self._register_wait_handler()
+                    logger.debug(f"Registered wait tool handler (tool_uuid: {tool.tool_uuid})")
+                    for tool_def in get_wait_tools():
+                        func = tool_def["function"]
+                        schemas.append(
+                            get_function_schema(
+                                func["name"],
+                                func["description"],
+                                properties=func["parameters"]["properties"],
+                                required=func["parameters"]["required"],
+                            )
+                        )
+                    continue
+
                 if tool.category == ToolCategory.CALCULATOR.value:
                     # Built-in calculator: return pre-defined schemas
                     for tool_def in get_calculator_tools():
@@ -248,7 +291,16 @@ class CustomToolManager:
         try:
             tools = await db_client.get_tools_by_uuids(tool_uuids, organization_id)
 
+            if self._engine._enable_callbacks:
+                self._register_schedule_callback_handler()
+                logger.debug("Registered native schedule_callback tool handler")
+
             for tool in tools:
+                if tool.category == "wait":
+                    self._register_wait_handler()
+                    logger.debug(f"Registered wait tool handler (tool_uuid: {tool.tool_uuid})")
+                    continue
+
                 if tool.category == ToolCategory.CALCULATOR.value:
                     self._register_calculator_handler()
                     logger.debug(
@@ -357,6 +409,186 @@ class CustomToolManager:
             resolver_timeout = min(max(resolver_timeout, 0.5), 5.0)
 
         return float(transfer_timeout) + resolver_timeout + 15.0
+
+    def _register_wait_handler(self) -> None:
+        """Register the built-in wait function with the LLM."""
+
+        async def wait_func(function_call_params: FunctionCallParams) -> None:
+            logger.info("LLM Function Call EXECUTED: wait_for_user")
+            logger.info(f"Arguments: {function_call_params.arguments}")
+            
+            try:
+                seconds_arg = function_call_params.arguments.get("seconds", 60)
+                try:
+                    seconds = int(seconds_arg)
+                    if seconds < 0:
+                        raise ValueError("Seconds cannot be negative.")
+                except (ValueError, TypeError):
+                    await function_call_params.result_callback({"error": f"Invalid 'seconds' parameter: {seconds_arg}. Must be a positive integer."})
+                    return
+                
+                # Use a hard cap of 300 seconds for the built-in wait tool
+                max_wait = 300
+                seconds = min(max(seconds, 1), max_wait)
+                
+                message = function_call_params.arguments.get("message")
+                if message:
+                    from pipecat.frames.frames import TTSSpeakFrame, TTSStartedFrame, TTSStoppedFrame
+                    from pipecat.observers.base_observer import BaseObserver as _BaseObserver, FramePushed as _FramePushed
+
+                    logger.info(f"Playing wait acknowledgment message: {message}")
+
+                    # Register a temporary observer BEFORE queuing the TTS so we
+                    # don't miss TTSStartedFrame if the pipeline is very fast.
+                    # We require TTSStartedFrame before accepting TTSStoppedFrame to
+                    # guard against stale TTSStoppedFrames from the previous response.
+                    tts_done_event = asyncio.Event()
+
+                    class _TTSDoneObserver(_BaseObserver):
+                        def __init__(self):
+                            super().__init__()
+                            self._seen_started = False
+
+                        async def on_push_frame(self, data: _FramePushed):
+                            if isinstance(data.frame, TTSStartedFrame):
+                                self._seen_started = True
+                            elif isinstance(data.frame, TTSStoppedFrame) and self._seen_started:
+                                logger.info("Wait tool: acknowledgment TTS finished (TTSStoppedFrame received).")
+                                tts_done_event.set()
+
+                    tts_done_observer = _TTSDoneObserver()
+                    _task = self._engine.task
+                    if _task:
+                        _task.add_observer(tts_done_observer)
+
+                    await self._engine.task.queue_frame(
+                        TTSSpeakFrame(
+                            message,
+                            append_to_context=False,
+                            persist_to_logs=True,
+                        )
+                    )
+
+                    # Wait for TTS to actually finish, with a generous fallback timeout.
+                    try:
+                        await asyncio.wait_for(tts_done_event.wait(), timeout=15.0)
+                    except asyncio.TimeoutError:
+                        logger.warning("Wait tool: TTS done event timed out after 15s ÔÇö proceeding anyway.")
+
+                    if _task:
+                        try:
+                            await _task.remove_observer(tts_done_observer)
+                        except Exception as e:
+                            logger.warning(f"Could not remove TTS done observer: {e}")
+
+                logger.info(f"Pausing for {seconds} seconds...")
+                
+                stop_event = asyncio.Event()
+                hold_music_task = None
+                
+                if seconds >= 5 and self._engine._audio_config and self._engine._transport_output:
+                    from api.constants import APP_ROOT_DIR
+                    sample_rate = self._engine._audio_config.pipeline_sample_rate
+                    audio_file = str(APP_ROOT_DIR / "assets" / f"wait_music_{sample_rate}.wav")
+
+                    hold_music_task = asyncio.create_task(
+                        play_audio_loop(
+                            stop_event=stop_event,
+                            sample_rate=sample_rate,
+                            queue_frame=self._engine._transport_output.queue_frame,
+                            audio_file=audio_file,
+                        )
+                    )
+                
+                user_speech_event = asyncio.Event()
+                # Issue 2 fix: capture the actual transcript text so we can include it
+                # in the tool result. Without this, the TranscriptionFrame is muted by
+                # FunctionCallUserMuteStrategy and the LLM never sees what the user said,
+                # forcing the user to repeat themselves.
+                import time
+                user_speech_text: list[str] = []  # mutable container for closure capture
+
+                # We use a pipeline observer (not the mute-filtered aggregator)
+                # because FunctionCallUserMuteStrategy suppresses all
+                # TranscriptionFrames and UserStartedSpeakingFrames while a
+                # tool is executing. Pipeline observers receive frames *before*
+                # the mute strategy suppresses them.
+                from pipecat.observers.base_observer import BaseObserver, FramePushed
+                from pipecat.frames.frames import TranscriptionFrame
+
+                class _WaitInterruptObserver(BaseObserver):
+                    async def on_push_frame(self, data: FramePushed):
+                        if isinstance(data.frame, TranscriptionFrame) and data.frame.text.strip():
+                            text = data.frame.text.strip()
+                            logger.info(f"Wait tool observer: transcription received: '{text}', signalling interrupt.")
+                            # Capture the text (Issue 2 fix: include in tool result)
+                            if not user_speech_text:
+                                user_speech_text.append(text)
+                            user_speech_event.set()
+
+                wait_observer = _WaitInterruptObserver()
+                task = self._engine.task
+                if task:
+                    task.add_observer(wait_observer)
+
+                elapsed = 0.0
+                try:
+                    # Fix #1: Never wait less than 15 seconds to avoid overlapping TTS
+                    # acknowledgment and immediate "are you still there" follow-up.
+                    effective_seconds = min(max(float(seconds), 15.0), float(max_wait))
+                    
+                    while round(elapsed, 1) < effective_seconds:
+                        if self._engine.is_call_disposed():
+                            break
+
+                        if user_speech_event.is_set():
+                            logger.info("Wait interrupted by user speech.")
+                            break
+
+                        await asyncio.sleep(0.1)
+                        elapsed += 0.1
+                finally:
+                    stop_event.set()
+                    if hold_music_task:
+                        hold_music_task.cancel()
+                        try:
+                            await hold_music_task
+                        except asyncio.CancelledError:
+                            pass
+
+                    if task:
+                        try:
+                            await task.remove_observer(wait_observer)
+                        except Exception as e:
+                            logger.warning(f"Could not remove wait observer: {e}")
+                
+                logger.info(f"Wait completed after {elapsed} seconds (requested {seconds}).")
+                
+                if function_call_params and function_call_params.result_callback:
+                    clean_elapsed = round(elapsed, 1)
+                    msg = f"Wait finished after {clean_elapsed} seconds. "
+                    if user_speech_event.is_set():
+                        # Issue 2 fix: The TranscriptionFrame was muted by
+                        # FunctionCallUserMuteStrategy so the LLM context never received
+                        # it. We inject the captured text directly into the tool result
+                        # so the LLM can respond to the user's exact words.
+                        captured = user_speech_text[0] if user_speech_text else None
+                        if captured:
+                            msg += f'The user has returned and said: "{captured}". Respond directly to what they said. Do NOT thank them for waiting, because YOU were the one waiting for THEM.'
+                        else:
+                            msg += "The user has returned and spoken. Please respond naturally to what they just said. Do NOT thank them for waiting, because YOU were the one waiting for THEM."
+                    else:
+                        msg += "The time is up. Please ask the user if they are still there and if they need further assistance. Do NOT thank them for waiting, because YOU were the one waiting for THEM."
+                        
+                    await function_call_params.result_callback(
+                        {"status": "success", "message": msg}
+                    )
+            except Exception as e:
+                logger.error(f"Wait tool error: {e}")
+                await function_call_params.result_callback({"error": str(e)})
+
+        # Register with a large timeout to prevent the LLM caller from timing out the wait.
+        self._engine.llm.register_function("wait_for_user", wait_func, timeout_secs=330.0)
 
     def _register_calculator_handler(self) -> None:
         """Register the built-in calculator function with the LLM."""
@@ -609,22 +841,22 @@ class CustomToolManager:
                     )
                     return
 
+                external_pbx_call = (
+                    getattr(workflow_run, "initial_context", None) or {}
+                ).get("external_pbx_call")
+                # Compatibility for calls that started before the migration.
+                external_pbx_call = external_pbx_call or (
+                    getattr(workflow_run, "initial_context", None) or {}
+                ).get("upstream_pbx")
+                if external_pbx_call:
+                    # Context-to-in-group and lead-field mappings must see the
+                    # final conversation-derived values.
+                    await self._engine.perform_final_variable_extraction()
+
                 resolver = config.get("resolver") if isinstance(config, dict) else None
                 is_dynamic_transfer = config.get(
                     "destination_source", "static"
                 ) == "dynamic" and isinstance(resolver, dict)
-                resolver_phase_muted = False
-
-                def clear_transfer_setup_mute_state() -> None:
-                    nonlocal resolver_phase_muted
-                    if resolver_phase_muted:
-                        self._engine.set_mute_pipeline(False)
-                        resolver_phase_muted = False
-                    self._engine._queued_speech_mute_state = "idle"
-
-                if is_dynamic_transfer:
-                    self._engine.set_mute_pipeline(True)
-                    resolver_phase_muted = True
 
                 if is_dynamic_transfer and resolver.get("wait_message"):
                     await self._engine.task.queue_frame(
@@ -634,7 +866,6 @@ class CustomToolManager:
                             persist_to_logs=True,
                         )
                     )
-                    self._engine._queued_speech_mute_state = "waiting"
 
                 try:
                     resolved_transfer = await resolve_transfer_config(
@@ -649,7 +880,6 @@ class CustomToolManager:
                     destination = resolved_transfer.destination
                     timeout_seconds = resolved_transfer.timeout_seconds
                 except TransferResolutionError as e:
-                    clear_transfer_setup_mute_state()
                     validation_error_result = {
                         "status": "failed",
                         "message": "I'm sorry, but I couldn't find a valid destination for this transfer.",
@@ -661,6 +891,25 @@ class CustomToolManager:
                     )
                     return
 
+                if (
+                    resolved_transfer.source == "context_mapping"
+                    and not external_pbx_call
+                ):
+                    await self._handle_transfer_result(
+                        {
+                            "status": "failed",
+                            "message": (
+                                "This call did not arrive through the configured "
+                                "external PBX."
+                            ),
+                            "action": "transfer_failed",
+                            "reason": "external_pbx_call_required",
+                        },
+                        function_call_params,
+                        properties,
+                    )
+                    return
+
                 # Validate destination phone number
                 if not destination or not destination.strip():
                     validation_error_result = {
@@ -669,11 +918,14 @@ class CustomToolManager:
                         "action": "transfer_failed",
                         "reason": "no_destination",
                     }
-                    clear_transfer_setup_mute_state()
                     await self._handle_transfer_result(
                         validation_error_result, function_call_params, properties
                     )
                     return
+
+                provider = await get_telephony_provider_for_run(
+                    workflow_run, organization_id
+                )
 
                 if resolved_transfer.message:
                     await self._engine.task.queue_frame(
@@ -683,15 +935,54 @@ class CustomToolManager:
                             persist_to_logs=True,
                         )
                     )
-                    self._engine._queued_speech_mute_state = "waiting"
                 else:
-                    played = await self._play_config_message(config)
-                    if played:
-                        self._engine._queued_speech_mute_state = "waiting"
+                    await self._play_config_message(config)
 
-                provider = await get_telephony_provider_for_run(
-                    workflow_run, organization_id
-                )
+                if external_pbx_call:
+                    workflow_configurations = (
+                        await db_client.get_workflow_run_configurations(
+                            self._engine._workflow_run_id, organization_id
+                        )
+                    )
+                    field_updates = resolve_external_pbx_field_mappings(
+                        self._engine._gathered_context,
+                        workflow_configurations.get("external_pbx_field_mappings", []),
+                    )
+                    external_result = await provider.transfer_external_pbx_call(
+                        identity=external_pbx_call,
+                        destination=destination,
+                        field_updates=field_updates,
+                    )
+                    if external_result is not None:
+                        if external_result.get("status") == "success":
+                            self._engine._gathered_context[
+                                "external_pbx_transferred"
+                            ] = True
+                            await db_client.update_workflow_run(
+                                run_id=self._engine._workflow_run_id,
+                                gathered_context={"external_pbx_transferred": True},
+                            )
+                            await function_call_params.result_callback(
+                                external_result, properties=properties
+                            )
+                            # Let VICIdial redirect the customer out of its
+                            # conference before Dograh tears down the local leg.
+                            await asyncio.sleep(4)
+                            await self._engine.end_call_with_reason(
+                                EndTaskReason.END_CALL_TOOL_REASON.value,
+                                abort_immediately=True,
+                            )
+                        else:
+                            await self._handle_transfer_result(
+                                {
+                                    **external_result,
+                                    "action": "transfer_failed",
+                                },
+                                function_call_params,
+                                properties,
+                            )
+                        return
+
                 if not provider.supports_transfers() or not provider.validate_config():
                     validation_error_result = {
                         "status": "failed",
@@ -699,7 +990,6 @@ class CustomToolManager:
                         "action": "transfer_failed",
                         "reason": "provider_does_not_support_transfer",
                     }
-                    clear_transfer_setup_mute_state()
                     await self._handle_transfer_result(
                         validation_error_result, function_call_params, properties
                     )
@@ -746,12 +1036,10 @@ class CustomToolManager:
                         transfer_id=transfer_id,
                         conference_name=conference_name,
                         timeout=timeout_seconds,
-                        original_call_sid=original_call_sid,
                     )
                 except Exception as e:
                     logger.error(f"Transfer provider failed: {e}")
                     self._engine.set_mute_pipeline(False)
-                    self._engine._queued_speech_mute_state = "idle"
                     await call_transfer_manager.remove_transfer_context(transfer_id)
                     provider_error_result = {
                         "status": "failed",
@@ -851,7 +1139,6 @@ class CustomToolManager:
                     f"Transfer call tool '{function_name}' execution failed: {e}"
                 )
                 self._engine.set_mute_pipeline(False)
-                self._engine._queued_speech_mute_state = "idle"
 
                 # Handle generic exception with user-friendly message
                 exception_result = {
@@ -906,7 +1193,11 @@ class CustomToolManager:
                 },
                 properties=response_properties,
             )
-
+            # Give Plivo time to process the Transfer API redirect and seat the
+            # aleg into the conference before we tear down the WebSocket.
+            # Without this delay, the WebSocket closes before Plivo has finished
+            # redirecting the original caller, causing a 404 "call not found" on
+            # the aleg and dropping the call on both sides.
             import asyncio
             await asyncio.sleep(2.0)
 
@@ -931,3 +1222,238 @@ class CustomToolManager:
             # Unknown action, treat as generic success
             logger.warning(f"Unknown transfer action: {action}, treating as success")
             await function_call_params.result_callback(result)
+
+    def _register_schedule_callback_handler(self) -> None:
+        """Register the built-in schedule_callback function with the LLM."""
+        properties = FunctionCallResultProperties(run_llm=False)
+
+        async def schedule_callback_func(function_call_params: FunctionCallParams) -> None:
+            logger.info("LLM Function Call EXECUTED: schedule_callback")
+            logger.info(f"Arguments: {function_call_params.arguments}")
+
+            # 1. Idempotency Check
+            if getattr(self._engine, "_callback_scheduled", False):
+                logger.info("Callback already scheduled in this session. Returning silent success.")
+                await function_call_params.result_callback(
+                    {"status": "already_scheduled"}, properties=properties
+                )
+                await self._play_farewell_and_end(function_call_params)
+                return
+
+            try:
+                # 2. Extract configuration & context
+                args = function_call_params.arguments
+                minutes = min(max(args.get("minutes", 60), 1), 480)
+                conversation_summary = args.get("conversation_summary", "")
+                
+                workflow_run_id = self._engine._workflow_run_id
+                organization_id = await self.get_organization_id()
+                workflow_run = await db_client.get_workflow_run_by_id(workflow_run_id)
+                workflow_id = workflow_run.workflow_id
+                
+                # Check WebRTC
+                if workflow_run.mode in [WorkflowRunMode.WEBRTC.value, WorkflowRunMode.SMALLWEBRTC.value, WorkflowRunMode.TEXTCHAT.value]:
+                    await function_call_params.result_callback({
+                        "error": "I'm sorry, callbacks are only available for phone calls."
+                    })
+                    return
+
+                # Get numbers
+                initial_context = workflow_run.initial_context or {}
+                # In outbound, we called them (called_number is user). In inbound, they called us (caller_number is user).
+                # The callback tool requires calling the user. 
+                is_inbound = initial_context.get("direction") == "inbound"
+                to_number = initial_context.get("caller_number") if is_inbound else initial_context.get("called_number")
+                from_number = initial_context.get("called_number") if is_inbound else initial_context.get("caller_number")
+
+                if is_inbound and from_number:
+                    try:
+                        provider = await get_telephony_provider_for_run(workflow_run, organization_id)
+                        available_numbers = await provider.get_available_phone_numbers()
+                        if from_number not in available_numbers:
+                            logger.info(f"Inbound DID {from_number} is not in outbound pool {available_numbers}. Falling back to default.")
+                            from_number = None
+                    except Exception as e:
+                        logger.warning(f"Failed to validate outbound number pool for callback: {e}")
+                        from_number = None
+                if not to_number or to_number.startswith("anonymous"):
+                    await function_call_params.result_callback({
+                        "error": "I'm sorry, I can't schedule a callback as your number is private."
+                    })
+                    return
+
+                # 3. Load Callback Settings (Phase 3)
+                settings = await resolve_callback_settings(organization_id, workflow_id, workflow_run.campaign_id)
+                
+                fallback_num_str = f" at {from_number}" if from_number else ""
+                if not settings.get("enabled", True):
+                    await function_call_params.result_callback({
+                        "error": f"I'm sorry, I'm unable to schedule callbacks for this call. Please call us back{fallback_num_str} when you're ready."
+                    })
+                    return
+
+                chain_depth = initial_context.get("callback_chain_depth", 0) + 1
+                if chain_depth > settings.get("max_chain_depth", 2):
+                    await function_call_params.result_callback({
+                        "error": f"I'm unable to schedule another callback. Please call us back{fallback_num_str} when you're ready."
+                    })
+                    return
+
+                min_delay = settings.get("min_delay_minutes", 1)
+                max_delay = settings.get("max_delay_minutes", 480)
+                
+                # Check bounds
+                if minutes < min_delay:
+                    await function_call_params.result_callback({
+                        "error": f"I can schedule a callback in as little as {min_delay} minute(s). Shall I call you back in {min_delay} minutes? (If user agrees, call this tool again with minutes={min_delay})"
+                    })
+                    return
+                    
+                if minutes > max_delay:
+                    max_hours = max_delay // 60
+                    await function_call_params.result_callback({
+                        "error": f"I can schedule callbacks for up to {max_hours} hours from now. Shall I call you back in {max_hours} hours? (If user agrees, call this tool again with minutes={max_delay})"
+                    })
+                    return
+
+                # Calculate scheduled time and check sociable hours
+                requested_time = datetime.now(UTC) + timedelta(minutes=minutes)
+                
+                start_str = settings.get("sociable_hours_start", "08:00")
+                end_str = settings.get("sociable_hours_end", "21:00")
+                
+                # Derive timezone from user's number, fallback to org/campaign timezone (Spec 9m)
+                default_tz_str = settings.get("sociable_timezone", "UTC")
+                tz_str = get_timezone_for_number(to_number, default_tz_str)
+                
+                adjusted_time = adjust_for_sociable_hours(requested_time, start_str, end_str, tz_str)
+                
+                # If it was pushed out due to sociable hours, fall through and schedule it
+                # at the adjusted time. The success response will tell the LLM the actual
+                # time so it can confirm correctly with the user.
+                # (Do NOT reject and ask LLM to re-call with adjusted minutes — that pattern
+                # causes an infinite loop because `adjusted_minutes` changes every second.)
+
+                # 4. Save to DB
+                async with db_client.async_session() as session:
+                    if workflow_run.campaign_id:
+                        # Fetch original queued_run for source_uuid
+                        original_queued_run = await db_client.get_queued_run_by_id(workflow_run.queued_run_id) if workflow_run.queued_run_id else None
+                        original_source_uuid = original_queued_run.source_uuid if original_queued_run else str(uuid.uuid4())
+                        new_source_uuid = f"{original_source_uuid}_callback_{int(time.time())}"
+                        
+                        original_context_vars = original_queued_run.context_variables if original_queued_run else {}
+                        
+                        # Campaign Callback Phase 2 Logic
+                        new_queued_run = QueuedRunModel(
+                            campaign_id=workflow_run.campaign_id,
+                            source_uuid=new_source_uuid,
+                            context_variables={
+                                **original_context_vars,
+                                "is_callback": True,
+                                "callback_reason": "user_requested",
+                                "original_run_id": workflow_run_id,
+                                "conversation_summary": conversation_summary,
+                                "gathered_context": self._engine._gathered_context,
+                                "callback_chain_depth": chain_depth,
+                                "callback_resume_mode": settings.get("callback_resume_mode", "fresh"),
+                                "caller_number": from_number,
+                                "called_number": to_number,
+                                "phone_number": to_number,
+                                "callback_ignore_campaign_window": True,   # Phase 3-4 feature stub
+                                "callback_sociable_hours_only": True,       # Phase 3-4 feature stub
+                                "callback_originally_requested_minutes": minutes
+                            },
+                            state="queued",
+                            retry_reason="user_requested_callback",
+                            retry_count=0,
+                            scheduled_for=adjusted_time
+                        )
+                        session.add(new_queued_run)
+                        await session.commit()
+                        logger.info(f"Scheduled campaign callback via QueuedRun for {to_number} at {adjusted_time}")
+                    else:
+                        # Non-campaign standalone callback (Phase 1)
+                        new_callback = ScheduledCallbackModel(
+                            organization_id=organization_id,
+                            workflow_id=workflow_id,
+                            original_run_id=workflow_run_id,
+                            status="pending",
+                            scheduled_for=adjusted_time,
+                            to_number=to_number,
+                            from_number=from_number,
+                            conversation_summary=conversation_summary,
+                            gathered_context=self._engine._gathered_context,
+                            callback_chain_depth=chain_depth
+                        )
+                        session.add(new_callback)
+                        await session.commit()
+                        
+                        defer_by = adjusted_time - datetime.now(UTC)
+                        defer_by = max(defer_by, timedelta(seconds=5))
+                        # Enqueue ARQ Job only for standalone callbacks
+                        await enqueue_job(
+                            FunctionNames.EXECUTE_CALLBACK,
+                            to_number=to_number,
+                            from_number=from_number,
+                            workflow_id=workflow_id,
+                            organization_id=organization_id,
+                            original_run_id=workflow_run_id,
+                            conversation_summary=conversation_summary,
+                            gathered_context=self._engine._gathered_context,
+                            callback_chain_depth=chain_depth,
+                            _defer_by=defer_by
+                        )
+                        logger.info(f"Scheduled standalone callback via ScheduledCallbackModel for {to_number}")
+
+                self._engine._callback_scheduled = True
+                
+                # Build a human-readable local time for the LLM to confirm back to the user
+                was_adjusted = adjusted_time != requested_time
+                try:
+                    user_tz_str = get_timezone_for_number(to_number, tz_str)
+                    local_adjusted = adjusted_time.astimezone(ZoneInfo(user_tz_str))
+                    actual_time_str = local_adjusted.strftime("%I:%M %p on %A, %B %-d")
+                except Exception:
+                    actual_time_str = adjusted_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                
+                result_payload = {
+                    "status": "scheduled",
+                    "callback_in_minutes": minutes,
+                    "actual_callback_time": actual_time_str,
+                    "was_adjusted_for_sociable_hours": was_adjusted,
+                }
+                if was_adjusted:
+                    result_payload["note"] = (
+                        f"The callback was adjusted from the requested time to {actual_time_str} "
+                        f"to respect sociable calling hours. "
+                        f"Tell the user you will call them at {actual_time_str} instead."
+                    )
+                
+                await function_call_params.result_callback(
+                    result_payload,
+                    properties=properties
+                )
+                await self._play_farewell_and_end(function_call_params)
+
+            except Exception as e:
+                logger.error(f"Schedule callback tool error: {e}")
+                await function_call_params.result_callback({"error": str(e)})
+
+        self._engine.llm.register_function(
+            "schedule_callback", schedule_callback_func, timeout_secs=30.0, is_node_transition=True
+        )
+
+    async def _play_farewell_and_end(self, function_call_params: FunctionCallParams):
+        """Helper to play the farewell message and end the call."""
+        farewell_message = function_call_params.arguments.get("farewell_message", "Okay, I will call you back. Goodbye!")
+        self._engine._queued_speech_mute_state = "waiting"
+        await self._engine.task.queue_frame(
+            TTSSpeakFrame(
+                farewell_message,
+                append_to_context=True,
+                persist_to_logs=True,
+            )
+        )
+        await self._engine.end_call_with_reason(EndTaskReason.END_CALL_TOOL_REASON.value, abort_immediately=False)
+

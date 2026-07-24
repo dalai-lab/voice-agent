@@ -33,8 +33,8 @@ class WorkflowRunClient(BaseDBClient):
         logs: dict = None,
         campaign_id: int = None,
         queued_run_id: int = None,
-        use_draft: bool = False,
         organization_id: int | None = None,
+        definition_id: int | None = None,
     ) -> WorkflowRunModel:
         async with self.async_session() as session:
             workflow_query = (
@@ -54,56 +54,28 @@ class WorkflowRunClient(BaseDBClient):
             if not workflow:
                 raise ValueError(f"Workflow with ID {workflow_id} not found")
 
-            # Resolve which definition to bind to this run
-            target_def = None
-
-            if use_draft:
-                # For test calls: prefer draft if it exists, fall back to published
-                draft_result = await session.execute(
-                    select(WorkflowDefinitionModel).where(
+            if definition_id is not None:
+                definition_result = await session.execute(
+                    select(WorkflowDefinitionModel.id).where(
+                        WorkflowDefinitionModel.id == definition_id,
                         WorkflowDefinitionModel.workflow_id == workflow.id,
-                        WorkflowDefinitionModel.status == "draft",
                     )
                 )
-                target_def = draft_result.scalars().first()
-
-            if target_def is None:
-                # Use the published version via released_definition_id (preferred)
-                # or fall back to is_current for backward compatibility
-                if workflow.released_definition_id:
-                    target_def = await session.get(
-                        WorkflowDefinitionModel, workflow.released_definition_id
+                if definition_result.scalar_one_or_none() is None:
+                    raise ValueError(
+                        f"Workflow definition {definition_id} does not belong to "
+                        f"workflow {workflow.id}"
                     )
-                else:
-                    pub_result = await session.execute(
-                        select(WorkflowDefinitionModel).where(
-                            WorkflowDefinitionModel.workflow_id == workflow.id,
-                            WorkflowDefinitionModel.is_current == True,
-                        )
-                    )
-                    target_def = pub_result.scalars().first()
 
             # Get the current storage backend based on ENABLE_AWS_S3 flag
             current_backend = StorageBackend.get_current_backend()
-
-            # Use initial_context from the version if available, else from workflow
-            default_context = (
-                target_def.template_context_variables
-                if target_def and target_def.template_context_variables
-                else workflow.template_context_variables
-            )
-
-            merged_initial_context = {
-                **(default_context or {}),
-                **(initial_context or {}),
-            }
 
             new_run = WorkflowRunModel(
                 name=name,
                 workflow=workflow,
                 mode=mode,
-                definition_id=target_def.id if target_def else None,
-                initial_context=merged_initial_context,
+                definition_id=definition_id,
+                initial_context=initial_context or {},
                 gathered_context=gathered_context or {},
                 logs=logs or {},
                 campaign_id=campaign_id,
@@ -257,6 +229,26 @@ class WorkflowRunClient(BaseDBClient):
             )
             return result.scalars().first()
 
+    async def get_workflow_run_configurations(
+        self, run_id: int, organization_id: int
+    ) -> dict:
+        """Load the immutable workflow configuration snapshot for one run."""
+
+        async with self.async_session() as session:
+            result = await session.execute(
+                select(WorkflowDefinitionModel.workflow_configurations)
+                .join(
+                    WorkflowRunModel,
+                    WorkflowRunModel.definition_id == WorkflowDefinitionModel.id,
+                )
+                .join(WorkflowModel, WorkflowRunModel.workflow_id == WorkflowModel.id)
+                .where(
+                    WorkflowRunModel.id == run_id,
+                    WorkflowModel.organization_id == organization_id,
+                )
+            )
+            return result.scalar_one_or_none() or {}
+
     async def get_organization_id_by_workflow_run_id(
         self, run_id: int | None
     ) -> int | None:
@@ -342,6 +334,72 @@ class WorkflowRunClient(BaseDBClient):
                 )
                 for run in result.scalars().all()
             ]
+            return runs, total_count
+
+
+    async def get_workflow_runs_by_organization_id(
+        self,
+        organization_id: int,
+        limit: int = 50,
+        offset: int = 0,
+        filters: list[dict[str, Any]] | None = None,
+        sort_by: str | None = None,
+        sort_order: str | None = "desc",
+    ) -> tuple[list[WorkflowRunResponseSchema], int]:
+        async with self.async_session() as session:
+            # Build base query
+            base_query = (
+                select(WorkflowRunModel, WorkflowModel.name.label("workflow_name"))
+                .join(WorkflowModel, WorkflowRunModel.workflow_id == WorkflowModel.id)
+                .where(WorkflowModel.organization_id == organization_id)
+            )
+
+            # Apply filters
+            base_query = apply_workflow_run_filters(base_query, filters)
+
+            # Count total with filters
+            count_query = base_query.with_only_columns(func.count(WorkflowRunModel.id))
+            count_result = await session.execute(count_query)
+            total_count = count_result.scalar()
+
+            # Get paginated results with filters and sorting
+            order_clause = get_workflow_run_order_clause(sort_by, sort_order)
+            result = await session.execute(
+                base_query.order_by(order_clause).limit(limit).offset(offset)
+            )
+            
+            runs = []
+            for row in result.all():
+                run = row[0]
+                wf_name = row[1]
+                runs.append(
+                    WorkflowRunResponseSchema.model_validate(
+                        {
+                            "id": run.id,
+                            "workflow_id": run.workflow_id,
+                            "name": run.name,
+                            "workflow_name": wf_name,
+                            "mode": run.mode,
+                            "created_at": run.created_at,
+                            "is_completed": run.is_completed,
+                            "recording_url": run.recording_url,
+                            "transcript_url": run.transcript_url,
+                            "user_recording_url": get_recording_storage_key(
+                                run.extra, "user"
+                            ),
+                            "bot_recording_url": get_recording_storage_key(
+                                run.extra, "bot"
+                            ),
+                            "cost_info": format_public_cost_info(
+                                run.cost_info, run.usage_info
+                            ),
+                            "definition_id": run.definition_id,
+                            "initial_context": run.initial_context,
+                            "gathered_context": run.gathered_context,
+                            "call_type": run.call_type,
+                        }
+                    )
+                )
             return runs, total_count
 
     async def update_workflow_run(

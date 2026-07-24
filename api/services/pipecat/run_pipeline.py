@@ -95,6 +95,9 @@ from pipecat.turns.user_start import (
     MinWordsUserTurnStartStrategy,
     ProvisionalVADUserTurnStartStrategy,
 )
+from pipecat.turns.user_start.transcription_user_turn_start_strategy import (
+    TranscriptionUserTurnStartStrategy,
+)
 from pipecat.turns.user_start.vad_user_turn_start_strategy import (
     VADUserTurnStartStrategy,
 )
@@ -162,7 +165,7 @@ def _create_non_realtime_user_turn_start_strategies(
         return [
             ProvisionalVADUserTurnStartStrategy(
                 pause_secs=_resolve_provisional_vad_pause_secs(run_configs)
-            )
+            ),
         ]
 
     if uses_external_turns:
@@ -172,7 +175,7 @@ def _create_non_realtime_user_turn_start_strategies(
         # confirms a real turn.
         return [ExternalUserTurnStartStrategy(enable_interruptions=True)]
 
-    return [VADUserTurnStartStrategy()]
+    return [TranscriptionUserTurnStartStrategy(), VADUserTurnStartStrategy()]
 
 
 def _create_non_realtime_user_turn_stop_strategies(
@@ -834,6 +837,7 @@ async def _run_pipeline_impl(
         has_recordings=has_recordings,
         context_compaction_enabled=context_compaction_enabled,
         enable_dtmf=workflow.enable_dtmf,
+        enable_callbacks=workflow.enable_callbacks,
     )
 
     # Create pipeline components
@@ -933,6 +937,10 @@ async def _run_pipeline_impl(
 
     user_context_aggregator = context_aggregator.user()
     assistant_context_aggregator = context_aggregator.assistant()
+
+    # Store the user aggregator on the engine so tools (e.g. wait_for_user)
+    # can subscribe to transcript events even while user frames are muted.
+    engine.set_user_aggregator(user_context_aggregator)
 
     # Register user idle event handlers
     user_idle_handler = engine.create_user_idle_handler()

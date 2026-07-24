@@ -97,7 +97,7 @@ async def sync_campaign_source(ctx: Dict, campaign_id: int) -> None:
 
 
 async def process_campaign_batch(
-    ctx: Dict, campaign_id: int, batch_size: int = 10
+    ctx: Dict, campaign_id: int, batch_size: int = 10, callbacks_only: bool = False
 ) -> None:
     """
     Phase 2: Processes a batch of queued runs
@@ -118,7 +118,7 @@ async def process_campaign_batch(
     try:
         # Process the batch
         processed_count = await campaign_call_dispatcher.process_batch(
-            campaign_id=campaign_id, batch_size=batch_size
+            campaign_id=campaign_id, batch_size=batch_size, callbacks_only=callbacks_only
         )
 
         if processed_count > 0:

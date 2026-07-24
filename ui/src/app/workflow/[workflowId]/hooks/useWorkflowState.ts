@@ -136,6 +136,7 @@ export const useWorkflowState = ({
         templateContextVariables,
         workflowConfigurations,
         initializeWorkflow,
+        commitDeletion,
         setNodes,
         setEdges,
         setWorkflowName,
@@ -493,6 +494,10 @@ export const useWorkflowState = ({
         [setNodes],
     );
 
+    const onDelete = useCallback(() => {
+        commitDeletion();
+    }, [commitDeletion]);
+
     const onRun = async (mode: string) => {
         if (!user?.id) return;
         const workflowRunName = `WR-${getRandomId()}`;
@@ -507,6 +512,7 @@ export const useWorkflowState = ({
         });
         router.push(`/workflow/${workflowId}/run/${response.data?.id}`);
     };
+
 
     // Save template context variables
     const saveTemplateContextVariables = useCallback(async (variables: Record<string, string>) => {
@@ -531,7 +537,7 @@ export const useWorkflowState = ({
     }, [workflowId, workflowName, user, setTemplateContextVariables]);
 
     // Save workflow configurations
-    const saveWorkflowConfigurations = useCallback(async (configurations: WorkflowConfigurations, newWorkflowName: string, enableDtmf?: boolean) => {
+    const saveWorkflowConfigurations = useCallback(async (configurations: WorkflowConfigurations, newWorkflowName: string, enableDtmf?: boolean, enableCallbacks?: boolean, callbackResumeMode?: "fresh" | "last_node") => {
         if (!user?.id) return;
         // Preserve the current dictionary when saving other configurations
         const currentDictionary = useWorkflowStore.getState().dictionary;
@@ -546,7 +552,9 @@ export const useWorkflowState = ({
                     workflow_definition: null,
                     workflow_configurations: configurationsWithDictionary as Record<string, unknown>,
                     enable_dtmf: enableDtmf,
-                },
+                    enable_callbacks: enableCallbacks,
+                    callback_resume_mode: callbackResumeMode,
+                } as any,
             });
 
             if (response.error) {
@@ -639,6 +647,7 @@ export const useWorkflowState = ({
         onConnect,
         onEdgesChange,
         onNodesChange,
+        onDelete,
         onRun,
         saveTemplateContextVariables,
         saveWorkflowConfigurations,

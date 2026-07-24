@@ -1,7 +1,7 @@
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 
 import redis.asyncio as aioredis
 from loguru import logger
@@ -22,7 +22,7 @@ class RateLimiter:
         self.redis_client: Optional[aioredis.Redis] = None
         self.stale_call_timeout = 1200  # 20 minutes in seconds
 
-    async def _get_redis(self) -> aioredis.Redis:
+    async def _get_redis(self) -> Any:
         """Get or create Redis connection"""
         if self.redis_client is None:
             self.redis_client = await aioredis.from_url(
@@ -448,6 +448,52 @@ class RateLimiter:
         except Exception as e:
             logger.error(f"Error acquiring from_number: {e}")
             return None
+
+    async def acquire_specific_from_number(
+        self,
+        organization_id: int,
+        telephony_configuration_id: int | None,
+        preferred_number: str,
+    ) -> bool:
+        """
+        Atomically attempt to acquire a specific from_number from the pool.
+        Returns True if acquired successfully, False if in use or not found.
+        """
+        redis_client = await self._get_redis()
+        key = self._from_number_pool_key(organization_id, telephony_configuration_id)
+        now = time.time()
+        stale_cutoff = now - self.stale_call_timeout
+
+        lua_script = """
+        local key = KEYS[1]
+        local now = tonumber(ARGV[1])
+        local stale_cutoff = tonumber(ARGV[2])
+        local preferred_number = ARGV[3]
+
+        -- Clean stale entries: members with score > 0 and score < stale_cutoff
+        local stale = redis.call('ZRANGEBYSCORE', key, 1, stale_cutoff)
+        for i, member in ipairs(stale) do
+            redis.call('ZADD', key, 0, member)
+        end
+
+        -- Check if preferred number is available (score == 0)
+        local score = redis.call('ZSCORE', key, preferred_number)
+        if score == "0" then
+            -- Mark as in-use with current timestamp
+            redis.call('ZADD', key, now, preferred_number)
+            return 1
+        end
+        return 0
+        """
+
+        try:
+            result = await redis_client.eval(lua_script, 1, key, now, stale_cutoff, preferred_number)
+            if result:
+                logger.debug(f"Acquired specific from_number {preferred_number} for org {organization_id}")
+            return bool(result)
+        except Exception as e:
+            logger.error(f"Error acquiring specific from_number: {e}")
+            return False
 
     async def release_from_number(
         self,

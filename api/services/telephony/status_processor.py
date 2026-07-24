@@ -5,13 +5,16 @@ modules can import the processor and normalized request type without
 introducing a circular import on the routes module.
 """
 
-from datetime import UTC, datetime
+import time
+import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Optional
 
 from loguru import logger
 from pydantic import BaseModel
 
 from api.db import db_client
+from api.db.models import QueuedRunModel, ScheduledCallbackModel
 from api.enums import TelephonyCallStatus, WorkflowRunState
 from api.services.campaign.campaign_call_dispatcher import campaign_call_dispatcher
 from api.services.campaign.campaign_event_publisher import (
@@ -147,9 +150,11 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
         await campaign_call_dispatcher.release_call_slot(workflow_run_id)
 
         if workflow_run.campaign_id:
-            await circuit_breaker.record_and_evaluate(
-                workflow_run.campaign_id, is_failure=False
-            )
+            is_callback = workflow_run.initial_context and workflow_run.initial_context.get("is_callback")
+            if not is_callback:
+                await circuit_breaker.record_and_evaluate(
+                    workflow_run.campaign_id, is_failure=False
+                )
 
         if workflow_run.state != WorkflowRunState.COMPLETED.value:
             await db_client.update_workflow_run(
@@ -165,26 +170,115 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
 
         await campaign_call_dispatcher.release_call_slot(workflow_run_id)
 
+        is_callback = workflow_run.initial_context and workflow_run.initial_context.get("is_callback")
+
         if workflow_run.campaign_id:
-            is_failure = normalized_status in FAILURE_NOT_CONNECTED_STATUSES
-            await circuit_breaker.record_and_evaluate(
-                workflow_run.campaign_id,
-                is_failure=is_failure,
-                workflow_run_id=workflow_run_id if is_failure else None,
-                reason=normalized_status.value if is_failure else None,
-            )
+            # Check if this is a callback run before tripping circuit breaker
+            if not is_callback:
+                is_failure = normalized_status in FAILURE_NOT_CONNECTED_STATUSES
+                await circuit_breaker.record_and_evaluate(
+                    workflow_run.campaign_id,
+                    is_failure=is_failure,
+                    workflow_run_id=workflow_run_id if is_failure else None,
+                    reason=normalized_status.value if is_failure else None,
+                )
+        
+        # Get call disposition to check for user_hangup
+        call_disposition = None
+        if workflow_run.gathered_context:
+            call_disposition = workflow_run.gathered_context.get("call_disposition")
 
         if (
             normalized_status in RETRYABLE_NOT_CONNECTED_STATUSES
-            and workflow_run.campaign_id
         ):
-            publisher = await get_campaign_event_publisher()
-            await publisher.publish_retry_needed(
-                workflow_run_id=workflow_run_id,
-                reason=normalized_status.value.replace("-", "_"),
-                campaign_id=workflow_run.campaign_id,
-                queued_run_id=workflow_run.queued_run_id,
-            )
+            publish_standard_retry = workflow_run.campaign_id is not None
+            
+            if is_callback and normalized_status.value == "no_answer":
+                logger.info(f"[run {workflow_run_id}] Callback got no_answer. Skipping auto-retry per spec.")
+                publish_standard_retry = False
+            elif is_callback and normalized_status.value == "busy":
+                is_busy_retry = workflow_run.initial_context.get("is_busy_retry", False)
+                if not is_busy_retry:
+                    try:
+                        # Check workflow settings for busy retry
+                        workflow = await db_client.get_workflow(workflow_run.workflow_id, organization_id=workflow_run.organization_id)
+                        busy_retry_enabled = True
+                        busy_retry_delay_minutes = 5
+                        
+                        if workflow and workflow.workflow_configurations:
+                            callback_config = workflow.workflow_configurations.get("callback", {})
+                            busy_retry_enabled = callback_config.get("busy_retry_enabled", True)
+                            busy_retry_delay_minutes = callback_config.get("busy_retry_delay_minutes", 5)
+                            
+                        if not busy_retry_enabled:
+                            logger.info(f"[run {workflow_run_id}] Callback got busy signal, but busy_retry_enabled is False. Skipping retry.")
+                            publish_standard_retry = False
+                        else:
+                            logger.info(f"[run {workflow_run_id}] Callback got busy signal, enqueuing {busy_retry_delay_minutes}-min retry.")
+                            
+                            retry_time = datetime.now(UTC) + timedelta(minutes=busy_retry_delay_minutes)
+                            new_context = dict(workflow_run.initial_context)
+                            new_context["is_busy_retry"] = True
+                            
+                            async with db_client.async_session() as session:
+                                if workflow_run.campaign_id:
+                                    # Re-queue campaign callback
+                                    new_source_uuid = f"busy_retry_{workflow_run_id}_{int(time.time())}"
+                                    new_queued_run = QueuedRunModel(
+                                        campaign_id=workflow_run.campaign_id,
+                                        source_uuid=new_source_uuid,
+                                        context_variables=new_context,
+                                        state="queued",
+                                        retry_reason="user_requested_callback",
+                                        scheduled_for=retry_time
+                                    )
+                                    session.add(new_queued_run)
+                                    await session.commit()
+                                else:
+                                    # Re-queue standalone callback
+                                    new_callback = ScheduledCallbackModel(
+                                        organization_id=workflow_run.organization_id,
+                                        workflow_id=workflow_run.workflow_id,
+                                        original_run_id=workflow_run.initial_context.get("original_run_id", workflow_run_id),
+                                        status="pending",
+                                        scheduled_for=retry_time,
+                                        to_number=workflow_run.initial_context.get("called_number"),
+                                        from_number=workflow_run.initial_context.get("caller_number"),
+                                        conversation_summary=workflow_run.initial_context.get("conversation_summary", ""),
+                                        gathered_context=workflow_run.gathered_context,
+                                        callback_chain_depth=workflow_run.initial_context.get("callback_chain_depth", 1)
+                                    )
+                                    session.add(new_callback)
+                                    await session.commit()
+                                    
+                                    await enqueue_job(
+                                        FunctionNames.EXECUTE_CALLBACK,
+                                        to_number=new_callback.to_number,
+                                        from_number=new_callback.from_number,
+                                        workflow_id=new_callback.workflow_id,
+                                        organization_id=new_callback.organization_id,
+                                        original_run_id=new_callback.original_run_id,
+                                        conversation_summary=new_callback.conversation_summary,
+                                        gathered_context=new_callback.gathered_context,
+                                        callback_chain_depth=new_callback.callback_chain_depth,
+                                        _defer_by=timedelta(minutes=busy_retry_delay_minutes)
+                                    )
+                    except Exception as e:
+                        logger.error(f"[run {workflow_run_id}] Failed to enqueue busy retry: {e}")
+                        
+                    publish_standard_retry = False
+            elif is_callback and (call_disposition == "user_hangup" or normalized_status.value == "user_hangup"):
+                logger.info(f"[run {workflow_run_id}] Skipping RetryNeededEvent for callback run (disposition: {call_disposition})")
+                publish_standard_retry = False
+
+            if publish_standard_retry:
+                publisher = await get_campaign_event_publisher()
+                await publisher.publish_retry_needed(
+                    workflow_run_id=workflow_run_id,
+                    reason=normalized_status.value.replace("-", "_"),
+                    campaign_id=workflow_run.campaign_id,
+                    queued_run_id=workflow_run.queued_run_id,
+                )
 
         call_tags = (
             workflow_run.gathered_context.get("call_tags", [])

@@ -106,6 +106,45 @@ class CampaignCallDispatcher:
         processed_count = 0
         processed_run_ids: set[int] = set()
         for i, queued_run in enumerate(queued_runs):
+            if getattr(queued_run, "retry_reason", None) == "user_requested_callback":
+                try:
+                    from api.services.workflow.tools.callback_settings import (
+                        resolve_callback_settings,
+                        adjust_for_sociable_hours,
+                        get_timezone_for_number,
+                    )
+                    
+                    settings = await resolve_callback_settings(
+                        organization_id=campaign.organization_id,
+                        workflow_id=campaign.workflow_id,
+                        campaign_id=campaign.id
+                    )
+                    
+                    to_number = queued_run.context_variables.get("called_number") or queued_run.context_variables.get("phone_number")
+                    start_str = settings.get("sociable_hours_start", "08:00")
+                    end_str = settings.get("sociable_hours_end", "21:00")
+                    default_tz_str = settings.get("sociable_timezone", "UTC")
+                    tz_str = get_timezone_for_number(to_number, default_tz_str)
+                    
+                    now_utc = datetime.now(UTC)
+                    adjusted_time = adjust_for_sociable_hours(now_utc, start_str, end_str, tz_str)
+                    
+                    if adjusted_time > now_utc:
+                        logger.info(
+                            f"Callback queued_run {queued_run.id} is outside sociable hours at dispatch time. "
+                            f"Re-queueing for {adjusted_time}"
+                        )
+                        await db_client.update_queued_run(
+                            queued_run_id=queued_run.id,
+                            state="queued",
+                            scheduled_for=adjusted_time
+                        )
+                        processed_run_ids.add(queued_run.id)
+                        continue
+                except Exception as e:
+                    logger.error(f"Error re-validating sociable hours for callback {queued_run.id}: {e}")
+                    # On error, we'll continue and dispatch it rather than dropping it forever
+
             try:
                 # Apply rate limiting, i.e lets not initiate more than rate_limit_per_second
                 # calls per second. It is different than concurrency limit.
@@ -555,6 +594,18 @@ class CampaignCallDispatcher:
 
             wait_time = time.time() - wait_start
             if wait_time > timeout:
+                if preferred_number:
+                    logger.warning(
+                        f"Preferred from_number {preferred_number} unavailable for org {organization_id} "
+                        f"config {telephony_configuration_id} after waiting {wait_time:.1f}s. "
+                        f"Falling back to any available number in pool."
+                    )
+                    from_number = await rate_limiter.acquire_from_number(
+                        organization_id, telephony_configuration_id
+                    )
+                    if from_number:
+                        return from_number
+
                 logger.warning(
                     f"From number pool exhausted for org {organization_id} "
                     f"config {telephony_configuration_id} after waiting "

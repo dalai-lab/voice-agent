@@ -474,6 +474,11 @@ async def create_campaign(
     if request.circuit_breaker:
         circuit_breaker_config = request.circuit_breaker.model_dump()
 
+    # Build callback_config dict if provided
+    callback_config = None
+    if request.callback_config:
+        callback_config = request.callback_config.model_dump()
+
     campaign = await db_client.create_campaign(
         name=request.name,
         workflow_id=request.workflow_id,
@@ -486,6 +491,7 @@ async def create_campaign(
         schedule_config=schedule_config,
         circuit_breaker=circuit_breaker_config,
         telephony_configuration_id=telephony_configuration_id,
+        callback_config=callback_config,
     )
 
     cfg_name = await _get_telephony_configuration_name(

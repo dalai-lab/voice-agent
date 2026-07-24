@@ -143,7 +143,7 @@ export default function CampaignAdvancedSettings({
     callbackLongCallbackThresholdMinutes,
     onCallbackLongCallbackThresholdMinutesChange,
 }: CampaignAdvancedSettingsProps) {
-    const idPrefix = useId();
+    const timezoneSelectId = useId();
 
     return (
         <div className="space-y-6">

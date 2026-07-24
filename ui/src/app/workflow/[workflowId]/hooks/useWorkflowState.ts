@@ -514,7 +514,6 @@ export const useWorkflowState = ({
     };
 
 
-
     // Save template context variables
     const saveTemplateContextVariables = useCallback(async (variables: Record<string, string>) => {
         if (!user?.id) return;

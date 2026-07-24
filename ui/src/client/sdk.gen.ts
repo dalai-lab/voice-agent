@@ -681,7 +681,7 @@ export const getVoicesApiV1UserConfigurationsVoicesProviderGet = <ThrowOnError e
  *
  * Get all scheduled callbacks for the organization.
  */
-export const listCallbacksApiV1CallbacksGet = <ThrowOnError extends boolean = false>(options: Options<ListCallbacksApiV1CallbacksGetData, ThrowOnError>): RequestResult<ListCallbacksApiV1CallbacksGetResponses, ListCallbacksApiV1CallbacksGetErrors, ThrowOnError> => (options.client ?? client).get<ListCallbacksApiV1CallbacksGetResponses, ListCallbacksApiV1CallbacksGetErrors, ThrowOnError>({ url: '/api/v1/callbacks', ...options });
+export const listCallbacksApiV1CallbacksGet = <ThrowOnError extends boolean = false>(options?: Options<ListCallbacksApiV1CallbacksGetData, ThrowOnError>): RequestResult<ListCallbacksApiV1CallbacksGetResponses, ListCallbacksApiV1CallbacksGetErrors, ThrowOnError> => (options?.client ?? client).get<ListCallbacksApiV1CallbacksGetResponses, ListCallbacksApiV1CallbacksGetErrors, ThrowOnError>({ url: '/api/v1/callbacks', ...options });
 
 /**
  * Cancel Callback

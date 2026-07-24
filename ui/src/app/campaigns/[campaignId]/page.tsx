@@ -16,6 +16,7 @@ import {
     startCampaignApiV1CampaignCampaignIdStartPost,
 } from '@/client/sdk.gen';
 import type { CampaignResponse } from '@/client/types.gen';
+import { CampaignCallbacks } from '@/components/campaign-callbacks';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -26,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CampaignRuns } from '@/components/workflow-runs';
 import { useAuth } from '@/lib/auth';
 
@@ -878,12 +880,25 @@ export default function CampaignDetailPage() {
                     </CardContent>
                 </Card>
 
-                {/* Workflow Runs */}
-                <CampaignRuns
-                    campaignId={campaignId}
-                    workflowId={campaign.workflow_id}
-                    searchParams={searchParams}
-                />
+                {/* Workflow Runs and Callbacks */}
+                <Tabs defaultValue="runs" className="w-full">
+                    <TabsList className="mb-4">
+                        <TabsTrigger value="runs">Runs</TabsTrigger>
+                        <TabsTrigger value="callbacks">Callbacks</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="runs">
+                        <CampaignRuns
+                            campaignId={campaignId}
+                            workflowId={campaign.workflow_id}
+                            searchParams={searchParams}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="callbacks">
+                        <CampaignCallbacks campaignId={campaignId} />
+                    </TabsContent>
+                </Tabs>
 
                 <Dialog open={isRedialDialogOpen} onOpenChange={setIsRedialDialogOpen}>
                     <DialogContent>

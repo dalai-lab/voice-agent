@@ -74,8 +74,8 @@ export interface CampaignAdvancedSettingsProps {
 /** Extract the string timezone value from ITimezoneOption | string */
 export function getTimezoneValue(tz: ITimezoneOption | string): string {
     const val = typeof tz === 'string' ? tz : tz.value;
-    
-    // Map common deprecated IANA timezones to modern equivalents 
+
+    // Map common deprecated IANA timezones to modern equivalents
     // to prevent Python ZoneInfo validation errors on the backend
     const tzMap: Record<string, string> = {
         'Asia/Calcutta': 'Asia/Kolkata',
@@ -85,7 +85,7 @@ export function getTimezoneValue(tz: ITimezoneOption | string): string {
         'Asia/Macao': 'Asia/Macau',
         'Europe/Kiev': 'Europe/Kyiv',
     };
-    
+
     return tzMap[val] || val;
 }
 

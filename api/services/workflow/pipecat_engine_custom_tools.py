@@ -1372,6 +1372,7 @@ class CustomToolManager:
                                 "conversation_summary": conversation_summary,
                                 "gathered_context": self._engine._gathered_context,
                                 "callback_chain_depth": chain_depth,
+                                "callback_resume_mode": settings.get("callback_resume_mode", "fresh"),
                                 "caller_number": from_number,
                                 "called_number": to_number,
                                 "phone_number": to_number,

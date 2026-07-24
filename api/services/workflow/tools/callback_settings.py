@@ -37,8 +37,8 @@ async def resolve_callback_settings(
     org_prefs = org_config.value if org_config else {}
     callback_defaults = org_prefs.get("callback_defaults", {})
     
-    org_sociable_start = callback_defaults.get("sociable_hours_start", "08:00")
-    org_sociable_end = callback_defaults.get("sociable_hours_end", "21:00")
+    org_sociable_start = callback_defaults.get("sociable_hours_start", "00:00")
+    org_sociable_end = callback_defaults.get("sociable_hours_end", "23:59")
     org_max_delay = callback_defaults.get("max_delay_minutes", 480)
     org_max_chain = callback_defaults.get("max_chain_depth", 2)
     org_timezone = org_prefs.get("timezone", "UTC")

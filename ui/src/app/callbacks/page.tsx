@@ -21,17 +21,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth";
 
 export default function PendingCallbacksPage() {
-    const { user, getAccessToken, redirectToLogin } = useAuth();
+    const { user, getAccessToken, redirectToLogin, loading } = useAuth();
     const [callbacks, setCallbacks] = useState<UnifiedCallbackItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [cancellingId, setCancellingId] = useState<number | null>(null);
     const [sourceTab, setSourceTab] = useState<"all" | "standalone" | "campaign">("all");
 
     useEffect(() => {
-        if (!user) {
+        if (!loading && !user) {
             redirectToLogin();
         }
-    }, [user, redirectToLogin]);
+    }, [loading, user, redirectToLogin]);
 
     const fetchCallbacks = useCallback(async (source: "all" | "standalone" | "campaign" = sourceTab) => {
         if (!user) return;

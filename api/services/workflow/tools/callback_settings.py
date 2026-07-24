@@ -136,6 +136,17 @@ def get_timezone_for_number(phone_number: str, default_tz: str = "UTC") -> str:
     if not phone_number:
         return default_tz
         
+    # Mapping for old tzdata aliases occasionally returned by phonenumbers
+    TZ_ALIASES = {
+        "Asia/Calcutta": "Asia/Kolkata",
+        "Asia/Chungking": "Asia/Chongqing",
+        "Asia/Katmandu": "Asia/Kathmandu",
+        "Asia/Macao": "Asia/Macau",
+        "Asia/Saigon": "Asia/Ho_Chi_Minh",
+        "Asia/Ulan_Bator": "Asia/Ulaanbaatar",
+        "Asia/Rangoon": "Asia/Yangon",
+    }
+        
     try:
         # Assuming E.164 format, if no +, we try to prepend it just in case
         if not phone_number.startswith("+"):
@@ -143,7 +154,7 @@ def get_timezone_for_number(phone_number: str, default_tz: str = "UTC") -> str:
             
         parsed = phonenumbers.parse(phone_number)
         timezones = timezone.time_zones_for_number(parsed)
-        if timezones and len(timezones) > 0 and timezones[0] != "Etc/Unknown":
+        if timezones:
             now = datetime.now(ZoneInfo("UTC"))
             def get_offset(tz_name):
                 try:
@@ -151,7 +162,17 @@ def get_timezone_for_number(phone_number: str, default_tz: str = "UTC") -> str:
                 except Exception:
                     return -9999999
                     
-            valid_tzs = [tz for tz in timezones if tz != "Etc/Unknown"]
+            valid_tzs = []
+            for tz in timezones:
+                if tz == "Etc/Unknown":
+                    continue
+                tz = TZ_ALIASES.get(tz, tz)
+                try:
+                    ZoneInfo(tz)
+                    valid_tzs.append(tz)
+                except Exception:
+                    pass
+                    
             if valid_tzs:
                 best_tz = max(valid_tzs, key=get_offset)
                 return best_tz

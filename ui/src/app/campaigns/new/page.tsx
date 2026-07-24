@@ -311,7 +311,7 @@ export default function NewCampaignPage() {
                 enabled: callbackEnabled,
                 sociable_hours_start: callbackSociableHoursStart,
                 sociable_hours_end: callbackSociableHoursEnd,
-                sociable_hours_timezone: typeof callbackSociableHoursTimezone === 'string' ? callbackSociableHoursTimezone : callbackSociableHoursTimezone.value,
+                sociable_hours_timezone: getTimezoneValue(callbackSociableHoursTimezone),
                 honor_campaign_window_for_long_callbacks: callbackHonorCampaignWindowForLongCallbacks,
                 long_callback_threshold_minutes: parseInt(callbackLongCallbackThresholdMinutes) || 120,
             };

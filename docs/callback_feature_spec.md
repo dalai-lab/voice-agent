@@ -256,6 +256,56 @@ When a callback `queued_run` is about to be dispatched, check in this order:
 
 **Legal note:** In India (TRAI), outbound marketing calls are restricted to 9 AM – 9 PM. In the US (TCPA), it's 8 AM – 9 PM local time. The 8 AM – 9 PM default is a safe, universal window that avoids regulatory violations in both markets.
 
+#### Intentional Behaviour: Sociable Hours Adjustment Can Extend Beyond the Max Delay Window
+
+This is a deliberate design decision — not a bug.
+
+**Scenario:**
+```
+User calls at 9:00 PM. Says: "call me back in 1 hour."
+Requested callback time = 10:00 PM (1 hour from now).
+10:00 PM is outside sociable hours (8 AM – 9 PM).
+System adjusts → callback fires at 8:00 AM the next morning (11 hours later).
+```
+
+**The 8-hour max delay cap is applied to the *requested time*, not the *adjusted time*.**
+
+- "Call me in 1 hour" → passes the 8-hour check (1 < 8) ✅
+- The adjusted fire time (11 hours) does NOT trigger another rejection
+- This is correct UX: the user asked for "soon," and 8 AM tomorrow is the earliest reasonable "soon" when factoring in sleep hours
+
+**Why not reject it?**
+Rejecting with "sorry, your 1-hour callback would land at 10 PM which is outside my sociable hours" would be confusing and bad UX. The user doesn't know or care about the technical constraint. Silently adjusting to 8 AM is always better than refusing.
+
+**LLM Confirmation (Important):**
+When sociable hours adjustment shifts the fire time, the tool must tell the LLM the **actual** callback time — not just the requested delay. Otherwise the AI says "I'll call you in 1 hour" when in reality it will call at 8 AM the next day, which is a broken promise.
+
+**Tool response when adjusted:**
+```json
+{
+  "status": "scheduled",
+  "callback_in_minutes": 60,
+  "actual_callback_time": "08:00 AM on Saturday, July 26",
+  "was_adjusted_for_sociable_hours": true,
+  "note": "The callback was adjusted to 08:00 AM on Saturday, July 26 to respect sociable calling hours. Tell the user you will call them at 08:00 AM on Saturday, July 26 instead."
+}
+```
+
+The LLM will then say something like:
+> "Great, I'll call you back tomorrow morning at 8 AM since I try not to call people late in the evening."
+
+**Tool response when NOT adjusted (within sociable hours):**
+```json
+{
+  "status": "scheduled",
+  "callback_in_minutes": 30,
+  "actual_callback_time": "02:45 PM on Friday, July 25",
+  "was_adjusted_for_sociable_hours": false
+}
+```
+
+
+
 **Implementation change:** Replace `ignore_schedule_window: true` with two flags:
 ```python
 context_variables = {
@@ -485,7 +535,7 @@ async def execute_callback(ctx, to_number, from_number,
 | Auto-retry a missed callback | Creates infinite callback loops |
 | Use a random number from pool for callback | Caller ID should be consistent — user won't recognise unknown number |
 | Resume live LLM conversation state | Technically impossible across two separate phone calls |
-| Allow callbacks > 8 hours (default) | Beyond 8 hours is unusual for a phone callback; org-level cap prevents abuse. Absolute hard limit is 24h — beyond that ARQ deferred jobs are unreliable. |
+| Allow callbacks > 8 hours (default) | Beyond 8 hours is not a voice-callback responsibility — it is a **CRM task**. If a user says "call me next week" or "call me in 2 days", the AI should decline politely and suggest they call back directly or that a human rep will follow up. The 8-hour cap is intentional and final. Scheduling days-ahead callbacks belongs in a CRM (HubSpot, Salesforce, etc.), not in an automated calling system whose context will be stale by then anyway. |
 | Allow callbacks on WebRTC/web sessions | No `from_number` exists — meaningless |
 | Block callback if campaign is completed | Bad UX — user was explicitly promised a callback |
 | Let schedule window block a user-requested callback | User was promised — always honor it |
@@ -825,6 +875,9 @@ The 3:00 PM job was missed.
 | 9k | ARQ worker down at callback fire time | Delayed callback (not lost) | ARQ handles this natively ✅ |
 | 9m | Inbound caller's timezone unknown | Legal violation (calling at 2 AM) | Derive timezone from phone number country code |
 | 9n | LLM calls the tool twice (double-fire) | Two callbacks to same person | Idempotency check on `workflow_run_id` |
+| 9o | Caller's original number removed from campaign number pool mid-flight | Callback waits 10 min, times out, requeues forever | Fall back to any free number in pool; log caller ID change warning |
+| 9p | Admin resumes campaign outside sociable hours — piled-up callbacks fire at 3 AM | Legal violation; user harassment | Re-validate sociable hours at **dispatch time** in dispatcher, not just at scheduling time |
+| 9q | Manual pause: code incorrectly fires callbacks (spec says defer) | Goes against admin intent | On manual pause, return early — do NOT set `callbacks_only = True`; only circuit breaker pause blocks AND still defers callbacks |
 
 ---
 
@@ -929,6 +982,88 @@ engine._callback_scheduled = True
 ```
 
 The DB write is still the source of truth (for durability), but the in-memory flag is sufficient to block the double-fire within the same call session.
+
+---
+
+### 9o. Caller's Original Phone Number Removed From Pool Mid-Flight
+
+```
+Campaign has 2 numbers: +91AAAA and +91BBBB.
+User is originally called from +91AAAA.
+Callback is scheduled for T+30min.
+Admin removes +91AAAA from the telephony config at T+15min.
+At T+30min, dispatcher tries to acquire +91AAAA specifically.
++91AAAA no longer exists in the pool → acquires nothing → waits 10 min → times out.
+Callback requeued → retries next cycle → same timeout → infinite loop.
+```
+
+**Fix:** When `acquire_specific_from_number` times out after the configured wait, fall back to any available number in the pool (`acquire_from_number` without `preferred_number`). Log a warning:
+```
+WARN: Callback for run {original_run_id} — preferred number {preferred} unavailable.
+Falling back to alternate number {fallback}. Caller ID will differ from original call.
+```
+This is always better than silently never calling the user back.
+
+---
+
+### 9p. Admin Resumes Campaign Outside Sociable Hours — Callbacks Pile Up and Fire at Wrong Time
+
+```
+Campaign paused at 2 PM. 8 callbacks scheduled during the pause for 3–5 PM.
+Admin resumes campaign at 11 PM (outside sociable hours).
+All 8 callbacks fire immediately at 11 PM. People are asleep.
+```
+
+**Why this happens:** Sociable hours is currently only checked **at scheduling time** inside the `schedule_callback` tool. There is no re-validation at dispatch time in the dispatcher.
+
+**Fix:** Add a sociable hours check inside `campaign_call_dispatcher.process_batch()` for `retry_reason = "user_requested_callback"` rows. Before dispatching:
+```python
+if queued_run.retry_reason == "user_requested_callback":
+    tz_str = queued_run.context_variables.get("sociable_timezone", "UTC")
+    if not is_within_sociable_hours(datetime.now(UTC), tz_str, start="08:00", end="21:00"):
+        # Return this run back to queued — do not dispatch
+        await db_client.update_queued_run(queued_run.id, state="queued")
+        continue
+```
+The callback stays in `queued` state and will be picked up on the next orchestrator cycle that runs within sociable hours.
+
+**Pile-up resume scenarios:**
+
+| Scenario | Expected Behavior |
+|---|---|
+| Resume inside sociable hours + inside schedule window | All due callbacks fire immediately (subject to concurrency limits) ✅ |
+| Resume inside sociable hours + outside schedule window | Callbacks fire (callbacks bypass schedule window), regular calls do not ✅ |
+| Resume outside sociable hours (e.g., 11 PM) | Callbacks held, re-queued. Fire next morning when sociable hours open ✅ (after fix) |
+| Resume during sociable hours but concurrency maxed | Callbacks wait for free slot (up to 10 min). Then dispatched. ✅ |
+| Resume and all piled callbacks due at same second | Rate limiter + concurrency limits naturally spread them out ✅ |
+
+---
+
+### 9q. Manual Pause Incorrectly Fires Callbacks — Code vs Spec Discrepancy
+
+**Spec intent (Section 3e):**
+- Manual pause → defer ALL callbacks until campaign is manually resumed
+- Circuit breaker pause → same: defer ALL callbacks
+
+**Current code behavior:**
+- Circuit breaker pause → correctly defers callbacks ✅
+- Manual pause → **incorrectly fires callbacks** ❌
+
+The code sets `callbacks_only = True` for a manually paused campaign, which means it still dispatches due callbacks. This contradicts the spec.
+
+**Fix:** On manual pause (i.e., paused but NOT by circuit breaker), return early without dispatching anything:
+```python
+if campaign.state == "paused":
+    is_cb_paused = campaign.orchestrator_metadata.get("paused_reason") == "circuit_breaker"
+    if is_cb_paused:
+        logger.info("Campaign paused by circuit breaker. Deferring all callbacks.")
+        return   # ← defer everything
+    else:
+        logger.info("Campaign manually paused. Deferring all callbacks until resumed.")
+        return   # ← defer everything — do NOT set callbacks_only = True
+```
+
+Callbacks sit safely in `queued` state and will fire when the admin resumes the campaign.
 
 ---
 

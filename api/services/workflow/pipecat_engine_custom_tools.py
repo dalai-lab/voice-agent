@@ -1423,8 +1423,33 @@ class CustomToolManager:
                         logger.info(f"Scheduled standalone callback via ScheduledCallbackModel for {to_number}")
 
                 self._engine._callback_scheduled = True
+                
+                # Build a human-readable local time for the LLM to confirm back to the user
+                was_adjusted = adjusted_time != requested_time
+                try:
+                    from api.services.workflow.tools.callback_settings import get_timezone_for_number
+                    user_tz_str = get_timezone_for_number(to_number, tz_str)
+                    from zoneinfo import ZoneInfo
+                    local_adjusted = adjusted_time.astimezone(ZoneInfo(user_tz_str))
+                    actual_time_str = local_adjusted.strftime("%I:%M %p on %A, %B %-d")
+                except Exception:
+                    actual_time_str = adjusted_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                
+                result_payload = {
+                    "status": "scheduled",
+                    "callback_in_minutes": minutes,
+                    "actual_callback_time": actual_time_str,
+                    "was_adjusted_for_sociable_hours": was_adjusted,
+                }
+                if was_adjusted:
+                    result_payload["note"] = (
+                        f"The callback was adjusted from the requested time to {actual_time_str} "
+                        f"to respect sociable calling hours. "
+                        f"Tell the user you will call them at {actual_time_str} instead."
+                    )
+                
                 await function_call_params.result_callback(
-                    {"status": "scheduled", "callback_in_minutes": minutes},
+                    result_payload,
                     properties=properties
                 )
                 await self._play_farewell_and_end(function_call_params)

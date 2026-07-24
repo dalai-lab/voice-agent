@@ -371,15 +371,8 @@ class CampaignOrchestrator:
                 if is_cb_paused:
                     logger.info(f"campaign_id: {campaign_id} - Campaign is paused by circuit breaker. Deferring callbacks.")
                     return
-                
-                has_callbacks = await db_client.get_scheduled_runs_count(
-                    campaign_id, scheduled_before=datetime.now(UTC), retry_reason="user_requested_callback"
-                ) > 0
-                if has_callbacks:
-                    logger.info(f"campaign_id: {campaign_id} - Campaign is manually paused but has due callbacks")
-                    callbacks_only = True
                 else:
-                    logger.info(f"campaign_id: {campaign_id} - Campaign is paused")
+                    logger.info(f"campaign_id: {campaign_id} - Campaign is manually paused. Deferring all callbacks until resumed.")
                     return
             else:
                 is_running = campaign.state in ["running", "syncing"]

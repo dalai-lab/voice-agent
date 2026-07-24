@@ -156,11 +156,35 @@ def register_event_handlers(
                         f"{list(fetch_result.keys())}"
                     )
 
-            # Set the start node now (after pre-call fetch data is merged)
-            # so that render_template() has the complete _call_context_vars.
-            await engine.set_node(engine.workflow.start_node_id)
+            # Determine which node to start at based on callback_resume_mode
+            resume_mode = engine._call_context_vars.get("callback_resume_mode", "fresh")
+            is_callback = engine._call_context_vars.get("is_callback", False)
+            nodes_visited = engine._call_context_vars.get("gathered_context", {}).get("nodes_visited", [])
+
+            if is_callback and resume_mode == "last_node" and nodes_visited:
+                # nodes_visited stores node NAMES (labels), but workflow.nodes is keyed by ID
+                # Build a reverse map: name → id
+                name_to_id = {
+                    node.name: node_id
+                    for node_id, node in engine.workflow.nodes.items()
+                    if node.name
+                }
+                # Walk backwards through visited nodes, pick the last one that still exists
+                start_node_id = engine.workflow.start_node_id
+                for node_name in reversed(nodes_visited):
+                    node_id = name_to_id.get(node_name)
+                    if node_id and node_id in engine.workflow.nodes:
+                        start_node_id = node_id
+                        logger.info(f"[CALLBACK DEBUG] Resuming from last visited node: '{node_name}' (id={node_id!r})")
+                        break
+                else:
+                    logger.info(f"[CALLBACK DEBUG] No matching node found in nodes_visited={nodes_visited}, starting fresh")
+            else:
+                start_node_id = engine.workflow.start_node_id
+
+            await engine.set_node(start_node_id)
             await engine.queue_node_opening(
-                node_id=engine.workflow.start_node_id,
+                node_id=start_node_id,
                 previous_node_id=None,
                 generate_if_no_greeting=True,
             )

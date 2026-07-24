@@ -5,6 +5,7 @@ import {
   ArrowUpCircle,
   AudioLines,
   Brain,
+  CalendarClock,
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
@@ -97,6 +98,11 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         title: "Campaigns",
         url: "/campaigns",
         icon: Megaphone,
+      },
+      {
+        title: "Callbacks",
+        url: "/callbacks",
+        icon: CalendarClock,
       },
       {
         title: "Models",

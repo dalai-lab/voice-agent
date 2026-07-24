@@ -23,13 +23,18 @@ The AI agent should:
 ## Industry Standard (How Vapi Does It)
 
 Vapi treats callback as a **first-class workflow tool** called `transferCall` with a `schedule` variant.  
+In Dograh, we implement it as a **Native Workflow Setting** (`enable_callbacks`) that automatically injects the `schedule_callback` capability into the AI's context across all nodes in the workflow.
 When triggered, Vapi:
 - Ends the call immediately
 - Creates a deferred outbound job with a TTL delay
 - On callback, starts a **fresh call** with the original assistant config
 - Does NOT resume previous conversation — the conversation state is reset
 
-**Key insight:** Vapi does NOT resume conversation context on callback. It is always a fresh call with optionally injected metadata (like "this is a callback, you spoke to this person earlier about X"). Dograh can follow the same pattern or go further by injecting a conversation summary.
+**Key insight:** Vapi does NOT resume conversation context on callback. It is always a fresh call with optionally injected metadata (like "this is a callback, you spoke to this person earlier about X").
+
+Dograh improves on this by offering a **Callback Resume Mode** toggle in the workflow settings:
+- **Start Fresh (Default):** Like Vapi, the call starts at Node 1. The LLM is given a system note summarizing the previous call and instructing it to generate the first greeting. Best for most workflows.
+- **Resume from Last Node:** Dograh automatically remembers which node the user was on when the callback was requested, and drops the AI and user back into that exact node. Best for rigid, multi-step intake flows.
 
 ---
 
@@ -41,7 +46,7 @@ The callback tool is just a **scheduled outbound call** triggered from inside a 
 - `enqueue_job(..., _defer_by=timedelta(...))` — ARQ already supports delayed jobs natively
 - `initial_context` — already injected into every workflow run
 
-No new provider changes needed. A lightweight DB record is needed for single outbound/inbound callbacks (for durability against Redis flushes — see Section 9b).
+No new provider changes needed. A lightweight DB record is needed for single outbound/inbound callbacks (for durability against Redis flushes — see Section 9b). The setting is exposed globally as a boolean on the Workflow, rather than a node-specific Tool, ensuring the user can request a callback at any point in the conversation.
 
 ---
 
@@ -251,6 +256,56 @@ When a callback `queued_run` is about to be dispatched, check in this order:
 
 **Legal note:** In India (TRAI), outbound marketing calls are restricted to 9 AM – 9 PM. In the US (TCPA), it's 8 AM – 9 PM local time. The 8 AM – 9 PM default is a safe, universal window that avoids regulatory violations in both markets.
 
+#### Intentional Behaviour: Sociable Hours Adjustment Can Extend Beyond the Max Delay Window
+
+This is a deliberate design decision — not a bug.
+
+**Scenario:**
+```
+User calls at 9:00 PM. Says: "call me back in 1 hour."
+Requested callback time = 10:00 PM (1 hour from now).
+10:00 PM is outside sociable hours (8 AM – 9 PM).
+System adjusts → callback fires at 8:00 AM the next morning (11 hours later).
+```
+
+**The 8-hour max delay cap is applied to the *requested time*, not the *adjusted time*.**
+
+- "Call me in 1 hour" → passes the 8-hour check (1 < 8) ✅
+- The adjusted fire time (11 hours) does NOT trigger another rejection
+- This is correct UX: the user asked for "soon," and 8 AM tomorrow is the earliest reasonable "soon" when factoring in sleep hours
+
+**Why not reject it?**
+Rejecting with "sorry, your 1-hour callback would land at 10 PM which is outside my sociable hours" would be confusing and bad UX. The user doesn't know or care about the technical constraint. Silently adjusting to 8 AM is always better than refusing.
+
+**LLM Confirmation (Important):**
+When sociable hours adjustment shifts the fire time, the tool must tell the LLM the **actual** callback time — not just the requested delay. Otherwise the AI says "I'll call you in 1 hour" when in reality it will call at 8 AM the next day, which is a broken promise.
+
+**Tool response when adjusted:**
+```json
+{
+  "status": "scheduled",
+  "callback_in_minutes": 60,
+  "actual_callback_time": "08:00 AM on Saturday, July 26",
+  "was_adjusted_for_sociable_hours": true,
+  "note": "The callback was adjusted to 08:00 AM on Saturday, July 26 to respect sociable calling hours. Tell the user you will call them at 08:00 AM on Saturday, July 26 instead."
+}
+```
+
+The LLM will then say something like:
+> "Great, I'll call you back tomorrow morning at 8 AM since I try not to call people late in the evening."
+
+**Tool response when NOT adjusted (within sociable hours):**
+```json
+{
+  "status": "scheduled",
+  "callback_in_minutes": 30,
+  "actual_callback_time": "02:45 PM on Friday, July 25",
+  "was_adjusted_for_sociable_hours": false
+}
+```
+
+
+
 **Implementation change:** Replace `ignore_schedule_window: true` with two flags:
 ```python
 context_variables = {
@@ -415,6 +470,74 @@ Feels like continuity. Is technically a fresh call. No glitches. No empty variab
 
 ---
 
+## Section 5b: Three Time Systems — How They Stack Without Conflicting
+
+There are **three independent time-related systems** in Dograh. They look similar but serve completely different layers. They do **not** conflict — they stack in sequence.
+
+### The Three Systems
+
+| System | Where | What it does | Who uses it |
+|---|---|---|---|
+| `{{current_time}}` template variable | System prompt (Jinja) | Tells the LLM what time it is right now | The LLM's reasoning |
+| **Sociable Hours** | `callback_settings.py` + `campaign_call_dispatcher.py` | Guards against calling humans at illegal/unreasonable hours (e.g., 3 AM) | Callback scheduler + dispatch re-validator |
+| **Campaign Schedule Window** | `campaign_orchestrator.py` | Controls when a campaign actively runs batches (e.g., Mon–Fri 1–5 PM only) | Campaign orchestrator loop |
+
+---
+
+### How They Stack (Execution Order)
+
+```
+BEFORE the call starts:
+  1. {{current_time}} → injected into LLM system prompt.
+     "It is 12:31 AM IST, Friday July 25."
+     LLM now knows when it is. It can convert "tomorrow morning" to minutes=450.
+
+DURING the call — user requests a callback:
+  2. LLM calls schedule_callback(minutes=X).
+     Server runs adjust_for_sociable_hours().
+     "Is the requested fire-time inside 8 AM–9 PM? No → bump to 8 AM."
+     Saves to DB. Sociable hours has no idea about the campaign schedule.
+
+WHEN the campaign orchestrator runs (separate background loop, every ~30s):
+  3. Orchestrator checks: "Is it inside the campaign's 1 PM–5 PM slot right now?"
+     Has no idea what the LLM said. Has no idea about sociable hours.
+     Just: should I dispatch a batch right now? Yes/No.
+     Callbacks bypass this check and always go through.
+```
+
+---
+
+### Can They Conflict?
+
+**No, but they can give different answers simultaneously — and that's correct by design.**
+
+Example: It is 8:30 AM.
+- Sociable hours says ✅ (8 AM–9 PM window is open)
+- Campaign schedule says ❌ (campaign only runs 1–5 PM)
+- Result: Campaign does not run. Callbacks (which bypass campaign schedule) still fire. ✅
+
+Example: It is 11 PM.
+- Sociable hours says ❌ (outside 8 AM–9 PM)
+- Campaign schedule says ❌ (outside 1–5 PM)
+- Result: Nothing runs. Callbacks are held and re-queued for 8 AM. ✅
+
+They are independent gatekeepers checking independent rules. When both say ✅, the call goes through. If either says ❌, it doesn't (with the exception that callbacks bypass the campaign schedule gate but never bypass sociable hours).
+
+---
+
+### Why `{{current_time}}` Can't Be Replaced By Sociable Hours
+
+Sociable hours is a **server-side validator** — it checks if a timestamp is legal before storing it. The LLM never sees it.
+
+Without `{{current_time}}` in the prompt:
+- User says "call me tomorrow at 8 AM" → LLM has no idea what "tomorrow" is → it cannot convert this to `minutes=450`
+- User says "good morning" → LLM might not contextually know it's morning
+- LLM guesses or hallucinates the time → wrong `minutes` value → callback fires at wrong time
+
+`{{current_time}}` gives the LLM **temporal grounding** so it can do the arithmetic correctly before it even calls the tool.
+
+---
+
 ## Section 6: New ARQ Task Needed
 
 ```python
@@ -480,7 +603,7 @@ async def execute_callback(ctx, to_number, from_number,
 | Auto-retry a missed callback | Creates infinite callback loops |
 | Use a random number from pool for callback | Caller ID should be consistent — user won't recognise unknown number |
 | Resume live LLM conversation state | Technically impossible across two separate phone calls |
-| Allow callbacks > 8 hours (default) | Beyond 8 hours is unusual for a phone callback; org-level cap prevents abuse. Absolute hard limit is 24h — beyond that ARQ deferred jobs are unreliable. |
+| Allow callbacks > 8 hours (default) | Beyond 8 hours is not a voice-callback responsibility — it is a **CRM task**. If a user says "call me next week" or "call me in 2 days", the AI should decline politely and suggest they call back directly or that a human rep will follow up. The 8-hour cap is intentional and final. Scheduling days-ahead callbacks belongs in a CRM (HubSpot, Salesforce, etc.), not in an automated calling system whose context will be stale by then anyway. |
 | Allow callbacks on WebRTC/web sessions | No `from_number` exists — meaningless |
 | Block callback if campaign is completed | Bad UX — user was explicitly promised a callback |
 | Let schedule window block a user-requested callback | User was promised — always honor it |
@@ -531,7 +654,7 @@ Stored in `workflow_configurations` JSON column on `WorkflowModel` — the same 
 
 | Setting | Type | Default | What it does |
 |---|---|---|---|
-| `enabled` | bool | `true` | Master toggle — disables the `schedule_callback` tool entirely for this agent |
+| `enabled` | bool | `true` | Master toggle — disables the callback capability entirely for this agent. (Stored as `enable_callbacks` natively on the Workflow) |
 | `min_delay_minutes` | int | `1` | Minimum callback delay the AI will accept. If user says "call in 10 seconds", AI says it can only go as low as this. |
 | `max_delay_minutes` | int | `480` (8 hrs) | Maximum delay allowed. If user says "call me next week", AI caps at this and asks to confirm. |
 | `max_chain_depth` | int | `2` | How many times a callback can itself request another callback before being blocked. Prevents infinite loops. |
@@ -820,6 +943,9 @@ The 3:00 PM job was missed.
 | 9k | ARQ worker down at callback fire time | Delayed callback (not lost) | ARQ handles this natively ✅ |
 | 9m | Inbound caller's timezone unknown | Legal violation (calling at 2 AM) | Derive timezone from phone number country code |
 | 9n | LLM calls the tool twice (double-fire) | Two callbacks to same person | Idempotency check on `workflow_run_id` |
+| 9o | Caller's original number removed from campaign number pool mid-flight | Callback waits 10 min, times out, requeues forever | Fall back to any free number in pool; log caller ID change warning |
+| 9p | Admin resumes campaign outside sociable hours — piled-up callbacks fire at 3 AM | Legal violation; user harassment | Re-validate sociable hours at **dispatch time** in dispatcher, not just at scheduling time |
+| 9q | Manual pause: code incorrectly fires callbacks (spec says defer) | Goes against admin intent | On manual pause, return early — do NOT set `callbacks_only = True`; only circuit breaker pause blocks AND still defers callbacks |
 
 ---
 
@@ -927,22 +1053,105 @@ The DB write is still the source of truth (for durability), but the in-memory fl
 
 ---
 
+### 9o. Caller's Original Phone Number Removed From Pool Mid-Flight
+
+```
+Campaign has 2 numbers: +91AAAA and +91BBBB.
+User is originally called from +91AAAA.
+Callback is scheduled for T+30min.
+Admin removes +91AAAA from the telephony config at T+15min.
+At T+30min, dispatcher tries to acquire +91AAAA specifically.
++91AAAA no longer exists in the pool → acquires nothing → waits 10 min → times out.
+Callback requeued → retries next cycle → same timeout → infinite loop.
+```
+
+**Fix:** When `acquire_specific_from_number` times out after the configured wait, fall back to any available number in the pool (`acquire_from_number` without `preferred_number`). Log a warning:
+```
+WARN: Callback for run {original_run_id} — preferred number {preferred} unavailable.
+Falling back to alternate number {fallback}. Caller ID will differ from original call.
+```
+This is always better than silently never calling the user back.
+
+---
+
+### 9p. Admin Resumes Campaign Outside Sociable Hours — Callbacks Pile Up and Fire at Wrong Time
+
+```
+Campaign paused at 2 PM. 8 callbacks scheduled during the pause for 3–5 PM.
+Admin resumes campaign at 11 PM (outside sociable hours).
+All 8 callbacks fire immediately at 11 PM. People are asleep.
+```
+
+**Why this happens:** Sociable hours is currently only checked **at scheduling time** inside the `schedule_callback` tool. There is no re-validation at dispatch time in the dispatcher.
+
+**Fix:** Add a sociable hours check inside `campaign_call_dispatcher.process_batch()` for `retry_reason = "user_requested_callback"` rows. Before dispatching:
+```python
+if queued_run.retry_reason == "user_requested_callback":
+    tz_str = queued_run.context_variables.get("sociable_timezone", "UTC")
+    if not is_within_sociable_hours(datetime.now(UTC), tz_str, start="08:00", end="21:00"):
+        # Return this run back to queued — do not dispatch
+        await db_client.update_queued_run(queued_run.id, state="queued")
+        continue
+```
+The callback stays in `queued` state and will be picked up on the next orchestrator cycle that runs within sociable hours.
+
+**Pile-up resume scenarios:**
+
+| Scenario | Expected Behavior |
+|---|---|
+| Resume inside sociable hours + inside schedule window | All due callbacks fire immediately (subject to concurrency limits) ✅ |
+| Resume inside sociable hours + outside schedule window | Callbacks fire (callbacks bypass schedule window), regular calls do not ✅ |
+| Resume outside sociable hours (e.g., 11 PM) | Callbacks held, re-queued. Fire next morning when sociable hours open ✅ (after fix) |
+| Resume during sociable hours but concurrency maxed | Callbacks wait for free slot (up to 10 min). Then dispatched. ✅ |
+| Resume and all piled callbacks due at same second | Rate limiter + concurrency limits naturally spread them out ✅ |
+
+---
+
+### 9q. Manual Pause Incorrectly Fires Callbacks — Code vs Spec Discrepancy
+
+**Spec intent (Section 3e):**
+- Manual pause → defer ALL callbacks until campaign is manually resumed
+- Circuit breaker pause → same: defer ALL callbacks
+
+**Current code behavior:**
+- Circuit breaker pause → correctly defers callbacks ✅
+- Manual pause → **incorrectly fires callbacks** ❌
+
+The code sets `callbacks_only = True` for a manually paused campaign, which means it still dispatches due callbacks. This contradicts the spec.
+
+**Fix:** On manual pause (i.e., paused but NOT by circuit breaker), return early without dispatching anything:
+```python
+if campaign.state == "paused":
+    is_cb_paused = campaign.orchestrator_metadata.get("paused_reason") == "circuit_breaker"
+    if is_cb_paused:
+        logger.info("Campaign paused by circuit breaker. Deferring all callbacks.")
+        return   # ← defer everything
+    else:
+        logger.info("Campaign manually paused. Deferring all callbacks until resumed.")
+        return   # ← defer everything — do NOT set callbacks_only = True
+```
+
+Callbacks sit safely in `queued` state and will fire when the admin resumes the campaign.
+
+---
+
 ## Section 11: Implementation Checklist (Build Order)
 
 Build in this order. Each step depends on the previous.
 
 ### Phase 1 — Core Tool (no campaign support yet)
-- [ ] Create `api/services/workflow/tools/schedule_callback.py`
+- [x] Create `api/services/workflow/tools/schedule_callback.py`
   - Idempotency flag: `engine._callback_scheduled`
   - Read `called_number`, `caller_number`, `workflow_id`, `organization_id` from context
   - Capture `engine._gathered_context` at execution time
   - Validate: not WebRTC, not private number, delay within min/max, chain depth not exceeded
   - Write DB record first (durability — see 9a, 9b)
   - Enqueue ARQ job with `_defer_by`
-- [ ] Create `api/tasks/callback_tasks.py` with `execute_callback()` function (Section 6)
-- [ ] Register `EXECUTE_CALLBACK` in `api/tasks/function_names.py`
-- [ ] Register `execute_callback` in ARQ worker functions list (`api/tasks/arq.py`)
-- [ ] Register `schedule_callback` tool in `CustomToolManager` (`pipecat_engine_custom_tools.py`)
+- [x] Create `api/tasks/callback_tasks.py` with `execute_callback()` function (Section 6)
+- [x] Register `EXECUTE_CALLBACK` in `api/tasks/function_names.py`
+- [x] Register `execute_callback` in ARQ worker functions list (`api/tasks/arq.py`)
+- [x] Update `WorkflowModel` to include `enable_callbacks` boolean column.
+- [x] Update `CustomToolManager` (`pipecat_engine_custom_tools.py`) to automatically inject `schedule_callback` when `enable_callbacks` is true.
 
 ### Phase 2 — Sociable Hours Enforcement
 - [ ] Create `api/services/callback_scheduler.py` with:
@@ -958,14 +1167,19 @@ Build in this order. Each step depends on the previous.
 - [ ] In callback `execute_callback`: handle `campaign completed/failed` state — fire anyway (3e)
 
 ### Phase 4 — Configurable Settings
-- [ ] Read `workflow_configurations.callback` in tool handler (Section 9a settings)
-- [ ] Read `orchestrator_metadata.callback_config` for campaign context (Section 9b settings)
-- [ ] Implement precedence resolution: org → campaign → workflow → tool args (10d)
+- [x] Read `workflow_configurations.callback` in tool handler (Section 9a settings)
+- [x] Read `orchestrator_metadata.callback_config` for campaign context (Section 9b settings)
+- [x] Implement precedence resolution: org → campaign → workflow → tool args (10d)
 
 ### Phase 5 — UI
-- [ ] Agent Settings tab: add "Callback Settings" toggle + min/max delay fields
-- [ ] Campaign Advanced Settings: add "Callback Settings" section with sociable hours + enable toggle
-- [ ] New "Pending Callbacks" universal menu: build UI view to list/cancel pending non-campaign callbacks from `ScheduledCallbackModel` (see 10b)
+- [x] Agent Settings tab: add "Callback Settings" toggle + min/max delay fields
+- [x] Campaign Advanced Settings: add "Callback Settings" section with sociable hours + enable toggle
+- [x] New "Pending Callbacks" universal menu: build UI view to list/cancel pending non-campaign callbacks from `ScheduledCallbackModel` (see 10b)
+- [ ] Extend `/callbacks` page to show campaign callbacks (unified view) — see Section 12c.1
+- [ ] Add "Callbacks" tab to campaign detail page — see Section 12c.2
+- [ ] Backend: extend `GET /api/v1/callbacks` to merge both sources — see Section 12b.1
+- [ ] Backend: add cancel support for campaign callbacks — see Section 12b.2
+- [ ] Backend: add `GET /api/v1/campaign/{id}/callbacks` — see Section 12b.3
 
 ### Phase 6 — Validation / Testing
 - [ ] Unit test: tool rejects WebRTC calls
@@ -974,3 +1188,277 @@ Build in this order. Each step depends on the previous.
 - [ ] Integration test: single outbound callback fires after delay
 - [ ] Integration test: campaign callback keeps campaign in `running` state until fired
 - [ ] Manual test: "call me back in 6 hours" on a campaign with a schedule window → fires at next window
+
+---
+
+## Section 12: Callback Visibility & Management (UI + API Proposal)
+
+> **Status:** Not yet implemented
+> **Problem:** The existing `/callbacks` page only surfaces standalone (`ScheduledCallbackModel`) callbacks. Campaign callbacks (`QueuedRunModel` with `retry_reason = "user_requested_callback"`) are completely invisible to operators. There is no way to see, filter, cancel, or audit them from the UI.
+
+---
+
+### 12a. Current State vs. Required State
+
+| Capability | Standalone (`ScheduledCallbackModel`) | Campaign (`QueuedRunModel` + `retry_reason`) |
+|---|---|---|
+| List pending callbacks | ✅ `/callbacks` page | ❌ Not surfaced anywhere |
+| Cancel a callback | ✅ DELETE `/api/v1/callbacks/{id}` | ❌ No endpoint |
+| See callback status (completed/failed/cancelled) | ✅ `status` column | ❌ Must infer from `state` on `QueuedRunModel` |
+| See conversation summary | ✅ `conversation_summary` column | ❌ Buried inside `context_variables` JSON |
+| See which campaign it belongs to | ❌ No campaign link | ⚠️ `campaign_id` exists but not shown in UI |
+| See which agent (workflow) fired it | ⚠️ Raw `workflow_id` number shown | ⚠️ Not shown in UI at all |
+| Filter by status | ✅ Query param `?status=pending` | ❌ No endpoint |
+| Show "fires in X minutes" countdown | ❌ | ❌ |
+| Show "was late by X minutes" | ❌ | ❌ |
+| Admin cancel from campaign detail | ❌ | ❌ |
+
+---
+
+### 12b. Backend API Changes Required
+
+#### 1. Extend `GET /api/v1/callbacks` — Unified View
+
+The existing endpoint only queries `ScheduledCallbackModel`. It must be extended to also fetch campaign callbacks from `QueuedRunModel`.
+
+**New query parameters:**
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `status` | string | `null` | Filter: `pending`, `completed`, `failed`, `cancelled`. For campaign callbacks, `pending` = `state="queued"`, `completed` = `state="completed"`. |
+| `source` | string | `all` | `standalone`, `campaign`, or `all` (both merged). |
+| `campaign_id` | int | `null` | Only callbacks for a specific campaign. |
+| `workflow_id` | int | `null` | Only callbacks from a specific agent. |
+| `limit` | int | `50` | Pagination limit (max 200). |
+| `offset` | int | `0` | Pagination offset. |
+
+**Unified response shape** (normalized across both sources):
+
+```json
+{
+  "items": [
+    {
+      "id": 42,
+      "source": "standalone",
+      "status": "pending",
+      "scheduled_for": "2026-07-24T17:30:00Z",
+      "fires_in_seconds": 1823,
+      "was_late_seconds": null,
+      "to_number": "+919876543210",
+      "from_number": "+918000000001",
+      "conversation_summary": "User was interested in the premium plan.",
+      "callback_chain_depth": 1,
+      "workflow_id": 7,
+      "workflow_name": "Sales Agent v2",
+      "campaign_id": null,
+      "campaign_name": null,
+      "original_run_id": 1234,
+      "created_at": "2026-07-24T16:25:00Z"
+    },
+    {
+      "id": 99,
+      "source": "campaign",
+      "status": "pending",
+      "scheduled_for": "2026-07-24T18:00:00Z",
+      "fires_in_seconds": 5400,
+      "was_late_seconds": null,
+      "to_number": "+917000000099",
+      "from_number": "+918000000001",
+      "conversation_summary": "User said they were in a meeting.",
+      "callback_chain_depth": 1,
+      "workflow_id": 7,
+      "workflow_name": "Sales Agent v2",
+      "campaign_id": 12,
+      "campaign_name": "July Outreach Wave 3",
+      "original_run_id": 1567,
+      "created_at": "2026-07-24T16:45:00Z"
+    }
+  ],
+  "total": 2,
+  "has_more": false
+}
+```
+
+**`fires_in_seconds`** — computed server-side as `max(0, (scheduled_for - now).total_seconds())`. Negative = overdue.
+**`was_late_seconds`** — for completed callbacks only: seconds between `scheduled_for` and the actual run's `created_at`. Requires join on `WorkflowRunModel`.
+
+**Implementation:** Two async queries (`asyncio.gather`), results merged and sorted by `scheduled_for` desc. Workflow and campaign names fetched via a single batch query on the collected IDs.
+
+```python
+# api/routes/callbacks.py — new signature
+@router.get("", response_model=UnifiedCallbackListResponse)
+async def list_callbacks(
+    status: Optional[str] = Query(None),
+    source: str = Query("all"),
+    campaign_id: Optional[int] = Query(None),
+    workflow_id: Optional[int] = Query(None),
+    limit: int = Query(50, le=200),
+    offset: int = Query(0),
+    user: UserModel = Depends(get_user),
+) -> Any:
+    ...
+```
+
+---
+
+#### 2. `DELETE /api/v1/callbacks/{id}?source=campaign` — Cancel Campaign Callback
+
+Add a `source` query param so the same endpoint handles both models.
+
+**For campaign callbacks:** Set `QueuedRunModel.state = "cancelled"`. The batch processor's `claim_queued_runs_for_processing` query filters `state = "queued"` — it will naturally skip cancelled rows.
+
+```python
+@router.delete("/{callback_id}")
+async def cancel_callback(
+    callback_id: int,
+    source: str = Query("standalone"),   # "standalone" | "campaign"
+    user: UserModel = Depends(get_user),
+) -> Any:
+    if source == "campaign":
+        # Set QueuedRunModel.state = "cancelled" where id = callback_id
+        # and campaign.organization_id = user.selected_organization_id (tenant check)
+        ...
+    else:
+        # Existing ScheduledCallbackModel logic (unchanged)
+        ...
+```
+
+> ⚠️ **Migration note:** Verify whether `QueuedRunModel.state` has a DB-level enum or check constraint that would need updating to allow `"cancelled"`. Check `api/db/models.py` before shipping this endpoint.
+
+---
+
+#### 3. `GET /api/v1/campaign/{campaign_id}/callbacks` — Per-Campaign Callback Log
+
+A dedicated endpoint for the campaign detail page "Callbacks" tab.
+
+```python
+# Inside api/routes/campaign.py
+@router.get("/{campaign_id}/callbacks")
+async def list_campaign_callbacks(
+    campaign_id: int,
+    status: Optional[str] = Query(None),
+    limit: int = Query(50),
+    offset: int = Query(0),
+    user: UserModel = Depends(get_user),
+) -> Any:
+    """
+    Returns QueuedRunModel rows for this campaign where
+    retry_reason = 'user_requested_callback', with outcome
+    joined from WorkflowRunModel where is_callback = true.
+    """
+    ...
+```
+
+Response shape per item:
+
+```json
+{
+  "queued_run_id": 99,
+  "status": "pending",
+  "scheduled_for": "2026-07-24T18:00:00Z",
+  "fires_in_seconds": 5400,
+  "to_number": "+917000000099",
+  "from_number": "+918000000001",
+  "conversation_summary": "User said they were in a meeting.",
+  "callback_chain_depth": 1,
+  "original_run_id": 1567,
+  "outcome_run_id": null,
+  "outcome_status": null,
+  "outcome_disposition": null,
+  "created_at": "2026-07-24T16:45:00Z"
+}
+```
+
+**`outcome_*` fields** — populated after the callback fires, by joining `WorkflowRunModel` on `initial_context->>'original_run_id' = original_run_id` and `initial_context->>'is_callback' = 'true'`. This is a JSONB containment query. Ensure a GIN index exists on `workflow_runs.initial_context`.
+
+---
+
+### 12c. UI Changes Required
+
+#### 1. Extend `/callbacks` — Global Unified View
+
+**File:** `ui/src/app/callbacks/page.tsx`
+
+Current gaps: Only shows standalone callbacks; flat table; no filtering UI; shows raw `workflow_id` number; no pagination.
+
+**Proposed improvements:**
+
+| Feature | Detail |
+|---|---|
+| **Source tabs** | "All" / "Standalone" / "Campaign" tab group. Default: All. Updates `source` query param. |
+| **Status filter** | Dropdown: All / Pending / Completed / Failed / Cancelled |
+| **Campaign filter** | Dropdown populated from campaign list. Only shown when source = "all" or "campaign". |
+| **"Agent" column** | Show `workflow_name` instead of raw `#workflow_id` |
+| **"Campaign" column** | Show `campaign_name` or "—" for standalone |
+| **"Fires In" column** | For pending: live client-side countdown `in 23m 14s`. For overdue pending: orange "overdue 5m ago" |
+| **"Was Late" column** | For completed: `on time` or `+8m late`. Hidden for pending/cancelled. |
+| **Cancel action** | Existing button for standalone. For campaign callbacks, call `DELETE /{id}?source=campaign`. |
+| **Overdue badge** | If `fires_in_seconds < 0` and status is still pending, show orange "Overdue" badge. |
+| **Pagination** | "Load more" button or simple page prev/next. Currently no pagination exists at all. |
+| **Auto-refresh** | Poll `GET /api/v1/callbacks` every 30 seconds when tab is visible, to catch newly completed/fired callbacks. |
+| **Empty states** | "No pending callbacks" (when filtered to pending with 0 results) vs "No callbacks scheduled yet" (when all sources empty). |
+
+---
+
+#### 2. Add "Callbacks" Tab to Campaign Detail Page
+
+**File:** `ui/src/app/campaigns/[campaignId]/page.tsx`
+
+**Where:** Add after the existing "Runs" content block. Suggested tab label: `Callbacks` with a small pending count badge (`Callbacks (3)`).
+
+**Tab content — table columns:**
+
+| Column | Data Source |
+|---|---|
+| To Number | `context_variables.called_number` or `to_number` |
+| Scheduled For | `scheduled_for` (formatted) |
+| Fires In / Was Late | Computed from `scheduled_for` vs now / outcome run's created_at |
+| Status | `state`: `queued` → "Pending", `completed` → "Dispatched" |
+| Outcome | After fire: `outcome_disposition` (Answered, No Answer, Busy, Hung Up) |
+| Summary | `context_variables.conversation_summary` (truncated to ~60 chars, expand on hover) |
+| Actions | "Cancel" button if pending. Calls `DELETE /api/v1/callbacks/{id}?source=campaign`. |
+
+**Pending count badge:** Fetched via `GET /api/v1/campaign/{id}/callbacks?status=pending&limit=1` on page load. Show as badge on tab label if count > 0.
+
+---
+
+#### 3. Sidebar Badge (Optional, Phase 2)
+
+Show a count badge on the "Callbacks" nav item in the sidebar if there are any org-wide pending callbacks. Requires a lightweight `GET /api/v1/callbacks?status=pending&limit=1` call on app load (or as part of an existing global data hook). Keep it optional — the polling overhead may not be worth it at low callback volumes.
+
+---
+
+### 12d. Data Model Notes
+
+#### Deriving outcome for campaign callbacks
+
+To show what happened after a campaign callback fired, join `WorkflowRunModel`:
+
+```sql
+SELECT wr.*
+FROM workflow_runs wr
+WHERE wr.initial_context->>'original_run_id' = :original_run_id
+  AND wr.initial_context->>'is_callback' = 'true'
+  AND wr.campaign_id = :campaign_id
+ORDER BY wr.created_at DESC
+LIMIT 1
+```
+
+> ⚠️ This is a JSONB text cast — not a typed query. Performance depends on having a GIN index on `workflow_runs.initial_context`. If the index does not exist, add a migration to create one before shipping the outcome join.
+
+#### `QueuedRunModel.state = "cancelled"` — migration check
+
+Before the cancel-campaign-callback endpoint can mark rows as `"cancelled"`, confirm whether there is an enum, check constraint, or application-level validation on `state`. If so, update accordingly and add a migration.
+
+---
+
+### 12e. Implementation Order
+
+Each step is independently shippable and does not block the others:
+
+1. **Backend: Extend `GET /api/v1/callbacks`** — unified query, no UI change required yet. Standalone page will show more data automatically once the API returns it.
+2. **Backend: Add `GET /api/v1/campaign/{id}/callbacks`** endpoint in `campaign.py`.
+3. **Backend: Extend `DELETE /api/v1/callbacks/{id}?source=campaign`**.
+4. **UI: Extend `/callbacks` page** — source tabs, status filter, agent/campaign columns, countdown, pagination.
+5. **UI: Add "Callbacks" tab to campaign detail page** — uses the new per-campaign endpoint.
+6. **UI: Sidebar badge** — optional, lowest priority.

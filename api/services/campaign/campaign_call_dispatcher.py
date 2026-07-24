@@ -57,7 +57,7 @@ class CampaignCallDispatcher:
         """Get the concurrent call limit for an organization."""
         return await call_concurrency.get_org_concurrent_limit(organization_id)
 
-    async def process_batch(self, campaign_id: int, batch_size: int = 10) -> int:
+    async def process_batch(self, campaign_id: int, batch_size: int = 10, callbacks_only: bool = False) -> int:
         """
         Processes a batch of queued runs with priority for scheduled retries.
         Thread-safe: uses SELECT FOR UPDATE SKIP LOCKED to prevent concurrent processing.
@@ -68,8 +68,11 @@ class CampaignCallDispatcher:
         if not campaign:
             raise ValueError(f"Campaign {campaign_id} not found")
 
-        # Check if campaign is in running state
-        if campaign.state != "running":
+        # Check if campaign is in running state (or completed/failed for callbacks)
+        if campaign.state == "paused":
+            logger.info(f"Campaign {campaign_id} is paused")
+            return 0
+        elif campaign.state != "running" and not callbacks_only:
             logger.info(
                 f"Campaign {campaign_id} is not in running state: {campaign.state}"
             )
@@ -81,6 +84,7 @@ class CampaignCallDispatcher:
             campaign_id=campaign_id,
             scheduled_before=datetime.now(UTC),
             limit=batch_size,
+            callbacks_only=callbacks_only,
         )
 
         if not queued_runs:
@@ -102,6 +106,45 @@ class CampaignCallDispatcher:
         processed_count = 0
         processed_run_ids: set[int] = set()
         for i, queued_run in enumerate(queued_runs):
+            if getattr(queued_run, "retry_reason", None) == "user_requested_callback":
+                try:
+                    from api.services.workflow.tools.callback_settings import (
+                        resolve_callback_settings,
+                        adjust_for_sociable_hours,
+                        get_timezone_for_number,
+                    )
+                    
+                    settings = await resolve_callback_settings(
+                        organization_id=campaign.organization_id,
+                        workflow_id=campaign.workflow_id,
+                        campaign_id=campaign.id
+                    )
+                    
+                    to_number = queued_run.context_variables.get("called_number") or queued_run.context_variables.get("phone_number")
+                    start_str = settings.get("sociable_hours_start", "08:00")
+                    end_str = settings.get("sociable_hours_end", "21:00")
+                    default_tz_str = settings.get("sociable_timezone", "UTC")
+                    tz_str = get_timezone_for_number(to_number, default_tz_str)
+                    
+                    now_utc = datetime.now(UTC)
+                    adjusted_time = adjust_for_sociable_hours(now_utc, start_str, end_str, tz_str)
+                    
+                    if adjusted_time > now_utc:
+                        logger.info(
+                            f"Callback queued_run {queued_run.id} is outside sociable hours at dispatch time. "
+                            f"Re-queueing for {adjusted_time}"
+                        )
+                        await db_client.update_queued_run(
+                            queued_run_id=queued_run.id,
+                            state="queued",
+                            scheduled_for=adjusted_time
+                        )
+                        processed_run_ids.add(queued_run.id)
+                        continue
+                except Exception as e:
+                    logger.error(f"Error re-validating sociable hours for callback {queued_run.id}: {e}")
+                    # On error, we'll continue and dispatch it rather than dropping it forever
+
             try:
                 # Apply rate limiting, i.e lets not initiate more than rate_limit_per_second
                 # calls per second. It is different than concurrency limit.
@@ -131,9 +174,10 @@ class CampaignCallDispatcher:
                 processed_run_ids.add(queued_run.id)
 
                 # Update campaign processed count
-                await db_client.update_campaign(
-                    campaign_id=campaign_id, processed_rows=campaign.processed_rows + 1
-                )
+                if getattr(queued_run, "retry_reason", None) != "user_requested_callback":
+                    await db_client.update_campaign(
+                        campaign_id=campaign_id, processed_rows=campaign.processed_rows + 1
+                    )
 
             except asyncio.CancelledError:
                 logger.warning(
@@ -254,12 +298,16 @@ class CampaignCallDispatcher:
             provider = await self.get_provider_for_campaign(campaign)
             workflow_run_mode = provider.PROVIDER_NAME
 
+            # For callbacks, prefer the original caller_number to maintain consistent caller ID
+            preferred_number = queued_run.context_variables.get("caller_number")
+
             # Acquire a unique from_number from the pool scoped to this campaign's
             # telephony configuration so orgs with multiple configs don't leak
             # caller IDs across configs.
             from_number = await self.acquire_from_number(
                 campaign.organization_id,
                 telephony_configuration_id=campaign.telephony_configuration_id,
+                preferred_number=preferred_number,
             )
             if from_number is None:
                 raise PhoneNumberPoolExhaustedError(
@@ -327,6 +375,13 @@ class CampaignCallDispatcher:
                 run_id=workflow_run.id,
                 gathered_context={
                     "call_tags": ["retry", f"retry_reason_{retry_reason}"]
+                },
+            )
+        elif getattr(queued_run, "retry_reason", None) == "user_requested_callback":
+            await db_client.update_workflow_run(
+                run_id=workflow_run.id,
+                gathered_context={
+                    "call_tags": ["callback"]
                 },
             )
 
@@ -509,12 +564,14 @@ class CampaignCallDispatcher:
     async def acquire_from_number(
         self,
         organization_id: int,
-        telephony_configuration_id: int | None,
+        telephony_configuration_id: int | None = None,
+        preferred_number: str | None = None,
         timeout: float = 600,
     ) -> Optional[str]:
         """
         Acquire a from_number from the (org, telephony config) pool with retry.
         Waits up to timeout seconds, polling every 1s.
+        If preferred_number is specified, ONLY attempts to acquire that exact number.
 
         Returns:
             The acquired phone number as a string, or None if timeout is exceeded.
@@ -522,14 +579,33 @@ class CampaignCallDispatcher:
         wait_start = time.time()
 
         while True:
-            from_number = await rate_limiter.acquire_from_number(
-                organization_id, telephony_configuration_id
-            )
-            if from_number:
-                return from_number
+            if preferred_number:
+                success = await rate_limiter.acquire_specific_from_number(
+                    organization_id, telephony_configuration_id, preferred_number
+                )
+                if success:
+                    return preferred_number
+            else:
+                from_number = await rate_limiter.acquire_from_number(
+                    organization_id, telephony_configuration_id
+                )
+                if from_number:
+                    return from_number
 
             wait_time = time.time() - wait_start
             if wait_time > timeout:
+                if preferred_number:
+                    logger.warning(
+                        f"Preferred from_number {preferred_number} unavailable for org {organization_id} "
+                        f"config {telephony_configuration_id} after waiting {wait_time:.1f}s. "
+                        f"Falling back to any available number in pool."
+                    )
+                    from_number = await rate_limiter.acquire_from_number(
+                        organization_id, telephony_configuration_id
+                    )
+                    if from_number:
+                        return from_number
+
                 logger.warning(
                     f"From number pool exhausted for org {organization_id} "
                     f"config {telephony_configuration_id} after waiting "

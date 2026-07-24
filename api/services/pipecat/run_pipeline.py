@@ -837,6 +837,7 @@ async def _run_pipeline_impl(
         has_recordings=has_recordings,
         context_compaction_enabled=context_compaction_enabled,
         enable_dtmf=workflow.enable_dtmf,
+        enable_callbacks=workflow.enable_callbacks,
     )
 
     # Create pipeline components

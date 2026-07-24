@@ -10,6 +10,7 @@ import asyncio
 import time
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
@@ -32,7 +33,7 @@ from api.services.workflow.tools.wait import get_wait_tools
 from api.services.workflow.tools.schedule_callback import get_schedule_callback_tools
 from api.tasks.arq import enqueue_job
 from api.tasks.function_names import FunctionNames
-from api.db.models import ScheduledCallbackModel
+from api.db.models import ScheduledCallbackModel, QueuedRunModel
 from datetime import datetime, timedelta, UTC
 from api.services.workflow.tools.custom_tool import (
     execute_http_tool,
@@ -41,6 +42,11 @@ from api.services.workflow.tools.custom_tool import (
 from api.services.workflow.tools.transfer_resolver import (
     TransferResolutionError,
     resolve_transfer_config,
+)
+from api.services.workflow.tools.callback_settings import (
+    resolve_callback_settings,
+    adjust_for_sociable_hours,
+    get_timezone_for_number,
 )
 from api.utils.template_renderer import render_template
 
@@ -177,26 +183,26 @@ class CustomToolManager:
             tools = await db_client.get_tools_by_uuids(tool_uuids, organization_id)
 
             schemas: list[FunctionSchema] = []
+
+            if self._engine._enable_callbacks:
+                self._register_schedule_callback_handler()
+                logger.debug("Registered native schedule_callback tool handler")
+                for tool_def in get_schedule_callback_tools():
+                    func = tool_def["function"]
+                    schemas.append(
+                        get_function_schema(
+                            func["name"],
+                            func["description"],
+                            properties=func["parameters"]["properties"],
+                            required=func["parameters"]["required"],
+                        )
+                    )
+
             for tool in tools:
                 if tool.category == "wait":
                     self._register_wait_handler()
                     logger.debug(f"Registered wait tool handler (tool_uuid: {tool.tool_uuid})")
                     for tool_def in get_wait_tools():
-                        func = tool_def["function"]
-                        schemas.append(
-                            get_function_schema(
-                                func["name"],
-                                func["description"],
-                                properties=func["parameters"]["properties"],
-                                required=func["parameters"]["required"],
-                            )
-                        )
-                    continue
-
-                if tool.category == ToolCategory.SCHEDULE_CALLBACK.value:
-                    self._register_schedule_callback_handler()
-                    logger.debug(f"Registered schedule_callback tool handler (tool_uuid: {tool.tool_uuid})")
-                    for tool_def in get_schedule_callback_tools():
                         func = tool_def["function"]
                         schemas.append(
                             get_function_schema(
@@ -284,6 +290,10 @@ class CustomToolManager:
 
         try:
             tools = await db_client.get_tools_by_uuids(tool_uuids, organization_id)
+
+            if self._engine._enable_callbacks:
+                self._register_schedule_callback_handler()
+                logger.debug("Registered native schedule_callback tool handler")
 
             for tool in tools:
                 if tool.category == "wait":
@@ -1183,6 +1193,13 @@ class CustomToolManager:
                 },
                 properties=response_properties,
             )
+            # Give Plivo time to process the Transfer API redirect and seat the
+            # aleg into the conference before we tear down the WebSocket.
+            # Without this delay, the WebSocket closes before Plivo has finished
+            # redirecting the original caller, causing a 404 "call not found" on
+            # the aleg and dropping the call on both sides.
+            import asyncio
+            await asyncio.sleep(2.0)
 
             # End pipeline - providers complete bridge swap/conference join as final transfer leg
             await self._engine.end_call_with_reason(
@@ -1245,58 +1262,176 @@ class CustomToolManager:
                 initial_context = workflow_run.initial_context or {}
                 # In outbound, we called them (called_number is user). In inbound, they called us (caller_number is user).
                 # The callback tool requires calling the user. 
-                # For Phase 1 (no campaign), we determine user number:
-                to_number = initial_context.get("called_number") if not initial_context.get("is_inbound") else initial_context.get("caller_number")
-                from_number = initial_context.get("caller_number") if not initial_context.get("is_inbound") else initial_context.get("called_number")
+                is_inbound = initial_context.get("direction") == "inbound"
+                to_number = initial_context.get("caller_number") if is_inbound else initial_context.get("called_number")
+                from_number = initial_context.get("called_number") if is_inbound else initial_context.get("caller_number")
 
+                if is_inbound and from_number:
+                    try:
+                        provider = await get_telephony_provider_for_run(workflow_run, organization_id)
+                        available_numbers = await provider.get_available_phone_numbers()
+                        if from_number not in available_numbers:
+                            logger.info(f"Inbound DID {from_number} is not in outbound pool {available_numbers}. Falling back to default.")
+                            from_number = None
+                    except Exception as e:
+                        logger.warning(f"Failed to validate outbound number pool for callback: {e}")
+                        from_number = None
                 if not to_number or to_number.startswith("anonymous"):
                     await function_call_params.result_callback({
                         "error": "I'm sorry, I can't schedule a callback as your number is private."
                     })
                     return
 
-                # Check chain depth
-                chain_depth = initial_context.get("callback_chain_depth", 0) + 1
-                if chain_depth > 2:
+                # 3. Load Callback Settings (Phase 3)
+                settings = await resolve_callback_settings(organization_id, workflow_id, workflow_run.campaign_id)
+                
+                fallback_num_str = f" at {from_number}" if from_number else ""
+                if not settings.get("enabled", True):
                     await function_call_params.result_callback({
-                        "error": "I'm unable to schedule another callback. Please call us back when you're ready."
+                        "error": f"I'm sorry, I'm unable to schedule callbacks for this call. Please call us back{fallback_num_str} when you're ready."
                     })
                     return
 
-                # 3. Save to DB
-                async with db_client.get_async_session() as session:
-                    new_callback = ScheduledCallbackModel(
-                        organization_id=organization_id,
-                        workflow_id=workflow_id,
-                        original_run_id=workflow_run_id,
-                        status="pending",
-                        scheduled_for=datetime.now(UTC) + timedelta(minutes=minutes),
-                        to_number=to_number,
-                        from_number=from_number,
-                        conversation_summary=conversation_summary,
-                        gathered_context=self._engine._gathered_context,
-                        callback_chain_depth=chain_depth
-                    )
-                    session.add(new_callback)
-                    await session.commit()
+                chain_depth = initial_context.get("callback_chain_depth", 0) + 1
+                if chain_depth > settings.get("max_chain_depth", 2):
+                    await function_call_params.result_callback({
+                        "error": f"I'm unable to schedule another callback. Please call us back{fallback_num_str} when you're ready."
+                    })
+                    return
+
+                min_delay = settings.get("min_delay_minutes", 1)
+                max_delay = settings.get("max_delay_minutes", 480)
                 
-                # 4. Enqueue ARQ Job
-                await enqueue_job(
-                    FunctionNames.EXECUTE_CALLBACK,
-                    to_number=to_number,
-                    from_number=from_number,
-                    workflow_id=workflow_id,
-                    organization_id=organization_id,
-                    original_run_id=workflow_run_id,
-                    conversation_summary=conversation_summary,
-                    gathered_context=self._engine._gathered_context,
-                    callback_chain_depth=chain_depth,
-                    _defer_by=timedelta(minutes=minutes)
-                )
+                # Check bounds
+                if minutes < min_delay:
+                    await function_call_params.result_callback({
+                        "error": f"I can schedule a callback in as little as {min_delay} minute(s). Shall I call you back in {min_delay} minutes? (If user agrees, call this tool again with minutes={min_delay})"
+                    })
+                    return
+                    
+                if minutes > max_delay:
+                    max_hours = max_delay // 60
+                    await function_call_params.result_callback({
+                        "error": f"I can schedule callbacks for up to {max_hours} hours from now. Shall I call you back in {max_hours} hours? (If user agrees, call this tool again with minutes={max_delay})"
+                    })
+                    return
+
+                # Calculate scheduled time and check sociable hours
+                requested_time = datetime.now(UTC) + timedelta(minutes=minutes)
+                
+                start_str = settings.get("sociable_hours_start", "08:00")
+                end_str = settings.get("sociable_hours_end", "21:00")
+                
+                # Derive timezone from user's number, fallback to org/campaign timezone (Spec 9m)
+                default_tz_str = settings.get("sociable_timezone", "UTC")
+                tz_str = get_timezone_for_number(to_number, default_tz_str)
+                
+                adjusted_time = adjust_for_sociable_hours(requested_time, start_str, end_str, tz_str)
+                
+                # If it was pushed out due to sociable hours, fall through and schedule it
+                # at the adjusted time. The success response will tell the LLM the actual
+                # time so it can confirm correctly with the user.
+                # (Do NOT reject and ask LLM to re-call with adjusted minutes — that pattern
+                # causes an infinite loop because `adjusted_minutes` changes every second.)
+
+                # 4. Save to DB
+                async with db_client.async_session() as session:
+                    if workflow_run.campaign_id:
+                        # Fetch original queued_run for source_uuid
+                        original_queued_run = await db_client.get_queued_run_by_id(workflow_run.queued_run_id) if workflow_run.queued_run_id else None
+                        original_source_uuid = original_queued_run.source_uuid if original_queued_run else str(uuid.uuid4())
+                        new_source_uuid = f"{original_source_uuid}_callback_{int(time.time())}"
+                        
+                        original_context_vars = original_queued_run.context_variables if original_queued_run else {}
+                        
+                        # Campaign Callback Phase 2 Logic
+                        new_queued_run = QueuedRunModel(
+                            campaign_id=workflow_run.campaign_id,
+                            source_uuid=new_source_uuid,
+                            context_variables={
+                                **original_context_vars,
+                                "is_callback": True,
+                                "callback_reason": "user_requested",
+                                "original_run_id": workflow_run_id,
+                                "conversation_summary": conversation_summary,
+                                "gathered_context": self._engine._gathered_context,
+                                "callback_chain_depth": chain_depth,
+                                "callback_resume_mode": settings.get("callback_resume_mode", "fresh"),
+                                "caller_number": from_number,
+                                "called_number": to_number,
+                                "phone_number": to_number,
+                                "callback_ignore_campaign_window": True,   # Phase 3-4 feature stub
+                                "callback_sociable_hours_only": True,       # Phase 3-4 feature stub
+                                "callback_originally_requested_minutes": minutes
+                            },
+                            state="queued",
+                            retry_reason="user_requested_callback",
+                            retry_count=0,
+                            scheduled_for=adjusted_time
+                        )
+                        session.add(new_queued_run)
+                        await session.commit()
+                        logger.info(f"Scheduled campaign callback via QueuedRun for {to_number} at {adjusted_time}")
+                    else:
+                        # Non-campaign standalone callback (Phase 1)
+                        new_callback = ScheduledCallbackModel(
+                            organization_id=organization_id,
+                            workflow_id=workflow_id,
+                            original_run_id=workflow_run_id,
+                            status="pending",
+                            scheduled_for=adjusted_time,
+                            to_number=to_number,
+                            from_number=from_number,
+                            conversation_summary=conversation_summary,
+                            gathered_context=self._engine._gathered_context,
+                            callback_chain_depth=chain_depth
+                        )
+                        session.add(new_callback)
+                        await session.commit()
+                        
+                        defer_by = adjusted_time - datetime.now(UTC)
+                        defer_by = max(defer_by, timedelta(seconds=5))
+                        # Enqueue ARQ Job only for standalone callbacks
+                        await enqueue_job(
+                            FunctionNames.EXECUTE_CALLBACK,
+                            to_number=to_number,
+                            from_number=from_number,
+                            workflow_id=workflow_id,
+                            organization_id=organization_id,
+                            original_run_id=workflow_run_id,
+                            conversation_summary=conversation_summary,
+                            gathered_context=self._engine._gathered_context,
+                            callback_chain_depth=chain_depth,
+                            _defer_by=defer_by
+                        )
+                        logger.info(f"Scheduled standalone callback via ScheduledCallbackModel for {to_number}")
 
                 self._engine._callback_scheduled = True
+                
+                # Build a human-readable local time for the LLM to confirm back to the user
+                was_adjusted = adjusted_time != requested_time
+                try:
+                    user_tz_str = get_timezone_for_number(to_number, tz_str)
+                    local_adjusted = adjusted_time.astimezone(ZoneInfo(user_tz_str))
+                    actual_time_str = local_adjusted.strftime("%I:%M %p on %A, %B %-d")
+                except Exception:
+                    actual_time_str = adjusted_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                
+                result_payload = {
+                    "status": "scheduled",
+                    "callback_in_minutes": minutes,
+                    "actual_callback_time": actual_time_str,
+                    "was_adjusted_for_sociable_hours": was_adjusted,
+                }
+                if was_adjusted:
+                    result_payload["note"] = (
+                        f"The callback was adjusted from the requested time to {actual_time_str} "
+                        f"to respect sociable calling hours. "
+                        f"Tell the user you will call them at {actual_time_str} instead."
+                    )
+                
                 await function_call_params.result_callback(
-                    {"status": "scheduled", "callback_in_minutes": minutes},
+                    result_payload,
                     properties=properties
                 )
                 await self._play_farewell_and_end(function_call_params)
@@ -1306,7 +1441,7 @@ class CustomToolManager:
                 await function_call_params.result_callback({"error": str(e)})
 
         self._engine.llm.register_function(
-            "schedule_callback", schedule_callback_func, timeout_secs=10.0, is_node_transition=True
+            "schedule_callback", schedule_callback_func, timeout_secs=30.0, is_node_transition=True
         )
 
     async def _play_farewell_and_end(self, function_call_params: FunctionCallParams):

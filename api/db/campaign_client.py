@@ -27,6 +27,7 @@ class CampaignClient(BaseDBClient):
         schedule_config: Optional[dict] = None,
         circuit_breaker: Optional[dict] = None,
         telephony_configuration_id: Optional[int] = None,
+        callback_config: Optional[dict] = None,
     ) -> CampaignModel:
         """Create a new campaign"""
         async with self.async_session() as session:
@@ -38,6 +39,8 @@ class CampaignClient(BaseDBClient):
                 orchestrator_metadata["schedule_config"] = schedule_config
             if circuit_breaker is not None:
                 orchestrator_metadata["circuit_breaker"] = circuit_breaker
+            if callback_config is not None:
+                orchestrator_metadata["callback_config"] = callback_config
 
             campaign = CampaignModel(
                 name=name,
@@ -619,7 +622,7 @@ class CampaignClient(BaseDBClient):
             }
             for campaign_id, state, count in result.all():
                 stats[campaign_id]["total"] += count
-                if state == "processed":
+                if state in ("processed", "cancelled", "failed"):
                     stats[campaign_id]["executed"] += count
             return stats
 
@@ -739,21 +742,49 @@ class CampaignClient(BaseDBClient):
             result = await session.execute(query)
             return list(result.scalars().all())
 
-    async def get_queued_runs_count(self, campaign_id: int, states: list[str]) -> int:
+    async def get_queued_runs_count(self, campaign_id: int, states: list[str], non_scheduled_only: bool = False) -> int:
         """Get count of queued runs for a campaign in specified states"""
         async with self.async_session() as session:
             query = select(func.count(QueuedRunModel.id)).where(
                 QueuedRunModel.campaign_id == campaign_id,
                 QueuedRunModel.state.in_(states),
             )
+            if non_scheduled_only:
+                query = query.where(QueuedRunModel.scheduled_for.is_(None))
             result = await session.execute(query)
             return result.scalar() or 0
+
+    async def get_campaigns_with_due_callbacks(self) -> list[CampaignModel]:
+        """Get campaigns that have due callbacks, regardless of campaign state."""
+        async with self.async_session() as session:
+            now = datetime.now(UTC)
+            query = (
+                select(CampaignModel)
+                .join(QueuedRunModel, QueuedRunModel.campaign_id == CampaignModel.id)
+                .where(
+                    QueuedRunModel.retry_reason == "user_requested_callback",
+                    QueuedRunModel.state == "queued",
+                    QueuedRunModel.scheduled_for <= now
+                )
+            )
+            result = await session.execute(query)
+            
+            campaigns = list(result.scalars().all())
+            seen = set()
+            unique_campaigns = []
+            for c in campaigns:
+                if c.id not in seen:
+                    seen.add(c.id)
+                    unique_campaigns.append(c)
+                    
+            return unique_campaigns
 
     async def get_scheduled_runs_count(
         self,
         campaign_id: int,
         scheduled_before: Optional[datetime] = None,
         scheduled_after: Optional[datetime] = None,
+        retry_reason: Optional[str] = None,
     ) -> int:
         """Get count of scheduled runs for a campaign"""
         async with self.async_session() as session:
@@ -767,6 +798,8 @@ class CampaignClient(BaseDBClient):
                 conditions.append(QueuedRunModel.scheduled_for <= scheduled_before)
             if scheduled_after:
                 conditions.append(QueuedRunModel.scheduled_for > scheduled_after)
+            if retry_reason is not None:
+                conditions.append(QueuedRunModel.retry_reason == retry_reason)
 
             query = select(func.count(QueuedRunModel.id)).where(*conditions)
             result = await session.execute(query)
@@ -777,6 +810,7 @@ class CampaignClient(BaseDBClient):
         campaign_id: int,
         scheduled_before: datetime,
         limit: int = 10,
+        callbacks_only: bool = False,
     ) -> list[QueuedRunModel]:
         """
         Atomically claim queued runs for processing using SELECT FOR UPDATE SKIP LOCKED.
@@ -801,6 +835,12 @@ class CampaignClient(BaseDBClient):
                     QueuedRunModel.scheduled_for.isnot(None),
                     QueuedRunModel.scheduled_for <= scheduled_before,
                 )
+            )
+            if callbacks_only:
+                scheduled_query = scheduled_query.where(QueuedRunModel.retry_reason == "user_requested_callback")
+
+            scheduled_query = (
+                scheduled_query
                 .order_by(QueuedRunModel.scheduled_for)
                 .limit(limit)
                 .with_for_update(skip_locked=True)
@@ -816,8 +856,8 @@ class CampaignClient(BaseDBClient):
 
             remaining_slots = limit - len(scheduled_runs)
 
-            # Then get regular queued runs if we have remaining slots
-            if remaining_slots > 0:
+            # Then get regular queued runs if we have remaining slots (skip if callbacks_only)
+            if remaining_slots > 0 and not callbacks_only:
                 regular_query = (
                     select(QueuedRunModel)
                     .where(

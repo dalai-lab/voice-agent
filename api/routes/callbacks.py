@@ -58,7 +58,7 @@ async def list_callbacks(
     campaign_items = []
     wf_names = {}
     
-    async with db_client.session_maker() as db:
+    async with db_client.async_session() as db:
         if source in ("all", "standalone") and not campaign_id:
             q_sa = select(ScheduledCallbackModel).where(ScheduledCallbackModel.organization_id == org_id)
             if status:
@@ -201,7 +201,7 @@ async def cancel_callback(
     if source not in ("standalone", "campaign"):
         raise HTTPException(status_code=400, detail="Invalid source. Must be 'standalone' or 'campaign'")
         
-    async with db_client.session_maker() as db:
+    async with db_client.async_session() as db:
         if source == "campaign":
             query = select(QueuedRunModel, CampaignModel).join(
                 CampaignModel, QueuedRunModel.campaign_id == CampaignModel.id

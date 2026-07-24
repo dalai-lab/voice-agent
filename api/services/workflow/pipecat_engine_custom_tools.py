@@ -1328,27 +1328,11 @@ class CustomToolManager:
                 
                 adjusted_time = adjust_for_sociable_hours(requested_time, start_str, end_str, tz_str)
                 
-                # If it was pushed out due to sociable hours
-                time_diff = adjusted_time - requested_time
-                if time_diff.total_seconds() > 60:
-                    adjusted_minutes = int((adjusted_time - datetime.now(UTC)).total_seconds() / 60)
-                    
-                    # If this is a campaign and the requested delay is below the long callback threshold, we are allowed to ignore sociable hours
-                    # Wait, the spec says Sub-case 1: Short delay, slightly outside window (the 2-hour example) - Ignore campaign window, BUT still respect Sociable Hours hard limit (8 AM - 9 PM)
-                    # "1. Is the callback fire time within "sociable hours" (8 AM - 9 PM local time)?
-                    #  -> YES: Fire it. Ignore campaign schedule window.
-                    #  -> NO (e.g. midnight): Do NOT fire. Hold until next allowed window."
-                    # So sociable hours are always respected.
-                    
-                    # If the user requested a time that falls outside sociable hours, we propose the adjusted time.
-                    # We require the LLM to explicitly re-call with the exact adjusted minutes to prove it agreed.
-                    adj_local = adjusted_time.astimezone(ZoneInfo(tz_str))
-                    next_time_str = adj_local.strftime("%I:%M %p").lstrip("0")
-                    
-                    await function_call_params.result_callback({
-                        "error": f"That time is outside of our calling hours. Tell the user: 'I'll schedule your callback for {next_time_str} when I'm able to reach you at a reasonable hour. Does that work?' (If they agree, call this tool again with minutes={adjusted_minutes})"
-                    })
-                    return
+                # If it was pushed out due to sociable hours, fall through and schedule it
+                # at the adjusted time. The success response will tell the LLM the actual
+                # time so it can confirm correctly with the user.
+                # (Do NOT reject and ask LLM to re-call with adjusted minutes — that pattern
+                # causes an infinite loop because `adjusted_minutes` changes every second.)
 
                 # 4. Save to DB
                 async with db_client.async_session() as session:

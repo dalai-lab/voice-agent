@@ -18,6 +18,8 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { useOrganizationTimezone } from "@/hooks/useOrganizationTimezone";
+import { formatDateTime } from "@/lib/dateTime";
 import { ActiveFilter, FilterAttribute } from "@/types/filters";
 
 export interface WorkflowRunsTableProps {
@@ -85,6 +87,7 @@ export function WorkflowRunsTable({
     emptyMessage = "No workflow runs found",
 }: WorkflowRunsTableProps) {
     const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
+    const organizationTimezone = useOrganizationTimezone();
 
     // Media preview dialog
     const mediaPreview = MediaPreviewDialog();
@@ -192,7 +195,9 @@ export function WorkflowRunsTable({
                                                     {run.is_completed ? "Completed" : "In Progress"}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-sm">{formatDate(run.created_at)}</TableCell>
+                                            <TableCell className="text-sm">
+                                                {formatDateTime(run.created_at, organizationTimezone)}
+                                            </TableCell>
                                             <TableCell>
                                                 <CallTypeCell mode={run.mode} callType={run.call_type} />
                                             </TableCell>

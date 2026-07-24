@@ -29,10 +29,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CampaignRuns } from '@/components/workflow-runs';
+import { useOrganizationTimezone } from '@/hooks/useOrganizationTimezone';
 import { useAuth } from '@/lib/auth';
+import { formatDate, formatDateTime } from '@/lib/dateTime';
 
 export default function CampaignDetailPage() {
     const { user, getAccessToken, redirectToLogin, loading } = useAuth();
+    const organizationTimezone = useOrganizationTimezone();
     const router = useRouter();
     const params = useParams();
     const searchParams = useSearchParams();
@@ -354,15 +357,6 @@ export default function CampaignDetailPage() {
         }
     };
 
-    // Format date for display
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString();
-    };
-
-    const formatDateTime = (dateString: string) => {
-        return new Date(dateString).toLocaleString();
-    };
-
     // Get badge variant for state
     const getStateBadgeVariant = (state: string) => {
         switch (state) {
@@ -412,7 +406,7 @@ export default function CampaignDetailPage() {
     const formatLogTimestamp = (ts: string) => {
         const d = new Date(ts);
         if (isNaN(d.getTime())) return ts;
-        return d.toLocaleString();
+        return formatDateTime(d, organizationTimezone);
     };
 
     // Render action button based on state
@@ -510,7 +504,7 @@ export default function CampaignDetailPage() {
                                     {campaign.state}
                                 </Badge>
                                 <span className="text-muted-foreground">
-                                    Created {formatDate(campaign.created_at)}
+                                    Created {formatDate(campaign.created_at, organizationTimezone)}
                                 </span>
                             </div>
                         </div>
@@ -702,13 +696,17 @@ export default function CampaignDetailPage() {
                             {campaign.started_at && (
                                 <div>
                                     <dt className="text-sm font-medium">Started At</dt>
-                                    <dd className="mt-1">{formatDateTime(campaign.started_at)}</dd>
+                                    <dd className="mt-1">
+                                        {formatDateTime(campaign.started_at, organizationTimezone)}
+                                    </dd>
                                 </div>
                             )}
                             {campaign.completed_at && (
                                 <div>
                                     <dt className="text-sm font-medium">Completed At</dt>
-                                    <dd className="mt-1">{formatDateTime(campaign.completed_at)}</dd>
+                                    <dd className="mt-1">
+                                        {formatDateTime(campaign.completed_at, organizationTimezone)}
+                                    </dd>
                                 </div>
                             )}
                         </dl>

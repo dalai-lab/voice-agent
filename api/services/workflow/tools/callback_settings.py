@@ -2,6 +2,9 @@ import logging
 from datetime import datetime, timedelta, date, time
 from typing import Dict, Any, Tuple
 from zoneinfo import ZoneInfo
+import phonenumbers
+from phonenumbers import timezone
+import asyncio
 
 from api.db import db_client
 
@@ -16,8 +19,21 @@ async def resolve_callback_settings(
     Resolves callback settings from Organization, Campaign, and Workflow levels.
     Priority: Org max ceilings -> Campaign overrides -> Workflow defaults.
     """
-    # 1. Organization defaults/ceilings
-    org_config = await db_client.get_configuration(organization_id, "ORGANIZATION_PREFERENCES")
+    # 1. Fetch all required DB records concurrently
+    tasks = [
+        db_client.get_configuration(organization_id, "ORGANIZATION_PREFERENCES"),
+        db_client.get_workflow(workflow_id, organization_id)
+    ]
+    if campaign_id:
+        tasks.append(db_client.get_campaign_by_id(campaign_id))
+        
+    results = await asyncio.gather(*tasks)
+    
+    org_config = results[0]
+    workflow = results[1]
+    campaign = results[2] if campaign_id else None
+
+    # 2. Organization defaults/ceilings
     org_prefs = org_config.value if org_config else {}
     callback_defaults = org_prefs.get("callback_defaults", {})
     
@@ -27,8 +43,7 @@ async def resolve_callback_settings(
     org_max_chain = callback_defaults.get("max_chain_depth", 2)
     org_timezone = org_prefs.get("timezone", "UTC")
 
-    # 2. Workflow (Agent) defaults
-    workflow = await db_client.get_workflow(workflow_id, organization_id)
+    # 3. Workflow (Agent) defaults
     wf_config = workflow.workflow_configurations if workflow and workflow.workflow_configurations else {}
     wf_cb_config = wf_config.get("callback", {})
     
@@ -41,7 +56,7 @@ async def resolve_callback_settings(
     if wf_max_delay > org_max_delay:
         wf_max_delay = org_max_delay
 
-    # 3. Campaign overrides
+    # 4. Campaign overrides
     camp_enabled = wf_enabled
     camp_sociable_start = org_sociable_start
     camp_sociable_end = org_sociable_end
@@ -49,9 +64,7 @@ async def resolve_callback_settings(
     camp_honor_window = True
     camp_long_thresh = 120
 
-    if campaign_id:
-        campaign = await db_client.get_campaign_by_id(campaign_id)
-        if campaign and campaign.orchestrator_metadata:
+    if campaign and campaign.orchestrator_metadata:
             camp_cb_config = campaign.orchestrator_metadata.get("callback_config", {})
             camp_enabled = camp_cb_config.get("enabled", wf_enabled)
             camp_sociable_start = camp_cb_config.get("sociable_hours_start", org_sociable_start)
@@ -103,7 +116,7 @@ def adjust_for_sociable_hours(
     local_time = local_dt.time()
     
     # If within window, return original
-    if start_time <= local_time <= end_time:
+    if start_time <= local_time < end_time:
         return scheduled_utc
         
     # If before window start, move to start of today's window
@@ -114,3 +127,35 @@ def adjust_for_sociable_hours(
     # If after window end, move to start of tomorrow's window
     target_dt = datetime.combine(local_dt.date() + timedelta(days=1), start_time, tzinfo=tz)
     return target_dt.astimezone(ZoneInfo("UTC"))
+
+def get_timezone_for_number(phone_number: str, default_tz: str = "UTC") -> str:
+    """
+    Derive the timezone from a phone number using the phonenumbers library.
+    Returns default_tz if undetermined or if an error occurs.
+    """
+    if not phone_number:
+        return default_tz
+        
+    try:
+        # Assuming E.164 format, if no +, we try to prepend it just in case
+        if not phone_number.startswith("+"):
+            phone_number = "+" + phone_number
+            
+        parsed = phonenumbers.parse(phone_number)
+        timezones = timezone.time_zones_for_number(parsed)
+        if timezones and len(timezones) > 0 and timezones[0] != "Etc/Unknown":
+            now = datetime.now(ZoneInfo("UTC"))
+            def get_offset(tz_name):
+                try:
+                    return ZoneInfo(tz_name).utcoffset(now).total_seconds()
+                except Exception:
+                    return -9999999
+                    
+            valid_tzs = [tz for tz in timezones if tz != "Etc/Unknown"]
+            if valid_tzs:
+                best_tz = max(valid_tzs, key=get_offset)
+                return best_tz
+    except Exception as e:
+        logger.warning(f"Failed to derive timezone for {phone_number}: {e}")
+        
+    return default_tz

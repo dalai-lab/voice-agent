@@ -135,10 +135,14 @@ class CampaignOrchestrator:
             if campaign.state != "running":
                 logger.info(
                     f"campaign_id: {campaign_id} - Campaign not in running state ({campaign.state}), "
-                    f"not scheduling next batch"
+                    f"checking for pending callbacks before stopping"
                 )
-                self._clear_campaign_state(campaign_id)
-                return
+                has_callbacks = await db_client.get_scheduled_runs_count(
+                    campaign_id, scheduled_before=datetime.now(UTC), retry_reason="user_requested_callback"
+                ) > 0
+                if not has_callbacks:
+                    self._clear_campaign_state(campaign_id)
+                    return
 
             # Immediately schedule next batch
             await self._schedule_next_batch(campaign_id)
@@ -174,6 +178,11 @@ class CampaignOrchestrator:
                 f"campaign_id: {campaign_id} - Circuit breaker tripped event received: "
                 f"failure_rate={event.failure_rate:.2%}"
             )
+            campaign = await db_client.get_campaign_by_id(campaign_id)
+            if campaign and campaign.state != "paused":
+                new_meta = dict(campaign.orchestrator_metadata or {})
+                new_meta["paused_reason"] = "circuit_breaker"
+                await db_client.update_campaign(campaign_id=campaign_id, state="paused", orchestrator_metadata=new_meta)
             self._clear_campaign_state(campaign_id)
 
     async def _handle_retry_event(self, event: RetryNeededEvent):
@@ -353,19 +362,34 @@ class CampaignOrchestrator:
             if not campaign:
                 logger.error(f"campaign_id: {campaign_id} - Campaign not found")
                 return
-
-            if campaign.state == "paused":
-                logger.info(f"campaign_id: {campaign_id} - Campaign is paused")
-                return
                 
-            is_running = campaign.state in ["running", "syncing"]
-            callbacks_only = False
+            if campaign.state == "paused":
+                is_cb_paused = False
+                if campaign.orchestrator_metadata:
+                    is_cb_paused = campaign.orchestrator_metadata.get("paused_reason") == "circuit_breaker"
+                
+                if is_cb_paused:
+                    logger.info(f"campaign_id: {campaign_id} - Campaign is paused by circuit breaker. Deferring callbacks.")
+                    return
+                
+                has_callbacks = await db_client.get_scheduled_runs_count(
+                    campaign_id, scheduled_before=datetime.now(UTC), retry_reason="user_requested_callback"
+                ) > 0
+                if has_callbacks:
+                    logger.info(f"campaign_id: {campaign_id} - Campaign is manually paused but has due callbacks")
+                    callbacks_only = True
+                else:
+                    logger.info(f"campaign_id: {campaign_id} - Campaign is paused")
+                    return
+            else:
+                is_running = campaign.state in ["running", "syncing"]
+                callbacks_only = False
 
-            if not is_running:
-                logger.info(
-                    f"campaign_id: {campaign_id} - Campaign state '{campaign.state}', checking for pending callbacks"
-                )
-                callbacks_only = True
+                if not is_running:
+                    logger.info(
+                        f"campaign_id: {campaign_id} - Campaign state '{campaign.state}', checking for pending callbacks"
+                    )
+                    callbacks_only = True
 
             # Check schedule window before scheduling
             if not callbacks_only and not self._is_within_schedule(campaign):
@@ -397,7 +421,9 @@ class CampaignOrchestrator:
                     f"campaign_id: {campaign_id} - Circuit breaker is open, "
                     f"pausing campaign. Stats: {stats}"
                 )
-                await db_client.update_campaign(campaign_id=campaign_id, state="paused")
+                new_meta = dict(campaign.orchestrator_metadata or {})
+                new_meta["paused_reason"] = "circuit_breaker"
+                await db_client.update_campaign(campaign_id=campaign_id, state="paused", orchestrator_metadata=new_meta)
                 await db_client.append_campaign_log(
                     campaign_id=campaign_id,
                     level="warning",
@@ -430,6 +456,13 @@ class CampaignOrchestrator:
                 has_work = await self._has_pending_work(campaign_id)
 
             if has_work:
+                if callbacks_only and campaign.state in ["completed", "failed"]:
+                    await db_client.append_campaign_log(
+                        campaign_id=campaign_id,
+                        level="info",
+                        event="post_completion_callbacks",
+                        message=f"Dispatching post-completion callbacks for {campaign.state} campaign",
+                    )
                 # Schedule batch immediately
                 await enqueue_job(
                     FunctionNames.PROCESS_CAMPAIGN_BATCH,
@@ -533,9 +566,7 @@ class CampaignOrchestrator:
                     if has_work:
                         callbacks_only = False
                         if not self._is_within_schedule(campaign) or campaign.state != "running":
-                            has_callbacks = await db_client.get_scheduled_runs_count(
-                                campaign_id, scheduled_before=datetime.now(UTC), retry_reason="user_requested_callback"
-                            ) > 0
+                            has_callbacks = any(c.id == campaign_id for c in due_callbacks_campaigns)
                             if not has_callbacks:
                                 logger.info(
                                     f"campaign_id: {campaign_id} - Found orphaned work but outside "
@@ -613,10 +644,10 @@ class CampaignOrchestrator:
         return True
 
     async def _has_pending_work(self, campaign_id: int) -> bool:
-        """Check if campaign has any work to do."""
-        # Check queued runs
+        """Check if there is any work that can be processed right now."""
+        # Check for regular queued runs (exclude scheduled runs like callbacks)
         queued_count = await db_client.get_queued_runs_count(
-            campaign_id=campaign_id, states=["queued"]
+            campaign_id=campaign_id, states=["queued"], non_scheduled_only=True
         )
 
         if queued_count > 0:
@@ -631,6 +662,17 @@ class CampaignOrchestrator:
         if scheduled_count > 0:
             logger.debug(
                 f"campaign_id: {campaign_id} - Has {scheduled_count} scheduled retries due"
+            )
+            return True
+
+        # Check for ANY pending callbacks (even future ones) to keep campaign alive
+        pending_callback_count = await db_client.get_scheduled_runs_count(
+            campaign_id=campaign_id, retry_reason="user_requested_callback"
+        )
+        
+        if pending_callback_count > 0:
+            logger.debug(
+                f"campaign_id: {campaign_id} - Has {pending_callback_count} pending callbacks (future or due)"
             )
             return True
 

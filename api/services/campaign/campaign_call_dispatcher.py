@@ -68,8 +68,11 @@ class CampaignCallDispatcher:
         if not campaign:
             raise ValueError(f"Campaign {campaign_id} not found")
 
-        # Check if campaign is in running state
-        if campaign.state != "running" and not callbacks_only:
+        # Check if campaign is in running state (or completed/failed for callbacks)
+        if campaign.state == "paused":
+            logger.info(f"Campaign {campaign_id} is paused")
+            return 0
+        elif campaign.state != "running" and not callbacks_only:
             logger.info(
                 f"Campaign {campaign_id} is not in running state: {campaign.state}"
             )
@@ -132,9 +135,10 @@ class CampaignCallDispatcher:
                 processed_run_ids.add(queued_run.id)
 
                 # Update campaign processed count
-                await db_client.update_campaign(
-                    campaign_id=campaign_id, processed_rows=campaign.processed_rows + 1
-                )
+                if getattr(queued_run, "retry_reason", None) != "user_requested_callback":
+                    await db_client.update_campaign(
+                        campaign_id=campaign_id, processed_rows=campaign.processed_rows + 1
+                    )
 
             except asyncio.CancelledError:
                 logger.warning(
@@ -255,12 +259,16 @@ class CampaignCallDispatcher:
             provider = await self.get_provider_for_campaign(campaign)
             workflow_run_mode = provider.PROVIDER_NAME
 
+            # For callbacks, prefer the original caller_number to maintain consistent caller ID
+            preferred_number = queued_run.context_variables.get("caller_number")
+
             # Acquire a unique from_number from the pool scoped to this campaign's
             # telephony configuration so orgs with multiple configs don't leak
             # caller IDs across configs.
             from_number = await self.acquire_from_number(
                 campaign.organization_id,
                 telephony_configuration_id=campaign.telephony_configuration_id,
+                preferred_number=preferred_number,
             )
             if from_number is None:
                 raise PhoneNumberPoolExhaustedError(
@@ -328,6 +336,13 @@ class CampaignCallDispatcher:
                 run_id=workflow_run.id,
                 gathered_context={
                     "call_tags": ["retry", f"retry_reason_{retry_reason}"]
+                },
+            )
+        elif getattr(queued_run, "retry_reason", None) == "user_requested_callback":
+            await db_client.update_workflow_run(
+                run_id=workflow_run.id,
+                gathered_context={
+                    "call_tags": ["callback"]
                 },
             )
 
@@ -510,12 +525,14 @@ class CampaignCallDispatcher:
     async def acquire_from_number(
         self,
         organization_id: int,
-        telephony_configuration_id: int | None,
+        telephony_configuration_id: int | None = None,
+        preferred_number: str | None = None,
         timeout: float = 600,
     ) -> Optional[str]:
         """
         Acquire a from_number from the (org, telephony config) pool with retry.
         Waits up to timeout seconds, polling every 1s.
+        If preferred_number is specified, ONLY attempts to acquire that exact number.
 
         Returns:
             The acquired phone number as a string, or None if timeout is exceeded.
@@ -523,11 +540,18 @@ class CampaignCallDispatcher:
         wait_start = time.time()
 
         while True:
-            from_number = await rate_limiter.acquire_from_number(
-                organization_id, telephony_configuration_id
-            )
-            if from_number:
-                return from_number
+            if preferred_number:
+                success = await rate_limiter.acquire_specific_from_number(
+                    organization_id, telephony_configuration_id, preferred_number
+                )
+                if success:
+                    return preferred_number
+            else:
+                from_number = await rate_limiter.acquire_from_number(
+                    organization_id, telephony_configuration_id
+                )
+                if from_number:
+                    return from_number
 
             wait_time = time.time() - wait_start
             if wait_time > timeout:

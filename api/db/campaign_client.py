@@ -742,13 +742,15 @@ class CampaignClient(BaseDBClient):
             result = await session.execute(query)
             return list(result.scalars().all())
 
-    async def get_queued_runs_count(self, campaign_id: int, states: list[str]) -> int:
+    async def get_queued_runs_count(self, campaign_id: int, states: list[str], non_scheduled_only: bool = False) -> int:
         """Get count of queued runs for a campaign in specified states"""
         async with self.async_session() as session:
             query = select(func.count(QueuedRunModel.id)).where(
                 QueuedRunModel.campaign_id == campaign_id,
                 QueuedRunModel.state.in_(states),
             )
+            if non_scheduled_only:
+                query = query.where(QueuedRunModel.scheduled_for.is_(None))
             result = await session.execute(query)
             return result.scalar() or 0
 
@@ -762,8 +764,7 @@ class CampaignClient(BaseDBClient):
                 .where(
                     QueuedRunModel.retry_reason == "user_requested_callback",
                     QueuedRunModel.state == "queued",
-                    QueuedRunModel.scheduled_for <= now,
-                    CampaignModel.state.in_(["completed", "failed"])
+                    QueuedRunModel.scheduled_for <= now
                 )
             )
             result = await session.execute(query)

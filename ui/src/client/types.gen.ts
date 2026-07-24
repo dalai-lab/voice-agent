@@ -875,6 +875,64 @@ export type CambTtsConfiguration = {
 };
 
 /**
+ * CampaignCallbackItem
+ */
+export type CampaignCallbackItem = {
+    /**
+     * Queued Run Id
+     */
+    queued_run_id: number;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Scheduled For
+     */
+    scheduled_for: string | null;
+    /**
+     * Fires In Seconds
+     */
+    fires_in_seconds: number | null;
+    /**
+     * To Number
+     */
+    to_number: string | null;
+    /**
+     * From Number
+     */
+    from_number: string | null;
+    /**
+     * Conversation Summary
+     */
+    conversation_summary: string | null;
+    /**
+     * Callback Chain Depth
+     */
+    callback_chain_depth: number;
+    /**
+     * Original Run Id
+     */
+    original_run_id: number | null;
+    /**
+     * Outcome Run Id
+     */
+    outcome_run_id: number | null;
+    /**
+     * Outcome Status
+     */
+    outcome_status: string | null;
+    /**
+     * Outcome Disposition
+     */
+    outcome_disposition: string | null;
+    /**
+     * Created At
+     */
+    created_at: string | null;
+};
+
+/**
  * CampaignDefaultsResponse
  */
 export type CampaignDefaultsResponse = {
@@ -6431,6 +6489,94 @@ export type UltravoxRealtimeLlmConfiguration = {
 };
 
 /**
+ * UnifiedCallbackItem
+ */
+export type UnifiedCallbackItem = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Scheduled For
+     */
+    scheduled_for: string | null;
+    /**
+     * Fires In Seconds
+     */
+    fires_in_seconds: number | null;
+    /**
+     * Was Late Seconds
+     */
+    was_late_seconds: number | null;
+    /**
+     * To Number
+     */
+    to_number: string | null;
+    /**
+     * From Number
+     */
+    from_number: string | null;
+    /**
+     * Conversation Summary
+     */
+    conversation_summary: string | null;
+    /**
+     * Callback Chain Depth
+     */
+    callback_chain_depth: number;
+    /**
+     * Workflow Id
+     */
+    workflow_id: number | null;
+    /**
+     * Workflow Name
+     */
+    workflow_name: string | null;
+    /**
+     * Campaign Id
+     */
+    campaign_id: number | null;
+    /**
+     * Campaign Name
+     */
+    campaign_name: string | null;
+    /**
+     * Original Run Id
+     */
+    original_run_id: number | null;
+    /**
+     * Created At
+     */
+    created_at: string | null;
+};
+
+/**
+ * UnifiedCallbackListResponse
+ */
+export type UnifiedCallbackListResponse = {
+    /**
+     * Items
+     */
+    items: Array<UnifiedCallbackItem>;
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * Has More
+     */
+    has_more: boolean;
+};
+
+/**
  * UpdateCampaignRequest
  */
 export type UpdateCampaignRequest = {
@@ -10141,6 +10287,20 @@ export type ListCallbacksApiV1CallbacksGetData = {
          */
         status?: string | null;
         /**
+         * Source
+         *
+         * Source of callback: all, standalone, campaign
+         */
+        source?: string;
+        /**
+         * Campaign Id
+         */
+        campaign_id?: number | null;
+        /**
+         * Workflow Id
+         */
+        workflow_id?: number | null;
+        /**
          * Limit
          */
         limit?: number;
@@ -10167,13 +10327,9 @@ export type ListCallbacksApiV1CallbacksGetError = ListCallbacksApiV1CallbacksGet
 
 export type ListCallbacksApiV1CallbacksGetResponses = {
     /**
-     * Response List Callbacks Api V1 Callbacks Get
-     *
      * Successful Response
      */
-    200: Array<{
-        [key: string]: unknown;
-    }>;
+    200: UnifiedCallbackListResponse;
 };
 
 export type ListCallbacksApiV1CallbacksGetResponse = ListCallbacksApiV1CallbacksGetResponses[keyof ListCallbacksApiV1CallbacksGetResponses];
@@ -10196,7 +10352,12 @@ export type CancelCallbackApiV1CallbacksCallbackIdDeleteData = {
          */
         callback_id: number;
     };
-    query?: never;
+    query?: {
+        /**
+         * Source
+         */
+        source?: string;
+    };
     url: '/api/v1/callbacks/{callback_id}';
 };
 
@@ -10785,6 +10946,65 @@ export type DownloadCampaignReportApiV1CampaignCampaignIdReportGetResponses = {
      */
     200: unknown;
 };
+
+export type ListCampaignCallbacksApiV1CampaignCampaignIdCallbacksGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * Authorization
+         */
+        authorization?: string | null;
+        /**
+         * X-Api-Key
+         */
+        'X-API-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Campaign Id
+         */
+        campaign_id: number;
+    };
+    query?: {
+        /**
+         * Status
+         */
+        status?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/api/v1/campaign/{campaign_id}/callbacks';
+};
+
+export type ListCampaignCallbacksApiV1CampaignCampaignIdCallbacksGetErrors = {
+    /**
+     * Not found
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCampaignCallbacksApiV1CampaignCampaignIdCallbacksGetError = ListCampaignCallbacksApiV1CampaignCampaignIdCallbacksGetErrors[keyof ListCampaignCallbacksApiV1CampaignCampaignIdCallbacksGetErrors];
+
+export type ListCampaignCallbacksApiV1CampaignCampaignIdCallbacksGetResponses = {
+    /**
+     * Response List Campaign Callbacks Api V1 Campaign  Campaign Id  Callbacks Get
+     *
+     * Successful Response
+     */
+    200: Array<CampaignCallbackItem>;
+};
+
+export type ListCampaignCallbacksApiV1CampaignCampaignIdCallbacksGetResponse = ListCampaignCallbacksApiV1CampaignCampaignIdCallbacksGetResponses[keyof ListCampaignCallbacksApiV1CampaignCampaignIdCallbacksGetResponses];
 
 export type ListCredentialsApiV1CredentialsGetData = {
     body?: never;

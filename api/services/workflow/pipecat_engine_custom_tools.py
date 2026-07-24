@@ -46,6 +46,7 @@ from api.services.workflow.tools.transfer_resolver import (
 from api.services.workflow.tools.callback_settings import (
     resolve_callback_settings,
     adjust_for_sociable_hours,
+    get_timezone_for_number,
 )
 from api.utils.template_renderer import render_template
 
@@ -1265,6 +1266,16 @@ class CustomToolManager:
                 to_number = initial_context.get("caller_number") if is_inbound else initial_context.get("called_number")
                 from_number = initial_context.get("called_number") if is_inbound else initial_context.get("caller_number")
 
+                if is_inbound and from_number:
+                    try:
+                        provider = await get_telephony_provider_for_run(workflow_run, organization_id)
+                        available_numbers = await provider.get_available_phone_numbers()
+                        if from_number not in available_numbers:
+                            logger.info(f"Inbound DID {from_number} is not in outbound pool {available_numbers}. Falling back to default.")
+                            from_number = None
+                    except Exception as e:
+                        logger.warning(f"Failed to validate outbound number pool for callback: {e}")
+                        from_number = None
                 if not to_number or to_number.startswith("anonymous"):
                     await function_call_params.result_callback({
                         "error": "I'm sorry, I can't schedule a callback as your number is private."
@@ -1274,16 +1285,17 @@ class CustomToolManager:
                 # 3. Load Callback Settings (Phase 3)
                 settings = await resolve_callback_settings(organization_id, workflow_id, workflow_run.campaign_id)
                 
+                fallback_num_str = f" at {from_number}" if from_number else ""
                 if not settings.get("enabled", True):
                     await function_call_params.result_callback({
-                        "error": "I'm sorry, I'm unable to schedule callbacks for this call. Please call us back when you're ready."
+                        "error": f"I'm sorry, I'm unable to schedule callbacks for this call. Please call us back{fallback_num_str} when you're ready."
                     })
                     return
 
                 chain_depth = initial_context.get("callback_chain_depth", 0) + 1
                 if chain_depth > settings.get("max_chain_depth", 2):
                     await function_call_params.result_callback({
-                        "error": "I'm unable to schedule another callback. Please call us back when you're ready."
+                        "error": f"I'm unable to schedule another callback. Please call us back{fallback_num_str} when you're ready."
                     })
                     return
 
@@ -1309,7 +1321,10 @@ class CustomToolManager:
                 
                 start_str = settings.get("sociable_hours_start", "08:00")
                 end_str = settings.get("sociable_hours_end", "21:00")
-                tz_str = settings.get("sociable_timezone", "UTC")
+                
+                # Derive timezone from user's number, fallback to org/campaign timezone (Spec 9m)
+                default_tz_str = settings.get("sociable_timezone", "UTC")
+                tz_str = get_timezone_for_number(to_number, default_tz_str)
                 
                 adjusted_time = adjust_for_sociable_hours(requested_time, start_str, end_str, tz_str)
                 
@@ -1326,21 +1341,14 @@ class CustomToolManager:
                     # So sociable hours are always respected.
                     
                     # If the user requested a time that falls outside sociable hours, we propose the adjusted time.
-                    # We pass a flag 'force_schedule' if the LLM wants to override? No, we just give the LLM the exact minutes to use for the next window.
+                    # We require the LLM to explicitly re-call with the exact adjusted minutes to prove it agreed.
+                    adj_local = adjusted_time.astimezone(ZoneInfo(tz_str))
+                    next_time_str = adj_local.strftime("%I:%M %p").lstrip("0")
                     
-                    force_schedule = args.get("force_schedule", False)
-                    if not force_schedule:
-                        # Find the local time string of the adjusted time
-                        try:
-                            adj_local = adjusted_time.astimezone(ZoneInfo(tz_str))
-                            next_time_str = adj_local.strftime("%I:%M %p").lstrip("0")
-                        except Exception:
-                            next_time_str = "the next morning"
-                            
-                        await function_call_params.result_callback({
-                            "error": f"That time is outside of our calling hours. Tell the user: 'I'll schedule your callback for {next_time_str} when I'm able to reach you at a reasonable hour. Does that work?' (If they agree, call this tool again with minutes={adjusted_minutes} and force_schedule=true)"
-                        })
-                        return
+                    await function_call_params.result_callback({
+                        "error": f"That time is outside of our calling hours. Tell the user: 'I'll schedule your callback for {next_time_str} when I'm able to reach you at a reasonable hour. Does that work?' (If they agree, call this tool again with minutes={adjusted_minutes})"
+                    })
+                    return
 
                 # 4. Save to DB
                 async with db_client.async_session() as session:
@@ -1373,6 +1381,7 @@ class CustomToolManager:
                             },
                             state="queued",
                             retry_reason="user_requested_callback",
+                            retry_count=0,
                             scheduled_for=adjusted_time
                         )
                         session.add(new_queued_run)
@@ -1395,6 +1404,8 @@ class CustomToolManager:
                         session.add(new_callback)
                         await session.commit()
                         
+                        defer_by = adjusted_time - datetime.now(UTC)
+                        defer_by = max(defer_by, timedelta(seconds=5))
                         # Enqueue ARQ Job only for standalone callbacks
                         await enqueue_job(
                             FunctionNames.EXECUTE_CALLBACK,
@@ -1406,7 +1417,7 @@ class CustomToolManager:
                             conversation_summary=conversation_summary,
                             gathered_context=self._engine._gathered_context,
                             callback_chain_depth=chain_depth,
-                            _defer_by=adjusted_time - datetime.now(UTC)
+                            _defer_by=defer_by
                         )
                         logger.info(f"Scheduled standalone callback via ScheduledCallbackModel for {to_number}")
 
@@ -1422,7 +1433,7 @@ class CustomToolManager:
                 await function_call_params.result_callback({"error": str(e)})
 
         self._engine.llm.register_function(
-            "schedule_callback", schedule_callback_func, timeout_secs=10.0, is_node_transition=True
+            "schedule_callback", schedule_callback_func, timeout_secs=30.0, is_node_transition=True
         )
 
     async def _play_farewell_and_end(self, function_call_params: FunctionCallParams):

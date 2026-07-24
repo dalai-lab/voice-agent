@@ -972,6 +972,11 @@ Build in this order. Each step depends on the previous.
 - [x] Agent Settings tab: add "Callback Settings" toggle + min/max delay fields
 - [x] Campaign Advanced Settings: add "Callback Settings" section with sociable hours + enable toggle
 - [x] New "Pending Callbacks" universal menu: build UI view to list/cancel pending non-campaign callbacks from `ScheduledCallbackModel` (see 10b)
+- [ ] Extend `/callbacks` page to show campaign callbacks (unified view) — see Section 12c.1
+- [ ] Add "Callbacks" tab to campaign detail page — see Section 12c.2
+- [ ] Backend: extend `GET /api/v1/callbacks` to merge both sources — see Section 12b.1
+- [ ] Backend: add cancel support for campaign callbacks — see Section 12b.2
+- [ ] Backend: add `GET /api/v1/campaign/{id}/callbacks` — see Section 12b.3
 
 ### Phase 6 — Validation / Testing
 - [ ] Unit test: tool rejects WebRTC calls
@@ -980,3 +985,277 @@ Build in this order. Each step depends on the previous.
 - [ ] Integration test: single outbound callback fires after delay
 - [ ] Integration test: campaign callback keeps campaign in `running` state until fired
 - [ ] Manual test: "call me back in 6 hours" on a campaign with a schedule window → fires at next window
+
+---
+
+## Section 12: Callback Visibility & Management (UI + API Proposal)
+
+> **Status:** Not yet implemented
+> **Problem:** The existing `/callbacks` page only surfaces standalone (`ScheduledCallbackModel`) callbacks. Campaign callbacks (`QueuedRunModel` with `retry_reason = "user_requested_callback"`) are completely invisible to operators. There is no way to see, filter, cancel, or audit them from the UI.
+
+---
+
+### 12a. Current State vs. Required State
+
+| Capability | Standalone (`ScheduledCallbackModel`) | Campaign (`QueuedRunModel` + `retry_reason`) |
+|---|---|---|
+| List pending callbacks | ✅ `/callbacks` page | ❌ Not surfaced anywhere |
+| Cancel a callback | ✅ DELETE `/api/v1/callbacks/{id}` | ❌ No endpoint |
+| See callback status (completed/failed/cancelled) | ✅ `status` column | ❌ Must infer from `state` on `QueuedRunModel` |
+| See conversation summary | ✅ `conversation_summary` column | ❌ Buried inside `context_variables` JSON |
+| See which campaign it belongs to | ❌ No campaign link | ⚠️ `campaign_id` exists but not shown in UI |
+| See which agent (workflow) fired it | ⚠️ Raw `workflow_id` number shown | ⚠️ Not shown in UI at all |
+| Filter by status | ✅ Query param `?status=pending` | ❌ No endpoint |
+| Show "fires in X minutes" countdown | ❌ | ❌ |
+| Show "was late by X minutes" | ❌ | ❌ |
+| Admin cancel from campaign detail | ❌ | ❌ |
+
+---
+
+### 12b. Backend API Changes Required
+
+#### 1. Extend `GET /api/v1/callbacks` — Unified View
+
+The existing endpoint only queries `ScheduledCallbackModel`. It must be extended to also fetch campaign callbacks from `QueuedRunModel`.
+
+**New query parameters:**
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `status` | string | `null` | Filter: `pending`, `completed`, `failed`, `cancelled`. For campaign callbacks, `pending` = `state="queued"`, `completed` = `state="completed"`. |
+| `source` | string | `all` | `standalone`, `campaign`, or `all` (both merged). |
+| `campaign_id` | int | `null` | Only callbacks for a specific campaign. |
+| `workflow_id` | int | `null` | Only callbacks from a specific agent. |
+| `limit` | int | `50` | Pagination limit (max 200). |
+| `offset` | int | `0` | Pagination offset. |
+
+**Unified response shape** (normalized across both sources):
+
+```json
+{
+  "items": [
+    {
+      "id": 42,
+      "source": "standalone",
+      "status": "pending",
+      "scheduled_for": "2026-07-24T17:30:00Z",
+      "fires_in_seconds": 1823,
+      "was_late_seconds": null,
+      "to_number": "+919876543210",
+      "from_number": "+918000000001",
+      "conversation_summary": "User was interested in the premium plan.",
+      "callback_chain_depth": 1,
+      "workflow_id": 7,
+      "workflow_name": "Sales Agent v2",
+      "campaign_id": null,
+      "campaign_name": null,
+      "original_run_id": 1234,
+      "created_at": "2026-07-24T16:25:00Z"
+    },
+    {
+      "id": 99,
+      "source": "campaign",
+      "status": "pending",
+      "scheduled_for": "2026-07-24T18:00:00Z",
+      "fires_in_seconds": 5400,
+      "was_late_seconds": null,
+      "to_number": "+917000000099",
+      "from_number": "+918000000001",
+      "conversation_summary": "User said they were in a meeting.",
+      "callback_chain_depth": 1,
+      "workflow_id": 7,
+      "workflow_name": "Sales Agent v2",
+      "campaign_id": 12,
+      "campaign_name": "July Outreach Wave 3",
+      "original_run_id": 1567,
+      "created_at": "2026-07-24T16:45:00Z"
+    }
+  ],
+  "total": 2,
+  "has_more": false
+}
+```
+
+**`fires_in_seconds`** — computed server-side as `max(0, (scheduled_for - now).total_seconds())`. Negative = overdue.
+**`was_late_seconds`** — for completed callbacks only: seconds between `scheduled_for` and the actual run's `created_at`. Requires join on `WorkflowRunModel`.
+
+**Implementation:** Two async queries (`asyncio.gather`), results merged and sorted by `scheduled_for` desc. Workflow and campaign names fetched via a single batch query on the collected IDs.
+
+```python
+# api/routes/callbacks.py — new signature
+@router.get("", response_model=UnifiedCallbackListResponse)
+async def list_callbacks(
+    status: Optional[str] = Query(None),
+    source: str = Query("all"),
+    campaign_id: Optional[int] = Query(None),
+    workflow_id: Optional[int] = Query(None),
+    limit: int = Query(50, le=200),
+    offset: int = Query(0),
+    user: UserModel = Depends(get_user),
+) -> Any:
+    ...
+```
+
+---
+
+#### 2. `DELETE /api/v1/callbacks/{id}?source=campaign` — Cancel Campaign Callback
+
+Add a `source` query param so the same endpoint handles both models.
+
+**For campaign callbacks:** Set `QueuedRunModel.state = "cancelled"`. The batch processor's `claim_queued_runs_for_processing` query filters `state = "queued"` — it will naturally skip cancelled rows.
+
+```python
+@router.delete("/{callback_id}")
+async def cancel_callback(
+    callback_id: int,
+    source: str = Query("standalone"),   # "standalone" | "campaign"
+    user: UserModel = Depends(get_user),
+) -> Any:
+    if source == "campaign":
+        # Set QueuedRunModel.state = "cancelled" where id = callback_id
+        # and campaign.organization_id = user.selected_organization_id (tenant check)
+        ...
+    else:
+        # Existing ScheduledCallbackModel logic (unchanged)
+        ...
+```
+
+> ⚠️ **Migration note:** Verify whether `QueuedRunModel.state` has a DB-level enum or check constraint that would need updating to allow `"cancelled"`. Check `api/db/models.py` before shipping this endpoint.
+
+---
+
+#### 3. `GET /api/v1/campaign/{campaign_id}/callbacks` — Per-Campaign Callback Log
+
+A dedicated endpoint for the campaign detail page "Callbacks" tab.
+
+```python
+# Inside api/routes/campaign.py
+@router.get("/{campaign_id}/callbacks")
+async def list_campaign_callbacks(
+    campaign_id: int,
+    status: Optional[str] = Query(None),
+    limit: int = Query(50),
+    offset: int = Query(0),
+    user: UserModel = Depends(get_user),
+) -> Any:
+    """
+    Returns QueuedRunModel rows for this campaign where
+    retry_reason = 'user_requested_callback', with outcome
+    joined from WorkflowRunModel where is_callback = true.
+    """
+    ...
+```
+
+Response shape per item:
+
+```json
+{
+  "queued_run_id": 99,
+  "status": "pending",
+  "scheduled_for": "2026-07-24T18:00:00Z",
+  "fires_in_seconds": 5400,
+  "to_number": "+917000000099",
+  "from_number": "+918000000001",
+  "conversation_summary": "User said they were in a meeting.",
+  "callback_chain_depth": 1,
+  "original_run_id": 1567,
+  "outcome_run_id": null,
+  "outcome_status": null,
+  "outcome_disposition": null,
+  "created_at": "2026-07-24T16:45:00Z"
+}
+```
+
+**`outcome_*` fields** — populated after the callback fires, by joining `WorkflowRunModel` on `initial_context->>'original_run_id' = original_run_id` and `initial_context->>'is_callback' = 'true'`. This is a JSONB containment query. Ensure a GIN index exists on `workflow_runs.initial_context`.
+
+---
+
+### 12c. UI Changes Required
+
+#### 1. Extend `/callbacks` — Global Unified View
+
+**File:** `ui/src/app/callbacks/page.tsx`
+
+Current gaps: Only shows standalone callbacks; flat table; no filtering UI; shows raw `workflow_id` number; no pagination.
+
+**Proposed improvements:**
+
+| Feature | Detail |
+|---|---|
+| **Source tabs** | "All" / "Standalone" / "Campaign" tab group. Default: All. Updates `source` query param. |
+| **Status filter** | Dropdown: All / Pending / Completed / Failed / Cancelled |
+| **Campaign filter** | Dropdown populated from campaign list. Only shown when source = "all" or "campaign". |
+| **"Agent" column** | Show `workflow_name` instead of raw `#workflow_id` |
+| **"Campaign" column** | Show `campaign_name` or "—" for standalone |
+| **"Fires In" column** | For pending: live client-side countdown `in 23m 14s`. For overdue pending: orange "overdue 5m ago" |
+| **"Was Late" column** | For completed: `on time` or `+8m late`. Hidden for pending/cancelled. |
+| **Cancel action** | Existing button for standalone. For campaign callbacks, call `DELETE /{id}?source=campaign`. |
+| **Overdue badge** | If `fires_in_seconds < 0` and status is still pending, show orange "Overdue" badge. |
+| **Pagination** | "Load more" button or simple page prev/next. Currently no pagination exists at all. |
+| **Auto-refresh** | Poll `GET /api/v1/callbacks` every 30 seconds when tab is visible, to catch newly completed/fired callbacks. |
+| **Empty states** | "No pending callbacks" (when filtered to pending with 0 results) vs "No callbacks scheduled yet" (when all sources empty). |
+
+---
+
+#### 2. Add "Callbacks" Tab to Campaign Detail Page
+
+**File:** `ui/src/app/campaigns/[campaignId]/page.tsx`
+
+**Where:** Add after the existing "Runs" content block. Suggested tab label: `Callbacks` with a small pending count badge (`Callbacks (3)`).
+
+**Tab content — table columns:**
+
+| Column | Data Source |
+|---|---|
+| To Number | `context_variables.called_number` or `to_number` |
+| Scheduled For | `scheduled_for` (formatted) |
+| Fires In / Was Late | Computed from `scheduled_for` vs now / outcome run's created_at |
+| Status | `state`: `queued` → "Pending", `completed` → "Dispatched" |
+| Outcome | After fire: `outcome_disposition` (Answered, No Answer, Busy, Hung Up) |
+| Summary | `context_variables.conversation_summary` (truncated to ~60 chars, expand on hover) |
+| Actions | "Cancel" button if pending. Calls `DELETE /api/v1/callbacks/{id}?source=campaign`. |
+
+**Pending count badge:** Fetched via `GET /api/v1/campaign/{id}/callbacks?status=pending&limit=1` on page load. Show as badge on tab label if count > 0.
+
+---
+
+#### 3. Sidebar Badge (Optional, Phase 2)
+
+Show a count badge on the "Callbacks" nav item in the sidebar if there are any org-wide pending callbacks. Requires a lightweight `GET /api/v1/callbacks?status=pending&limit=1` call on app load (or as part of an existing global data hook). Keep it optional — the polling overhead may not be worth it at low callback volumes.
+
+---
+
+### 12d. Data Model Notes
+
+#### Deriving outcome for campaign callbacks
+
+To show what happened after a campaign callback fired, join `WorkflowRunModel`:
+
+```sql
+SELECT wr.*
+FROM workflow_runs wr
+WHERE wr.initial_context->>'original_run_id' = :original_run_id
+  AND wr.initial_context->>'is_callback' = 'true'
+  AND wr.campaign_id = :campaign_id
+ORDER BY wr.created_at DESC
+LIMIT 1
+```
+
+> ⚠️ This is a JSONB text cast — not a typed query. Performance depends on having a GIN index on `workflow_runs.initial_context`. If the index does not exist, add a migration to create one before shipping the outcome join.
+
+#### `QueuedRunModel.state = "cancelled"` — migration check
+
+Before the cancel-campaign-callback endpoint can mark rows as `"cancelled"`, confirm whether there is an enum, check constraint, or application-level validation on `state`. If so, update accordingly and add a migration.
+
+---
+
+### 12e. Implementation Order
+
+Each step is independently shippable and does not block the others:
+
+1. **Backend: Extend `GET /api/v1/callbacks`** — unified query, no UI change required yet. Standalone page will show more data automatically once the API returns it.
+2. **Backend: Add `GET /api/v1/campaign/{id}/callbacks`** endpoint in `campaign.py`.
+3. **Backend: Extend `DELETE /api/v1/callbacks/{id}?source=campaign`**.
+4. **UI: Extend `/callbacks` page** — source tabs, status filter, agent/campaign columns, countdown, pagination.
+5. **UI: Add "Callbacks" tab to campaign detail page** — uses the new per-campaign endpoint.
+6. **UI: Sidebar badge** — optional, lowest priority.

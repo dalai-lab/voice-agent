@@ -622,7 +622,7 @@ class CampaignClient(BaseDBClient):
             }
             for campaign_id, state, count in result.all():
                 stats[campaign_id]["total"] += count
-                if state == "processed":
+                if state in ("processed", "cancelled", "failed"):
                     stats[campaign_id]["executed"] += count
             return stats
 

@@ -3,6 +3,9 @@
 import {
   AlertTriangle,
   ArrowUpCircle,
+  AudioLines,
+  Brain,
+  CalendarClock,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -87,6 +90,11 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         icon: PhosphorIcons.Megaphone,
       },
       {
+        title: "Callbacks",
+        url: "/callbacks",
+        icon: CalendarClock,
+      },
+      {
         title: "Models",
         url: "/model-configurations",
         icon: PhosphorIcons.Brain,
@@ -123,7 +131,12 @@ const NAV_SECTIONS: SidebarNavSection[] = [
     label: "MANAGE",
     items: [
       {
-        title: "Agent Runs",
+        title: "Agent Logs",
+        url: "/runs",
+        icon: TrendingUp,
+      },
+      {
+        title: "Usage",
         url: "/usage",
         icon: PhosphorIcons.TrendUp,
       },

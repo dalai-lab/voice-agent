@@ -13,12 +13,28 @@ import type {
     ToolParameter,
     TransferCallConfig,
     TransferCallToolDefinition,
+    WaitToolDefinition,
 } from "@/client/types.gen";
 
-export type ToolCategory = "http_api" | "end_call" | "transfer_call" | "calculator" | "native" | "integration" | "mcp";
+export type ToolCategory = "http_api" | "end_call" | "transfer_call" | "calculator" | "wait" | "native" | "integration" | "mcp";
 
 export type EndCallMessageType = "none" | "custom" | "audio";
-export type TransferDestinationSource = "static" | "dynamic";
+export type TransferDestinationSource = "static" | "dynamic" | "context_mapping";
+
+export interface ContextDestinationRoute {
+    context_value: string;
+    destination: string;
+}
+
+export interface ContextDestinationRouteRow extends ContextDestinationRoute {
+    id: string;
+}
+
+export interface ContextDestinationMappingConfig {
+    context_path: string;
+    routes: ContextDestinationRoute[];
+    fallback_destination?: string | null;
+}
 
 export interface TransferResolverConfig {
     type: "http";
@@ -34,6 +50,7 @@ export interface TransferResolverConfig {
 export interface ExtendedTransferCallConfig extends TransferCallConfig {
     destination_source?: TransferDestinationSource;
     resolver?: TransferResolverConfig | null;
+    context_mapping?: ContextDestinationMappingConfig | null;
 }
 
 export interface ToolCategoryConfig {
@@ -104,6 +121,18 @@ export const TOOL_CATEGORIES: ToolCategoryConfig[] = [
         iconColor: "#8B5CF6",
     },
     {
+        value: "wait",
+        label: "Dynamic Wait",
+        description: "Built-in dynamic wait tool to pause the agent when the user asks to wait.",
+        icon: Cog,
+        iconName: "cog",
+        iconColor: "#8B5CF6",
+        autoFill: {
+            name: "Wait",
+            description: "Wait for a specified number of seconds when the user asks you to hold on.",
+        },
+    },
+    {
         value: "native",
         label: "Native (Coming Soon)",
         description: "Built-in tools like call transfer, DTMF input",
@@ -152,6 +181,8 @@ export function getToolTypeLabel(category: string): string {
             return "HTTP API Tool";
         case "calculator":
             return "Calculator Tool";
+        case "wait":
+            return "Wait Tool";
         case "native":
             return "Native Tool";
         case "integration":
@@ -184,6 +215,7 @@ export type ToolDefinition =
     | EndCallToolDefinition
     | TransferCallToolDefinition
     | CalculatorToolDefinition
+    | WaitToolDefinition
     | McpToolDefinition;
 
 export function createEndCallDefinition(config: EndCallConfig): EndCallToolDefinition {
@@ -220,6 +252,12 @@ export function createCalculatorDefinition(): CalculatorToolDefinition {
     };
 }
 
+export function createWaitDefinition(): WaitToolDefinition {
+    return {
+        type: "wait",
+    };
+}
+
 export const MCP_URL_PATTERN = /^https?:\/\//i;
 
 export function createMcpDefinition(
@@ -250,6 +288,10 @@ export function createToolDefinition(category: ToolCategory): ToolDefinition {
             return createTransferCallDefinition(DEFAULT_TRANSFER_CALL_CONFIG);
         case "calculator":
             return createCalculatorDefinition();
+        case "wait":
+            return createWaitDefinition();
+        case "mcp":
+            return createMcpDefinition("", "", "");
         case "http_api":
         default:
             return createHttpApiDefinition();

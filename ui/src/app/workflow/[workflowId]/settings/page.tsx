@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { ArrowLeft, BookA, Brain, CalendarIcon, Clipboard, Download, ExternalLink, FileDown, Fingerprint, Loader2, Mic, Pause, PhoneOff, Play, Rocket, Settings, Trash2Icon, Upload, Variable, X } from "lucide-react";
+import { ArrowLeft, BookA, Brain, CalendarIcon, Clipboard, Download, ExternalLink, FileDown, Fingerprint, Loader2, Mic, Pause, PhoneOff, Play, Plus, Rocket, Settings, Trash2Icon, Upload, Variable, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -33,11 +33,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { SETTINGS_DOCUMENTATION_URLS } from "@/constants/documentation";
+import { useOrgConfig } from "@/context/OrgConfigContext";
 import { UnsavedChangesProvider, useUnsavedChanges, useUnsavedChangesContext } from "@/context/UnsavedChangesContext";
 import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 import { detailFromError } from "@/lib/apiError";
@@ -49,6 +51,7 @@ import {
     DEFAULT_PROVISIONAL_VAD_PAUSE_SECS,
     DEFAULT_TURN_START_MIN_WORDS,
     DEFAULT_VOICEMAIL_DETECTION_CONFIGURATION,
+    type ExternalPBXFieldMapping,
     resolveWorkflowConfigurations,
     TURN_START_STRATEGY_OPTIONS,
     type TurnStartStrategy,
@@ -267,16 +270,23 @@ function GeneralSection({
     workflowName,
     workflowId,
     enableDtmf,
+    enableCallbacks,
+    callbackResumeMode,
     onSave,
 }: {
     workflowConfigurations: WorkflowConfigurations;
     workflowName: string;
     workflowId: number;
     enableDtmf: boolean;
-    onSave: (configurations: WorkflowConfigurations, workflowName: string, enableDtmf?: boolean) => Promise<void>;
+    enableCallbacks: boolean;
+    callbackResumeMode: "fresh" | "last_node";
+    onSave: (configurations: WorkflowConfigurations, workflowName: string, enableDtmf?: boolean, enableCallbacks?: boolean, callbackResumeMode?: "fresh" | "last_node") => Promise<void>;
 }) {
+    const { externalPbxIntegrationsEnabled } = useOrgConfig();
     const [name, setName] = useState(workflowName);
     const [dtmfEnabled, setDtmfEnabled] = useState(enableDtmf);
+    const [callbacksEnabled, setCallbacksEnabled] = useState(enableCallbacks);
+    const [resumeMode, setResumeMode] = useState(callbackResumeMode);
     const [ambientNoiseConfig, setAmbientNoiseConfig] = useState<AmbientNoiseConfiguration>(
         workflowConfigurations.ambient_noise_configuration,
     );
@@ -301,6 +311,9 @@ function GeneralSection({
     const [includeTranscriptEndTimestamps, setIncludeTranscriptEndTimestamps] = useState(
         workflowConfigurations.transcript_configuration?.include_end_timestamps ?? false,
     );
+    const [externalPbxFieldMappings, setExternalPbxFieldMappings] = useState<ExternalPBXFieldMapping[]>(
+        workflowConfigurations.external_pbx_field_mappings,
+    );
     const [isSaving, setIsSaving] = useState(false);
     const [isUploadingAudio, setIsUploadingAudio] = useState(false);
     const [audioUploadError, setAudioUploadError] = useState<string | null>(null);
@@ -308,6 +321,11 @@ function GeneralSection({
     const { playingId, toggle: togglePlayback } = useAudioPlayback();
     const selectedTurnStartStrategy = TURN_START_STRATEGY_OPTIONS.find(
         (option) => option.value === turnStartStrategy,
+    );
+    const externalPbxFieldMappingsValid = externalPbxFieldMappings.every(
+        (mapping) =>
+            Boolean(mapping.context_path.trim()) &&
+            /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(mapping.destination_field.trim()),
     );
 
     const isDirty = useMemo(() => {
@@ -325,9 +343,13 @@ function GeneralSection({
             contextCompactionEnabled !== workflowConfigurations.context_compaction_enabled ||
             dtmfEnabled !== enableDtmf ||
             includeTranscriptEndTimestamps !==
-            (workflowConfigurations.transcript_configuration?.include_end_timestamps ?? false)
+            (workflowConfigurations.transcript_configuration?.include_end_timestamps ?? false) ||
+            JSON.stringify(externalPbxFieldMappings) !==
+            JSON.stringify(workflowConfigurations.external_pbx_field_mappings) ||
+            callbacksEnabled !== enableCallbacks ||
+            resumeMode !== callbackResumeMode
         );
-    }, [name, workflowName, ambientNoiseConfig, maxCallDuration, maxUserIdleTimeout, smartTurnStopSecs, turnStartStrategy, turnStartMinWords, provisionalVadPauseSecs, turnStopStrategy, contextCompactionEnabled, includeTranscriptEndTimestamps, workflowConfigurations, dtmfEnabled, enableDtmf]);
+    }, [name, workflowName, ambientNoiseConfig, maxCallDuration, maxUserIdleTimeout, smartTurnStopSecs, turnStartStrategy, turnStartMinWords, provisionalVadPauseSecs, turnStopStrategy, contextCompactionEnabled, includeTranscriptEndTimestamps, workflowConfigurations, dtmfEnabled, enableDtmf, callbacksEnabled, enableCallbacks, externalPbxFieldMappings, resumeMode, callbackResumeMode]);
 
     useUnsavedChanges("general", isDirty);
 
@@ -408,9 +430,12 @@ function GeneralSection({
                         ...(workflowConfigurations.transcript_configuration ?? {}),
                         include_end_timestamps: includeTranscriptEndTimestamps,
                     },
+                    external_pbx_field_mappings: externalPbxFieldMappings,
                 },
                 name,
-                dtmfEnabled
+                dtmfEnabled,
+                callbacksEnabled,
+                resumeMode
             );
         } catch (error) {
             console.error("Failed to save general settings:", error);
@@ -460,6 +485,50 @@ function GeneralSection({
                             onCheckedChange={setDtmfEnabled}
                         />
                     </div>
+                </div>
+
+                <Separator />
+
+                {/* Callbacks */}
+                <div className="space-y-4">
+                    <div>
+                        <h3 className="text-sm font-medium">Schedule Callbacks</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            Allows the AI to schedule a callback later if the user requests it (e.g. "Call me back in 10 minutes").
+                        </p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="callbacks-enabled" className="text-sm">Enable Callbacks</Label>
+                        <Switch
+                            id="callbacks-enabled"
+                            checked={callbacksEnabled}
+                            onCheckedChange={setCallbacksEnabled}
+                        />
+                    </div>
+                    {callbacksEnabled && (
+                        <div className="mt-4 pl-4 border-l-2 space-y-4 border-muted">
+                            <div className="space-y-1">
+                                <Label className="text-xs">Callback Resume Mode</Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Determines where the workflow starts when calling the user back.
+                                </p>
+                            </div>
+                            <RadioGroup
+                                value={resumeMode}
+                                onValueChange={(value) => setResumeMode(value as "fresh" | "last_node")}
+                                className="flex flex-col space-y-1"
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="fresh" id="resume-fresh" />
+                                    <Label htmlFor="resume-fresh" className="text-sm font-normal">Start Fresh (Default)</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="last_node" id="resume-last-node" />
+                                    <Label htmlFor="resume-last-node" className="text-sm font-normal">Resume from Last Node</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+                    )}
                 </div>
 
                 <Separator />
@@ -672,6 +741,11 @@ function GeneralSection({
                         </Select>
                         <p className="text-xs text-muted-foreground">
                             {selectedTurnStartStrategy?.description}
+                            {turnStartStrategy === "provisional_vad" && (
+                                <span className="ml-2 inline-flex rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                    Experimental
+                                </span>
+                            )}
                         </p>
                     </div>
                     {turnStartStrategy === "min_words" && (
@@ -813,10 +887,94 @@ function GeneralSection({
                         </div>
                     </div>
                 </div>
+
+                {externalPbxIntegrationsEnabled && (
+                    <>
+                        <Separator />
+
+                        {/* External PBX Field Updates */}
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="text-sm font-medium">External PBX Field Updates</h3>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Optionally copy final gathered-context values into provider-native fields before transfer or hangup.
+                                </p>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <Label className="text-sm">Field Mappings</Label>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setExternalPbxFieldMappings((current) => [
+                                        ...current,
+                                        { context_path: "", destination_field: "" },
+                                    ])}
+                                >
+                                    <Plus className="mr-1 h-4 w-4" /> Add mapping
+                                </Button>
+                            </div>
+                            <div className="space-y-2">
+                                {externalPbxFieldMappings.map((mapping, index) => (
+                                    <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                                        <Input
+                                            aria-label={`Gathered context field ${index + 1}`}
+                                            value={mapping.context_path}
+                                            onChange={(event) => setExternalPbxFieldMappings((current) =>
+                                                current.map((item, itemIndex) =>
+                                                    itemIndex === index
+                                                        ? { ...item, context_path: event.target.value }
+                                                        : item,
+                                                )
+                                            )}
+                                            placeholder="qualified"
+                                        />
+                                        <Input
+                                            aria-label={`External PBX destination field ${index + 1}`}
+                                            value={mapping.destination_field}
+                                            onChange={(event) => setExternalPbxFieldMappings((current) =>
+                                                current.map((item, itemIndex) =>
+                                                    itemIndex === index
+                                                        ? { ...item, destination_field: event.target.value }
+                                                        : item,
+                                                )
+                                            )}
+                                            placeholder="address3"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label={`Remove external PBX field mapping ${index + 1}`}
+                                            onClick={() => setExternalPbxFieldMappings((current) =>
+                                                current.filter((_, itemIndex) => itemIndex !== index)
+                                            )}
+                                        >
+                                            <Trash2Icon className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                                {externalPbxFieldMappings.length === 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                        No external fields will be updated. Context names may be direct extracted-variable names or paths such as extracted_variables.qualified.
+                                    </p>
+                                )}
+                                {!externalPbxFieldMappingsValid && (
+                                    <p className="text-xs text-destructive">
+                                        Each mapping needs a context field and a destination field containing only letters, numbers, and underscores.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </>
+                )}
             </CardContent>
             <CardFooter className="justify-end gap-3 border-t pt-6">
                 {isDirty && <span className="text-xs text-muted-foreground">Unsaved changes</span>}
-                <Button onClick={handleSave} disabled={isSaving || !isDirty}>
+                <Button
+                    onClick={handleSave}
+                    disabled={isSaving || !isDirty || (externalPbxIntegrationsEnabled && !externalPbxFieldMappingsValid)}
+                >
                     {isSaving ? "Saving..." : "Save General Settings"}
                 </Button>
             </CardFooter>
@@ -1590,7 +1748,9 @@ function WorkflowSettingsInner({
                                 workflowConfigurations={resolvedWorkflowConfigurationsForRender}
                                 workflowName={workflowName || workflow.name}
                                 workflowId={workflowId}
-                                enableDtmf={workflow.enable_dtmf ?? false}
+                                enableDtmf={(workflow as any).enable_dtmf ?? false}
+                                enableCallbacks={(workflow as any).enable_callbacks ?? false}
+                                callbackResumeMode={(workflow as any).callback_resume_mode ?? "fresh"}
                                 onSave={saveWorkflowConfigurations}
                             />
 

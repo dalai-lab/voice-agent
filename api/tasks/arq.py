@@ -43,6 +43,7 @@ from api.tasks.campaign_tasks import (
     process_campaign_batch,
     sync_campaign_source,
 )
+from api.tasks.callback_tasks import execute_callback
 from api.tasks.knowledge_base_processing import process_knowledge_base_document
 from api.tasks.run_integrations import run_integrations_post_workflow_run
 from api.tasks.webhook_delivery import deliver_webhook, sweep_webhook_deliveries
@@ -57,6 +58,7 @@ class WorkerSettings:
         process_campaign_batch,
         process_knowledge_base_document,
         deliver_webhook,
+        execute_callback,
     ]
     cron_jobs = [
         # Safety net for webhook deliveries whose ARQ job was lost (worker

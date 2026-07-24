@@ -32,6 +32,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+
 interface Workflow {
     id: number;
     name: string;
@@ -55,6 +56,7 @@ export function WorkflowTable({
     currentFolderId = null,
 }: WorkflowTableProps) {
     const router = useRouter();
+    const organizationTimezone = useOrganizationTimezone();
     const [isPending, startTransition] = useTransition();
     const [loadingWorkflowId, setLoadingWorkflowId] = useState<number | null>(null);
     const [movingWorkflowId, setMovingWorkflowId] = useState<number | null>(null);

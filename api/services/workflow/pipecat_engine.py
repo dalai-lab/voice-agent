@@ -83,6 +83,7 @@ class PipecatEngine:
         has_recordings: bool = False,
         context_compaction_enabled: bool = False,
         enable_dtmf: bool = False,
+        enable_callbacks: bool = False,
     ):
         self.task = task
         self.llm = llm
@@ -105,9 +106,14 @@ class PipecatEngine:
         self._pending_extraction_tasks: set[asyncio.Task] = set()
         self._dtmf_subscription_task: Optional[asyncio.Task] = None
         self._enable_dtmf: bool = enable_dtmf
+        self._enable_callbacks: bool = enable_callbacks
         self._dtmf_buffer: str = ""
         self._dtmf_timer_task: Optional[asyncio.Task] = None
         self._dtmf_timeout_seconds: float = 3.0
+        # True once a final (synchronous) extraction has run, so the end-of-call
+        # and upstream-transfer paths don't redundantly re-extract the same
+        # terminal state.
+        self._final_extraction_done: bool = False
 
         # Will be set later in initialize() when we have
         # access to _context
@@ -128,6 +134,9 @@ class PipecatEngine:
 
         # Custom tool manager (initialized in initialize())
         self._custom_tool_manager: Optional[CustomToolManager] = None
+
+        # User context aggregator - stored so tools can subscribe to transcript events
+        self._user_aggregator = None
 
         # Cached organization ID (resolved lazily from workflow run)
         self._organization_id: Optional[int] = None
@@ -226,20 +235,7 @@ class PipecatEngine:
             async for event in dtmf_manager.subscribe_dtmf_events(call_id):
                 logger.info(f"Pipeline received DTMF digit {event.digit} for call {call_id}")
                 if self.task and self.context:
-                    # Append the DTMF digit to the LLM context
-                    dtmf_message = {
-                        "role": "system",
-                        "content": f"The caller pressed the keypad digit: {event.digit}"
-                    }
-                    self.context.add_message(dtmf_message)
-                    
-                    # Push the updated messages to trigger LLM evaluation
-                    # Pipecat v0.2.x uses LLMMessagesAppendFrame
-                    frame = LLMMessagesAppendFrame(
-                        messages=[dtmf_message],
-                        run_llm=True
-                    )
-                    await self.task.queue_frame(frame)
+                    await self.handle_dtmf_event(event.digit)
         except asyncio.CancelledError:
             logger.debug("DTMF listener task cancelled")
         except Exception as e:
@@ -606,6 +602,29 @@ class PipecatEngine:
                 f"Incomplete: {incomplete}"
             )
 
+    async def perform_final_variable_extraction(self) -> None:
+        """Flush in-flight + current-node variable extraction synchronously.
+
+        Awaits any background extractions still running from previous nodes,
+        then runs the current node's extraction inline so callers that need the
+        freshest extracted variables before acting can rely on them -- e.g.
+        end_call_with_reason before disposing the call, or an external-PBX
+        transfer that maps extracted variables into a provider lead update
+        call before handing the customer off.
+
+        Idempotent: only the first call does work. The external-PBX transfer
+        runs this just before forwarding update_lead, so the subsequent
+        end_call_with_reason would otherwise re-extract the same terminal state.
+        """
+        if self._final_extraction_done:
+            logger.debug("Final variable extraction already performed; skipping")
+            return
+        self._final_extraction_done = True
+        await self._await_pending_extractions()
+        await self._perform_variable_extraction_if_needed(
+            self._current_node, run_in_background=False
+        )
+
     async def _setup_llm_context(self, node: Node) -> None:
         """Common method to set up LLM context"""
         # Set OTel span name for tracing
@@ -643,6 +662,20 @@ class PipecatEngine:
             format_prompt=self._format_prompt,
             has_recordings=self._has_recordings,
         )
+
+        # Callback context note — appended last so it's the final instruction the LLM reads
+        is_callback = self._call_context_vars.get("is_callback", False)
+        logger.info(f"[CALLBACK DEBUG] is_callback={is_callback!r}, node_id={node.id!r}")
+        if is_callback and "is_callback" not in node.prompt:
+            summary = self._call_context_vars.get("conversation_summary", "our previous conversation")
+            callback_injection = (
+                f"\n\n[SYSTEM NOTE: This is an outbound callback you are making to the user. "
+                f"Summary of the previous call: '{summary}'. "
+                f"Open the call by naturally referencing the callback and what the user needed — do not treat this as a new inbound call. "
+                f"Do not ask for information already covered in the summary.]\n"
+            )
+            system_prompt += callback_injection
+            logger.info(f"[CALLBACK DEBUG] Injected (appended). Prompt last 150 chars: {system_prompt[-150:]!r}")
         functions = await compose_functions_for_node(
             node=node,
             custom_tool_manager=self._custom_tool_manager,
@@ -733,7 +766,15 @@ class PipecatEngine:
             return ("audio", node.greeting_recording_id)
 
         if node.greeting:
-            return ("text", self._format_prompt(node.greeting))
+            greeting_text = node.greeting
+            
+            # Smart Fallback for Callbacks
+            is_callback = self._call_context_vars.get("is_callback", False)
+            if is_callback and "is_callback" not in greeting_text:
+                # Return None to skip the static TTS greeting and let the LLM generate the first turn
+                return None
+                
+            return ("text", self._format_prompt(greeting_text))
 
         return None
 
@@ -841,13 +882,8 @@ class PipecatEngine:
             EndTaskReason.PIPELINE_ERROR.value,
             EndTaskReason.VOICEMAIL_DETECTED.value,
         ):
-            # Await any in-flight background extractions from previous nodes
-            await self._await_pending_extractions()
-
-            # Perform final variable extraction synchronously before ending
-            await self._perform_variable_extraction_if_needed(
-                self._current_node, run_in_background=False
-            )
+            # Flush in-flight + current-node extractions synchronously before ending
+            await self.perform_final_variable_extraction()
 
         frame_to_push = (
             CancelFrame(reason=reason) if abort_immediately else EndFrame(reason=reason)
@@ -864,6 +900,20 @@ class PipecatEngine:
             if call_disposition not in call_tags:
                 call_tags.append(call_disposition)
             self._gathered_context["call_tags"] = call_tags
+
+        # Hangup strategies run while serializing the terminal frame. Persist
+        # the final extracted values first so external-PBX adapters can apply
+        # workflow lead-field mappings before terminating the customer leg.
+        try:
+            await db_client.update_workflow_run(
+                run_id=self._workflow_run_id,
+                gathered_context=self._gathered_context,
+            )
+        except Exception as exc:
+            # Call teardown must never be held hostage by an enrichment write.
+            logger.warning(
+                f"Could not persist final gathered context before hangup: {exc}"
+            )
 
         logger.debug(
             f"Finishing run with reason: {reason}, disposition: {call_disposition} "
@@ -951,6 +1001,20 @@ class PipecatEngine:
     def set_audio_config(self, audio_config) -> None:
         """Set the audio configuration for the pipeline."""
         self._audio_config = audio_config
+
+    def set_user_aggregator(self, user_aggregator) -> None:
+        """Set the user context aggregator.
+
+        Stored so tools (e.g. wait_for_user) can subscribe to transcript
+        events such as ``on_user_turn_message_added`` even while user frames
+        are muted by the FunctionCallUserMuteStrategy.
+        """
+        self._user_aggregator = user_aggregator
+
+    @property
+    def user_aggregator(self):
+        """Return the user context aggregator, or None if not yet set."""
+        return self._user_aggregator
 
     def set_transport_output(self, transport_output) -> None:
         """Set the transport output processor for direct audio playback.

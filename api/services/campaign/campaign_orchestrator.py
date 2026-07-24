@@ -354,18 +354,33 @@ class CampaignOrchestrator:
                 logger.error(f"campaign_id: {campaign_id} - Campaign not found")
                 return
 
-            if campaign.state not in ["running", "syncing"]:
-                logger.info(
-                    f"campaign_id: {campaign_id} - Campaign not in running state: {campaign.state}"
-                )
+            if campaign.state == "paused":
+                logger.info(f"campaign_id: {campaign_id} - Campaign is paused")
                 return
+                
+            is_running = campaign.state in ["running", "syncing"]
+            callbacks_only = False
+
+            if not is_running:
+                logger.info(
+                    f"campaign_id: {campaign_id} - Campaign state '{campaign.state}', checking for pending callbacks"
+                )
+                callbacks_only = True
 
             # Check schedule window before scheduling
-            if not self._is_within_schedule(campaign):
+            if not callbacks_only and not self._is_within_schedule(campaign):
                 logger.info(
-                    f"campaign_id: {campaign_id} - Outside scheduled time window, skipping batch"
+                    f"campaign_id: {campaign_id} - Outside scheduled time window, checking for pending callbacks"
                 )
-                return
+                callbacks_only = True
+                
+            if callbacks_only:
+                # Make sure there are actual callbacks pending before we enqueue a batch
+                has_callbacks = await db_client.get_scheduled_runs_count(
+                    campaign_id, scheduled_before=datetime.now(UTC), retry_reason="user_requested_callback"
+                ) > 0
+                if not has_callbacks:
+                    return
 
             # Safety net: check circuit breaker before scheduling
             cb_config = None
@@ -409,7 +424,10 @@ class CampaignOrchestrator:
                 return
 
             # Check for available work (queued runs + due retries)
-            has_work = await self._has_pending_work(campaign_id)
+            if callbacks_only:
+                has_work = True
+            else:
+                has_work = await self._has_pending_work(campaign_id)
 
             if has_work:
                 # Schedule batch immediately
@@ -417,8 +435,9 @@ class CampaignOrchestrator:
                     FunctionNames.PROCESS_CAMPAIGN_BATCH,
                     campaign_id,
                     10,  # batch_size
+                    callbacks_only  # callbacks_only
                 )
-                logger.info(f"campaign_id: {campaign_id} - Scheduled next batch")
+                logger.info(f"campaign_id: {campaign_id} - Scheduled next batch (callbacks_only={callbacks_only})")
 
                 # Set batch in progress flag
                 self._batch_in_progress[campaign_id] = datetime.now(UTC)
@@ -473,6 +492,13 @@ class CampaignOrchestrator:
         logger.debug("Checking for stale campaigns...")
 
         campaigns = await db_client.get_campaigns_by_status(statuses=["running"])
+        due_callbacks_campaigns = await db_client.get_campaigns_with_due_callbacks()
+        
+        # Merge lists, avoiding duplicates
+        seen_ids = {c.id for c in campaigns}
+        for c in due_callbacks_campaigns:
+            if c.id not in seen_ids:
+                campaigns.append(c)
 
         for campaign in campaigns:
             try:
@@ -505,16 +531,29 @@ class CampaignOrchestrator:
                 if campaign_id not in self._batch_in_progress:
                     has_work = await self._has_pending_work(campaign_id)
                     if has_work:
-                        if not self._is_within_schedule(campaign):
+                        callbacks_only = False
+                        if not self._is_within_schedule(campaign) or campaign.state != "running":
+                            has_callbacks = await db_client.get_scheduled_runs_count(
+                                campaign_id, scheduled_before=datetime.now(UTC), retry_reason="user_requested_callback"
+                            ) > 0
+                            if not has_callbacks:
+                                logger.info(
+                                    f"campaign_id: {campaign_id} - Found orphaned work but outside "
+                                    f"schedule window (or not running), skipping"
+                                )
+                                continue
+                            callbacks_only = True
+                        
+                        if callbacks_only:
                             logger.info(
-                                f"campaign_id: {campaign_id} - Found orphaned work but outside "
-                                f"schedule window, skipping"
+                                f"campaign_id: {campaign_id} - Found orphaned callbacks, "
+                                f"scheduling batch to process"
                             )
-                            continue
-                        logger.info(
-                            f"campaign_id: {campaign_id} - Found orphaned work (likely new retries), "
-                            f"scheduling batch to process"
-                        )
+                        else:
+                            logger.info(
+                                f"campaign_id: {campaign_id} - Found orphaned work (likely new retries), "
+                                f"scheduling batch to process"
+                            )
                         await self._schedule_next_batch(campaign_id)
                         continue
 

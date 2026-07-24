@@ -10,6 +10,7 @@ import asyncio
 import time
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
@@ -32,7 +33,7 @@ from api.services.workflow.tools.wait import get_wait_tools
 from api.services.workflow.tools.schedule_callback import get_schedule_callback_tools
 from api.tasks.arq import enqueue_job
 from api.tasks.function_names import FunctionNames
-from api.db.models import ScheduledCallbackModel
+from api.db.models import ScheduledCallbackModel, QueuedRunModel
 from datetime import datetime, timedelta, UTC
 from api.services.workflow.tools.custom_tool import (
     execute_http_tool,
@@ -41,6 +42,10 @@ from api.services.workflow.tools.custom_tool import (
 from api.services.workflow.tools.transfer_resolver import (
     TransferResolutionError,
     resolve_transfer_config,
+)
+from api.services.workflow.tools.callback_settings import (
+    resolve_callback_settings,
+    adjust_for_sociable_hours,
 )
 from api.utils.template_renderer import render_template
 
@@ -1266,44 +1271,144 @@ class CustomToolManager:
                     })
                     return
 
-                # Check chain depth
+                # 3. Load Callback Settings (Phase 3)
+                settings = await resolve_callback_settings(organization_id, workflow_id, workflow_run.campaign_id)
+                
+                if not settings.get("enabled", True):
+                    await function_call_params.result_callback({
+                        "error": "I'm sorry, I'm unable to schedule callbacks for this call. Please call us back when you're ready."
+                    })
+                    return
+
                 chain_depth = initial_context.get("callback_chain_depth", 0) + 1
-                if chain_depth > 2:
+                if chain_depth > settings.get("max_chain_depth", 2):
                     await function_call_params.result_callback({
                         "error": "I'm unable to schedule another callback. Please call us back when you're ready."
                     })
                     return
 
-                # 3. Save to DB
-                async with db_client.async_session() as session:
-                    new_callback = ScheduledCallbackModel(
-                        organization_id=organization_id,
-                        workflow_id=workflow_id,
-                        original_run_id=workflow_run_id,
-                        status="pending",
-                        scheduled_for=datetime.now(UTC) + timedelta(minutes=minutes),
-                        to_number=to_number,
-                        from_number=from_number,
-                        conversation_summary=conversation_summary,
-                        gathered_context=self._engine._gathered_context,
-                        callback_chain_depth=chain_depth
-                    )
-                    session.add(new_callback)
-                    await session.commit()
+                min_delay = settings.get("min_delay_minutes", 1)
+                max_delay = settings.get("max_delay_minutes", 480)
                 
-                # 4. Enqueue ARQ Job
-                await enqueue_job(
-                    FunctionNames.EXECUTE_CALLBACK,
-                    to_number=to_number,
-                    from_number=from_number,
-                    workflow_id=workflow_id,
-                    organization_id=organization_id,
-                    original_run_id=workflow_run_id,
-                    conversation_summary=conversation_summary,
-                    gathered_context=self._engine._gathered_context,
-                    callback_chain_depth=chain_depth,
-                    _defer_by=timedelta(minutes=minutes)
-                )
+                # Check bounds
+                if minutes < min_delay:
+                    await function_call_params.result_callback({
+                        "error": f"I can schedule a callback in as little as {min_delay} minute(s). Shall I call you back in {min_delay} minutes? (If user agrees, call this tool again with minutes={min_delay})"
+                    })
+                    return
+                    
+                if minutes > max_delay:
+                    max_hours = max_delay // 60
+                    await function_call_params.result_callback({
+                        "error": f"I can schedule callbacks for up to {max_hours} hours from now. Shall I call you back in {max_hours} hours? (If user agrees, call this tool again with minutes={max_delay})"
+                    })
+                    return
+
+                # Calculate scheduled time and check sociable hours
+                requested_time = datetime.now(UTC) + timedelta(minutes=minutes)
+                
+                start_str = settings.get("sociable_hours_start", "08:00")
+                end_str = settings.get("sociable_hours_end", "21:00")
+                tz_str = settings.get("sociable_timezone", "UTC")
+                
+                adjusted_time = adjust_for_sociable_hours(requested_time, start_str, end_str, tz_str)
+                
+                # If it was pushed out due to sociable hours
+                time_diff = adjusted_time - requested_time
+                if time_diff.total_seconds() > 60:
+                    adjusted_minutes = int((adjusted_time - datetime.now(UTC)).total_seconds() / 60)
+                    
+                    # If this is a campaign and the requested delay is below the long callback threshold, we are allowed to ignore sociable hours
+                    # Wait, the spec says Sub-case 1: Short delay, slightly outside window (the 2-hour example) - Ignore campaign window, BUT still respect Sociable Hours hard limit (8 AM - 9 PM)
+                    # "1. Is the callback fire time within "sociable hours" (8 AM - 9 PM local time)?
+                    #  -> YES: Fire it. Ignore campaign schedule window.
+                    #  -> NO (e.g. midnight): Do NOT fire. Hold until next allowed window."
+                    # So sociable hours are always respected.
+                    
+                    # If the user requested a time that falls outside sociable hours, we propose the adjusted time.
+                    # We pass a flag 'force_schedule' if the LLM wants to override? No, we just give the LLM the exact minutes to use for the next window.
+                    
+                    force_schedule = args.get("force_schedule", False)
+                    if not force_schedule:
+                        # Find the local time string of the adjusted time
+                        try:
+                            adj_local = adjusted_time.astimezone(ZoneInfo(tz_str))
+                            next_time_str = adj_local.strftime("%I:%M %p").lstrip("0")
+                        except Exception:
+                            next_time_str = "the next morning"
+                            
+                        await function_call_params.result_callback({
+                            "error": f"That time is outside of our calling hours. Tell the user: 'I'll schedule your callback for {next_time_str} when I'm able to reach you at a reasonable hour. Does that work?' (If they agree, call this tool again with minutes={adjusted_minutes} and force_schedule=true)"
+                        })
+                        return
+
+                # 4. Save to DB
+                async with db_client.async_session() as session:
+                    if workflow_run.campaign_id:
+                        # Fetch original queued_run for source_uuid
+                        original_queued_run = await db_client.get_queued_run_by_id(workflow_run.queued_run_id) if workflow_run.queued_run_id else None
+                        original_source_uuid = original_queued_run.source_uuid if original_queued_run else str(uuid.uuid4())
+                        new_source_uuid = f"{original_source_uuid}_callback_{int(time.time())}"
+                        
+                        original_context_vars = original_queued_run.context_variables if original_queued_run else {}
+                        
+                        # Campaign Callback Phase 2 Logic
+                        new_queued_run = QueuedRunModel(
+                            campaign_id=workflow_run.campaign_id,
+                            source_uuid=new_source_uuid,
+                            context_variables={
+                                **original_context_vars,
+                                "is_callback": True,
+                                "callback_reason": "user_requested",
+                                "original_run_id": workflow_run_id,
+                                "conversation_summary": conversation_summary,
+                                "gathered_context": self._engine._gathered_context,
+                                "callback_chain_depth": chain_depth,
+                                "caller_number": from_number,
+                                "called_number": to_number,
+                                "phone_number": to_number,
+                                "callback_ignore_campaign_window": True,   # Phase 3-4 feature stub
+                                "callback_sociable_hours_only": True,       # Phase 3-4 feature stub
+                                "callback_originally_requested_minutes": minutes
+                            },
+                            state="queued",
+                            retry_reason="user_requested_callback",
+                            scheduled_for=adjusted_time
+                        )
+                        session.add(new_queued_run)
+                        await session.commit()
+                        logger.info(f"Scheduled campaign callback via QueuedRun for {to_number} at {new_queued_run.scheduled_for}")
+                    else:
+                        # Non-campaign standalone callback (Phase 1)
+                        new_callback = ScheduledCallbackModel(
+                            organization_id=organization_id,
+                            workflow_id=workflow_id,
+                            original_run_id=workflow_run_id,
+                            status="pending",
+                            scheduled_for=adjusted_time,
+                            to_number=to_number,
+                            from_number=from_number,
+                            conversation_summary=conversation_summary,
+                            gathered_context=self._engine._gathered_context,
+                            callback_chain_depth=chain_depth
+                        )
+                        session.add(new_callback)
+                        await session.commit()
+                        
+                        # Enqueue ARQ Job only for standalone callbacks
+                        await enqueue_job(
+                            FunctionNames.EXECUTE_CALLBACK,
+                            to_number=to_number,
+                            from_number=from_number,
+                            workflow_id=workflow_id,
+                            organization_id=organization_id,
+                            original_run_id=workflow_run_id,
+                            conversation_summary=conversation_summary,
+                            gathered_context=self._engine._gathered_context,
+                            callback_chain_depth=chain_depth,
+                            _defer_by=adjusted_time - datetime.now(UTC)
+                        )
+                        logger.info(f"Scheduled standalone callback via ScheduledCallbackModel for {to_number}")
 
                 self._engine._callback_scheduled = True
                 await function_call_params.result_callback(

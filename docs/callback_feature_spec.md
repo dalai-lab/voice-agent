@@ -470,6 +470,74 @@ Feels like continuity. Is technically a fresh call. No glitches. No empty variab
 
 ---
 
+## Section 5b: Three Time Systems — How They Stack Without Conflicting
+
+There are **three independent time-related systems** in Dograh. They look similar but serve completely different layers. They do **not** conflict — they stack in sequence.
+
+### The Three Systems
+
+| System | Where | What it does | Who uses it |
+|---|---|---|---|
+| `{{current_time}}` template variable | System prompt (Jinja) | Tells the LLM what time it is right now | The LLM's reasoning |
+| **Sociable Hours** | `callback_settings.py` + `campaign_call_dispatcher.py` | Guards against calling humans at illegal/unreasonable hours (e.g., 3 AM) | Callback scheduler + dispatch re-validator |
+| **Campaign Schedule Window** | `campaign_orchestrator.py` | Controls when a campaign actively runs batches (e.g., Mon–Fri 1–5 PM only) | Campaign orchestrator loop |
+
+---
+
+### How They Stack (Execution Order)
+
+```
+BEFORE the call starts:
+  1. {{current_time}} → injected into LLM system prompt.
+     "It is 12:31 AM IST, Friday July 25."
+     LLM now knows when it is. It can convert "tomorrow morning" to minutes=450.
+
+DURING the call — user requests a callback:
+  2. LLM calls schedule_callback(minutes=X).
+     Server runs adjust_for_sociable_hours().
+     "Is the requested fire-time inside 8 AM–9 PM? No → bump to 8 AM."
+     Saves to DB. Sociable hours has no idea about the campaign schedule.
+
+WHEN the campaign orchestrator runs (separate background loop, every ~30s):
+  3. Orchestrator checks: "Is it inside the campaign's 1 PM–5 PM slot right now?"
+     Has no idea what the LLM said. Has no idea about sociable hours.
+     Just: should I dispatch a batch right now? Yes/No.
+     Callbacks bypass this check and always go through.
+```
+
+---
+
+### Can They Conflict?
+
+**No, but they can give different answers simultaneously — and that's correct by design.**
+
+Example: It is 8:30 AM.
+- Sociable hours says ✅ (8 AM–9 PM window is open)
+- Campaign schedule says ❌ (campaign only runs 1–5 PM)
+- Result: Campaign does not run. Callbacks (which bypass campaign schedule) still fire. ✅
+
+Example: It is 11 PM.
+- Sociable hours says ❌ (outside 8 AM–9 PM)
+- Campaign schedule says ❌ (outside 1–5 PM)
+- Result: Nothing runs. Callbacks are held and re-queued for 8 AM. ✅
+
+They are independent gatekeepers checking independent rules. When both say ✅, the call goes through. If either says ❌, it doesn't (with the exception that callbacks bypass the campaign schedule gate but never bypass sociable hours).
+
+---
+
+### Why `{{current_time}}` Can't Be Replaced By Sociable Hours
+
+Sociable hours is a **server-side validator** — it checks if a timestamp is legal before storing it. The LLM never sees it.
+
+Without `{{current_time}}` in the prompt:
+- User says "call me tomorrow at 8 AM" → LLM has no idea what "tomorrow" is → it cannot convert this to `minutes=450`
+- User says "good morning" → LLM might not contextually know it's morning
+- LLM guesses or hallucinates the time → wrong `minutes` value → callback fires at wrong time
+
+`{{current_time}}` gives the LLM **temporal grounding** so it can do the arithmetic correctly before it even calls the tool.
+
+---
+
 ## Section 6: New ARQ Task Needed
 
 ```python

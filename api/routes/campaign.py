@@ -1124,7 +1124,7 @@ async def list_campaign_callbacks(
         outcome_map = {}
         if orig_run_ids:
             stmt = text("""
-                SELECT initial_context->>'original_run_id' as orig_run_id, id, state, disposition 
+                SELECT initial_context->>'original_run_id' as orig_run_id, id, state, gathered_context->>'call_disposition' as disposition 
                 FROM workflow_runs 
                 WHERE campaign_id = :campaign_id 
                 AND initial_context->>'is_callback' = 'true'

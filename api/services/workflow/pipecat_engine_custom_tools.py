@@ -1377,7 +1377,7 @@ class CustomToolManager:
                         )
                         session.add(new_queued_run)
                         await session.commit()
-                        logger.info(f"Scheduled campaign callback via QueuedRun for {to_number} at {new_queued_run.scheduled_for}")
+                        logger.info(f"Scheduled campaign callback via QueuedRun for {to_number} at {adjusted_time}")
                     else:
                         # Non-campaign standalone callback (Phase 1)
                         new_callback = ScheduledCallbackModel(

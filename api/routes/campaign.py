@@ -1110,7 +1110,7 @@ async def list_campaign_callbacks(
             
     query = query.order_by(desc(QueuedRunModel.scheduled_for)).limit(limit).offset(offset)
     
-    async with db_client.session_maker() as db:
+    async with db_client.async_session() as db:
         result = await db.execute(query)
         queued_runs = result.scalars().all()
         

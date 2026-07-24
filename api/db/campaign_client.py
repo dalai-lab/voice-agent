@@ -762,10 +762,18 @@ class CampaignClient(BaseDBClient):
                     QueuedRunModel.scheduled_for <= now,
                     CampaignModel.state.in_(["completed", "failed"])
                 )
-                .distinct()
             )
             result = await session.execute(query)
-            return list(result.scalars().all())
+            
+            campaigns = list(result.scalars().all())
+            seen = set()
+            unique_campaigns = []
+            for c in campaigns:
+                if c.id not in seen:
+                    seen.add(c.id)
+                    unique_campaigns.append(c)
+                    
+            return unique_campaigns
 
     async def get_scheduled_runs_count(
         self,

@@ -1427,9 +1427,7 @@ class CustomToolManager:
                 # Build a human-readable local time for the LLM to confirm back to the user
                 was_adjusted = adjusted_time != requested_time
                 try:
-                    from api.services.workflow.tools.callback_settings import get_timezone_for_number
                     user_tz_str = get_timezone_for_number(to_number, tz_str)
-                    from zoneinfo import ZoneInfo
                     local_adjusted = adjusted_time.astimezone(ZoneInfo(user_tz_str))
                     actual_time_str = local_adjusted.strftime("%I:%M %p on %A, %B %-d")
                 except Exception:

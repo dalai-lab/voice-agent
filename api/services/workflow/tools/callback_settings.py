@@ -17,7 +17,7 @@ async def resolve_callback_settings(
     Priority: Org max ceilings -> Campaign overrides -> Workflow defaults.
     """
     # 1. Organization defaults/ceilings
-    org_config = await db_client.get_organization_configuration(organization_id, "ORGANIZATION_PREFERENCES")
+    org_config = await db_client.get_configuration(organization_id, "ORGANIZATION_PREFERENCES")
     org_prefs = org_config.value if org_config else {}
     callback_defaults = org_prefs.get("callback_defaults", {})
     

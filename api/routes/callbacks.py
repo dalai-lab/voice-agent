@@ -11,7 +11,6 @@ router = APIRouter(prefix="/callbacks")
 
 @router.get("", response_model=List[Dict[str, Any]])
 async def list_callbacks(
-    organization_id: int,
     status: Optional[str] = Query(None, description="Filter by status (e.g. pending, completed, failed, cancelled)"),
     limit: int = 50,
     offset: int = 0,
@@ -19,7 +18,7 @@ async def list_callbacks(
 ) -> Any:
     """Get all scheduled callbacks for the organization."""
     query = select(ScheduledCallbackModel).where(
-        ScheduledCallbackModel.organization_id == organization_id
+        ScheduledCallbackModel.organization_id == user.selected_organization_id
     )
 
     if status:
@@ -51,13 +50,12 @@ async def list_callbacks(
 @router.delete("/{callback_id}", response_model=Dict[str, Any])
 async def cancel_callback(
     callback_id: int,
-    organization_id: int,
     user: UserModel = Depends(get_user),
 ) -> Any:
     """Cancel a pending callback."""
     query = select(ScheduledCallbackModel).where(
         ScheduledCallbackModel.id == callback_id,
-        ScheduledCallbackModel.organization_id == organization_id,
+        ScheduledCallbackModel.organization_id == user.selected_organization_id,
     )
     
     async with db_client.session_maker() as db:

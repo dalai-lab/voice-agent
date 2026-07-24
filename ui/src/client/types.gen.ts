@@ -10133,11 +10133,7 @@ export type ListCallbacksApiV1CallbacksGetData = {
         'X-API-Key'?: string | null;
     };
     path?: never;
-    query: {
-        /**
-         * Organization Id
-         */
-        organization_id: number;
+    query?: {
         /**
          * Status
          *
@@ -10200,12 +10196,7 @@ export type CancelCallbackApiV1CallbacksCallbackIdDeleteData = {
          */
         callback_id: number;
     };
-    query: {
-        /**
-         * Organization Id
-         */
-        organization_id: number;
-    };
+    query?: never;
     url: '/api/v1/callbacks/{callback_id}';
 };
 

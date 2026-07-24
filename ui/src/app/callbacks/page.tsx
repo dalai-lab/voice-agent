@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
 import { format } from "date-fns";
 import { Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
-import { useAuth } from "@/lib/auth";
+import { cancelCallbackApiV1CallbacksCallbackIdDelete, listCallbacksApiV1CallbacksGet } from "@/client";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -16,8 +17,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { cancelCallbackApiV1CallbacksCallbackIdDelete, listCallbacksApiV1CallbacksGet } from "@/client";
+import { useAuth } from "@/lib/auth";
 
 type CallbackStatus = "pending" | "completed" | "failed" | "cancelled";
 
@@ -52,10 +52,10 @@ export default function PendingCallbacksPage() {
         try {
             const accessToken = await getAccessToken();
             const response = await listCallbacksApiV1CallbacksGet({
-                query: { organization_id: user.selected_organization_id },
+                query: {},
                 headers: { "Authorization": `Bearer ${accessToken}` },
             });
-            
+
             if (response.data) {
                 setCallbacks(response.data as unknown as PendingCallback[]);
             } else if (response.error) {
@@ -76,16 +76,15 @@ export default function PendingCallbacksPage() {
     const handleCancelCallback = async (id: number) => {
         if (!user) return;
         if (!confirm("Are you sure you want to cancel this scheduled callback?")) return;
-        
+
         setCancellingId(id);
         try {
             const accessToken = await getAccessToken();
             const response = await cancelCallbackApiV1CallbacksCallbackIdDelete({
                 path: { callback_id: id },
-                query: { organization_id: user.selected_organization_id },
                 headers: { "Authorization": `Bearer ${accessToken}` },
             });
-            
+
             if (response.error) {
                 toast.error("Failed to cancel callback");
             } else {

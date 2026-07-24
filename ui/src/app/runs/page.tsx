@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState, Suspense } from "react";
+import { Suspense,useCallback, useEffect, useState } from "react";
+
 import { client } from "@/client/client.gen";
 import { WorkflowRunResponseSchema } from "@/client/types.gen";
 import { WorkflowRunsTable } from "@/components/workflow-runs";
@@ -12,7 +13,7 @@ import { ActiveFilter, availableAttributes, FilterAttribute } from "@/types/filt
 function RunsView() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    
+
     const [workflowRuns, setWorkflowRuns] = useState<WorkflowRunResponseSchema[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);

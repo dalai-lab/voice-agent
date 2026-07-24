@@ -31,6 +31,8 @@ const eslintConfig = [
       "simple-import-sort/exports": "error",
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": ["warn", { vars: "all", args: "after-used" }],
+      "@typescript-eslint/no-explicit-any": "warn",
+      "react/no-unescaped-entities": "warn",
 
     },
     languageOptions: {

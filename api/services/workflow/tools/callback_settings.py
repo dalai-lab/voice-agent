@@ -83,7 +83,8 @@ async def resolve_callback_settings(
         "sociable_hours_end": camp_sociable_end,
         "sociable_timezone": camp_sociable_tz,
         "honor_campaign_window": camp_honor_window,
-        "long_callback_threshold": camp_long_thresh
+        "long_callback_threshold": camp_long_thresh,
+        "callback_resume_mode": workflow.callback_resume_mode if workflow else "fresh"
     }
 
 def adjust_for_sociable_hours(

@@ -277,8 +277,13 @@ export default function EditCampaignPage() {
             });
 
             if (response.error) {
-                const errorDetail = (response.error as { detail?: string })?.detail;
-                const errorMessage = errorDetail || 'Failed to update campaign';
+                let errorDetail = (response.error as any)?.detail;
+                if (Array.isArray(errorDetail)) {
+                    errorDetail = errorDetail.map((e: any) => `${e.loc?.join('.') || 'Field'}: ${e.msg}`).join(', ');
+                } else if (typeof errorDetail === 'object' && errorDetail !== null) {
+                    errorDetail = JSON.stringify(errorDetail);
+                }
+                const errorMessage = typeof errorDetail === 'string' ? errorDetail : 'Failed to update campaign';
                 setSubmitError(errorMessage);
                 toast.error(errorMessage);
                 return;

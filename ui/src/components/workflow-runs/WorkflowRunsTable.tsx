@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { WorkflowRunResponseSchema } from "@/client/types.gen";
@@ -86,6 +87,7 @@ export function WorkflowRunsTable({
     showFilters = true,
     emptyMessage = "No workflow runs found",
 }: WorkflowRunsTableProps) {
+    const router = useRouter();
     const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
     const organizationTimezone = useOrganizationTimezone();
 
@@ -95,7 +97,7 @@ export function WorkflowRunsTable({
     const formatDate = (dateString: string) => new Date(dateString).toLocaleString();
 
     const handleRowClick = (runId: number, runWorkflowId: number) => {
-        window.open(`/workflow/${runWorkflowId}/run/${runId}`, '_blank');
+        router.push(`/workflow/${runWorkflowId}/run/${runId}`);
     };
 
     return (
@@ -228,9 +230,9 @@ export function WorkflowRunsTable({
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-8 w-8 rounded-lg"
-                                                    onClick={() => window.open(`/workflow/${run.workflow_id}/run/${run.id}`, '_blank')}
+                                                    onClick={() => router.push(`/workflow/${run.workflow_id}/run/${run.id}`)}
                                                 >
-                                                    <ExternalLink className="h-4 w-4" />
+                                                    <ArrowRight className="h-4 w-4" />
                                                 </Button>
                                             </div>
                                         </TableCell>

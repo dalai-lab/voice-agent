@@ -1,8 +1,8 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import React, { createContext, lazy, Suspense, useContext, useEffect, useState } from 'react';
 
+import SpinLoader from '@/components/SpinLoader';
 import logger from '@/lib/logger';
 
 import type { AuthUser } from '../types';
@@ -37,9 +37,7 @@ const LocalProviderWrapper = lazy(() =>
 );
 
 const LoadingFallback = (
-  <div className="flex items-center justify-center min-h-screen">
-    <Loader2 className="w-8 h-8 animate-spin" />
-  </div>
+  <SpinLoader />
 );
 
 interface ResolvedAuthConfig {

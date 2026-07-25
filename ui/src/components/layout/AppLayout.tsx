@@ -12,6 +12,7 @@ import { PostHogEvent } from "@/constants/posthog-events";
 import { useAppConfig } from "@/context/AppConfigContext";
 import { LeadFormsProvider } from "@/context/LeadFormsContext";
 
+import { BrandLogo } from "@/components/BrandLogo";
 import { AppSidebar } from "./AppSidebar";
 import { GitHubStarBadge } from "./GitHubStarBadge";
 
@@ -24,7 +25,9 @@ function AppHeader() {
         <Button variant="ghost" size="icon" onClick={toggleSidebar} aria-label="Open menu" className="md:hidden">
           <Menu className="h-5 w-5" />
         </Button>
-        <Link href="/" className="text-lg font-bold md:hidden">Nova</Link>
+        <Link href="/">
+          <BrandLogo className="md:hidden" />
+        </Link>
       </div>
       <div className="flex items-center gap-3">
       </div>

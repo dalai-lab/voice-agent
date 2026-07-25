@@ -50,6 +50,7 @@ class TestCustomToolManagerContextIntegration:
             mock_db.get_tools_by_uuids = AsyncMock(return_value=sample_tools)
 
             # Get tool schemas via CustomToolManager - now returns FunctionSchema objects
+            mock_engine._enable_callbacks = False
             tool_uuids = ["weather-uuid-123", "booking-uuid-456", "lookup-uuid-789"]
             schemas = await manager.get_tool_schemas(tool_uuids)
 
@@ -155,6 +156,7 @@ class TestCustomToolManagerContextIntegration:
             )  # Just weather
 
             # Get custom tool schemas - returns FunctionSchema objects
+            mock_engine._enable_callbacks = False
             custom_schemas = await manager.get_tool_schemas(["weather-uuid-123"])
 
             # Create built-in function schemas (like calculator, timezone)
@@ -218,6 +220,7 @@ class TestCustomToolManagerContextIntegration:
             mock_db.get_tools_by_uuids = AsyncMock(return_value=[sample_tools[0]])
 
             # Get schemas - returns FunctionSchema objects
+            mock_engine._enable_callbacks = False
             schemas = await manager.get_tool_schemas(["weather-uuid-123"])
 
             # Create context with function call history
@@ -278,6 +281,7 @@ class TestCustomToolManagerContextIntegration:
         ) as mock_db:
             mock_db.get_tools_by_uuids = AsyncMock(return_value=[])
 
+            mock_engine._enable_callbacks = False
             schemas = await manager.get_tool_schemas([])
             assert schemas == []
 
@@ -335,6 +339,7 @@ class TestCustomToolManagerContextIntegration:
             mock_db.get_tools_by_uuids = AsyncMock(return_value=[tool_with_types])
 
             # Get schemas - returns FunctionSchema objects
+            mock_engine._enable_callbacks = False
             schemas = await manager.get_tool_schemas(["order-uuid"])
             schema = schemas[0]
 

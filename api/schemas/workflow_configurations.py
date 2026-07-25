@@ -40,6 +40,17 @@ class AmbientNoiseConfigurationDefaults(BaseModel):
     volume: float = 0.3
 
 
+class VoicemailDetectionConfigurationDefaults(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    enabled: bool = False
+    leave_message: bool = False
+    message_type: Literal["static", "dynamic"] = "static"
+    message_text: str = ""
+    wait_for_beep_seconds: float = Field(default=3.0, ge=1.0, le=10.0)
+    max_message_duration_seconds: int = Field(default=30, ge=10, le=120)
+
+
 class WorkflowConfigurationDefaults(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -55,6 +66,9 @@ class WorkflowConfigurationDefaults(BaseModel):
 
     ambient_noise_configuration: AmbientNoiseConfigurationDefaults = Field(
         default_factory=AmbientNoiseConfigurationDefaults
+    )
+    voicemail_detection: VoicemailDetectionConfigurationDefaults = Field(
+        default_factory=VoicemailDetectionConfigurationDefaults
     )
     max_call_duration: int = Field(
         default=DEFAULT_MAX_CALL_DURATION_SECONDS,

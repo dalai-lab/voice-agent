@@ -23,6 +23,7 @@ from api.services.campaign.campaign_event_publisher import (
 from api.services.campaign.circuit_breaker import circuit_breaker
 from api.tasks.arq import enqueue_job
 from api.tasks.function_names import FunctionNames
+from pipecat.utils.enums import EndTaskReason
 
 TERMINAL_NOT_CONNECTED_STATUSES = frozenset(
     {
@@ -150,8 +151,14 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
         await campaign_call_dispatcher.release_call_slot(workflow_run_id)
 
         if workflow_run.campaign_id:
-            is_callback = workflow_run.initial_context and workflow_run.initial_context.get("is_callback")
-            if not is_callback:
+            initial_context = getattr(workflow_run, 'initial_context', None)
+            is_callback = initial_context.get("is_callback") if isinstance(initial_context, dict) else False
+            
+            gathered_context = getattr(workflow_run, 'gathered_context', None)
+            call_disposition = gathered_context.get("call_disposition", "") if isinstance(gathered_context, dict) else ""
+            is_voicemail = call_disposition == EndTaskReason.VOICEMAIL_DETECTED.value
+            
+            if not is_callback and not is_voicemail:
                 await circuit_breaker.record_and_evaluate(
                     workflow_run.campaign_id, is_failure=False
                 )
@@ -170,7 +177,8 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
 
         await campaign_call_dispatcher.release_call_slot(workflow_run_id)
 
-        is_callback = workflow_run.initial_context and workflow_run.initial_context.get("is_callback")
+        initial_context = getattr(workflow_run, 'initial_context', None)
+        is_callback = initial_context.get("is_callback") if isinstance(initial_context, dict) else False
 
         if workflow_run.campaign_id:
             # Check if this is a callback run before tripping circuit breaker

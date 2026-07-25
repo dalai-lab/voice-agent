@@ -56,9 +56,6 @@ def build_pipeline(
     ]
 
     # Insert voicemail detector after STT if enabled
-    # Note: We intentionally do NOT use voicemail_detector.gate() to allow TTS
-    # frames to continue flowing during classification (non-blocking detection)
-
     # Note: We must keep user_context_aggregator after voicemail_detector
     # or else, LLMContextFrames generated from user_context_aggregator will
     # start generating LLM Completion from Voicemail Classifier
@@ -84,6 +81,19 @@ def build_pipeline(
             llm,  # LLM
             *post_llm,
             tts,  # TTS
+        ]
+    )
+
+    # Insert TTS gate between TTS and transport output when voicemail detection
+    # is enabled. This buffers all TTS audio frames until classification is
+    # complete: on CONVERSATION they are released, on VOICEMAIL they are
+    # discarded — preventing any bot audio from leaking into the voicemail box.
+    if voicemail_detector:
+        logger.info("Adding TTS gate to pipeline for voicemail detection")
+        processors.append(voicemail_detector.gate())
+
+    processors.extend(
+        [
             transport.output(),  # Transport bot output
             audio_buffer,  # AudioBufferProcessor - records both input and output audio
             assistant_context_aggregator,  # Assistant spoken responses

@@ -109,7 +109,8 @@ from pipecat.turns.user_stop import (
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.utils.enums import EndTaskReason, RealtimeFeedbackType
 from pipecat.utils.run_context import set_current_org_id, set_current_run_id
-
+from pipecat.frames.frames import TTSSpeakFrame
+from pipecat.processors.aggregators.llm_context import LLMContext
 # Setup tracing if enabled
 ensure_tracing()
 
@@ -996,14 +997,160 @@ async def _run_pipeline_impl(
             custom_system_prompt=custom_system_prompt,
         )
 
-        # Register event handler to end task when voicemail is detected
         @voicemail_detector.event_handler("on_voicemail_detected")
         async def _on_voicemail_detected(_processor):
             logger.info(f"Voicemail detected for workflow run {workflow_run_id}")
+
+            leave_message = voicemail_config.get("leave_message", False)
+
+            if not leave_message:
+                # Original path: abort immediately, no audio played
+                await engine.end_call_with_reason(
+                    reason=EndTaskReason.VOICEMAIL_DETECTED.value,
+                    abort_immediately=True,
+                )
+                return
+
+            # === Leave Voicemail Message path ===
+
+            # Guard 1: per-run idempotency (belt-and-suspenders against double-fire)
+            if engine._voicemail_left:
+                logger.info(f"[run {workflow_run_id}] Voicemail already left. Hanging up silently.")
+                await engine.end_call_with_reason(
+                    reason=EndTaskReason.VOICEMAIL_DETECTED.value,
+                    abort_immediately=True,
+                )
+                return
+
+            # Guard 2: chain-level idempotency — don't leave voicemail on callback
+            # of a callback where we already left one
+            initial_ctx = workflow_run.initial_context or {}
+            if initial_ctx.get("voicemail_left_in_chain", False):
+                logger.info(f"[run {workflow_run_id}] Voicemail already left in this chain. Hanging up silently.")
+                await engine.end_call_with_reason(
+                    reason=EndTaskReason.VOICEMAIL_DETECTED.value,
+                    abort_immediately=True,
+                )
+                return
+
+            # Enforce minimum beep_wait to give TTSGate buffer time to fully clear
+            beep_wait = max(voicemail_config.get("wait_for_beep_seconds", 3.0), 0.5)
+            message_type = voicemail_config.get("message_type", "static")
+            max_duration = voicemail_config.get("max_message_duration_seconds", 30.0)
+
+            # Resolve message text
+            if message_type == "dynamic":
+                message_text = await _generate_dynamic_voicemail_message(engine, workflow_run)
+            else:
+                message_text = voicemail_config.get("message_text", "").strip()
+
+            if not message_text:
+                logger.warning(
+                    f"[run {workflow_run_id}] leave_message=True but no message text. Hanging up silently."
+                )
+                await engine.end_call_with_reason(
+                    reason=EndTaskReason.VOICEMAIL_DETECTED.value,
+                    abort_immediately=True,
+                )
+                return
+
+            logger.info(f"[run {workflow_run_id}] Waiting {beep_wait}s for voicemail beep.")
+            await asyncio.sleep(beep_wait)
+
+            # Guard 3: check if pipeline was torn down DURING the sleep.
+            # broadcast_interruption() (step 2 above) can cause on_client_disconnected
+            # to fire, which calls end_call_with_reason(USER_HANGUP, abort_immediately=True).
+            # That sets _call_disposed=True and queues a CancelFrame. If that happened,
+            # queueing our TTSSpeakFrame would go into a dead/cancelled pipeline.
+            if engine._call_disposed:
+                logger.warning(
+                    f"[run {workflow_run_id}] Call disposed during beep wait. Voicemail message skipped."
+                )
+                return
+
+            # Mark as left BEFORE queueing TTS — protects against any re-entry
+            # even if the sleep was interrupted
+            engine._voicemail_left = True
+
+            # Add observability tag for QA filtering and analytics
+            call_tags = engine._gathered_context.get("call_tags", [])
+            if "voicemail_message_left" not in call_tags:
+                call_tags.append("voicemail_message_left")
+            engine._gathered_context["call_tags"] = call_tags
+
+            # Queue the voicemail TTS message.
+            # The TTSGate is now inactive (_gating_active=False, buffer cleared at step 1),
+            # so this frame flows directly to transport.output().
+            # append_to_context=False: don't pollute the LLM's conversation context.
+            # persist_to_logs=True: show in UI transcript so users can see what was left.
+            await engine.task.queue_frame(
+                TTSSpeakFrame(
+                    message_text,
+                    append_to_context=False,
+                    persist_to_logs=True,
+                )
+            )
+
+            # Estimate TTS playback duration at Deepgram Aura-2's ~3.0 WPS with 20% buffer.
+            # This is a sleep-based wait — not ideal, but sufficient given there's no
+            # TTSStoppedFrame hook available from this event handler context.
+            word_count = len(message_text.split())
+            estimated_duration = min((word_count / 3.0) * 1.2, max_duration)
+            logger.info(
+                f"[run {workflow_run_id}] Voicemail message queued (~{estimated_duration:.1f}s estimated). "
+                "Ending call gracefully after wait."
+            )
+            await asyncio.sleep(estimated_duration)
+
+            # End gracefully (EndFrame, not CancelFrame) so TTS can finish flushing.
+            # end_call_with_reason is idempotent — if the call was already disposed
+            # during our sleep (carrier hung up first), this returns immediately.
             await engine.end_call_with_reason(
                 reason=EndTaskReason.VOICEMAIL_DETECTED.value,
-                abort_immediately=True,
+                abort_immediately=False,
             )
+
+        async def _generate_dynamic_voicemail_message(engine, workflow_run) -> str:
+            """Generate a context-aware voicemail message via out-of-band LLM inference.
+        
+            Uses engine.inference_llm.run_inference() — the same out-of-band path as
+            variable extraction. Does NOT use llm.generate_text() (doesn't exist on
+            Pipecat LLM services). Does NOT go through the pipeline.
+        
+            Returns empty string on failure so callers fall through to silent hang-up.
+            """
+            try:
+                from pipecat.processors.aggregators.llm_context import LLMContext
+        
+                gathered = engine._gathered_context or {}
+                initial_ctx = workflow_run.initial_context or {}
+                conversation_summary = initial_ctx.get("conversation_summary", "")
+        
+                context_parts = []
+                if conversation_summary:
+                    context_parts.append(f"Previous conversation summary: {conversation_summary}")
+                if gathered:
+                    context_parts.append(f"Gathered call context: {gathered}")
+        
+                context_str = "\n".join(context_parts) or "No prior context available."
+        
+                system_prompt = (
+                    "Generate a brief, natural voicemail message (max 20 seconds when spoken, ~50 words). "
+                    "Be direct. Include a clear call to action. "
+                    "Do not say 'beep', 'voicemail', or reference the recording system."
+                )
+        
+                ctx = LLMContext()
+                ctx.set_messages([{"role": "user", "content": f"Call context:\n{context_str}"}])
+        
+                response = await engine.inference_llm.run_inference(
+                    ctx, system_instruction=system_prompt
+                )
+                # run_inference returns str | None
+                return (response or "").strip()
+            except Exception as e:
+                logger.error(f"[run {engine._workflow_run_id}] Dynamic voicemail message generation failed: {e}")
+                return ""
 
     # Recording router is only meaningful in non-realtime mode (it routes between
     # pre-recorded audio playback and dynamic TTS; realtime LLMs produce audio

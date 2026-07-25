@@ -52,12 +52,22 @@ export interface VoicemailDetectionConfiguration {
     api_key?: string;
     system_prompt?: string;
     long_speech_timeout: number;  // seconds cutoff for long speech detection
+    leave_message?: boolean;
+    message_type?: 'static' | 'dynamic';
+    message_text?: string;
+    wait_for_beep_seconds?: number;
+    max_message_duration_seconds?: number;
 }
 
 export const DEFAULT_VOICEMAIL_DETECTION_CONFIGURATION: VoicemailDetectionConfiguration = {
     enabled: false,
     use_workflow_llm: true,
     long_speech_timeout: 8.0,
+    leave_message: false,
+    message_type: 'static',
+    message_text: '',
+    wait_for_beep_seconds: 3.0,
+    max_message_duration_seconds: 30,
 };
 
 export interface TranscriptConfiguration {

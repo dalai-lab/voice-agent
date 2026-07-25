@@ -1232,7 +1232,7 @@ class CustomToolManager:
             logger.info(f"Arguments: {function_call_params.arguments}")
 
             # 1. Idempotency Check
-            if getattr(self._engine, "_callback_scheduled", False):
+            if self._engine._callback_scheduled:
                 logger.info("Callback already scheduled in this session. Returning silent success.")
                 await function_call_params.result_callback(
                     {"status": "already_scheduled"}, properties=properties
@@ -1335,6 +1335,14 @@ class CustomToolManager:
                 # causes an infinite loop because `adjusted_minutes` changes every second.)
 
                 # 4. Save to DB
+                gathered_context_for_callback = {
+                    **self._engine._gathered_context,
+                    "voicemail_left_in_chain": (
+                        self._engine._voicemail_left
+                        or bool((workflow_run.initial_context or {}).get("voicemail_left_in_chain", False))
+                    ),
+                }
+
                 async with db_client.async_session() as session:
                     if workflow_run.campaign_id:
                         # Fetch original queued_run for source_uuid
@@ -1354,7 +1362,7 @@ class CustomToolManager:
                                 "callback_reason": "user_requested",
                                 "original_run_id": workflow_run_id,
                                 "conversation_summary": conversation_summary,
-                                "gathered_context": self._engine._gathered_context,
+                                "gathered_context": gathered_context_for_callback,
                                 "callback_chain_depth": chain_depth,
                                 "callback_resume_mode": settings.get("callback_resume_mode", "fresh"),
                                 "caller_number": from_number,
@@ -1383,7 +1391,7 @@ class CustomToolManager:
                             to_number=to_number,
                             from_number=from_number,
                             conversation_summary=conversation_summary,
-                            gathered_context=self._engine._gathered_context,
+                            gathered_context=gathered_context_for_callback,
                             callback_chain_depth=chain_depth
                         )
                         session.add(new_callback)
@@ -1400,7 +1408,7 @@ class CustomToolManager:
                             organization_id=organization_id,
                             original_run_id=workflow_run_id,
                             conversation_summary=conversation_summary,
-                            gathered_context=self._engine._gathered_context,
+                            gathered_context=gathered_context_for_callback,
                             callback_chain_depth=chain_depth,
                             _defer_by=defer_by
                         )
@@ -1452,7 +1460,7 @@ class CustomToolManager:
             TTSSpeakFrame(
                 farewell_message,
                 append_to_context=True,
-                persist_to_logs=True,
+                persist_to_logs=False,
             )
         )
         await self._engine.end_call_with_reason(EndTaskReason.END_CALL_TOOL_REASON.value, abort_immediately=False)

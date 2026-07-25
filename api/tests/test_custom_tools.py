@@ -1453,6 +1453,7 @@ class TestCustomToolManagerUnit:
         ):
             mock_db.get_tools_by_uuids = AsyncMock(return_value=[mock_tool])
 
+            manager._engine._enable_callbacks = False
             schemas = await manager.get_tool_schemas(["uuid-1"])
 
             assert len(schemas) == 1
@@ -1570,6 +1571,7 @@ class TestCustomToolManagerUnit:
         mock_engine = Mock()
         mock_engine._get_organization_id = AsyncMock(return_value=1)
         mock_engine.llm.register_function = Mock()
+        mock_engine._enable_callbacks = False
         manager = CustomToolManager(mock_engine)
         tool = MockToolModel(
             tool_uuid=f"{category}-uuid",

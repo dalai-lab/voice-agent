@@ -100,6 +100,8 @@ class PipecatEngine:
         self._node_transition_callback = node_transition_callback
         self._initialized = False
         self._call_disposed = False
+        self._voicemail_left: bool = False
+        self._callback_scheduled: bool = False
         self._current_node: Optional[Node] = None
         self._gathered_context: dict = {}
         self._user_response_timeout_task: Optional[asyncio.Task] = None

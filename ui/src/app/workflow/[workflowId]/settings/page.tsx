@@ -1190,6 +1190,11 @@ function VoicemailSection({
     const [apiKey, setApiKey] = useState(getConfig().api_key || "");
     const [systemPrompt, setSystemPrompt] = useState(getConfig().system_prompt || DEFAULT_VOICEMAIL_SYSTEM_PROMPT);
     const [longSpeechTimeout, setLongSpeechTimeout] = useState(getConfig().long_speech_timeout);
+    const [leaveMessage, setLeaveMessage] = useState(getConfig().leave_message ?? false);
+    const [messageType, setMessageType] = useState<"static" | "dynamic">(getConfig().message_type ?? "static");
+    const [messageText, setMessageText] = useState(getConfig().message_text ?? "");
+    const [waitForBeep, setWaitForBeep] = useState(getConfig().wait_for_beep_seconds ?? 3.0);
+    const [maxMessageDuration, setMaxMessageDuration] = useState(getConfig().max_message_duration_seconds ?? 30);
     const [isSaving, setIsSaving] = useState(false);
 
     const isDirty = useMemo(() => {
@@ -1204,9 +1209,14 @@ function VoicemailSection({
             model !== (init.model || "gpt-4.1") ||
             apiKey !== (init.api_key || "") ||
             systemPrompt !== (init.system_prompt || DEFAULT_VOICEMAIL_SYSTEM_PROMPT) ||
-            longSpeechTimeout !== init.long_speech_timeout
+            longSpeechTimeout !== init.long_speech_timeout ||
+            leaveMessage !== (init.leave_message ?? false) ||
+            messageType !== (init.message_type ?? "static") ||
+            messageText !== (init.message_text ?? "") ||
+            waitForBeep !== (init.wait_for_beep_seconds ?? 3.0) ||
+            maxMessageDuration !== (init.max_message_duration_seconds ?? 30)
         );
-    }, [enabled, useWorkflowLlm, provider, model, apiKey, systemPrompt, longSpeechTimeout, workflowConfigurations]);
+    }, [enabled, useWorkflowLlm, provider, model, apiKey, systemPrompt, longSpeechTimeout, leaveMessage, messageType, messageText, waitForBeep, maxMessageDuration, workflowConfigurations]);
 
     useUnsavedChanges("voicemail", isDirty);
 
@@ -1222,6 +1232,11 @@ function VoicemailSection({
                 system_prompt:
                     systemPrompt && systemPrompt !== DEFAULT_VOICEMAIL_SYSTEM_PROMPT ? systemPrompt : undefined,
                 long_speech_timeout: longSpeechTimeout,
+                leave_message: enabled ? leaveMessage : false,
+                message_type: messageType,
+                message_text: messageText,
+                wait_for_beep_seconds: waitForBeep,
+                max_message_duration_seconds: maxMessageDuration,
             };
             await onSave(
                 { ...workflowConfigurations, voicemail_detection: voicemailConfig },
@@ -1312,6 +1327,97 @@ function VoicemailSection({
                         </div>
                     </>
                 )}
+
+                {/* Voicemail Message Configuration */}
+                <div className={`space-y-4 pt-4 border-t ${!enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className="flex items-center space-x-2">
+                        <Switch
+                            id="voicemail-leave-message-page"
+                            checked={leaveMessage}
+                            onCheckedChange={setLeaveMessage}
+                            disabled={!enabled}
+                        />
+                        <Label htmlFor="voicemail-leave-message-page">Leave Voicemail Message</Label>
+                    </div>
+
+                    {leaveMessage && (
+                        <div className="space-y-6 pl-6 border-l-2 ml-2 border-muted/50">
+                            <div className="space-y-3">
+                                <Label>Message Type</Label>
+                                <RadioGroup
+                                    value={messageType}
+                                    onValueChange={(val: "static" | "dynamic") => setMessageType(val)}
+                                    className="flex flex-col space-y-1"
+                                >
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="static" id="msg-static-page" />
+                                        <Label htmlFor="msg-static-page" className="font-normal">Static</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="dynamic" id="msg-dynamic-page" />
+                                        <Label htmlFor="msg-dynamic-page" className="font-normal">Dynamic (LLM-generated)</Label>
+                                    </div>
+                                </RadioGroup>
+                            </div>
+
+                            {messageType === "static" ? (
+                                <div className="grid gap-2">
+                                    <Label>Message Text</Label>
+                                    <Textarea
+                                        value={messageText}
+                                        onChange={(e) => setMessageText(e.target.value)}
+                                        placeholder="Hi, this is [company]. We tried calling you back..."
+                                        className="min-h-[100px]"
+                                    />
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                        <span>⏱ ~{(messageText.trim().split(/\s+/).filter(w => w.length > 0).length / 3.0).toFixed(1)} seconds</span>
+                                        {(messageText.trim().split(/\s+/).filter(w => w.length > 0).length / 3.0) > 20 && (
+                                            <span className="text-yellow-600">⚠ Keep under 20s recommended</span>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-3 bg-muted/20 rounded-md border text-sm text-muted-foreground">
+                                    <p>LLM generates a context-aware message at detection time using gathered call context and conversation summary.</p>
+                                </div>
+                            )}
+
+                            <div className="grid gap-4">
+                                <Label className="font-medium">Message Timing</Label>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-sm">Wait for beep</Label>
+                                        <div className="flex items-center space-x-2">
+                                            <Input
+                                                type="number"
+                                                step="0.5"
+                                                min="1"
+                                                max="10"
+                                                value={waitForBeep}
+                                                onChange={(e) => setWaitForBeep(parseFloat(e.target.value) || 3.0)}
+                                            />
+                                            <span className="text-xs text-muted-foreground shrink-0">s (1-10)</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-sm">Max message length</Label>
+                                        <div className="flex items-center space-x-2">
+                                            <Input
+                                                type="number"
+                                                step="1"
+                                                min="10"
+                                                max="120"
+                                                value={maxMessageDuration}
+                                                onChange={(e) => setMaxMessageDuration(parseInt(e.target.value, 10) || 30)}
+                                            />
+                                            <span className="text-xs text-muted-foreground shrink-0">s (10-120)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </CardContent>
             <CardFooter className="justify-end gap-3 border-t pt-6">
                 {isDirty && <span className="text-xs text-muted-foreground">Unsaved changes</span>}

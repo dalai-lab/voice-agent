@@ -56,7 +56,7 @@ interface WorkflowRunResponse {
     annotations: Record<string, unknown> | null;
 }
 
-const RUN_SHELL_HEIGHT_CLASS = "h-[calc(100svh-49px)] min-h-[calc(100svh-49px)] max-h-[calc(100svh-49px)]";
+const RUN_SHELL_HEIGHT_CLASS = "h-[calc(100svh-49px)] md:h-[100svh] min-h-[calc(100svh-49px)] md:min-h-[100svh] max-h-[calc(100svh-49px)] md:max-h-[100svh]";
 const WAVEFORM_BAR_COUNT = 96;
 type SplitTrackPlaybackMode = 'both' | 'user' | 'bot';
 
@@ -87,9 +87,9 @@ function getTranscriptMetrics(logs: WorkflowRunLogs | null, gatheredContext: Rec
 
 function MetricCard({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-xl border border-border bg-muted/40 px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-            <p className="mt-2 text-lg font-semibold text-foreground">{value}</p>
+        <div className="rounded-xl border border-border bg-secondary/20 p-4 flex flex-col gap-1.5">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">{label}</p>
+            <p className="text-lg font-black text-foreground">{value}</p>
         </div>
     );
 }
@@ -104,20 +104,18 @@ function CopyDebugIdButton({ label, value }: { label: string; value: string }) {
     };
 
     return (
-        <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
-            <div className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-                <p className="font-mono text-sm font-semibold text-foreground">{value}</p>
-            </div>
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary/40 px-2.5 py-1 text-[10px] font-bold">
+            <span className="text-muted-foreground uppercase tracking-wider">{label}:</span>
+            <span className="font-mono text-foreground">{value}</span>
             <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 shrink-0"
+                className="h-4 w-4 shrink-0 hover:bg-muted text-muted-foreground hover:text-foreground"
                 onClick={handleCopy}
                 aria-label={`Copy ${label.toLowerCase()}`}
             >
-                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? <Check className="h-2.5 w-2.5" /> : <Copy className="h-2.5 w-2.5" />}
             </Button>
         </div>
     );
@@ -413,7 +411,7 @@ function SplitTracksSection({
     const playbackTargetLabel = playbackMode === 'both' ? 'split tracks' : `${playbackMode} track`;
 
     return (
-        <Card className="border-border">
+        <div className="border border-border bg-card/30 backdrop-blur-md rounded-xl p-5 shadow-xs space-y-4">
             <audio
                 ref={userAudioRef}
                 src={signedUrls.user ?? undefined}
@@ -428,105 +426,82 @@ function SplitTracksSection({
                 className="hidden"
                 onEnded={handleTrackEnded}
             />
-            <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Split Tracks</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2" role="group" aria-label="Playback tracks">
-                        <Button
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Audio Recording</span>
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 border border-border bg-secondary/35 rounded-lg p-0.5">
+                        <button
                             type="button"
-                            variant="outline"
-                            size="sm"
-                            aria-pressed={userTrackActive}
-                            aria-label={playbackMode === 'user' ? 'Play both tracks' : 'Play user track only'}
                             onClick={() => handleTrackButtonClick('user')}
                             className={cn(
-                                'gap-1.5',
-                                userTrackActive
-                                    ? 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300'
-                                    : 'text-muted-foreground opacity-60'
+                                'px-2.5 py-1 text-[10px] font-bold rounded-md transition-colors cursor-pointer',
+                                userTrackActive ? 'bg-sky-500/10 text-sky-500' : 'text-muted-foreground'
                             )}
                         >
-                            <UserRound className="h-4 w-4" />
                             User
-                        </Button>
-                        <span className="h-4 w-px bg-border" />
-                        <Button
+                        </button>
+                        <button
                             type="button"
-                            variant="outline"
-                            size="sm"
-                            aria-pressed={botTrackActive}
-                            aria-label={playbackMode === 'bot' ? 'Play both tracks' : 'Play bot track only'}
                             onClick={() => handleTrackButtonClick('bot')}
                             className={cn(
-                                'gap-1.5',
-                                botTrackActive
-                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300'
-                                    : 'text-muted-foreground opacity-60'
+                                'px-2.5 py-1 text-[10px] font-bold rounded-md transition-colors cursor-pointer',
+                                botTrackActive ? 'bg-emerald-500/10 text-emerald-500' : 'text-muted-foreground'
                             )}
                         >
-                            <Bot className="h-4 w-4" />
                             Bot
-                        </Button>
+                        </button>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button
+                    <div className="flex items-center gap-1.5">
+                        <button
                             type="button"
-                            variant="outline"
-                            size="sm"
                             onClick={() => downloadFile(userRecordingUrl)}
-                            className="gap-2"
+                            className="flex items-center gap-1 px-2.5 py-1 border border-border bg-secondary/20 hover:bg-muted text-[10px] font-semibold text-foreground rounded-lg transition-colors cursor-pointer"
                         >
-                            <Download className="h-4 w-4" />
-                            User
-                        </Button>
-                        <Button
+                            <Download className="w-3 h-3 text-muted-foreground" /> User
+                        </button>
+                        <button
                             type="button"
-                            variant="outline"
-                            size="sm"
                             onClick={() => downloadFile(botRecordingUrl)}
-                            className="gap-2"
+                            className="flex items-center gap-1 px-2.5 py-1 border border-border bg-secondary/20 hover:bg-muted text-[10px] font-semibold text-foreground rounded-lg transition-colors cursor-pointer"
                         >
-                            <Download className="h-4 w-4" />
-                            Bot
-                        </Button>
+                            <Download className="w-3 h-3 text-muted-foreground" /> Bot
+                        </button>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <Button
-                        type="button"
-                        size="icon"
-                        variant={isPlaying ? 'default' : 'outline'}
-                        onClick={togglePlayback}
-                        disabled={!canPlay}
-                        aria-label={isPlaying ? `Pause ${playbackTargetLabel}` : `Play ${playbackTargetLabel}`}
-                        className="h-10 w-10 shrink-0"
-                    >
-                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    </Button>
-                    <div className="relative h-36 min-w-0 flex-1 overflow-hidden rounded-lg border border-border/70 bg-background">
-                        <div className="absolute left-3 right-3 top-1/2 h-px bg-border/80" />
-                        <WaveformLane peaks={peaks.user} track="user" position="top" isActive={userTrackActive} />
-                        <WaveformLane peaks={peaks.bot} track="bot" position="bottom" isActive={botTrackActive} />
-                        {canPlay && (
-                            <div className="pointer-events-none absolute inset-x-3 inset-y-3">
-                                <div
-                                    className="absolute top-0 bottom-0 w-px bg-foreground/50"
-                                    style={{ left: `${progressPercent}%` }}
-                                />
-                            </div>
-                        )}
-                        {isLoading && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-background/70 text-xs text-muted-foreground">
-                                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                                Loading
-                            </div>
-                        )}
-                    </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+                <button
+                    type="button"
+                    onClick={togglePlayback}
+                    disabled={!canPlay}
+                    className={cn(
+                        'h-9 w-9 flex items-center justify-center rounded-lg border transition-colors cursor-pointer shrink-0',
+                        isPlaying ? 'bg-cta text-cta-foreground border-cta' : 'bg-secondary/40 border-border hover:bg-muted text-foreground'
+                    )}
+                >
+                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
+                </button>
+                <div className="relative h-24 min-w-0 flex-1 overflow-hidden rounded-lg border border-border/75 bg-secondary/15">
+                    <div className="absolute left-3 right-3 top-1/2 h-px bg-border/40" />
+                    <WaveformLane peaks={peaks.user} track="user" position="top" isActive={userTrackActive} />
+                    <WaveformLane peaks={peaks.bot} track="bot" position="bottom" isActive={botTrackActive} />
+                    {canPlay && (
+                        <div className="pointer-events-none absolute inset-x-3 inset-y-2">
+                            <div
+                                className="absolute top-0 bottom-0 w-0.5 bg-foreground/60"
+                                style={{ left: `${progressPercent}%` }}
+                            />
+                        </div>
+                    )}
+                    {isLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/80 text-xs text-muted-foreground font-bold gap-1.5">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-cta" /> Loading waveforms
+                        </div>
+                    )}
                 </div>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }
 
@@ -542,18 +517,31 @@ function RunMetricsSection({
     const metrics = getTranscriptMetrics(logs, gatheredContext);
 
     return (
-        <Card className="border-border">
-            <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Run Metrics</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <MetricCard label="Duration" value={formatDuration(costInfo?.call_duration_seconds)} />
-                <MetricCard label="User Turns" value={String(metrics.userTurns)} />
-                <MetricCard label="Bot Turns" value={String(metrics.botTurns)} />
-                <MetricCard label="Tool Calls" value={String(metrics.toolCalls)} />
-                <MetricCard label="Nodes Visited" value={String(metrics.visitedNodes)} />
-            </CardContent>
-        </Card>
+        <div className="border border-border bg-card/30 backdrop-blur-md rounded-xl p-5 shadow-xs space-y-4 text-left">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Session Metrics</span>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="space-y-1">
+                    <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Duration</div>
+                    <div className="text-lg font-black text-foreground">{formatDuration(costInfo?.call_duration_seconds)}</div>
+                </div>
+                <div className="space-y-1 border-l border-border/40 pl-4">
+                    <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">User Turns</div>
+                    <div className="text-lg font-black text-foreground">{metrics.userTurns}</div>
+                </div>
+                <div className="space-y-1 border-l border-border/40 pl-4">
+                    <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Bot Turns</div>
+                    <div className="text-lg font-black text-foreground">{metrics.botTurns}</div>
+                </div>
+                <div className="space-y-1 border-l border-border/40 pl-4">
+                    <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Tool Calls</div>
+                    <div className="text-lg font-black text-foreground">{metrics.toolCalls}</div>
+                </div>
+                <div className="space-y-1 border-l border-border/40 pl-4">
+                    <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Visited Nodes</div>
+                    <div className="text-lg font-black text-foreground">{metrics.visitedNodes}</div>
+                </div>
+            </div>
+        </div>
     );
 }
 
@@ -569,32 +557,26 @@ function ContextDisplay({ title, context }: { title: string; context: Record<str
 
     if (!context || Object.keys(context).length === 0) {
         return (
-            <Card className="border-border">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">{title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground">No data available</p>
-                </CardContent>
-            </Card>
+            <div className="border border-border bg-card/30 backdrop-blur-md rounded-xl p-5 shadow-xs space-y-2 text-left">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-foreground">{title}</h3>
+                <p className="text-xs text-muted-foreground">No data available</p>
+            </div>
         );
     }
 
     return (
-        <Card className="border-border">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg">{title}</CardTitle>
-                <Button variant="ghost" size="sm" onClick={handleCopy} className="gap-2">
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        <div className="border border-border bg-card/30 backdrop-blur-md rounded-xl p-5 shadow-xs space-y-3 text-left">
+            <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-foreground">{title}</h3>
+                <Button variant="ghost" size="sm" onClick={handleCopy} className="h-6 gap-1 px-2 text-[10px] font-bold">
+                    {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                     {copied ? 'Copied' : 'Copy'}
                 </Button>
-            </CardHeader>
-            <CardContent>
-                <pre className="text-sm bg-muted p-3 rounded-md overflow-auto max-h-64">
-                    {JSON.stringify(context, null, 2)}
-                </pre>
-            </CardContent>
-        </Card>
+            </div>
+            <pre className="text-xs bg-secondary/35 border border-border p-3 rounded-lg overflow-auto max-h-64 font-mono text-muted-foreground leading-relaxed">
+                {JSON.stringify(context, null, 2)}
+            </pre>
+        </div>
     );
 }
 
@@ -708,142 +690,104 @@ export default function WorkflowRunPage() {
         returnValue = (
             <div className={`flex ${RUN_SHELL_HEIGHT_CLASS} min-h-0 w-full overflow-hidden bg-background`}>
                 <div className="min-w-0 flex-1 overflow-y-auto">
-                    <div className="mx-auto w-full max-w-4xl space-y-6 p-6">
-                    <Card className="border-border">
-                        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="min-w-0 flex-1 space-y-2">
-                                {workflowName && (
-                                    <div className="flex min-w-0 items-center gap-3">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
-                                            <Bot className="h-5 w-5" />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                                                Agent
-                                            </p>
-                                            <p className="truncate text-xl font-semibold text-foreground">
-                                                {workflowName}
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                                <div className="flex flex-wrap gap-2 pt-1">
-                                    <CopyDebugIdButton label="Agent ID" value={workflowId} />
-                                    <CopyDebugIdButton label="Run ID" value={runId} />
+                    <div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-8">
+                        {/* Clean Typography Header Row */}
+                        <div className="flex items-center justify-between border-b border-border/40 pb-5 text-left">
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-3">
+                                    <h1 className="text-xl font-bold tracking-tight text-foreground">{workflowName || "Voice Agent"}</h1>
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${isTextChatRun ? 'bg-sky-500/5 text-sky-500 border-sky-500/10' : 'bg-emerald-500/5 text-emerald-500 border-emerald-500/10'}`}>
+                                        {isTextChatRun ? 'Text Chat' : 'Completed Call'}
+                                    </span>
                                 </div>
-                                <div className="flex min-w-0 items-center gap-4 pt-1">
-                                    <CardTitle className="min-w-0 text-2xl">
-                                        {isTextChatRun ? 'Text Chat Session' : 'Agent Run Completed'}
-                                    </CardTitle>
-                                    <div className={`h-8 w-8 rounded-full flex items-center justify-center ${isTextChatRun ? 'bg-sky-500/15' : 'bg-emerald-500/20'}`}>
-                                        {isTextChatRun ? (
-                                            <FileText className="h-5 w-5 text-sky-500" />
-                                        ) : (
-                                            <svg className="h-5 w-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        )}
-                                    </div>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                                    {workflowRun?.created_at && (
+                                        <span className="flex items-center gap-1.5">
+                                            <Clock className="w-3.5 h-3.5 text-muted-foreground/60" />
+                                            {formatDateTime(workflowRun.created_at, organizationTimezone)}
+                                        </span>
+                                    )}
+                                    <span className="text-border/60">•</span>
+                                    <span className="flex items-center gap-1">
+                                        <span className="text-muted-foreground/60 uppercase text-[9px] font-bold">Agent ID:</span>
+                                        <span className="font-mono font-bold text-foreground/80">{workflowId}</span>
+                                    </span>
+                                    <span className="text-border/60">•</span>
+                                    <span className="flex items-center gap-1">
+                                        <span className="text-muted-foreground/60 uppercase text-[9px] font-bold">Run ID:</span>
+                                        <span className="font-mono font-bold text-foreground/80">{runId}</span>
+                                    </span>
                                 </div>
-                                {workflowRun?.created_at && (
-                                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                        <Clock className="h-4 w-4" />
-                                        Call time: {formatDateTime(workflowRun.created_at, organizationTimezone)}
-                                    </p>
-                                )}
                             </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                                <Link href={`/workflow/${params.workflowId}`}>
-                                    <Button
-                                        ref={customizeButtonRef}
-                                        className="gap-2"
+                            <Link href={`/workflow/${params.workflowId}`}>
+                                <Button
+                                    ref={customizeButtonRef}
+                                    className="h-8 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-bold text-xs cursor-pointer gap-1.5"
+                                >
+                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Customize Agent
+                                </Button>
+                            </Link>
+                        </div>
+
+                        {/* Session Actions Toolbar */}
+                        <div className="flex flex-wrap items-center gap-3 text-left">
+                            {!isTextChatRun && (
+                                <>
+                                    <MediaPreviewButton
+                                        recordingUrl={workflowRun?.recording_url}
+                                        transcriptUrl={workflowRun?.transcript_url}
+                                        runId={Number(params.runId)}
+                                        onOpenPreview={openPreview}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => downloadFile(workflowRun?.transcript_url ?? null)}
+                                        disabled={!workflowRun?.transcript_url || !auth.isAuthenticated}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 border border-border bg-card/30 hover:bg-muted text-xs font-semibold text-foreground rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                                     >
-                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                        Customize Agent
-                                    </Button>
-                                </Link>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-muted-foreground mb-8">
-                                {isTextChatRun
-                                    ? 'Review the conversation history, metrics, and context captured for this text session.'
-                                    : 'Your voice agent run has been completed successfully. You can preview or download the transcript and recording.'}
-                            </p>
+                                        <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                                        Transcript
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => downloadFile(workflowRun?.recording_url ?? null)}
+                                        disabled={!workflowRun?.recording_url || !auth.isAuthenticated}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 border border-border bg-card/30 hover:bg-muted text-xs font-semibold text-foreground rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                                    >
+                                        <Video className="w-3.5 h-3.5 text-muted-foreground" />
+                                        Full Recording
+                                    </button>
+                                </>
+                            )}
+                            {workflowRun?.gathered_context?.trace_url && (
+                                <a
+                                    href={String(workflowRun.gathered_context.trace_url)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 border border-border bg-card/30 hover:bg-muted text-xs font-semibold text-foreground rounded-lg transition-colors cursor-pointer"
+                                >
+                                    <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                                    View Trace
+                                </a>
+                            )}
+                        </div>
 
-                            <div className="flex flex-wrap gap-4">
-                                {!isTextChatRun && (
-                                    <>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm text-muted-foreground">Preview:</span>
-                                            <MediaPreviewButton
-                                                recordingUrl={workflowRun?.recording_url}
-                                                transcriptUrl={workflowRun?.transcript_url}
-                                                runId={Number(params.runId)}
-                                                onOpenPreview={openPreview}
-                                            />
-                                        </div>
-                                        <div className="flex items-center gap-2 border-l border-border pl-4">
-                                            <span className="text-sm text-muted-foreground">Download:</span>
-                                            <Button
-                                                onClick={() => downloadFile(workflowRun?.transcript_url ?? null)}
-                                                disabled={!workflowRun?.transcript_url || !auth.isAuthenticated}
-                                                size="sm"
-                                                className="gap-2"
-                                            >
-                                                <FileText className="h-4 w-4" />
-                                                Transcript
-                                            </Button>
-                                            <Button
-                                                onClick={() => downloadFile(workflowRun?.recording_url ?? null)}
-                                                disabled={!workflowRun?.recording_url || !auth.isAuthenticated}
-                                                size="sm"
-                                                className="gap-2"
-                                            >
-                                                <Video className="h-4 w-4" />
-                                                Recording
-                                            </Button>
-                                        </div>
-                                    </>
-                                )}
-                                {workflowRun?.gathered_context?.trace_url && (
-                                    <div className={`flex items-center gap-2 ${isTextChatRun ? '' : 'border-l border-border pl-4'}`}>
-                                        <span className="text-sm text-muted-foreground">Trace:</span>
-                                        <Button
-                                            asChild
-                                            size="sm"
-                                            variant="outline"
-                                            className="gap-2"
-                                        >
-                                            <a
-                                                href={String(workflowRun.gathered_context.trace_url)}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                            >
-                                                <ExternalLink className="h-4 w-4" />
-                                                View Trace
-                                            </a>
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                        <RunMetricsSection
-                            costInfo={workflowRun?.cost_info ?? null}
-                            logs={workflowRun?.logs ?? null}
-                            gatheredContext={workflowRun?.gathered_context ?? null}
-                        />
-
+                        {/* Audio visualizer section or custom loader */}
                         {!isTextChatRun && hasSplitTracks && (
                             <SplitTracksSection
                                 userRecordingUrl={userSplitRecordingUrl as string}
                                 botRecordingUrl={botSplitRecordingUrl as string}
                             />
                         )}
+
+                        <RunMetricsSection
+                            costInfo={workflowRun?.cost_info ?? null}
+                            logs={workflowRun?.logs ?? null}
+                            gatheredContext={workflowRun?.gathered_context ?? null}
+                        />
 
                         <div className="grid gap-6 md:grid-cols-2">
                             <ContextDisplay

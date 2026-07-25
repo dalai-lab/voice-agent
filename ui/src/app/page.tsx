@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { ArrowRight, ArrowUpRight, Cpu, Shield, Terminal } from "lucide-react";
 import Link from "next/link";
 
@@ -7,8 +8,38 @@ import { BrandLogo } from "@/components/BrandLogo";
 import ThemeToggle from "@/components/ThemeSwitcher";
 import { useAuth } from "@/lib/auth";
 
+const SIMULATED_TURNS = [
+  { speaker: "assistant", text: "Hello! I'm Sarah from Nova. How can I help you today?" },
+  { speaker: "user", text: "Hey! Can you explain what Nova does?" },
+  { speaker: "assistant", text: "Nova is a platform to build low-latency voice AI agents that speak naturally." },
+  { speaker: "user", text: "Wow, how fast is the response time?" },
+  { speaker: "assistant", text: "We achieve a latency of around 120ms, making conversations feel completely real-time." }
+];
+
 export default function LandingPage() {
   const { isAuthenticated, loading } = useAuth();
+  const [turnIndex, setTurnIndex] = useState(0);
+  const [displayedText, setDisplayedText] = useState("");
+
+  useEffect(() => {
+    let index = 0;
+    const text = SIMULATED_TURNS[turnIndex].text;
+    setDisplayedText("");
+    
+    const timer = setInterval(() => {
+      index++;
+      setDisplayedText(text.substring(0, index));
+      if (index >= text.length) {
+        clearInterval(timer);
+        const nextTimeout = setTimeout(() => {
+          setTurnIndex((prev) => (prev + 1) % SIMULATED_TURNS.length);
+        }, 2200);
+        return () => clearTimeout(nextTimeout);
+      }
+    }, 35);
+
+    return () => clearInterval(timer);
+  }, [turnIndex]);
 
   return (
     <div className="relative min-h-screen bg-background text-foreground overflow-hidden font-sans selection:bg-foreground selection:text-background transition-colors duration-150">
@@ -127,7 +158,15 @@ export default function LandingPage() {
             <span></span>
           </div>
 
-          <div className="text-[10px] text-muted-foreground/60 font-mono tracking-tight">latency: ~120ms</div>
+          <div className="w-full min-h-[72px] bg-muted/30 border border-border/40 rounded-xl p-3 flex flex-col justify-center gap-1 text-left self-stretch">
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground/80">
+              {SIMULATED_TURNS[turnIndex].speaker === "assistant" ? "Nova Agent (Sarah)" : "Caller"}
+            </span>
+            <p className="text-xs text-foreground font-semibold leading-relaxed min-h-[32px]">
+              {displayedText}
+              <span className="inline-block w-1.5 h-3 ml-0.5 bg-cta/80 animate-pulse align-middle" />
+            </p>
+          </div>
         </div>
       </section>
 
@@ -172,8 +211,6 @@ export default function LandingPage() {
           <div className="text-[10px] text-muted-foreground/60">© {new Date().getFullYear()} Nova. All rights reserved.</div>
           <div className="flex gap-6 text-[10px] font-semibold">
             <a href="https://docs.dograh.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Docs</a>
-            <a href="https://github.com/dalai-lab/voice-agent" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
-            <a href="https://www.dograh.com/privacy-policy" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Privacy</a>
           </div>
         </div>
       </footer>

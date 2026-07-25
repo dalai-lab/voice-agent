@@ -17,6 +17,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React from "react";
 
+import { BrandLogo } from "@/components/BrandLogo";
 import { SidebarTeamSwitcher } from "@/components/layout/SidebarTeamSwitcher";
 import ThemeToggle from "@/components/ThemeSwitcher";
 import { Button } from "@/components/ui/button";
@@ -329,16 +330,22 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border bg-sidebar">
       <SidebarHeader className={cn("notranslate border-b border-sidebar-border", isCollapsed ? "p-2" : "px-4 py-4")} translate="no">
-        <div className={cn("flex items-center w-full", isCollapsed ? "justify-center" : "justify-between")}>
+        <div className={cn("flex items-center w-full", isCollapsed ? "flex-col gap-3 justify-center" : "justify-between")}>
+          {isCollapsed ? (
+            <Link href="/overview" className="mt-1">
+              <BrandLogo mark className="h-6 w-6 text-sidebar-foreground" />
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link href="/overview">
+                <BrandLogo className="text-sidebar-foreground" />
+              </Link>
+              {versionInfo && process.env.NODE_ENV !== "production" && (
+                <span className="text-[10px] font-normal text-muted-foreground mt-1">v{versionInfo.ui}</span>
+              )}
+            </div>
+          )}
           <div className={cn("flex items-center gap-2", isCollapsed && "hidden")}>
-            {versionInfo && (
-              <span
-                className="notranslate text-sm font-bold tracking-tight text-sidebar-foreground"
-                translate="no"
-              >
-                Nova <span className="text-[10px] font-normal text-muted-foreground">v{versionInfo.ui}</span>
-              </span>
-            )}
             {isBehind && latestRelease && (
               <Tooltip>
                 <TooltipTrigger asChild>

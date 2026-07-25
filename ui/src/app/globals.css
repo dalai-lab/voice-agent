@@ -129,12 +129,31 @@
 }
 
 @layer base {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--border) 70%, var(--foreground) 30%);
+  }
+
   * {
     @apply border-border outline-ring/50 transition-colors duration-150;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight font-extrabold text-foreground;
   }
 
   /* Simulates elevated top lights on cards and sidebars in dark mode */

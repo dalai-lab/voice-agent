@@ -146,15 +146,9 @@ export default function RecordingsList({ refreshKey }: { refreshKey?: number }) 
 
     if (isLoading && recordings.length === 0) {
         return (
-            <div className="space-y-4">
+            <div className="grid gap-3">
                 {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-2 flex-1">
-                            <Skeleton className="h-4 w-48" />
-                            <Skeleton className="h-3 w-64" />
-                        </div>
-                        <Skeleton className="h-8 w-24" />
-                    </div>
+                    <div key={i} className="h-20 rounded-xl bg-card border border-border animate-pulse" />
                 ))}
             </div>
         );
@@ -162,28 +156,29 @@ export default function RecordingsList({ refreshKey }: { refreshKey?: number }) 
 
     if (error) {
         return (
-            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive">
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-semibold">
                 {error}
             </div>
         );
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-5">
             {/* Search and Refresh */}
-            <div className="flex items-center gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-3">
+                <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
                     <Input
                         placeholder="Search by filename, transcript, or ID..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
+                        className="pl-9 h-9 rounded-lg border-border bg-background text-xs"
                     />
                 </div>
                 <Button
                     variant="outline"
                     size="icon"
+                    className="h-9 w-9 rounded-lg border-border bg-background"
                     onClick={() => { stopPlayback(); fetchRecordings(); }}
                     disabled={isLoading}
                 >
@@ -192,23 +187,26 @@ export default function RecordingsList({ refreshKey }: { refreshKey?: number }) 
             </div>
 
             {/* Results count */}
-            <div className="text-sm text-muted-foreground">
+            <div className="text-[10px] text-muted-foreground/60 font-semibold uppercase tracking-wider pl-1">
                 {filteredRecordings.length} recording{filteredRecordings.length !== 1 ? "s" : ""}
                 {searchQuery && ` matching "${searchQuery}"`}
             </div>
 
             {/* Recordings List */}
             {filteredRecordings.length === 0 ? (
-                <div className="text-center py-12">
-                    <AudioLines className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                        {searchQuery
-                            ? "No recordings match your search"
-                            : "No recordings yet"}
-                    </p>
+                <div className="flex items-center justify-center w-full py-12">
+                    <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm w-full border border-border bg-card rounded-xl shadow-xs">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted/30 text-muted-foreground mb-4">
+                            <AudioLines className="h-6 w-6" />
+                        </div>
+                        <h3 className="text-xs font-bold text-foreground tracking-tight mb-2 uppercase">No recordings found</h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            {searchQuery ? "No recordings match your search criteria." : "No recordings uploaded yet."}
+                        </p>
+                    </div>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="grid gap-3">
                     {filteredRecordings.map((rec) => {
                         const filename = (rec.metadata?.original_filename as string) || "";
                         const isEditing = editingId === rec.recording_id;
@@ -216,17 +214,17 @@ export default function RecordingsList({ refreshKey }: { refreshKey?: number }) 
                         return (
                             <div
                                 key={rec.recording_id}
-                                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                                className="flex items-center justify-between p-4 border border-border bg-card hover:bg-card/90 transition-all rounded-xl shadow-xs group"
                             >
                                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                        <AudioLines className="w-5 h-5 text-primary" />
+                                    <div className="w-10 h-10 rounded-lg bg-muted/40 border border-border/60 flex items-center justify-center shrink-0">
+                                        <AudioLines className="w-5 h-5 text-muted-foreground" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         {/* Recording ID (editable) */}
-                                        <div className="flex items-center gap-2 mb-1">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                                             {isEditing ? (
-                                                <div className="flex items-center gap-1 flex-wrap">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
                                                     <Input
                                                         value={editValue}
                                                         onChange={(e) => { setEditValue(e.target.value); setEditError(null); }}
@@ -234,7 +232,7 @@ export default function RecordingsList({ refreshKey }: { refreshKey?: number }) 
                                                             if (e.key === "Enter") saveRecordingId(rec);
                                                             if (e.key === "Escape") cancelEditing();
                                                         }}
-                                                        className={`h-7 text-sm font-mono w-48 ${editError ? "border-destructive" : ""}`}
+                                                        className={`h-7 text-xs font-mono w-48 ${editError ? "border-destructive" : ""}`}
                                                         maxLength={64}
                                                         autoFocus
                                                     />
@@ -255,21 +253,21 @@ export default function RecordingsList({ refreshKey }: { refreshKey?: number }) 
                                                         <X className="w-3.5 h-3.5" />
                                                     </Button>
                                                     {editError && (
-                                                        <span className="text-xs text-destructive">{editError}</span>
+                                                        <span className="text-[10px] text-destructive font-bold">{editError}</span>
                                                     )}
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center gap-1.5">
-                                                    <code className="text-sm font-mono bg-muted px-1.5 py-0.5 rounded truncate max-w-[250px]">
+                                                    <code className="text-xs font-bold font-mono border border-border/60 bg-muted/40 px-1.5 py-0.5 rounded truncate max-w-[250px]">
                                                         {rec.recording_id}
                                                     </code>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="h-6 px-1.5 text-xs text-muted-foreground gap-1"
+                                                        className="h-6 px-1.5 text-[10px] text-muted-foreground/60 gap-1 rounded hover:bg-muted"
                                                         onClick={() => startEditing(rec)}
                                                     >
-                                                        <Pencil className="w-3 h-3" />
+                                                        <Pencil className="w-2.5 h-2.5" />
                                                         Edit ID
                                                     </Button>
                                                 </div>
@@ -277,15 +275,15 @@ export default function RecordingsList({ refreshKey }: { refreshKey?: number }) 
                                         </div>
                                         {/* Filename */}
                                         {filename && (
-                                            <p className="text-xs text-muted-foreground mb-0.5 truncate max-w-[300px]">
+                                            <p className="text-xs font-bold text-foreground mb-0.5 truncate max-w-[300px]">
                                                 {filename}
                                             </p>
                                         )}
                                         {/* Transcript */}
-                                        <p className="text-sm text-muted-foreground line-clamp-1 mb-1">
+                                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                                             {rec.transcript}
                                         </p>
-                                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground/60 mt-1">
                                             <span>{formatDateTime(rec.created_at, organizationTimezone)}</span>
                                         </div>
                                     </div>
@@ -293,7 +291,8 @@ export default function RecordingsList({ refreshKey }: { refreshKey?: number }) 
                                 <div className="flex items-center gap-1 shrink-0 ml-2">
                                     <Button
                                         variant="ghost"
-                                        size="sm"
+                                        size="icon"
+                                        className="h-8 w-8 rounded-lg"
                                         onClick={() => handlePlay(rec)}
                                     >
                                         {playingId === rec.recording_id ? (
@@ -304,9 +303,9 @@ export default function RecordingsList({ refreshKey }: { refreshKey?: number }) 
                                     </Button>
                                     <Button
                                         variant="ghost"
-                                        size="sm"
+                                        size="icon"
+                                        className="h-8 w-8 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
                                         onClick={() => handleDelete(rec.recording_id)}
-                                        className="text-destructive hover:text-destructive/90"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </Button>

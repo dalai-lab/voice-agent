@@ -536,35 +536,35 @@ export function ServiceConfigurationForm({
 
         return (
             <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <Label>Provider</Label>
+                        <Label className="text-xs font-bold text-foreground">Provider</Label>
                         <Select
                             value={currentProvider}
                             onValueChange={(providerName) => {
                                 handleProviderChange(service, providerName);
                             }}
                         >
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className="h-9 rounded-lg border-border bg-background text-xs w-full">
                                 <SelectValue placeholder="Select provider" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="rounded-lg text-xs">
                                 {availableProviders.map((provider) => (
-                                    <SelectItem key={provider} value={provider}>
+                                    <SelectItem key={provider} value={provider} className="text-xs">
                                         {getProviderDisplayName(provider, schemas?.[service]?.[provider])}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                         {(providerSchema?.description || providerSchema?.provider_docs_url) && (
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-[10px] text-muted-foreground/60 leading-normal">
                                 {providerSchema?.description}{" "}
                                 {providerSchema?.provider_docs_url && (
                                     <a
                                         href={providerSchema.provider_docs_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-0.5 underline"
+                                        className="inline-flex items-center gap-0.5 underline font-semibold text-foreground"
                                     >
                                         Learn more <ExternalLink className="h-3 w-3" />
                                     </a>
@@ -575,14 +575,14 @@ export function ServiceConfigurationForm({
 
                     {currentProvider && providerSchema && configFields[0] && (
                         <div className="space-y-2">
-                            <Label className="capitalize">{configFields[0].replace(/_/g, ' ')}</Label>
+                            <Label className="text-xs font-bold text-foreground capitalize">{configFields[0].replace(/_/g, ' ')}</Label>
                             {renderField(service, configFields[0], providerSchema)}
                         </div>
                     )}
                 </div>
 
                 {currentProvider && providerSchema && configFields.length > 1 && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {configFields.slice(1).map((field) => {
                             const fieldSchema = providerSchema.properties[field];
                             const actualFieldSchema = fieldSchema?.$ref && providerSchema.$defs
@@ -590,8 +590,8 @@ export function ServiceConfigurationForm({
                                 : fieldSchema;
                             const fullWidth = actualFieldSchema?.multiline;
                             return (
-                                <div key={field} className={`space-y-2 ${fullWidth ? "col-span-2" : ""}`}>
-                                    <Label className="capitalize">{field.replace(/_/g, ' ')}</Label>
+                                <div key={field} className={`space-y-2 ${fullWidth ? "col-span-1 sm:col-span-2" : ""}`}>
+                                    <Label className="text-xs font-bold text-foreground capitalize">{field.replace(/_/g, ' ')}</Label>
                                     {renderField(service, field, providerSchema)}
                                 </div>
                             );
@@ -600,39 +600,42 @@ export function ServiceConfigurationForm({
                 )}
 
                 {currentProvider && providerSchema && providerSchema.properties.api_key && (
-                    <div className="space-y-2">
-                        <Label>{mode === 'override' ? 'API Key (leave empty to use global)' : 'API Key(s)'}</Label>
+                    <div className="space-y-2 pt-2 border-t border-border/40">
+                        <Label className="text-xs font-bold text-foreground">{mode === 'override' ? 'API Key (leave empty to use global)' : 'API Key(s)'}</Label>
                         {renderFieldDescription("api_key", providerSchema)}
-                        {apiKeys[service].map((key, index) => (
-                            <div key={index} className="flex gap-2">
-                                <Input
-                                    type="text"
-                                    placeholder="Enter API key"
-                                    value={key}
-                                    onChange={(e) => {
-                                        const newKeys = [...apiKeys[service]];
-                                        newKeys[index] = e.target.value;
-                                        setApiKeys(prev => ({ ...prev, [service]: newKeys }));
-                                    }}
-                                />
-                                {apiKeys[service].length > 1 && (
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="shrink-0"
-                                        onClick={() => {
-                                            setApiKeys(prev => ({
-                                                ...prev,
-                                                [service]: prev[service].filter((_, i) => i !== index),
-                                            }));
+                        <div className="space-y-2">
+                            {apiKeys[service].map((key, index) => (
+                                <div key={index} className="flex gap-2">
+                                    <Input
+                                        type="text"
+                                        placeholder="Enter API key"
+                                        value={key}
+                                        onChange={(e) => {
+                                            const newKeys = [...apiKeys[service]];
+                                            newKeys[index] = e.target.value;
+                                            setApiKeys(prev => ({ ...prev, [service]: newKeys }));
                                         }}
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                )}
-                            </div>
-                        ))}
+                                        className="h-9 rounded-lg border-border bg-background text-xs"
+                                    />
+                                    {apiKeys[service].length > 1 && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="shrink-0 h-9 w-9 rounded-lg"
+                                            onClick={() => {
+                                                setApiKeys(prev => ({
+                                                    ...prev,
+                                                    [service]: prev[service].filter((_, i) => i !== index),
+                                                }));
+                                            }}
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                         {mode !== 'override' && (
                             <Button
                                 type="button"
@@ -644,8 +647,9 @@ export function ServiceConfigurationForm({
                                         [service]: [...prev[service], ""],
                                     }));
                                 }}
+                                className="h-8 px-3 rounded-lg text-xs font-semibold mt-1"
                             >
-                                <Plus className="h-4 w-4 mr-1" /> Add API Key
+                                <Plus className="h-3.5 w-3.5 mr-1" /> Add API Key
                             </Button>
                         )}
                     </div>
@@ -727,6 +731,7 @@ export function ServiceConfigurationForm({
                             onChange={(e) => {
                                 setValue(fieldKey, e.target.value, { shouldDirty: true });
                             }}
+                            className="h-9 rounded-lg border-border bg-background text-xs"
                         />
                         <div className="flex items-center space-x-2">
                             <Checkbox
@@ -739,7 +744,7 @@ export function ServiceConfigurationForm({
                                     }
                                 }}
                             />
-                            <Label htmlFor={`custom-input-${fieldKey}`} className="text-sm font-normal cursor-pointer">
+                            <Label htmlFor={`custom-input-${fieldKey}`} className="text-xs font-semibold text-foreground cursor-pointer">
                                 Enter Custom Value
                             </Label>
                         </div>
@@ -756,12 +761,12 @@ export function ServiceConfigurationForm({
                             setValue(fieldKey, value, { shouldDirty: true });
                         }}
                     >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="h-9 rounded-lg border-border bg-background text-xs w-full">
                             <SelectValue placeholder={`Select ${field}`} />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="rounded-lg text-xs">
                             {options.map((value: string) => (
-                                <SelectItem key={value} value={value}>
+                                <SelectItem key={value} value={value} className="text-xs">
                                     {value}
                                 </SelectItem>
                             ))}
@@ -775,7 +780,7 @@ export function ServiceConfigurationForm({
                                 setIsCustomInput(prev => ({ ...prev, [fieldKey]: checked as boolean }));
                             }}
                         />
-                        <Label htmlFor={`custom-input-${fieldKey}-dropdown`} className="text-sm font-normal cursor-pointer">
+                        <Label htmlFor={`custom-input-${fieldKey}-dropdown`} className="text-xs font-semibold text-foreground cursor-pointer">
                             Enter Custom Value
                         </Label>
                     </div>
@@ -802,12 +807,12 @@ export function ServiceConfigurationForm({
                         setValue(`${service}_${field}`, value, { shouldDirty: true });
                     }}
                 >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="h-9 rounded-lg border-border bg-background text-xs w-full">
                         <SelectValue placeholder={`Select ${field}`} />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="rounded-lg text-xs">
                         {dropdownOptions.map((value: string) => (
-                            <SelectItem key={value} value={value}>
+                            <SelectItem key={value} value={value} className="text-xs">
                                 {getDisplayName(value)}
                             </SelectItem>
                         ))}
@@ -819,8 +824,8 @@ export function ServiceConfigurationForm({
         if (actualSchema?.multiline) {
             return (
                 <Textarea
-                    rows={6}
-                    className="font-mono text-xs"
+                    rows={4}
+                    className="font-mono text-xs rounded-lg border-border bg-background p-3 focus-visible:ring-1"
                     placeholder={`Enter ${field}`}
                     {...register(`${service}_${field}`, {
                         required: service !== "embeddings" && providerSchema.required?.includes(field),
@@ -834,6 +839,7 @@ export function ServiceConfigurationForm({
                 type={actualSchema?.type === "number" ? "number" : "text"}
                 {...(actualSchema?.type === "number" && { step: "any" })}
                 placeholder={`Enter ${field}`}
+                className="h-9 rounded-lg border-border bg-background text-xs"
                 {...register(`${service}_${field}`, {
                     required: service !== "embeddings" && providerSchema.required?.includes(field),
                     valueAsNumber: actualSchema?.type === "number"
@@ -853,13 +859,13 @@ export function ServiceConfigurationForm({
         const globalProviderSchema = globalProvider ? schemas?.[service]?.[globalProvider] : undefined;
 
         return (
-            <div className="flex items-center justify-between p-3 border rounded-md bg-muted/20 mb-4">
-                <div className="space-y-0.5">
-                    <Label htmlFor={`override-${service}`} className="text-sm cursor-pointer font-medium">
+            <div className="flex items-center justify-between p-4 border border-border bg-muted/20 rounded-xl mb-4">
+                <div className="space-y-1">
+                    <Label htmlFor={`override-${service}`} className="text-xs font-bold text-foreground cursor-pointer">
                         Override {label}
                     </Label>
                     {!isEnabled && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[10px] text-muted-foreground/60 leading-normal">
                             Using global: {getGlobalSummary(globalVal, globalProviderSchema)}
                         </p>
                     )}
@@ -887,12 +893,12 @@ export function ServiceConfigurationForm({
         <form onSubmit={handleSubmit(onSubmit)}>
             {/* Realtime toggle — hidden when the parent locks the mode (v2 tabs) */}
             {forceRealtime === undefined && (
-                <div className="flex items-center justify-between mb-4 p-4 border rounded-lg">
-                    <div>
-                        <Label htmlFor="realtime-toggle" className="text-sm font-medium">
+                <div className="flex items-center justify-between mb-4 p-4 border border-border rounded-xl bg-card">
+                    <div className="space-y-1">
+                        <Label htmlFor="realtime-toggle" className="text-xs font-bold text-foreground">
                             Realtime Mode
                         </Label>
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <p className="text-[10px] text-muted-foreground/60 leading-normal">
                             Uses a single speech-to-speech model (no separate STT/TTS). An LLM is still required for variable extraction and QA.
                         </p>
                     </div>
@@ -904,30 +910,28 @@ export function ServiceConfigurationForm({
                 </div>
             )}
 
-            <Card>
-                <CardContent className="pt-6">
-                    <Tabs key={defaultTab} defaultValue={defaultTab} className="w-full">
-                        <TabsList className="grid w-full mb-6" style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)` }}>
-                            {visibleTabs.map(({ key, label }) => (
-                                <TabsTrigger key={key} value={key}>
-                                    {label}
-                                </TabsTrigger>
-                            ))}
-                        </TabsList>
-
+            <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs">
+                <Tabs key={defaultTab} defaultValue={defaultTab} className="w-full">
+                    <TabsList className="mb-4 bg-muted/40 border border-border rounded-lg p-0.5" style={{ display: 'grid', gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)` }}>
                         {visibleTabs.map(({ key, label }) => (
-                            <TabsContent key={key} value={key} className="mt-0">
-                                {mode === 'override' && renderOverrideToggle(key, label)}
-                                {(mode === 'global' || enabledOverrides[key]) && renderServiceFields(key)}
-                            </TabsContent>
+                            <TabsTrigger key={key} value={key} className="text-xs font-semibold rounded-md px-3 py-1.5 cursor-pointer">
+                                {label}
+                            </TabsTrigger>
                         ))}
-                    </Tabs>
-                </CardContent>
-            </Card>
+                    </TabsList>
 
-            {apiError && <p className="text-red-500 mt-4">{apiError}</p>}
+                    {visibleTabs.map(({ key, label }) => (
+                        <TabsContent key={key} value={key} className="mt-0 focus-visible:outline-none">
+                            {mode === 'override' && renderOverrideToggle(key, label)}
+                            {(mode === 'global' || enabledOverrides[key]) && renderServiceFields(key)}
+                        </TabsContent>
+                    ))}
+                </Tabs>
+            </div>
 
-            <Button type="submit" className="w-full mt-6" disabled={isSaving}>
+            {apiError && <p className="text-xs text-destructive font-semibold mt-4">{apiError}</p>}
+
+            <Button type="submit" className="w-full mt-6 h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs transition-all cursor-pointer" disabled={isSaving}>
                 {isSaving ? "Saving..." : (submitLabel || "Save Configuration")}
             </Button>
         </form>

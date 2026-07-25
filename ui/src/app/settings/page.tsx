@@ -15,68 +15,67 @@ import {
 
 export default function SettingsPage() {
   return (
-    <div className="flex justify-center py-12 px-4">
-      <div className="w-full max-w-2xl space-y-6">
+    <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+      <div className="pb-2 border-b border-border/40">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Platform Settings</h1>
+        <p className="text-xs text-muted-foreground">
+          Manage your platform configuration and integrations.
+        </p>
+      </div>
+
+      {/* Preferences Section */}
+      <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
         <div>
-          <h1 className="text-2xl font-bold">Platform Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your platform configuration and integrations.
+          <h2 className="text-sm font-bold text-foreground">Preferences</h2>
+          <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+            Set organization-wide defaults such as the test phone number and timezone.
           </p>
         </div>
+        <div className="pt-2 border-t border-border/40">
+          <OrganizationPreferencesSection />
+        </div>
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Preferences</CardTitle>
-            <CardDescription>
-              Set organization-wide defaults such as the test phone number and
-              timezone.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <OrganizationPreferencesSection />
-          </CardContent>
-        </Card>
+      {/* MCP Server Section */}
+      <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
+        <div>
+          <h2 className="text-sm font-bold text-foreground">MCP Server</h2>
+          <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+            Let AI agents access your Dograh workspace and documentation via the Model Context Protocol.{" "}
+            <a
+              href="https://docs.dograh.com/integrations/mcp"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-0.5 underline font-semibold text-foreground"
+            >
+              Learn more <ExternalLink className="h-3 w-3" />
+            </a>
+          </p>
+        </div>
+        <div className="pt-2 border-t border-border/40">
+          <MCPSection />
+        </div>
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>MCP Server</CardTitle>
-            <CardDescription>
-              Let AI agents access your Dograh workspace and documentation via
-              the Model Context Protocol.{" "}
-              <a
-                href="https://docs.dograh.com/integrations/mcp"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-0.5 underline"
-              >
-                Learn more <ExternalLink className="h-3 w-3" />
-              </a>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MCPSection />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Telemetry</CardTitle>
-            <CardDescription>
-              Configure Langfuse tracing for your voice agent calls.{" "}
-              <a
-                href="https://docs.dograh.com/configurations/tracing"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-0.5 underline"
-              >
-                Learn more <ExternalLink className="h-3 w-3" />
-              </a>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TelemetrySection />
-          </CardContent>
-        </Card>
+      {/* Telemetry Section */}
+      <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
+        <div>
+          <h2 className="text-sm font-bold text-foreground">Telemetry</h2>
+          <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+            Configure Langfuse tracing for your voice agent calls.{" "}
+            <a
+              href="https://docs.dograh.com/configurations/tracing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-0.5 underline font-semibold text-foreground"
+            >
+              Learn more <ExternalLink className="h-3 w-3" />
+            </a>
+          </p>
+        </div>
+        <div className="pt-2 border-t border-border/40">
+          <TelemetrySection />
+        </div>
       </div>
     </div>
   );

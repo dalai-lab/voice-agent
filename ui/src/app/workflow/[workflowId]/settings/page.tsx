@@ -474,7 +474,7 @@ function GeneralSection({
                     <div>
                         <h3 className="text-sm font-medium">Keypad DTMF Input</h3>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                            Allows callers to enter digits via their phone keypad. Multi-digit inputs like PINs are automatically buffered and submitted when the caller presses # or stops typing for 3 seconds.
+                            Allows callers to enter digits via their phone keypad. Multi-digit inputs like PINs are automatically buffered and submitted when the caller presses # or stops typing for 3 seconds (Supported only on Plivo).
                         </p>
                     </div>
                     <div className="flex items-center justify-between">
@@ -1721,143 +1721,168 @@ function WorkflowSettingsInner({
     }, []);
 
     return (
-        <div className="min-h-screen">
-            {/* Sticky header */}
-            <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="min-h-screen bg-background text-foreground">
+            {/* Header */}
+            <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-6 py-4">
                 <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => confirmNavigate(() => router.push(`/workflow/${workflowId}`))}
+                    className="h-8 w-8 rounded-lg"
                 >
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                    <p className="text-xs text-muted-foreground">Workflow Settings</p>
-                    <h1 className="text-sm font-semibold">{workflowName || workflow.name}</h1>
+                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">Workflow Settings</p>
+                    <h1 className="text-sm font-bold text-foreground tracking-tight">{workflowName || workflow.name}</h1>
                 </div>
             </header>
 
-            {/* Main + right nav */}
+            {/* Left Nav + Content Workspace */}
             <div className="mx-auto flex max-w-5xl gap-8 px-6 py-8">
-                {/* Sections */}
-                <div className="min-w-0 flex-1 space-y-8">
+                {/* Left Sidebar Navigation */}
+                <aside className="w-48 shrink-0">
+                    <div className="sticky top-24 space-y-1">
+                        <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 pl-2.5">
+                            Configuration
+                        </p>
+                        {NAV_ITEMS.map((item) => {
+                            const Icon = item.icon;
+                            const isDirty = dirtySections.has(item.id);
+                            return (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setActiveSection(item.id)}
+                                    className={`w-full flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer ${
+                                        activeSection === item.id
+                                            ? "bg-foreground/[0.04] text-foreground dark:bg-foreground/[0.06]"
+                                            : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.01]"
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Icon className="h-4 w-4 shrink-0" />
+                                        <span>{item.label}</span>
+                                    </div>
+                                    {isDirty && (
+                                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shadow-xs" />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </aside>
+
+                {/* Right Content Panels */}
+                <div className="min-w-0 flex-1">
                     {resolvedWorkflowConfigurationsForRender && (
-                        <>
-                            {/* General */}
-                            <GeneralSection
-                                workflowConfigurations={resolvedWorkflowConfigurationsForRender}
-                                workflowName={workflowName || workflow.name}
-                                workflowId={workflowId}
-                                enableDtmf={(workflow as any).enable_dtmf ?? false}
-                                enableCallbacks={(workflow as any).enable_callbacks ?? false}
-                                callbackResumeMode={(workflow as any).callback_resume_mode ?? "fresh"}
-                                onSave={saveWorkflowConfigurations}
-                            />
+                        <div className="space-y-6">
+                            {/* General Section */}
+                            {activeSection === "general" && (
+                                <GeneralSection
+                                    workflowConfigurations={resolvedWorkflowConfigurationsForRender}
+                                    workflowName={workflowName || workflow.name}
+                                    workflowId={workflowId}
+                                    enableDtmf={(workflow as any).enable_dtmf ?? false}
+                                    enableCallbacks={(workflow as any).enable_callbacks ?? false}
+                                    callbackResumeMode={(workflow as any).callback_resume_mode ?? "fresh"}
+                                    onSave={saveWorkflowConfigurations}
+                                />
+                            )}
 
-                            <WorkflowModelOverridesSection
-                                workflowConfigurations={resolvedWorkflowConfigurationsForRender}
-                                workflowName={workflowName}
-                                onSave={saveWorkflowConfigurations}
-                                modelConfigurationDefaults={modelConfigurationDefaults}
-                                organizationModelConfiguration={organizationModelConfiguration}
-                                modelConfigurationPricing={modelConfigurationPricing}
-                                modelConfigurationLoading={modelConfigurationLoading}
-                                modelConfigurationError={modelConfigurationError}
-                            />
+                            {/* Models Override Section */}
+                            {activeSection === "models" && (
+                                <WorkflowModelOverridesSection
+                                    workflowConfigurations={resolvedWorkflowConfigurationsForRender}
+                                    workflowName={workflowName}
+                                    onSave={saveWorkflowConfigurations}
+                                    modelConfigurationDefaults={modelConfigurationDefaults}
+                                    organizationModelConfiguration={organizationModelConfiguration}
+                                    modelConfigurationPricing={modelConfigurationPricing}
+                                    modelConfigurationLoading={modelConfigurationLoading}
+                                    modelConfigurationError={modelConfigurationError}
+                                />
+                            )}
 
-                            {/* Template Variables */}
-                            <TemplateVariablesSection
-                                templateContextVariables={templateContextVariables}
-                                onSave={saveTemplateContextVariables}
-                            />
+                            {/* Template Variables Section */}
+                            {activeSection === "variables" && (
+                                <TemplateVariablesSection
+                                    templateContextVariables={templateContextVariables}
+                                    onSave={saveTemplateContextVariables}
+                                />
+                            )}
 
-                            {/* Dictionary */}
-                            <DictionarySection dictionary={dictionary} onSave={saveDictionary} />
+                            {/* Dictionary Section */}
+                            {activeSection === "dictionary" && (
+                                <DictionarySection dictionary={dictionary} onSave={saveDictionary} />
+                            )}
 
-                            {/* Voicemail Detection */}
-                            <VoicemailSection
-                                workflowConfigurations={resolvedWorkflowConfigurationsForRender}
-                                workflowName={workflowName}
-                                onSave={saveWorkflowConfigurations}
-                            />
+                            {/* Voicemail Classifier Section */}
+                            {activeSection === "voicemail" && (
+                                <VoicemailSection
+                                    workflowConfigurations={resolvedWorkflowConfigurationsForRender}
+                                    workflowName={workflowName}
+                                    onSave={saveWorkflowConfigurations}
+                                />
+                            )}
 
-                            {/* Recordings – moved to org-level page */}
-                            <Card id="recordings">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <Mic className="h-4 w-4" />
-                                        Recordings
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Recordings are now managed at the organization level and shared across all agents.
-                                        Use <code className="rounded bg-muted px-1 text-xs">@</code> in prompt fields to insert them.{" "}
-                                        <a href={SETTINGS_DOCUMENTATION_URLS.recordings} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">Learn more <ExternalLink className="h-3 w-3" /></a>
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardFooter className="border-t pt-6">
-                                    <Button variant="outline" asChild>
-                                        <Link href="/recordings">
-                                            Go to Recordings
-                                            <ExternalLink className="ml-2 h-4 w-4" />
-                                        </Link>
-                                    </Button>
-                                </CardFooter>
-                            </Card>
+                            {/* Recordings Section */}
+                            {activeSection === "recordings" && (
+                                <Card id="recordings" className="border border-border bg-card rounded-xl shadow-xs">
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <Mic className="h-4 w-4" />
+                                            Recordings
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Recordings are now managed at the organization level and shared across all agents.
+                                            Use <code className="rounded bg-muted px-1 text-xs">@</code> in prompt fields to insert them.{" "}
+                                            <a href={SETTINGS_DOCUMENTATION_URLS.recordings} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">Learn more <ExternalLink className="h-3 w-3" /></a>
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardFooter className="border-t border-border pt-6">
+                                        <Button variant="outline" asChild className="rounded-lg h-9 text-xs">
+                                            <Link href="/recordings">
+                                                Go to Recordings
+                                                <ExternalLink className="ml-2 h-4 w-4" />
+                                            </Link>
+                                        </Button>
+                                    </CardFooter>
+                                </Card>
+                            )}
 
-                            {/* Deployment (dialog trigger) */}
-                            <Card id="deployment">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <Rocket className="h-4 w-4" />
-                                        Add to Website
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Configure a widget to add this voice agent to your website.{" "}
-                                        <a href={SETTINGS_DOCUMENTATION_URLS.deployment} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">Learn more <ExternalLink className="h-3 w-3" /></a>
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardFooter className="border-t pt-6">
-                                    <Button variant="outline" onClick={() => setIsEmbedDialogOpen(true)}>
-                                        Configure Widget
-                                    </Button>
-                                </CardFooter>
-                            </Card>
+                            {/* Deployment Widget Section */}
+                            {activeSection === "deployment" && (
+                                <Card id="deployment" className="border border-border bg-card rounded-xl shadow-xs">
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <Rocket className="h-4 w-4" />
+                                            Add to Website
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Configure a widget to add this voice agent to your website.{" "}
+                                            <a href={SETTINGS_DOCUMENTATION_URLS.deployment} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">Learn more <ExternalLink className="h-3 w-3" /></a>
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardFooter className="border-t border-border pt-6">
+                                        <Button variant="outline" onClick={() => setIsEmbedDialogOpen(true)} className="rounded-lg h-9 text-xs">
+                                            Configure Widget
+                                        </Button>
+                                    </CardFooter>
+                                </Card>
+                            )}
 
-                            {/* Report */}
-                            <ReportSection workflowId={workflowId} />
+                            {/* Report Section */}
+                            {activeSection === "report" && (
+                                <ReportSection workflowId={workflowId} />
+                            )}
 
-                            {/* Agent UUID */}
-                            {workflow.workflow_uuid && (
+                            {/* Identity Key Section */}
+                            {activeSection === "identity" && workflow.workflow_uuid && (
                                 <AgentUuidSection workflowUuid={workflow.workflow_uuid} />
                             )}
-                        </>
+                        </div>
                     )}
                 </div>
-
-                {/* ---- Right-side sticky nav ---- */}
-                <nav className="hidden w-44 shrink-0 lg:block">
-                    <div className="sticky top-20 space-y-1">
-                        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                            On this page
-                        </p>
-                        {NAV_ITEMS.map((item) => (
-                            <a
-                                key={item.id}
-                                href={`#${item.id}`}
-                                className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-sm transition-colors hover:text-foreground ${
-                                    activeSection === item.id
-                                        ? "font-medium text-foreground"
-                                        : "text-muted-foreground"
-                                }`}
-                            >
-                                {item.label}
-                                {dirtySections.has(item.id) && (
-                                    <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                                )}
-                            </a>
-                        ))}
-                    </div>
-                </nav>
             </div>
 
             {/* Dialogs for complex sections */}

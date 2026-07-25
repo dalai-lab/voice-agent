@@ -88,8 +88,9 @@ export function UploadWorkflowButton() {
             <Button
                 onClick={() => setIsOpen(true)}
                 variant="outline"
+                className="h-9 rounded-lg text-xs font-semibold cursor-pointer"
             >
-                <Upload className="w-4 h-4 mr-2" />
+                <Upload className="w-4 h-4 mr-1.5" />
                 Upload Agent Definition
             </Button>
 

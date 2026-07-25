@@ -191,13 +191,10 @@ export function OrganizationPreferencesSection() {
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Set organization-wide defaults used by testing and scheduling flows.
-      </p>
+    <form onSubmit={handleSave} className="space-y-4 pt-1">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="settings-test-phone-number">Test Phone Number</Label>
+          <Label htmlFor="settings-test-phone-number" className="text-xs font-bold text-foreground">Test Phone Number</Label>
           <Input
             id="settings-test-phone-number"
             value={preferences.test_phone_number || ""}
@@ -208,24 +205,40 @@ export function OrganizationPreferencesSection() {
               })
             }
             placeholder="+15551234567"
+            className="h-9 rounded-lg border-border bg-background text-xs"
           />
         </div>
         <div className="space-y-2">
-          <Label>Timezone</Label>
+          <Label className="text-xs font-bold text-foreground">Timezone</Label>
           <TimezoneSelect
             instanceId={timezoneSelectId}
             value={timezone}
             onChange={setTimezone}
-            styles={timezoneSelectStyles}
+            styles={{
+              ...timezoneSelectStyles,
+              control: (base: Record<string, unknown>, state: { isFocused: boolean }) => ({
+                ...base,
+                minHeight: "36px",
+                height: "36px",
+                fontSize: "12px",
+                borderRadius: "8px",
+                backgroundColor: "var(--background)",
+                borderColor: state.isFocused ? "var(--ring)" : "var(--border)",
+                boxShadow: state.isFocused
+                  ? "0 0 0 1px var(--ring)"
+                  : "none",
+                "&:hover": { borderColor: "var(--border)" },
+              }),
+            }}
           />
         </div>
       </div>
-      <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+      <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-4 bg-muted/20">
         <div className="space-y-1">
-          <Label htmlFor="settings-external-pbx-integrations">
+          <Label htmlFor="settings-external-pbx-integrations" className="text-xs font-bold text-foreground cursor-pointer">
             External PBX integrations
           </Label>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground/60 leading-normal max-w-lg">
             Show and enable advanced external-PBX configuration for Asterisk,
             transfer tools, and workflows. Existing configuration is preserved
             when this is disabled.
@@ -242,10 +255,12 @@ export function OrganizationPreferencesSection() {
           }
         />
       </div>
-      <Button type="submit" disabled={saving}>
-        <Save className="mr-2 h-4 w-4" />
-        {saving ? "Saving..." : "Save"}
-      </Button>
+      <div className="flex justify-end pt-2 border-t border-border/40">
+        <Button type="submit" disabled={saving} className="h-9 px-4 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs transition-all cursor-pointer">
+          <Save className="mr-1.5 h-3.5 w-3.5" />
+          {saving ? "Saving..." : "Save Preferences"}
+        </Button>
+      </div>
     </form>
   );
 }

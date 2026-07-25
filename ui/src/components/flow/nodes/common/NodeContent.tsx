@@ -15,6 +15,7 @@ interface NodeContentProps {
     icon: ReactNode;
     badgeLabel?: string;
     badgeClassName?: string;
+    accentClassName?: string;
     contentLabel?: string;
     hasSourceHandle?: boolean;
     hasTargetHandle?: boolean;
@@ -37,6 +38,7 @@ export const NodeContent = ({
     icon,
     badgeLabel,
     badgeClassName,
+    accentClassName,
     contentLabel = "Prompt",
     hasSourceHandle = false,
     hasTargetHandle = false,
@@ -57,36 +59,38 @@ export const NodeContent = ({
             selected_through_edge={selected_through_edge}
             hovered_through_edge={hovered_through_edge}
             runtimeActive={runtimeActive}
-            className={cn("p-3 flex flex-col justify-center gap-2 h-full", className)}
+            className={cn("p-4.5 flex flex-col justify-between gap-4.5 h-full pl-6.5", className)}
             onDoubleClick={onDoubleClick}
         >
+            {accentClassName && (
+                <div className={cn("absolute left-[1px] top-[1px] bottom-[1px] w-[3.5px] rounded-l-[11px]", accentClassName)} />
+            )}
+
             {hasTargetHandle && <BaseHandle type="target" position={Position.Top} />}
 
-            <div className="space-y-2">
+            <div className="space-y-3">
                 {/* Header Row: Title, Node Type Badge, ID */}
                 <div className="flex items-center justify-between gap-3">
-                    <div className="space-y-0.5 min-w-0 flex-1">
-                        <h3 className="text-xs font-bold text-foreground truncate tracking-tight">
+                    <div className="space-y-0.5 min-w-0 flex-1 pl-1">
+                        <h3 className="text-base font-extrabold text-foreground leading-snug tracking-tight truncate">
                             {title}
                         </h3>
-                        <div className="flex items-center gap-1 text-[9px] text-muted-foreground/60 font-semibold uppercase tracking-wider">
-                            <span className={cn(
-                                "inline-flex items-center px-1 py-0.25 rounded-md text-[8px] font-bold",
-                                badge.className
-                            )}>
-                                {badge.label}
-                            </span>
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/85 font-bold uppercase tracking-wider">
+                            {accentClassName && (
+                                <span className={cn("inline-block w-1.5 h-1.5 rounded-full shrink-0", accentClassName)} />
+                            )}
+                            <span>{badge.label}</span>
                         </div>
                     </div>
 
-                    <div className="bg-muted/40 p-1 rounded-md border border-border/40 shrink-0 text-muted-foreground">
-                        <span className="[&>*]:w-3.5 [&>*]:h-3.5">{icon}</span>
+                    <div className="bg-muted/40 p-1.5 rounded-lg border border-border shrink-0 text-muted-foreground">
+                        <span className="[&>*]:w-4.5 [&>*]:h-4.5">{icon}</span>
                     </div>
                 </div>
 
                 {/* Content area */}
                 {children && (
-                    <div className="text-[10px] text-muted-foreground/80 pt-1 border-t border-border/10 line-clamp-2 leading-relaxed">
+                    <div className="text-[11px] text-foreground/75 pl-1 pt-2 border-t border-border/80 line-clamp-2 leading-relaxed">
                         {children}
                     </div>
                 )}

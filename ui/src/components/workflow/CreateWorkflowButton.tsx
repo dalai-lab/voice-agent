@@ -84,13 +84,13 @@ export function CreateWorkflowButton() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button disabled={isCreating}>
+                <Button className="h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer gap-1.5" disabled={isCreating}>
                     <PlusIcon className="w-4 h-4" />
                     {isCreating ? 'Creating...' : 'Create Agent'}
-                    <ChevronDown className="w-4 h-4" />
+                    <ChevronDown className="w-4 h-4 ml-0.5" />
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="rounded-xl border border-border shadow-lg">
                 <DropdownMenuItem onClick={handleAgentBuilder} className="cursor-pointer">
                     <Bot className="w-4 h-4 mr-2" />
                     <div>

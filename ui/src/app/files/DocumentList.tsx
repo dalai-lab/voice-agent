@@ -99,19 +99,19 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge className="bg-green-500">Completed</Badge>;
+        return <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md bg-green-500/10 text-green-600 border-green-500/20">Completed</Badge>;
       case 'processing':
         return (
-          <Badge variant="secondary" className="animate-pulse">
+          <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md bg-amber-500/10 text-amber-600 border-amber-500/20 animate-pulse">
             Processing
           </Badge>
         );
       case 'pending':
-        return <Badge variant="outline">Pending</Badge>;
+        return <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md border-border/60 bg-muted/40 text-muted-foreground">Pending</Badge>;
       case 'failed':
-        return <Badge variant="destructive">Failed</Badge>;
+        return <Badge variant="destructive" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md">Failed</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md">{status}</Badge>;
     }
   };
 
@@ -129,15 +129,9 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
 
   if (isLoading && documents.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="grid gap-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="space-y-2 flex-1">
-              <Skeleton className="h-4 w-48" />
-              <Skeleton className="h-3 w-64" />
-            </div>
-            <Skeleton className="h-8 w-24" />
-          </div>
+          <div key={i} className="h-20 rounded-xl bg-card border border-border animate-pulse" />
         ))}
       </div>
     );
@@ -145,28 +139,29 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
 
   if (error) {
     return (
-      <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive">
+      <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-semibold">
         {error}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Search and Refresh */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
           <Input
             placeholder="Search documents..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-9 h-9 rounded-lg border-border bg-background text-xs"
           />
         </div>
         <Button
           variant="outline"
           size="icon"
+          className="h-9 w-9 rounded-lg border-border bg-background"
           onClick={fetchDocuments}
           disabled={isLoading}
         >
@@ -174,38 +169,40 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
         </Button>
       </div>
 
-      {/* Document List */}
       {filteredDocuments.length === 0 ? (
-        <div className="text-center py-12">
-          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">
-            {searchQuery
-              ? 'No documents match your search'
-              : 'No documents uploaded yet'}
-          </p>
+        <div className="flex items-center justify-center w-full py-12">
+          <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm w-full border border-border bg-card rounded-xl shadow-xs">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted/30 text-muted-foreground mb-4">
+              <FileText className="h-6 w-6" />
+            </div>
+            <h3 className="text-xs font-bold text-foreground tracking-tight mb-2 uppercase">No documents found</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {searchQuery ? 'No documents match your search criteria.' : 'No documents uploaded yet.'}
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid gap-3">
           {filteredDocuments.map((doc) => (
             <div
               key={doc.document_uuid}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+              className="flex items-center justify-between p-4 border border-border bg-card hover:bg-card/90 transition-all rounded-xl shadow-xs group"
             >
-              <div className="flex items-center gap-4 flex-1">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-primary" />
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className="w-10 h-10 rounded-lg bg-muted/40 border border-border/60 flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium truncate">{doc.filename}</span>
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="font-bold text-sm text-foreground truncate">{doc.filename}</span>
                     {getStatusBadge(doc.processing_status)}
                     {doc.retrieval_mode === 'full_document' ? (
-                      <Badge variant="outline" className="text-xs">Full Document</Badge>
+                      <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md border-border/60 bg-muted/40">Full Document</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-xs">Chunked</Badge>
+                      <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md border-border/60 bg-muted/40">Chunked</Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground/60 flex-wrap">
                     <span>{formatFileSize(doc.file_size_bytes)}</span>
                     {doc.processing_status === 'completed' && doc.retrieval_mode !== 'full_document' && (
                       <span>{doc.total_chunks} chunks</span>
@@ -228,9 +225,9 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
               </div>
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={() => handleDelete(doc.document_uuid, doc.filename)}
-                className="text-destructive hover:text-destructive/90"
+                className="h-8 w-8 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>

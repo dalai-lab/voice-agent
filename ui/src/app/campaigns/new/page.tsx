@@ -36,6 +36,7 @@ export default function NewCampaignPage() {
     const router = useRouter();
 
     // Form state
+    const [activeTab, setActiveTab] = useState("details");
     const [campaignName, setCampaignName] = useState('');
     const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('');
     const [sourceType, setSourceType] = useState<'csv'>('csv');
@@ -374,243 +375,301 @@ export default function NewCampaignPage() {
         setCreateError(null);
     };
 
+    const CREATION_TABS = [
+        { id: "details", label: "Campaign Details" },
+        { id: "source", label: "Data Source (CSV)" },
+        { id: "advanced", label: "Advanced Settings" },
+    ];
+
     return (
-        <div className="container mx-auto p-6 pb-12 space-y-6 max-w-2xl">
-            <div>
+        <div className="min-h-screen bg-background text-foreground flex flex-col">
+            {/* Header */}
+            <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-6 py-4">
                 <Button
                     variant="ghost"
+                    size="icon"
                     onClick={handleBack}
-                    className="mb-4"
+                    className="h-8 w-8 rounded-lg"
                 >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Campaigns
+                    <ArrowLeft className="h-4 w-4" />
                 </Button>
-                <h1 className="text-3xl font-bold mb-2">Create New Campaign</h1>
-                <p className="text-muted-foreground">Set up a new campaign to execute workflows at scale</p>
-            </div>
+                <div>
+                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">Campaigns</p>
+                    <h1 className="text-sm font-bold text-foreground tracking-tight">Create New Campaign</h1>
+                </div>
+            </header>
 
-            <Card>
-                    <CardHeader>
-                        <CardTitle>Campaign Details</CardTitle>
-                        <CardDescription>
-                            Configure your campaign settings
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="space-y-2">
-                                <Label htmlFor="campaign-name">Campaign Name</Label>
-                                <Input
-                                    id="campaign-name"
-                                    placeholder="Enter campaign name"
-                                    value={campaignName}
-                                    onChange={(e) => setCampaignName(e.target.value)}
-                                    maxLength={255}
-                                    required
-                                />
-                                <p className="text-sm text-muted-foreground">
-                                    Choose a descriptive name for your campaign
-                                </p>
-                            </div>
+            {/* Left Nav + Content Form Column */}
+            <div className="mx-auto flex max-w-5xl w-full gap-8 px-6 py-8 flex-1">
+                {/* Left Tabs Sidebar */}
+                <aside className="w-48 shrink-0">
+                    <div className="sticky top-24 space-y-1">
+                        <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 pl-2.5">
+                            Steps
+                        </p>
+                        {CREATION_TABS.map((tab) => {
+                            // Check if fields are complete in that tab for visual feedback
+                            let isComplete = false;
+                            if (tab.id === "details") {
+                                isComplete = !!campaignName && !!selectedWorkflowId && !!selectedTelephonyConfigId;
+                            } else if (tab.id === "source") {
+                                isComplete = !!sourceId;
+                            } else if (tab.id === "advanced") {
+                                isComplete = true; // Advanced has defaults
+                            }
 
-                            <div className="space-y-2">
-                                <Label htmlFor="workflow">Workflow</Label>
-                                <Select
-                                    value={selectedWorkflowId}
-                                    onValueChange={setSelectedWorkflowId}
-                                    required
+                            return (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`w-full flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer ${
+                                        activeTab === tab.id
+                                            ? "bg-foreground/[0.04] text-foreground dark:bg-foreground/[0.06]"
+                                            : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.01]"
+                                    }`}
                                 >
-                                    <SelectTrigger id="workflow">
-                                        <SelectValue placeholder="Select a workflow" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {isLoadingWorkflows ? (
-                                            <SelectItem value="loading" disabled>
-                                                Loading workflows...
-                                            </SelectItem>
-                                        ) : workflows.length === 0 ? (
-                                            <SelectItem value="none" disabled>
-                                                No workflows found
-                                            </SelectItem>
-                                        ) : (
-                                            workflows.map((workflow) => (
-                                                <SelectItem
-                                                    key={workflow.id}
-                                                    value={workflow.id.toString()}
-                                                >
-                                                    {workflow.name} (#{workflow.id})
-                                                </SelectItem>
-                                            ))
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                                <p className="text-sm text-muted-foreground">
-                                    Select the workflow to execute for each row in the data source
-                                </p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="telephony-config">Telephony Configuration</Label>
-                                {!isLoadingTelephonyConfigs && telephonyConfigs.length === 0 ? (
-                                    <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                                        No telephony configurations yet.{' '}
-                                        <Link
-                                            href="/telephony-configurations"
-                                            className="underline text-foreground"
-                                        >
-                                            Add one
-                                        </Link>{' '}
-                                        to create a campaign.
-                                    </div>
-                                ) : (
-                                    <Select
-                                        value={selectedTelephonyConfigId}
-                                        onValueChange={setSelectedTelephonyConfigId}
-                                        required
-                                    >
-                                        <SelectTrigger id="telephony-config">
-                                            <SelectValue placeholder="Select a telephony configuration" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {isLoadingTelephonyConfigs ? (
-                                                <SelectItem value="loading" disabled>
-                                                    Loading configurations...
-                                                </SelectItem>
-                                            ) : (
-                                                telephonyConfigs.map((config) => (
-                                                    <SelectItem
-                                                        key={config.id}
-                                                        value={config.id.toString()}
-                                                    >
-                                                        {config.name} ({config.provider})
-                                                        {config.is_default_outbound ? ' - default' : ''}
-                                                    </SelectItem>
-                                                ))
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                                <p className="text-sm text-muted-foreground">
-                                    Outbound calls for this campaign will use this configuration&apos;s caller IDs
-                                </p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="source-type">Data Source Type</Label>
-                                <Select
-                                    value={sourceType}
-                                    onValueChange={(value) => {
-                                        setSourceType(value as 'csv');
-                                        setSourceId('');
-                                        setSelectedFileName('');
-                                    }}
-                                    required
-                                >
-                                    <SelectTrigger id="source-type">
-                                        <SelectValue placeholder="Select source type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="csv">CSV File</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <p className="text-sm text-muted-foreground">
-                                    Choose where your contact data is stored
-                                </p>
-                            </div>
-
-                            <CsvUploadSelector
-                                onFileUploaded={handleFileUploaded}
-                                selectedFileName={selectedFileName}
-                            />
-
-                            {/* Advanced Settings */}
-                            <Collapsible
-                                open={showAdvancedSettings}
-                                onOpenChange={setShowAdvancedSettings}
-                                className="border rounded-lg"
-                            >
-                                <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-muted/50 transition-colors">
-                                    <span className="font-medium">Advanced Settings</span>
-                                    {showAdvancedSettings ? (
-                                        <ChevronDown className="h-4 w-4" />
-                                    ) : (
-                                        <ChevronRight className="h-4 w-4" />
+                                    <span>{tab.label}</span>
+                                    {isComplete && (
+                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-xs" />
                                     )}
-                                </CollapsibleTrigger>
-                                <CollapsibleContent className="px-4 pb-4">
-                                    <CampaignAdvancedSettings
-                                        maxConcurrency={maxConcurrency}
-                                        onMaxConcurrencyChange={setMaxConcurrency}
-                                        effectiveLimit={effectiveLimit}
-                                        orgConcurrentLimit={orgConcurrentLimit}
-                                        fromNumbersCount={fromNumbersCount}
-                                        retryEnabled={retryEnabled}
-                                        onRetryEnabledChange={setRetryEnabled}
-                                        maxRetries={maxRetries}
-                                        onMaxRetriesChange={setMaxRetries}
-                                        retryDelaySeconds={retryDelaySeconds}
-                                        onRetryDelaySecondsChange={setRetryDelaySeconds}
-                                        retryOnBusy={retryOnBusy}
-                                        onRetryOnBusyChange={setRetryOnBusy}
-                                        retryOnNoAnswer={retryOnNoAnswer}
-                                        onRetryOnNoAnswerChange={setRetryOnNoAnswer}
-                                        retryOnVoicemail={retryOnVoicemail}
-                                        onRetryOnVoicemailChange={setRetryOnVoicemail}
-                                        scheduleEnabled={scheduleEnabled}
-                                        onScheduleEnabledChange={setScheduleEnabled}
-                                        scheduleTimezone={scheduleTimezone}
-                                        onScheduleTimezoneChange={setScheduleTimezone}
-                                        timeSlots={timeSlots}
-                                        onTimeSlotsChange={setTimeSlots}
-                                        circuitBreakerEnabled={circuitBreakerEnabled}
-                                        onCircuitBreakerEnabledChange={setCircuitBreakerEnabled}
-                                        circuitBreakerFailureThreshold={circuitBreakerFailureThreshold}
-                                        onCircuitBreakerFailureThresholdChange={setCircuitBreakerFailureThreshold}
-                                        circuitBreakerWindowSeconds={circuitBreakerWindowSeconds}
-                                        onCircuitBreakerWindowSecondsChange={setCircuitBreakerWindowSeconds}
-                                        circuitBreakerMinCalls={circuitBreakerMinCalls}
-                                        onCircuitBreakerMinCallsChange={setCircuitBreakerMinCalls}
-                                        callbackEnabled={callbackEnabled}
-                                        onCallbackEnabledChange={setCallbackEnabled}
-                                        callbackSociableHoursStart={callbackSociableHoursStart}
-                                        onCallbackSociableHoursStartChange={setCallbackSociableHoursStart}
-                                        callbackSociableHoursEnd={callbackSociableHoursEnd}
-                                        onCallbackSociableHoursEndChange={setCallbackSociableHoursEnd}
-                                        callbackSociableHoursTimezone={callbackSociableHoursTimezone}
-                                        onCallbackSociableHoursTimezoneChange={setCallbackSociableHoursTimezone}
-                                        callbackHonorCampaignWindowForLongCallbacks={callbackHonorCampaignWindowForLongCallbacks}
-                                        onCallbackHonorCampaignWindowForLongCallbacksChange={setCallbackHonorCampaignWindowForLongCallbacks}
-                                        callbackLongCallbackThresholdMinutes={callbackLongCallbackThresholdMinutes}
-                                        onCallbackLongCallbackThresholdMinutesChange={setCallbackLongCallbackThresholdMinutes}
-                                    />
-                                </CollapsibleContent>
-                            </Collapsible>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </aside>
 
-                            {createError && (
-                                <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
-                                    {createError}
+                {/* Right Form Panels */}
+                <div className="min-w-0 flex-1">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="bg-card border border-border rounded-xl p-6 shadow-xs">
+                            {activeTab === "details" && (
+                                <div className="space-y-5">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80 border-b border-border pb-2">Campaign Details</h3>
+                                    
+                                    {/* Campaign Name */}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="campaign-name" className="text-xs font-bold text-foreground">Campaign Name</Label>
+                                        <Input
+                                            id="campaign-name"
+                                            placeholder="Enter campaign name"
+                                            value={campaignName}
+                                            onChange={(e) => setCampaignName(e.target.value)}
+                                            maxLength={255}
+                                            required
+                                            className="h-9 rounded-lg border-border bg-background text-xs"
+                                        />
+                                        <p className="text-[10px] text-muted-foreground/60">
+                                            Choose a descriptive name for your campaign.
+                                        </p>
+                                    </div>
+
+                                    {/* Workflow Select */}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="workflow" className="text-xs font-bold text-foreground">Workflow</Label>
+                                        <Select
+                                            value={selectedWorkflowId}
+                                            onValueChange={setSelectedWorkflowId}
+                                            required
+                                        >
+                                            <SelectTrigger id="workflow" className="h-9 rounded-lg border-border bg-background text-xs">
+                                                <SelectValue placeholder="Select a workflow" />
+                                            </SelectTrigger>
+                                            <SelectContent className="rounded-lg text-xs">
+                                                {isLoadingWorkflows ? (
+                                                    <SelectItem value="loading" disabled>
+                                                        Loading workflows...
+                                                    </SelectItem>
+                                                ) : workflows.length === 0 ? (
+                                                    <SelectItem value="none" disabled>
+                                                        No workflows found
+                                                    </SelectItem>
+                                                ) : (
+                                                    workflows.map((workflow) => (
+                                                        <SelectItem
+                                                            key={workflow.id}
+                                                            value={workflow.id.toString()}
+                                                            className="text-xs"
+                                                        >
+                                                            {workflow.name} (#{workflow.id})
+                                                        </SelectItem>
+                                                    ))
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-[10px] text-muted-foreground/60">
+                                            Select the workflow to execute for each row in the data source.
+                                        </p>
+                                    </div>
+
+                                    {/* Telephony config */}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="telephony-config" className="text-xs font-bold text-foreground">Telephony Configuration</Label>
+                                        {!isLoadingTelephonyConfigs && telephonyConfigs.length === 0 ? (
+                                            <div className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground bg-muted/20">
+                                                No telephony configurations yet.{' '}
+                                                <Link
+                                                    href="/telephony-configurations"
+                                                    className="underline text-foreground font-semibold"
+                                                >
+                                                    Add one
+                                                </Link>{' '}
+                                                to create a campaign.
+                                            </div>
+                                        ) : (
+                                            <Select
+                                                value={selectedTelephonyConfigId}
+                                                onValueChange={setSelectedTelephonyConfigId}
+                                                required
+                                            >
+                                                <SelectTrigger id="telephony-config" className="h-9 rounded-lg border-border bg-background text-xs">
+                                                    <SelectValue placeholder="Select a telephony configuration" />
+                                                </SelectTrigger>
+                                                <SelectContent className="rounded-lg text-xs">
+                                                    {isLoadingTelephonyConfigs ? (
+                                                        <SelectItem value="loading" disabled>
+                                                            Loading configurations...
+                                                        </SelectItem>
+                                                    ) : (
+                                                        telephonyConfigs.map((config) => (
+                                                            <SelectItem
+                                                                key={config.id}
+                                                                value={config.id.toString()}
+                                                                className="text-xs"
+                                                            >
+                                                                {config.name} ({config.provider})
+                                                                {config.is_default_outbound ? ' - default' : ''}
+                                                            </SelectItem>
+                                                        ))
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                        <p className="text-[10px] text-muted-foreground/60">
+                                            Outbound calls for this campaign will use this configuration&apos;s caller IDs.
+                                        </p>
+                                    </div>
                                 </div>
                             )}
 
-                            <div className="flex gap-4 pt-4">
-                                <Button
-                                    type="submit"
-                                    disabled={isSubmitting || !campaignName || !selectedWorkflowId || !sourceId || !selectedTelephonyConfigId}
-                                >
-                                    {isSubmitting ? 'Creating...' : 'Create Campaign'}
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={handleBack}
-                                    disabled={isSubmitting}
-                                >
-                                    Cancel
-                                </Button>
+                            {activeTab === "source" && (
+                                <div className="space-y-5">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80 border-b border-border pb-2">Data Source (CSV)</h3>
+                                    
+                                    <div className="space-y-2">
+                                        <Label htmlFor="source-type" className="text-xs font-bold text-foreground">Data Source Type</Label>
+                                        <Select
+                                            value={sourceType}
+                                            onValueChange={(value) => {
+                                                setSourceType(value as 'csv');
+                                                setSourceId('');
+                                                setSelectedFileName('');
+                                            }}
+                                            required
+                                        >
+                                            <SelectTrigger id="source-type" className="h-9 rounded-lg border-border bg-background text-xs">
+                                                <SelectValue placeholder="Select source type" />
+                                            </SelectTrigger>
+                                            <SelectContent className="rounded-lg text-xs">
+                                                <SelectItem value="csv" className="text-xs">CSV File</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-[10px] text-muted-foreground/60">
+                                            Choose where your contact data is stored.
+                                        </p>
+                                    </div>
+
+                                    <div className="pt-2">
+                                        <CsvUploadSelector
+                                            onFileUploaded={handleFileUploaded}
+                                            selectedFileName={selectedFileName}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === "advanced" && (
+                                <div className="space-y-5">
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80 border-b border-border pb-2">Advanced Configuration</h3>
+                                    <div className="max-h-[420px] overflow-y-auto pr-2">
+                                        <CampaignAdvancedSettings
+                                            maxConcurrency={maxConcurrency}
+                                            onMaxConcurrencyChange={setMaxConcurrency}
+                                            effectiveLimit={effectiveLimit}
+                                            orgConcurrentLimit={orgConcurrentLimit}
+                                            fromNumbersCount={fromNumbersCount}
+                                            retryEnabled={retryEnabled}
+                                            onRetryEnabledChange={setRetryEnabled}
+                                            maxRetries={maxRetries}
+                                            onMaxRetriesChange={setMaxRetries}
+                                            retryDelaySeconds={retryDelaySeconds}
+                                            onRetryDelaySecondsChange={setRetryDelaySeconds}
+                                            retryOnBusy={retryOnBusy}
+                                            onRetryOnBusyChange={setRetryOnBusy}
+                                            retryOnNoAnswer={retryOnNoAnswer}
+                                            onRetryOnNoAnswerChange={setRetryOnNoAnswer}
+                                            retryOnVoicemail={retryOnVoicemail}
+                                            onRetryOnVoicemailChange={setRetryOnVoicemail}
+                                            scheduleEnabled={scheduleEnabled}
+                                            onScheduleEnabledChange={setScheduleEnabled}
+                                            scheduleTimezone={scheduleTimezone}
+                                            onScheduleTimezoneChange={setScheduleTimezone}
+                                            timeSlots={timeSlots}
+                                            onTimeSlotsChange={setTimeSlots}
+                                            circuitBreakerEnabled={circuitBreakerEnabled}
+                                            onCircuitBreakerEnabledChange={setCircuitBreakerEnabled}
+                                            circuitBreakerFailureThreshold={circuitBreakerFailureThreshold}
+                                            onCircuitBreakerFailureThresholdChange={setCircuitBreakerFailureThreshold}
+                                            circuitBreakerWindowSeconds={circuitBreakerWindowSeconds}
+                                            onCircuitBreakerWindowSecondsChange={setCircuitBreakerWindowSeconds}
+                                            circuitBreakerMinCalls={circuitBreakerMinCalls}
+                                            onCircuitBreakerMinCallsChange={setCircuitBreakerMinCalls}
+                                            callbackEnabled={callbackEnabled}
+                                            onCallbackEnabledChange={setCallbackEnabled}
+                                            callbackSociableHoursStart={callbackSociableHoursStart}
+                                            onCallbackSociableHoursStartChange={setCallbackSociableHoursStart}
+                                            callbackSociableHoursEnd={callbackSociableHoursEnd}
+                                            onCallbackSociableHoursEndChange={setCallbackSociableHoursEnd}
+                                            callbackSociableHoursTimezone={callbackSociableHoursTimezone}
+                                            onCallbackSociableHoursTimezoneChange={setCallbackSociableHoursTimezone}
+                                            callbackHonorCampaignWindowForLongCallbacks={callbackHonorCampaignWindowForLongCallbacks}
+                                            onCallbackHonorCampaignWindowForLongCallbacksChange={setCallbackHonorCampaignWindowForLongCallbacks}
+                                            callbackLongCallbackThresholdMinutes={callbackLongCallbackThresholdMinutes}
+                                            onCallbackLongCallbackThresholdMinutesChange={setCallbackLongCallbackThresholdMinutes}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {createError && (
+                            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-semibold">
+                                {createError}
                             </div>
-                        </form>
-                    </CardContent>
-                </Card>
+                        )}
+
+                        {/* Submit CTAs */}
+                        <div className="flex items-center gap-3 pt-4 border-t border-border mt-6">
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting || !campaignName || !selectedWorkflowId || !sourceId || !selectedTelephonyConfigId}
+                                className="h-9 px-4 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs transition-all cursor-pointer"
+                            >
+                                {isSubmitting ? 'Creating...' : 'Create Campaign'}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleBack}
+                                disabled={isSubmitting}
+                                className="h-9 px-4 rounded-lg text-xs font-semibold"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     );
 }

@@ -172,7 +172,7 @@ function RunsView() {
     }, [fetchWorkflowRuns, currentPage, appliedFilters, sortBy, sortOrder]);
 
     return (
-        <div className="container mx-auto py-8">
+        <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
             <WorkflowRunsTable
                 runs={workflowRuns}
                 loading={loading}

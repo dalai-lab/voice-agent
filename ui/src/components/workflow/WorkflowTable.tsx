@@ -23,6 +23,7 @@ import {
 import type { FolderResponse } from '@/client/types.gen';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useOrganizationTimezone } from '@/hooks/useOrganizationTimezone';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -118,31 +119,32 @@ export function WorkflowTable({
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {workflows.map((workflow) => (
-                <Card 
+                <div 
                     key={workflow.id} 
-                    className="relative flex flex-col justify-between p-5 border border-border/40 bg-card/40 hover:bg-card/75 transition-all duration-200 group rounded-xl hover:shadow-xs hover:border-border/80"
+                    className="relative flex flex-col justify-between p-4 border border-border bg-card rounded-xl hover:bg-card/90 transition-all shadow-xs group"
                 >
                     {/* Top Row: Name and Actions */}
                     <div className="space-y-1.5">
                         <div className="flex items-start justify-between gap-4">
-                            <span className="font-semibold tracking-tight text-foreground text-[15px] group-hover:text-cta transition-colors">
+                            <span className="font-bold text-sm text-foreground group-hover:text-cta transition-colors">
                                 {workflow.name}
                             </span>
                             
-                            <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 shrink-0">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-muted/65">
                                             <MoreHorizontal className="h-4 w-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuContent align="end" className="w-48 rounded-xl border border-border shadow-lg">
                                         {folders && (
                                             <>
-                                                <DropdownMenuLabel className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">Move Location</DropdownMenuLabel>
+                                                <DropdownMenuLabel className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-wider">Move Location</DropdownMenuLabel>
                                                 <DropdownMenuItem
                                                     disabled={currentFolderId === null}
                                                     onClick={() => handleMove(workflow.id, null)}
+                                                    className="text-xs font-semibold"
                                                 >
                                                     <Inbox size={14} className="mr-2" />
                                                     Uncategorized
@@ -153,6 +155,7 @@ export function WorkflowTable({
                                                         key={folder.id}
                                                         disabled={folder.id === currentFolderId}
                                                         onClick={() => handleMove(workflow.id, folder.id)}
+                                                        className="text-xs font-semibold"
                                                     >
                                                         <FolderIcon size={14} className="mr-2" />
                                                         <span className="truncate">{folder.name}</span>
@@ -165,7 +168,7 @@ export function WorkflowTable({
                                         
                                         <DropdownMenuItem 
                                             onClick={() => handleArchiveToggle(workflow.id, workflow.status)}
-                                            className={showArchived ? "" : "text-destructive focus:text-destructive"}
+                                            className={showArchived ? "text-xs font-semibold" : "text-xs font-semibold text-destructive focus:text-destructive"}
                                         >
                                             {showArchived ? (
                                                 <>
@@ -184,7 +187,7 @@ export function WorkflowTable({
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 font-semibold">
                             <span>ID: {workflow.id}</span>
                             <span>•</span>
                             <span>
@@ -198,23 +201,23 @@ export function WorkflowTable({
                     </div>
 
                     {/* Bottom Row: Stats & Action */}
-                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/20">
+                    <div className="flex items-center justify-between mt-6 pt-3 border-t border-border/40">
                         <div className="flex flex-col">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Total Runs</span>
-                            <span className="text-sm font-semibold text-foreground mt-0.5">{workflow.total_runs || 0}</span>
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Total Runs</span>
+                            <span className="text-xs font-bold text-foreground mt-0.5">{workflow.total_runs || 0}</span>
                         </div>
 
                         <div className="flex items-center gap-2">
                             <Button
-                                size="sm"
                                 onClick={() => handleEdit(workflow.id)}
+                                className="h-8 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer px-3"
                             >
-                                <Settings className="h-3.5 w-3.5" />
+                                <Settings className="h-3.5 w-3.5 mr-1" />
                                 Configure
                             </Button>
                         </div>
                     </div>
-                </Card>
+                </div>
             ))}
         </div>
     );

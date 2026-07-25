@@ -24,48 +24,38 @@ export default function RecordingsPage() {
 
     if (loading || !user) {
         return (
-            <div className="container mx-auto px-4 py-8">
+            <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background">
                 <div className="space-y-4">
-                    <Skeleton className="h-12 w-64" />
-                    <Skeleton className="h-64 w-full" />
+                    <Skeleton className="h-10 w-64 rounded-lg" />
+                    <Skeleton className="h-48 w-full rounded-xl animate-pulse" />
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto px-4 py-8">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold mb-2">Recordings</h1>
-                <p className="text-muted-foreground">
-                    Manage audio recordings for your organization. Use{" "}
-                    <code className="rounded bg-muted px-1 text-xs">@</code> in prompt fields to insert them,
-                    or as transition messages in tool calls.{" "}
-                    <a href="https://docs.dograh.com/voice-agent/pre-recorded-audio" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">
-                        Learn more <ExternalLink className="h-3 w-3" />
-                    </a>
-                </p>
+        <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+            {/* Header section */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Recordings</h1>
+                    <p className="text-xs text-muted-foreground">
+                        Manage audio recordings for your organization. Use{" "}
+                        <code className="rounded bg-muted/60 px-1 text-[10px] font-mono border border-border/40">@</code> in prompt fields to insert them,
+                        or as transition messages in tool calls.{" "}
+                        <a href="https://docs.dograh.com/voice-agent/pre-recorded-audio" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline font-semibold text-foreground">
+                            Learn more <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                    </p>
+                </div>
+                <Button onClick={() => setIsUploadOpen(true)} className="h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer">
+                    <Upload className="w-4 h-4 mr-1.5" />
+                    Upload Recording
+                </Button>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <CardTitle>All Recordings</CardTitle>
-                            <CardDescription>
-                                Audio recordings shared across all agents in your organization
-                            </CardDescription>
-                        </div>
-                        <Button onClick={() => setIsUploadOpen(true)}>
-                            <Upload className="w-4 h-4 mr-2" />
-                            Upload Recording
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <RecordingsList refreshKey={refreshKey} />
-                </CardContent>
-            </Card>
+            {/* Flat list body */}
+            <RecordingsList refreshKey={refreshKey} />
 
             <RecordingsUploadDialog
                 open={isUploadOpen}

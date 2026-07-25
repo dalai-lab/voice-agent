@@ -22,6 +22,7 @@ import {
     getPropertyColumnSpan,
     isFractionalNumberInput,
 } from "./propertyRendererOptions";
+import { cn } from "@/lib/utils";
 
 export interface RendererContext {
     tools: ToolResponse[];
@@ -163,8 +164,7 @@ function StringWidget({ spec, value, onChange }: WidgetProps) {
                     value={v}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={spec.placeholder ?? undefined}
-                    className="min-h-[80px] max-h-[200px] resize-none"
-                    style={{ overflowY: "auto" }}
+                    className="min-h-[220px] font-mono text-xs leading-relaxed resize-y"
                 />
             ) : (
                 <Input
@@ -210,14 +210,18 @@ function NumberWidget({ spec, value, onChange }: WidgetProps) {
 function BooleanWidget({ spec, value, onChange }: WidgetProps) {
     const v = !!value;
     return (
-        <div className="flex items-center space-x-2">
-            <Switch id={`prop-${spec.name}`} checked={v} onCheckedChange={onChange} />
-            <Label htmlFor={`prop-${spec.name}`}>{spec.display_name}</Label>
-            {spec.description && (
-                <Label className="text-xs text-muted-foreground ml-2">
-                    {spec.description}
+        <div className="flex items-start justify-between gap-4 py-1.5">
+            <div className="flex flex-col gap-1 pr-4">
+                <Label htmlFor={`prop-${spec.name}`} className="font-semibold text-xs leading-none cursor-pointer text-foreground">
+                    {spec.display_name}
                 </Label>
-            )}
+                {spec.description && (
+                    <span className="text-[10px] text-muted-foreground leading-relaxed">
+                        {spec.description}
+                    </span>
+                )}
+            </div>
+            <Switch id={`prop-${spec.name}`} checked={v} onCheckedChange={onChange} className="shrink-0 mt-0.5" />
         </div>
     );
 }
@@ -409,7 +413,7 @@ function MentionWidget({
                 value={(value as string | undefined) ?? ""}
                 onChange={onChange}
                 placeholder={spec.placeholder ?? undefined}
-                className="min-h-[100px] max-h-[300px] resize-none overflow-y-auto"
+                className="min-h-[220px] resize-y overflow-y-auto"
                 recordings={recordings}
             />
         </div>

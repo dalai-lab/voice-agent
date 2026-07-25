@@ -37,56 +37,49 @@ export default function FilesPage() {
 
     if (loading || !user) {
         return (
-            <div className="container mx-auto px-4 py-8">
+            <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background">
                 <div className="space-y-4">
-                    <Skeleton className="h-12 w-64" />
-                    <Skeleton className="h-64 w-full" />
+                    <Skeleton className="h-10 w-64 rounded-lg" />
+                    <Skeleton className="h-48 w-full rounded-xl animate-pulse" />
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto px-4 py-8">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold mb-2">Knowledge Base Files</h1>
-                <p className="text-muted-foreground">
-                    Upload and manage documents for your voice agents to reference.{" "}
-                    <a href="https://docs.dograh.com/voice-agent/knowledge-base" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">
-                        Learn more <ExternalLink className="h-3 w-3" />
-                    </a>
-                </p>
+        <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+            {/* Header section */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Knowledge Base Files</h1>
+                    <p className="text-xs text-muted-foreground">
+                        Upload and manage documents for your voice agents to reference.{" "}
+                        <a href="https://docs.dograh.com/voice-agent/knowledge-base" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline font-semibold text-foreground">
+                            Learn more <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                    </p>
+                </div>
+                <Button onClick={() => setIsUploadOpen(true)} className="h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer">
+                    <Upload className="w-4 h-4 mr-1.5" />
+                    Upload Document
+                </Button>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <CardTitle>Your Documents</CardTitle>
-                            <CardDescription>
-                                Documents shared across all agents in your organization
-                            </CardDescription>
-                        </div>
-                        <Button onClick={() => setIsUploadOpen(true)}>
-                            <Upload className="w-4 h-4 mr-2" />
-                            Upload Document
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <DocumentList refreshTrigger={refreshKey} />
-                </CardContent>
-            </Card>
+            {/* Document list render */}
+            <DocumentList refreshTrigger={refreshKey} />
 
+            {/* Upload Dialog */}
             <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Upload Document</DialogTitle>
-                        <DialogDescription>
+                <DialogContent className="max-w-md rounded-xl bg-background border border-border shadow-lg p-6">
+                    <DialogHeader className="space-y-1.5">
+                        <DialogTitle className="text-base font-bold text-foreground">Upload Document</DialogTitle>
+                        <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
                             Upload a PDF or document file to add to your knowledge base
                         </DialogDescription>
                     </DialogHeader>
-                    <DocumentUpload onUploadSuccess={handleUploadSuccess} />
+                    <div className="pt-2">
+                        <DocumentUpload onUploadSuccess={handleUploadSuccess} />
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>

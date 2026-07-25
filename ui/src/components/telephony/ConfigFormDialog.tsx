@@ -217,22 +217,22 @@ export function ConfigFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Edit telephony configuration" : "Add telephony configuration"}
+      <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto rounded-xl bg-background border border-border shadow-lg p-6">
+        <DialogHeader className="space-y-1.5">
+          <DialogTitle className="text-base font-bold text-foreground">
+            {isEdit ? "Edit Telephony Configuration" : "Add Telephony Configuration"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
             {isEdit
               ? "Update credentials for this configuration. Phone numbers are managed separately."
               : "Connect a telephony provider account. Phone numbers are added after the configuration is created."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 pt-2">
           {isEdit && existing && (
-            <div className="space-y-1">
-              <Label>Configuration ID</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-foreground">Configuration ID</Label>
               <button
                 type="button"
                 onClick={() => {
@@ -242,7 +242,7 @@ export function ConfigFormDialog({
                     .catch(() => toast.error("Failed to copy ID"));
                 }}
                 title="Click to copy"
-                className="group flex w-full items-center gap-2 rounded-md border bg-muted/20 p-2 text-left font-mono text-xs transition-colors hover:bg-muted/40"
+                className="group flex w-full items-center gap-2 rounded-lg border border-border bg-muted/20 p-2 text-left font-mono text-[10px] transition-colors hover:bg-muted/40"
               >
                 <code className="flex-1 truncate">{existing.id}</code>
                 <Copy className="h-3 w-3 shrink-0 text-muted-foreground group-hover:text-foreground" />
@@ -251,35 +251,36 @@ export function ConfigFormDialog({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="cfg-name">Name</Label>
+            <Label htmlFor="cfg-name" className="text-xs font-bold text-foreground">Name</Label>
             <Input
               id="cfg-name"
               placeholder="e.g. Twilio US prod"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              className="h-9 rounded-lg border-border bg-background text-xs"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cfg-provider">Provider</Label>
+            <Label htmlFor="cfg-provider" className="text-xs font-bold text-foreground">Provider</Label>
             <Select
               value={providerName}
               onValueChange={setProviderName}
               disabled={lockedProvider || providers.length === 0}
             >
-              <SelectTrigger id="cfg-provider">
+              <SelectTrigger id="cfg-provider" className="h-9 rounded-lg border-border bg-background text-xs">
                 <SelectValue placeholder="Select a provider" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-lg text-xs">
                 {providers.map((p) => (
-                  <SelectItem key={p.provider} value={p.provider}>
+                  <SelectItem key={p.provider} value={p.provider} className="text-xs">
                     {p.display_name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {lockedProvider && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] text-muted-foreground/60">
                 Provider cannot be changed after creation.
               </p>
             )}
@@ -288,18 +289,18 @@ export function ConfigFormDialog({
                 href={currentProvider.docs_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-blue-600 underline"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-foreground underline"
               >
-                {currentProvider.display_name} docs <ExternalLink className="h-3 w-3" />
+                {currentProvider.display_name} docs <ExternalLink className="h-2.5 w-2.5" />
               </a>
             )}
           </div>
 
           {!isEdit && (
-            <div className="flex items-center justify-between rounded border p-3">
-              <div>
-                <Label className="text-sm">Set as default for outbound calls</Label>
-                <p className="text-xs text-muted-foreground">
+            <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/10">
+              <div className="space-y-0.5">
+                <Label className="text-xs font-bold text-foreground">Set as default for outbound calls</Label>
+                <p className="text-[10px] text-muted-foreground/60 leading-normal">
                   Used by test calls and campaigns when no specific config is selected.
                 </p>
               </div>
@@ -308,18 +309,18 @@ export function ConfigFormDialog({
           )}
 
           {currentProvider && (
-            <div className="space-y-3 border-t pt-3">
+            <div className="space-y-4 border-t border-border pt-4">
               {visibleFields.map((field, index) => (
-                <div className="space-y-1" key={field.name}>
+                <div className="space-y-2" key={field.name}>
                   {field.section && field.section !== visibleFields[index - 1]?.section && (
-                    <div className="pb-2 pt-3">
-                      <h3 className="text-sm font-semibold">{field.section}</h3>
+                    <div className="pb-1 pt-2 border-b border-border/40">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80">{field.section}</h3>
                     </div>
                   )}
-                  <Label htmlFor={`cfg-field-${field.name}`}>
+                  <Label htmlFor={`cfg-field-${field.name}`} className="text-xs font-bold text-foreground">
                     {field.label}
                     {!field.required && (
-                      <span className="ml-1 text-xs text-muted-foreground">
+                      <span className="ml-1 text-[10px] text-muted-foreground/60 font-normal">
                         (optional)
                       </span>
                     )}
@@ -331,7 +332,7 @@ export function ConfigFormDialog({
                     isEdit={isEdit}
                   />
                   {field.description && (
-                    <p className="text-xs text-muted-foreground">{field.description}</p>
+                    <p className="text-[10px] text-muted-foreground/60 leading-normal">{field.description}</p>
                   )}
                 </div>
               ))}
@@ -339,11 +340,11 @@ export function ConfigFormDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+        <DialogFooter className="mt-6 gap-3">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting} className="h-9 px-4 rounded-lg text-xs font-semibold">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting || !currentProvider}>
+          <Button onClick={handleSubmit} disabled={submitting || !currentProvider} className="h-9 px-4 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer">
             {submitting ? "Saving..." : isEdit ? "Save changes" : "Create"}
           </Button>
         </DialogFooter>
@@ -364,7 +365,7 @@ interface FieldInputProps {
 function FieldInput({ field, value, onChange, isEdit }: FieldInputProps) {
   if (field.name === "from_numbers") {
     return (
-      <p className="text-xs text-muted-foreground">
+      <p className="text-[10px] text-muted-foreground/60 font-medium">
         Phone numbers are managed separately on the configuration page.
       </p>
     );
@@ -382,7 +383,7 @@ function FieldInput({ field, value, onChange, isEdit }: FieldInputProps) {
         value={(value as string) ?? ""}
         onChange={(e) => onChange(e.target.value)}
         rows={6}
-        className="field-sizing-fixed resize-y break-all font-mono text-xs"
+        className="min-h-[100px] rounded-lg border-border bg-background text-xs leading-relaxed font-mono resize-y"
       />
     );
   }
@@ -394,6 +395,7 @@ function FieldInput({ field, value, onChange, isEdit }: FieldInputProps) {
         placeholder={placeholder}
         value={value as number | string | undefined ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
+        className="h-9 rounded-lg border-border bg-background text-xs"
       />
     );
   }
@@ -412,13 +414,13 @@ function FieldInput({ field, value, onChange, isEdit }: FieldInputProps) {
         value={value === undefined ? "__none__" : String(value)}
         onValueChange={(next) => onChange(next === "__none__" ? undefined : next)}
       >
-        <SelectTrigger id={`cfg-field-${field.name}`}>
+        <SelectTrigger id={`cfg-field-${field.name}`} className="h-9 rounded-lg border-border bg-background text-xs">
           <SelectValue placeholder={placeholder || "Select an option"} />
         </SelectTrigger>
-        <SelectContent>
-          {!field.required && <SelectItem value="__none__">Not configured</SelectItem>}
+        <SelectContent className="rounded-lg text-xs">
+          {!field.required && <SelectItem value="__none__" className="text-xs">Not configured</SelectItem>}
           {(field.options ?? []).map((option) => (
-            <SelectItem key={option.value} value={option.value}>
+            <SelectItem key={option.value} value={option.value} className="text-xs">
               {option.label}
             </SelectItem>
           ))}
@@ -434,6 +436,7 @@ function FieldInput({ field, value, onChange, isEdit }: FieldInputProps) {
       value={(value as string) ?? ""}
       onChange={(e) => onChange(e.target.value)}
       autoComplete={field.sensitive ? "current-password" : undefined}
+      className="h-9 rounded-lg border-border bg-background text-xs"
     />
   );
 }

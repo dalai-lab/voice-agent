@@ -536,10 +536,10 @@ function RenderWorkflow({
                                 deleteKeyCode={isViewingHistoricalVersion ? null : "Backspace"}
                             >
                                 <Background
-                                    variant={BackgroundVariant.Dots}
-                                    gap={18}
+                                    variant={BackgroundVariant.Lines}
+                                    gap={24}
                                     size={1}
-                                    className="opacity-[0.25] dark:opacity-[0.15]"
+                                    className="text-border/40 dark:text-border/15"
                                 />
 
                                 {/* Top-right controls - vertical layout (hidden when viewing history) */}
@@ -569,7 +569,7 @@ function RenderWorkflow({
                                                             variant="outline"
                                                             size="icon"
                                                             onClick={() => router.push(`/workflow/${workflowId}/settings`)}
-                                                            className="bg-white shadow-sm hover:shadow-md"
+                                                            className="bg-card text-card-foreground border-border shadow-xs hover:bg-accent"
                                                         >
                                                             <Settings className="h-4 w-4" />
                                                         </Button>
@@ -593,7 +593,7 @@ function RenderWorkflow({
                                                 variant="outline"
                                                 size="icon"
                                                 onClick={() => rfInstance.current?.zoomIn()}
-                                                className="bg-white shadow-sm hover:shadow-md h-8 w-8"
+                                                className="bg-card text-card-foreground border-border shadow-xs hover:bg-accent h-8 w-8"
                                             >
                                                 <Plus className="h-4 w-4" />
                                             </Button>
@@ -609,7 +609,7 @@ function RenderWorkflow({
                                                 variant="outline"
                                                 size="icon"
                                                 onClick={() => rfInstance.current?.zoomOut()}
-                                                className="bg-white shadow-sm hover:shadow-md h-8 w-8"
+                                                className="bg-card text-card-foreground border-border shadow-xs hover:bg-accent h-8 w-8"
                                             >
                                                 <Minus className="h-4 w-4" />
                                             </Button>
@@ -625,7 +625,7 @@ function RenderWorkflow({
                                                 variant="outline"
                                                 size="icon"
                                                 onClick={() => rfInstance.current?.fitView()}
-                                                className="bg-white shadow-sm hover:shadow-md h-8 w-8"
+                                                className="bg-card text-card-foreground border-border shadow-xs hover:bg-accent h-8 w-8"
                                             >
                                                 <Maximize2 className="h-4 w-4" />
                                             </Button>
@@ -645,7 +645,7 @@ function RenderWorkflow({
                                                         setNodes(layoutNodes(nodes, edges, 'TB', rfInstance));
                                                         setIsDirty(true);
                                                     }}
-                                                    className="bg-white shadow-sm hover:shadow-md h-8 w-8"
+                                                    className="bg-card text-card-foreground border-border shadow-xs hover:bg-accent h-8 w-8"
                                                 >
                                                     <BrushCleaning className="h-4 w-4" />
                                                 </Button>

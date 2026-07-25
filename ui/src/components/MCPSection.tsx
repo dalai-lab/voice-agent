@@ -44,16 +44,16 @@ export function MCPSection() {
   };
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6 pt-1">
       <div className="grid gap-2">
-        <Label>MCP Endpoint</Label>
-        <p className="text-xs text-muted-foreground">
+        <Label className="text-xs font-bold text-foreground">MCP Endpoint</Label>
+        <p className="text-[10px] text-muted-foreground/60 leading-normal">
           Connect an MCP-compatible AI assistant to this URL over Streamable
           HTTP. Requires an API key in the X-API-Key header.{" "}
           <Link
             href="/api-keys"
             target="_blank"
-            className="text-primary underline hover:no-underline"
+            className="text-cta underline font-semibold"
           >
             Get your API key
           </Link>
@@ -62,18 +62,18 @@ export function MCPSection() {
           {endpoints.map(({ key, label, url }) => (
             <div key={key} className="grid gap-1">
               {endpoints.length > 1 && (
-                <span className="text-xs font-medium text-muted-foreground">
+                <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">
                   {label}
                 </span>
               )}
               <div className="flex items-center gap-2">
-                <code className="text-xs break-all bg-muted px-2 py-1 rounded flex-1">
+                <code className="text-xs font-mono break-all bg-muted/40 border border-border px-3 py-1.5 rounded-lg flex-1">
                   {url}
                 </code>
                 <Button
                   variant="outline"
                   size="icon"
-                  className="shrink-0"
+                  className="shrink-0 h-9 w-9 rounded-lg"
                   onClick={() => handleCopy(url, key)}
                 >
                   {copiedKey === key ? (
@@ -87,21 +87,21 @@ export function MCPSection() {
           ))}
         </div>
         {tunnelUrl && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground/60 leading-normal">
             Use the public URL from externally-hosted assistants; the backend URL
             works from the deployment&apos;s own network.
           </p>
         )}
       </div>
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-[10px] text-muted-foreground/60 leading-normal">
         For step-by-step setup with Claude Code, Claude Desktop, Cursor, and
         other clients, see the{" "}
         <Link
           href="https://docs.dograh.com/integrations/mcp"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary underline hover:no-underline"
+          className="text-cta underline font-semibold"
         >
           MCP integration guide
         </Link>

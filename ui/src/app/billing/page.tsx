@@ -224,37 +224,38 @@ export default function BillingPage() {
 
     if (loading || configLoading) {
         return (
-            <div className="container mx-auto p-6 space-y-6">
+            <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background">
                 <div className="space-y-2">
-                    <Skeleton className="h-9 w-40" />
-                    <Skeleton className="h-5 w-96 max-w-full" />
+                    <Skeleton className="h-10 w-40 rounded-lg animate-pulse" />
+                    <Skeleton className="h-4 w-96 max-w-full rounded-md animate-pulse" />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                    <Skeleton className="h-36 rounded-lg" />
-                    <Skeleton className="h-36 rounded-lg" />
+                    <Skeleton className="h-32 rounded-xl animate-pulse" />
+                    <Skeleton className="h-32 rounded-xl animate-pulse" />
                 </div>
-                <Skeleton className="h-80 rounded-lg" />
+                <Skeleton className="h-64 rounded-xl animate-pulse" />
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold mb-2">Billing</h1>
-                    <p className="text-muted-foreground">
+        <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+            {/* Header section */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Billing</h1>
+                    <p className="text-xs text-muted-foreground">
                         Credits, balance, and account usage for your organization.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-                        <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+                    <Button variant="outline" className="h-9 rounded-lg text-xs font-semibold" onClick={handleRefresh} disabled={refreshing}>
+                        <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
                         Refresh
                     </Button>
                     {canPurchaseCredits && (
-                        <Button onClick={handlePurchaseCredits} disabled={purchasing}>
-                            <CreditCard className="h-4 w-4 mr-2" />
+                        <Button onClick={handlePurchaseCredits} className="h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer" disabled={purchasing}>
+                            <CreditCard className="h-3.5 w-3.5 mr-1.5" />
                             {purchasing ? "Opening..." : "Add Credits"}
                         </Button>
                     )}
@@ -262,26 +263,25 @@ export default function BillingPage() {
             </div>
 
             {isOssMode && (
-                <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/30">
-                    <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
-                    <div className="text-sm text-amber-900 dark:text-amber-200">
-                        <p className="font-medium">Credit purchases are unavailable in OSS mode</p>
-                        <p className="mt-1">
+                <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-4 text-amber-900 dark:text-amber-200">
+                    <div className="space-y-1 text-xs">
+                        <p className="font-bold">Credit purchases are unavailable in OSS mode</p>
+                        <p className="leading-relaxed text-muted-foreground">
                             You can&apos;t purchase credits from this self-hosted app. Sign up and
                             purchase credits at{" "}
                             <a
                                 href="https://app.dograh.com"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+                                className="font-bold underline"
                             >
                                 app.dograh.com
-                                <ExternalLink className="h-3 w-3" />
+                                <ExternalLink className="h-3 w-3 inline ml-0.5" />
                             </a>
                             . Then add the generated service key in{" "}
                             <Link
                                 href="/model-configurations"
-                                className="font-medium underline underline-offset-2"
+                                className="font-bold underline"
                             >
                                 Model Configurations
                             </Link>
@@ -291,52 +291,58 @@ export default function BillingPage() {
                 </div>
             )}
 
+            {/* Metrics cards grid */}
             <div className="grid gap-4 md:grid-cols-2">
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardDescription>{isOssMode ? "Credits remaining" : "Credit balance"}</CardDescription>
-                        <CardTitle className="flex items-center gap-2 text-3xl">
-                            <CircleDollarSign className="h-6 w-6 text-muted-foreground" />
+                <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs flex flex-col justify-between">
+                    <div>
+                        <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                            {isOssMode ? "Credits remaining" : "Credit balance"}
+                        </span>
+                        <h3 className="flex items-center gap-2 text-2xl font-bold mt-1 text-foreground">
+                            <CircleDollarSign className="h-5 w-5 text-muted-foreground/60" />
                             {formatCredits(remainingCredits)}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-muted-foreground">1 credit = 1 cent</p>
-                    </CardContent>
-                </Card>
+                        </h3>
+                    </div>
+                    <div className="mt-4">
+                        <p className="text-[10px] text-muted-foreground/60 font-semibold">1 credit = 1 cent</p>
+                    </div>
+                </div>
 
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardDescription>Credits used</CardDescription>
-                        <CardTitle className="text-3xl">{formatCredits(usedCredits)}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-muted-foreground">
+                <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs flex flex-col justify-between">
+                    <div>
+                        <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Credits used</span>
+                        <h3 className="text-2xl font-bold mt-1 text-foreground">{formatCredits(usedCredits)}</h3>
+                    </div>
+                    <div className="mt-4">
+                        <p className="text-[10px] text-muted-foreground/60 font-semibold">
                             {isOssMode ? "Current allocation usage" : "Total ledger debits"}
                         </p>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             </div>
 
+            {/* Ledger or Credit Usage section */}
             {!isOssMode ? (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Credit Ledger</CardTitle>
-                        <CardDescription>Recent grants, purchases, and usage debits.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {ledgerEntries.length > 0 ? (
-                            <div className="bg-card border rounded-lg overflow-x-auto shadow-sm">
+                <div className="space-y-4 pt-2">
+                    <div className="border-b border-border/40 pb-2">
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">Credit Ledger</h2>
+                        <p className="text-xs text-muted-foreground mt-0.5">Recent grants, purchases, and usage debits</p>
+                    </div>
+
+                    {ledgerEntries.length > 0 ? (
+                        <div className="space-y-4">
+                            {/* Flat Table container */}
+                            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-xs w-full">
                                 <Table>
                                     <TableHeader>
-                                        <TableRow className="bg-muted/50">
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Activity</TableHead>
-                                            <TableHead>Origin</TableHead>
-                                            <TableHead>Run</TableHead>
-                                            <TableHead className="text-right">Delta</TableHead>
-                                            <TableHead className="text-right">Balance</TableHead>
-                                            <TableHead className="text-right">Amount</TableHead>
+                                        <TableRow className="bg-muted/30 border-b border-border/80">
+                                            <TableHead className="font-bold text-xs text-foreground py-3">Date</TableHead>
+                                            <TableHead className="font-bold text-xs text-foreground py-3">Activity</TableHead>
+                                            <TableHead className="font-bold text-xs text-foreground py-3">Origin</TableHead>
+                                            <TableHead className="font-bold text-xs text-foreground py-3">Run</TableHead>
+                                            <TableHead className="font-bold text-xs text-foreground py-3 text-right">Delta</TableHead>
+                                            <TableHead className="font-bold text-xs text-foreground py-3 text-right">Balance</TableHead>
+                                            <TableHead className="font-bold text-xs text-foreground py-3 pr-6 text-right">Amount</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -345,29 +351,29 @@ export default function BillingPage() {
                                             const runHref = getRunHref(entry);
                                             const billableQuantity = formatBillableQuantity(entry);
                                             return (
-                                                <TableRow key={entry.id}>
-                                                    <TableCell>
+                                                <TableRow key={entry.id} className="hover:bg-muted/40 transition-colors border-b border-border/50">
+                                                    <TableCell className="text-xs text-muted-foreground">
                                                         {formatDateTime(entry.created_at, organizationTimezone)}
                                                     </TableCell>
                                                     <TableCell>
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className="font-medium">{getLedgerEntryLabel(entry)}</span>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span className="font-bold text-xs text-foreground">{getLedgerEntryLabel(entry)}</span>
                                                             {billableQuantity && (
-                                                                <span className="text-xs text-muted-foreground">{billableQuantity}</span>
+                                                                <span className="text-[10px] text-muted-foreground/60">{billableQuantity}</span>
                                                             )}
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
                                                         {entry.origin ? (
-                                                            <Badge variant="secondary">{formatTitleCase(entry.origin)}</Badge>
+                                                            <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md border-border/60 bg-muted/40 text-foreground">{formatTitleCase(entry.origin)}</Badge>
                                                         ) : (
                                                             "-"
                                                         )}
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="text-xs text-muted-foreground">
                                                         {entry.workflow_run_id ? (
                                                             runHref ? (
-                                                                <Link className="font-medium text-primary hover:underline" href={runHref}>
+                                                                <Link className="font-bold underline hover:text-foreground text-muted-foreground" href={runHref}>
                                                                     #{entry.workflow_run_id}
                                                                 </Link>
                                                             ) : (
@@ -377,12 +383,12 @@ export default function BillingPage() {
                                                             "-"
                                                         )}
                                                     </TableCell>
-                                                    <TableCell className={`text-right font-medium ${delta >= 0 ? "text-green-600" : "text-destructive"}`}>
+                                                    <TableCell className={`text-xs text-right font-bold ${delta >= 0 ? "text-green-600" : "text-destructive"}`}>
                                                         {delta >= 0 ? "+" : ""}
                                                         {formatCredits(delta)}
                                                     </TableCell>
-                                                    <TableCell className="text-right">{formatCredits(entry.balance_after)}</TableCell>
-                                                    <TableCell className="text-right">
+                                                    <TableCell className="text-xs text-right text-muted-foreground">{formatCredits(entry.balance_after)}</TableCell>
+                                                    <TableCell className="text-xs text-right pr-6 font-bold text-foreground">
                                                         {formatAmount(entry.amount_minor, entry.amount_currency)}
                                                     </TableCell>
                                                 </TableRow>
@@ -391,53 +397,57 @@ export default function BillingPage() {
                                     </TableBody>
                                 </Table>
                             </div>
-                        ) : (
-                            <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-                                No ledger entries yet
-                            </div>
-                        )}
-                        {ledgerTotalPages > 1 && (
-                            <div className="flex items-center justify-between mt-6">
-                                <p className="text-sm text-muted-foreground">
-                                    Page {ledgerPage} of {ledgerTotalPages} ({ledgerTotalCount} total entries)
-                                </p>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handlePageChange(ledgerPage - 1)}
-                                        disabled={ledgerPage <= 1 || loading || refreshing}
-                                    >
-                                        <ChevronLeft className="h-4 w-4" />
-                                        Previous
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handlePageChange(ledgerPage + 1)}
-                                        disabled={ledgerPage >= ledgerTotalPages || loading || refreshing}
-                                    >
-                                        Next
-                                        <ChevronRight className="h-4 w-4" />
-                                    </Button>
+
+                            {/* Pagination */}
+                            {ledgerTotalPages > 1 && (
+                                <div className="flex items-center justify-between mt-6">
+                                    <p className="text-xs text-muted-foreground">
+                                        Page {ledgerPage} of {ledgerTotalPages} ({ledgerTotalCount} total entries)
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 text-xs font-semibold rounded-lg"
+                                            onClick={() => handlePageChange(ledgerPage - 1)}
+                                            disabled={ledgerPage <= 1 || loading || refreshing}
+                                        >
+                                            <ChevronLeft className="h-4 w-4 mr-1" />
+                                            Previous
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 text-xs font-semibold rounded-lg"
+                                            onClick={() => handlePageChange(ledgerPage + 1)}
+                                            disabled={ledgerPage >= ledgerTotalPages || loading || refreshing}
+                                        >
+                                            Next
+                                            <ChevronRight className="h-4 w-4 ml-1" />
+                                        </Button>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm mx-auto border border-border bg-card rounded-xl shadow-xs">
+                            <p className="text-xs text-muted-foreground">No ledger entries yet</p>
+                        </div>
+                    )}
+                </div>
             ) : (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Credit Usage</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <Progress value={usagePercent} />
-                        <div className="flex justify-between text-sm text-muted-foreground">
+                <div className="space-y-4 pt-2">
+                    <div className="border-b border-border/40 pb-2">
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">Credit Usage</h2>
+                    </div>
+                    <div className="border border-border bg-card rounded-xl p-5 shadow-xs space-y-4">
+                        <Progress value={usagePercent} className="h-2" />
+                        <div className="flex justify-between text-xs text-muted-foreground font-semibold">
                             <span>{usagePercent}% used</span>
                             <span>{formatCredits(remainingCredits)} of {formatCredits(totalQuota)} remaining</span>
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             )}
         </div>
     );

@@ -112,94 +112,103 @@ export default function PendingCallbacksPage() {
     };
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold mb-2">Scheduled Callbacks</h1>
-                <p className="text-muted-foreground">Monitor and manage scheduled callbacks from your workflows and campaigns.</p>
+        <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+            {/* Header section */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Scheduled Callbacks</h1>
+                    <p className="text-xs text-muted-foreground">Monitor and manage scheduled callbacks from your workflows and campaigns</p>
+                </div>
             </div>
 
-            <Tabs defaultValue="all" value={sourceTab} onValueChange={(val) => setSourceTab(val as any)}>
-                <TabsList className="mb-4">
-                    <TabsTrigger value="all">All Callbacks</TabsTrigger>
-                    <TabsTrigger value="standalone">Standalone</TabsTrigger>
-                    <TabsTrigger value="campaign">Campaigns</TabsTrigger>
+            {/* Filter Tabs */}
+            <Tabs defaultValue="all" value={sourceTab} onValueChange={(val) => setSourceTab(val as any)} className="space-y-6">
+                <TabsList className="h-8 rounded-lg bg-muted/60 p-0.5 border border-border/60">
+                    <TabsTrigger value="all" className="h-7 text-xs px-4 rounded-md font-semibold cursor-pointer">All Callbacks</TabsTrigger>
+                    <TabsTrigger value="standalone" className="h-7 text-xs px-4 rounded-md font-semibold cursor-pointer">Standalone</TabsTrigger>
+                    <TabsTrigger value="campaign" className="h-7 text-xs px-4 rounded-md font-semibold cursor-pointer">Campaigns</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value={sourceTab}>
-                    <Card>
-                    <CardHeader>
-                        <CardTitle>
-                            {sourceTab === "all" ? "All Callbacks" : sourceTab === "standalone" ? "Standalone Callbacks" : "Campaign Callbacks"}
-                        </CardTitle>
-                        <CardDescription>View all pending and past callbacks</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {isLoading && callbacks.length === 0 ? (
-                            <div className="animate-pulse py-12">
-                                <div className="h-64 bg-muted rounded"></div>
+                <TabsContent value={sourceTab} className="focus-visible:outline-none">
+                    {/* Content Section */}
+                    {isLoading && callbacks.length === 0 ? (
+                        <div className="grid grid-cols-1 gap-4">
+                            {[...Array(4)].map((_, i) => (
+                                <div key={i} className="h-16 rounded-xl bg-card border border-border animate-pulse" />
+                            ))}
+                        </div>
+                    ) : callbacks.length === 0 ? (
+                        <div className="flex items-center justify-center w-full py-12">
+                            <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm w-full border border-border bg-card rounded-xl shadow-xs">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted/30 text-muted-foreground mb-4">
+                                    <Phone className="h-6 w-6" />
+                                </div>
+                                <h3 className="text-xs font-bold text-foreground tracking-tight mb-2 uppercase">No callbacks found</h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed">When an agent schedules a callback task, it will be listed here.</p>
                             </div>
-                        ) : callbacks.length === 0 ? (
-                            <div className="text-center py-12 border rounded-lg bg-muted/20">
-                                <h3 className="text-lg font-medium text-muted-foreground">No callbacks found</h3>
-                                <p className="text-sm text-muted-foreground">When an agent schedules a callback, it will appear here.</p>
-                            </div>
-                        ) : (
+                        </div>
+                    ) : (
+                        <div className="border border-border bg-card rounded-xl overflow-hidden shadow-xs">
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead>Scheduled For</TableHead>
-                                        <TableHead>Fires In</TableHead>
-                                        <TableHead>To Number</TableHead>
-                                        <TableHead>Agent / Campaign</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                <TableHeader className="bg-muted/35">
+                                    <TableRow className="border-border/80 hover:bg-transparent">
+                                        <TableHead className="text-xs font-bold text-muted-foreground/80 py-3">Type</TableHead>
+                                        <TableHead className="text-xs font-bold text-muted-foreground/80 py-3">Scheduled For</TableHead>
+                                        <TableHead className="text-xs font-bold text-muted-foreground/80 py-3">Fires In</TableHead>
+                                        <TableHead className="text-xs font-bold text-muted-foreground/80 py-3">To Number</TableHead>
+                                        <TableHead className="text-xs font-bold text-muted-foreground/80 py-3">Agent / Campaign</TableHead>
+                                        <TableHead className="text-xs font-bold text-muted-foreground/80 py-3">Status</TableHead>
+                                        <TableHead className="text-xs font-bold text-muted-foreground/80 py-3 text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {callbacks.map((cb) => (
-                                        <TableRow key={`${cb.source}-${cb.id}`}>
-                                            <TableCell>
+                                        <TableRow key={`${cb.source}-${cb.id}`} className="border-border/60 hover:bg-muted/30 transition-colors">
+                                            <TableCell className="py-3">
                                                 {cb.source === "campaign" ? (
-                                                    <Badge variant="outline" className="flex items-center w-max"><Briefcase className="w-3 h-3 mr-1"/> Campaign</Badge>
+                                                    <Badge variant="outline" className="flex items-center w-max gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 rounded-md border-border/60 bg-muted/40">
+                                                        <Briefcase className="w-2.5 h-2.5"/> Campaign
+                                                    </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="flex items-center w-max"><Phone className="w-3 h-3 mr-1"/> Standalone</Badge>
+                                                    <Badge variant="outline" className="flex items-center w-max gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 rounded-md border-border/60 bg-muted/40">
+                                                        <Phone className="w-2.5 h-2.5"/> Standalone
+                                                    </Badge>
                                                 )}
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="text-xs font-medium py-3">
                                                 {cb.scheduled_for ? format(new Date(cb.scheduled_for), "MMM d, yyyy h:mm a") : "N/A"}
                                             </TableCell>
-                                            <TableCell className="font-mono text-sm text-muted-foreground">
+                                            <TableCell className="font-mono text-[11px] text-muted-foreground py-3">
                                                 {cb.status === "pending" ? formatFiresIn(cb.fires_in_seconds) : "-"}
                                             </TableCell>
-                                            <TableCell>{cb.to_number || "-"}</TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center text-sm font-medium">
-                                                        <Bot className="w-3 h-3 mr-1 text-muted-foreground"/> {cb.workflow_name || `#${cb.workflow_id}`}
+                                            <TableCell className="text-xs font-semibold py-3">{cb.to_number || "-"}</TableCell>
+                                            <TableCell className="py-3">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <div className="flex items-center text-xs font-bold text-foreground">
+                                                        <Bot className="w-3.5 h-3.5 mr-1 text-muted-foreground/80"/> {cb.workflow_name || `#${cb.workflow_id}`}
                                                     </div>
                                                     {cb.campaign_id && (
-                                                        <div className="flex items-center text-xs text-muted-foreground">
-                                                            <Briefcase className="w-3 h-3 mr-1"/> {cb.campaign_name || `#${cb.campaign_id}`}
+                                                        <div className="flex items-center text-[10px] text-muted-foreground/80 font-medium">
+                                                            <Briefcase className="w-3 h-3 mr-1 text-muted-foreground/60"/> {cb.campaign_name || `#${cb.campaign_id}`}
                                                         </div>
                                                     )}
                                                 </div>
                                             </TableCell>
-                                            <TableCell>
-                                                <Badge variant={getStatusBadgeVariant(cb.status)}>
+                                            <TableCell className="py-3">
+                                                <Badge variant={getStatusBadgeVariant(cb.status)} className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md">
                                                     {cb.status}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right">
+                                            <TableCell className="text-right py-3">
                                                 {cb.status === "pending" && (
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                        className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg font-semibold"
                                                         onClick={() => handleCancelCallback(cb)}
                                                         disabled={cancellingId === cb.id}
                                                     >
-                                                        <Trash2 className="h-4 w-4 mr-2" />
+                                                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                                                         Cancel
                                                     </Button>
                                                 )}
@@ -208,9 +217,8 @@ export default function PendingCallbacksPage() {
                                     ))}
                                 </TableBody>
                             </Table>
-                        )}
-                    </CardContent>
-                </Card>
+                        </div>
+                    )}
                 </TabsContent>
             </Tabs>
         </div>

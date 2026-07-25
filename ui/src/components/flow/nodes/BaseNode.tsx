@@ -15,8 +15,7 @@ export const BaseNode = forwardRef<
     <div
         ref={ref}
         className={cn(
-            "relative rounded-xl border bg-card text-card-foreground min-w-[260px] max-w-[340px] min-h-[64px] shadow-sm transition-all duration-200 select-none",
-            "border-border/60",
+            "relative rounded-xl border border-border bg-card text-card-foreground min-w-[300px] max-w-[380px] min-h-[130px] shadow-sm transition-all duration-200 select-none",
             className,
             // Selected state - sharp, high contrast ring, no neon glow
             selected ? "border-foreground ring-1 ring-foreground/20 shadow-md scale-[1.01]" : "",
@@ -26,7 +25,7 @@ export const BaseNode = forwardRef<
             hovered_through_edge ? "border-foreground/80 ring-1 ring-foreground/10" : "",
             !hovered_through_edge && selected_through_edge ? "border-foreground/60" : "",
             runtimeActive ? "border-sky-500 ring-2 ring-sky-500/10" : "",
-            !selected_through_edge && !hovered_through_edge && "hover:border-border/100 hover:shadow-xs",
+            !selected_through_edge && !hovered_through_edge && "hover:border-foreground/40 hover:shadow-xs",
         )}
         tabIndex={0}
         {...props}

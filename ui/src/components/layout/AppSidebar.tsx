@@ -10,6 +10,7 @@ import {
   ChevronRight,
   LogOut,
   Settings,
+  TrendingUp,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -92,10 +93,35 @@ const NAV_SECTIONS: SidebarNavSection[] = [
       {
         title: "Callbacks",
         url: "/callbacks",
-        icon: CalendarClock,
+        icon: PhosphorIcons.PhoneCall,
       },
       {
-        title: "Models",
+        title: "Tools",
+        url: "/tools",
+        icon: PhosphorIcons.Wrench,
+      },
+    ],
+  },
+  {
+    label: "RESOURCES",
+    items: [
+      {
+        title: "Knowledge Base",
+        url: "/files",
+        icon: PhosphorIcons.Database,
+      },
+      {
+        title: "Audio Recordings",
+        url: "/recordings",
+        icon: PhosphorIcons.VinylRecord,
+      },
+    ],
+  },
+  {
+    label: "CONFIGURE",
+    items: [
+      {
+        title: "AI Models",
         url: "/model-configurations",
         icon: PhosphorIcons.Brain,
       },
@@ -106,24 +132,14 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         showsTelephonyWarning: true,
       },
       {
-        title: "Tools",
-        url: "/tools",
-        icon: PhosphorIcons.Wrench,
-      },
-      {
-        title: "Files",
-        url: "/files",
-        icon: PhosphorIcons.Database,
-      },
-      {
-        title: "Recordings",
-        url: "/recordings",
-        icon: PhosphorIcons.VinylRecord,
-      },
-      {
         title: "Developers",
         url: "/api-keys",
         icon: PhosphorIcons.Key,
+      },
+      {
+        title: "Platform Settings",
+        url: "/settings",
+        icon: PhosphorIcons.Gear,
       },
     ],
   },
@@ -133,7 +149,7 @@ const NAV_SECTIONS: SidebarNavSection[] = [
       {
         title: "Agent Logs",
         url: "/runs",
-        icon: TrendingUp,
+        icon: PhosphorIcons.ClockCounterClockwise,
       },
       {
         title: "Usage",
@@ -148,7 +164,7 @@ const NAV_SECTIONS: SidebarNavSection[] = [
       {
         title: "Reports",
         url: "/reports",
-        icon: PhosphorIcons.FileText,
+        icon: PhosphorIcons.ChartBar,
       }
     ],
   },
@@ -214,26 +230,27 @@ export function AppSidebar() {
         asChild
         tooltip={tooltip}
         className={cn(
-          "rounded-md mx-2 w-[calc(100%-16px)] h-9 transition-all duration-150 text-sm font-medium border border-transparent select-none",
+          "rounded-lg transition-all duration-150 text-xs font-medium select-none border relative",
+          isCollapsed ? "mx-auto h-8.5" : "mx-2 w-[calc(100%-16px)] h-8.5",
           isItemActive
-            ? "bg-foreground/5 text-foreground border-border/60 shadow-xs"
-            : "hover:bg-foreground/[0.03] text-muted-foreground hover:text-foreground"
+            ? "bg-cta/[0.05] border-transparent text-cta font-semibold before:absolute before:left-0.5 before:top-[20%] before:h-[60%] before:w-0.75 before:rounded-full before:bg-cta"
+            : "border-transparent text-sidebar-foreground/75 hover:bg-sidebar-accent/30 hover:text-sidebar-foreground"
         )}
       >
         <Link
           href={item.url}
           onClick={handleMobileNavClick}
-          className={cn("flex items-center gap-3 px-3", isCollapsed && "justify-center px-0")}
+          className={cn("flex items-center gap-3 px-3", isCollapsed && "justify-center px-0 w-full h-full")}
           translate="no"
         >
           <Icon
             className={cn(
-              "h-[16px] w-[16px] shrink-0 transition-colors",
-              isItemActive ? "text-cta" : "text-muted-foreground group-hover:text-foreground"
+              "h-4 w-4 shrink-0 transition-colors",
+              isItemActive ? "text-cta" : "text-muted-foreground group-hover:text-sidebar-foreground"
             )}
           />
           <span
-            className={cn("notranslate truncate font-sans text-sm tracking-tight", isCollapsed && "hidden")}
+            className={cn("notranslate truncate font-sans text-xs tracking-tight", isCollapsed && "hidden")}
             translate="no"
           >
             {item.title}
@@ -274,7 +291,7 @@ export function AppSidebar() {
     <Button
       variant="ghost"
       size="icon"
-      className="h-8 w-8 shrink-0 cursor-pointer rounded-lg border border-border/80 bg-background/50 hover:bg-muted"
+      className="h-8 w-8 shrink-0 cursor-pointer rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
     >
       <span className="text-xs font-semibold">{userInitials}</span>
     </Button>
@@ -286,7 +303,7 @@ export function AppSidebar() {
         <Button
           size="icon"
           variant="outline"
-          className="h-8 w-8 rounded-lg border-border/80 bg-background/50 hover:bg-muted"
+          className="hidden h-8 w-8 rounded-lg border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
           onClick={() => openHireExpert("sidebar")}
           aria-label="Hire an Expert"
         >
@@ -301,7 +318,7 @@ export function AppSidebar() {
     <Button
       size="sm"
       variant="outline"
-      className="h-8 gap-2 rounded-lg text-xs font-medium border-border/80 bg-background/50 hover:bg-muted"
+      className="hidden h-8 gap-2 rounded-lg text-xs font-medium border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
       onClick={() => openHireExpert("sidebar")}
     >
       <UserRound className="h-3.5 w-3.5" />
@@ -310,16 +327,16 @@ export function AppSidebar() {
   );
 
   return (
-    <Sidebar collapsible="icon" variant="sidebar" className="border-r border-border/40 bg-sidebar">
-      <SidebarHeader className="px-4 py-4 notranslate border-b border-border/40" translate="no">
-        <div className="flex items-center justify-between">
+    <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border bg-sidebar">
+      <SidebarHeader className={cn("notranslate border-b border-sidebar-border", isCollapsed ? "p-2" : "px-4 py-4")} translate="no">
+        <div className={cn("flex items-center w-full", isCollapsed ? "justify-center" : "justify-between")}>
           <div className={cn("flex items-center gap-2", isCollapsed && "hidden")}>
             {versionInfo && (
               <span
-                className="notranslate text-xs font-semibold tracking-tight text-foreground"
+                className="notranslate text-sm font-bold tracking-tight text-sidebar-foreground"
                 translate="no"
               >
-                Dograh <span className="text-muted-foreground/60">v{versionInfo.ui}</span>
+                Nova <span className="text-[10px] font-normal text-muted-foreground">v{versionInfo.ui}</span>
               </span>
             )}
             {isBehind && latestRelease && (
@@ -354,7 +371,7 @@ export function AppSidebar() {
             )}
           </div>
 
-          <SidebarTrigger className={cn("hover:bg-accent h-8 w-8 rounded-lg border border-border/80 bg-background/50", isCollapsed && "mx-auto")}>
+          <SidebarTrigger className={cn("hover:bg-sidebar-accent h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 text-sidebar-foreground", isCollapsed && "mx-auto")}>
             {isCollapsed ? (
               <ChevronRight className="h-4 w-4" />
             ) : (
@@ -370,21 +387,21 @@ export function AppSidebar() {
         )}
       </SidebarHeader>
 
-      <SidebarContent className="notranslate py-3 space-y-4" translate="no">
+      <SidebarContent className="notranslate py-4 space-y-4 no-scrollbar" translate="no">
         {NAV_SECTIONS.map((section) => (
           <SidebarGroup
             key={section.label ?? "overview"}
-            className="p-0 space-y-1.5"
+            className="p-0 space-y-1"
           >
             {section.label && (
               <SidebarGroupLabel
                 className={cn(
-                  "notranslate text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 px-5 h-6",
+                  "notranslate text-[10px] font-semibold capitalize tracking-wide text-muted-foreground/45 px-5 h-6 mb-0.5 mt-2 first:mt-0",
                   isCollapsed && "hidden"
                 )}
                 translate="no"
               >
-                {section.label}
+                {section.label.toLowerCase()}
               </SidebarGroupLabel>
             )}
             <SidebarMenu className="space-y-0.5">
@@ -399,7 +416,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter
-        className="p-4 border-t border-border/40 bg-sidebar"
+        className={cn("border-t border-sidebar-border bg-sidebar", isCollapsed ? "p-2" : "p-4")}
         translate="no"
       >
         <div className="space-y-2">
@@ -435,7 +452,7 @@ export function AppSidebar() {
                   {hireExpertButton}
                   <ThemeToggle
                     showLabel={false}
-                    className="h-8 w-8 rounded-lg border border-border/80 bg-background/50 hover:bg-muted"
+                    className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
                   />
                 </div>
               )}
@@ -445,7 +462,7 @@ export function AppSidebar() {
                   {hireExpertButton}
                   <ThemeToggle
                     showLabel={false}
-                    className="h-8 w-8 rounded-lg border border-border/80 bg-background/50 hover:bg-muted"
+                    className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
                   />
                 </div>
               )}
@@ -491,7 +508,7 @@ export function AppSidebar() {
                   {hireExpertButton}
                   <ThemeToggle
                     showLabel={false}
-                    className="h-8 w-8 rounded-lg border border-border/80 bg-background/50 hover:bg-muted"
+                    className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
                   />
                 </div>
               )}
@@ -501,7 +518,7 @@ export function AppSidebar() {
                   {hireExpertButton}
                   <ThemeToggle
                     showLabel={false}
-                    className="h-8 w-8 rounded-lg border border-border/80 bg-background/50 hover:bg-muted"
+                    className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
                   />
                 </div>
               )}

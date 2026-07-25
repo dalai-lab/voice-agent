@@ -32,15 +32,22 @@ export function EmptyState({
     action?: ReactNode;
 }) {
     return (
-        <div className="flex flex-1 flex-col justify-center rounded-xl border border-border/70 bg-background px-5 py-6 text-left">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        <div className="flex flex-col items-center justify-center text-center py-12 px-6 max-w-xs mx-auto my-auto h-full">
+            {/* Centered Icon Badge */}
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted/30 text-muted-foreground mb-4.5 shadow-xs">
                 {icon}
             </div>
-            <div className="mt-4 space-y-1.5">
-                <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-                <p className="text-sm leading-6 text-muted-foreground">{description}</p>
-            </div>
-            {action ? <div className="mt-5">{action}</div> : null}
+
+            {/* Title & Description */}
+            <h3 className="text-xs font-bold text-foreground tracking-tight mb-2 uppercase">{title}</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed mb-6">{description}</p>
+
+            {/* CTA Action */}
+            {action && (
+                <div className="w-full flex justify-center">
+                    {action}
+                </div>
+            )}
         </div>
     );
 }

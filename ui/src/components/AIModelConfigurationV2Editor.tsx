@@ -452,20 +452,20 @@ export function AIModelConfigurationV2Editor({
     return (
         <div className="space-y-6">
             {error && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-semibold">
                     {error}
                 </div>
             )}
 
             <Tabs value={mode} onValueChange={(value) => setMode(value as ModelMode)} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="realtime">Speech to Speech</TabsTrigger>
-                    <TabsTrigger value="dograh">Dograh</TabsTrigger>
-                    <TabsTrigger value="byok">BYOK</TabsTrigger>
+                <TabsList className="h-8 rounded-lg bg-muted/60 p-0.5 border border-border/60">
+                    <TabsTrigger value="realtime" className="h-7 text-xs px-4 rounded-md font-semibold cursor-pointer">Speech to Speech</TabsTrigger>
+                    <TabsTrigger value="dograh" className="h-7 text-xs px-4 rounded-md font-semibold cursor-pointer">Dograh</TabsTrigger>
+                    <TabsTrigger value="byok" className="h-7 text-xs px-4 rounded-md font-semibold cursor-pointer">BYOK</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="realtime" className="mt-0">
-                    <p className="mb-4 text-sm text-muted-foreground">
+                <TabsContent value="realtime" className="mt-0 space-y-4 focus-visible:outline-none">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                         A single speech-to-speech model handles the conversation in realtime (no separate transcriber or voice). An LLM is still required for variable extraction and QA.
                     </p>
                     <PricingSummary pricing={pricing} includeDograhModel={false} thirdPartyModels />
@@ -481,99 +481,98 @@ export function AIModelConfigurationV2Editor({
                     <ThirdPartyProviderNotice />
                 </TabsContent>
 
-                <TabsContent value="dograh" className="mt-0">
-                    <p className="mb-4 text-sm text-muted-foreground">
+                <TabsContent value="dograh" className="mt-0 space-y-4 focus-visible:outline-none">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                         Dograh provides a managed transcriber, LLM, and voice pipeline. Select a voice and language while Dograh manages the underlying model providers.{" "}
                         We offer custom pricing and a 15-second pulse with a monthly commitment.{" "}
                         <a
                             href="https://www.dograh.com/contact"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="underline"
+                            className="underline font-semibold text-foreground"
                         >
                             Contact us
                         </a>
                         .
                     </p>
                     <PricingSummary pricing={pricing} includeDograhModel />
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="space-y-2 sm:col-span-2">
-                                    <Label>Voice</Label>
-                                    <VoiceSelectorModal
-                                        provider="dograh"
-                                        value={dograh.voice}
-                                        onChange={(voice) => setDograh({ ...dograh, voice })}
-                                        allowManualInput={allowCustomVoice}
-                                    />
-                                </div>
-
-                                <div className="space-y-2 sm:col-span-2">
-                                    <Label>Language</Label>
-                                    <Select value={dograh.language} onValueChange={(language) => setDograh({ ...dograh, language })}>
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Select language" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {defaults.dograh.languages.map((language) => (
-                                                <SelectItem key={language} value={language}>
-                                                    {LANGUAGE_DISPLAY_NAMES[language] || language}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {dograh.language === MULTILINGUAL_LANGUAGE_CODE && multilingualLanguageNames && (
-                                        <p className="text-xs text-muted-foreground">
-                                            Auto-detects {multilingualLanguageNames}.
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="dograh-speed">Speed</Label>
-                                    <Input
-                                        id="dograh-speed"
-                                        type="number"
-                                        min={dograhSpeedRange.min}
-                                        max={dograhSpeedRange.max}
-                                        step={dograhSpeedRange.step ?? 0.1}
-                                        value={dograh.speed}
-                                        onChange={(event) => {
-                                            const speed = event.currentTarget.valueAsNumber;
-                                            setDograh({
-                                                ...dograh,
-                                                speed: Number.isFinite(speed) ? speed : defaults.dograh.defaults.speed,
-                                            });
-                                        }}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="dograh-api-key">API Key</Label>
-                                    <div className="relative">
-                                        <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                        <Input
-                                            id="dograh-api-key"
-                                            className="pl-9"
-                                            value={dograh.api_key}
-                                            onChange={(event) => setDograh({ ...dograh, api_key: event.target.value })}
-                                            placeholder="Enter API key"
-                                        />
-                                    </div>
-                                </div>
+                    <div className="bg-card border border-border rounded-xl p-6 shadow-xs">
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            <div className="space-y-2 sm:col-span-2">
+                                <Label className="text-xs font-bold text-foreground">Voice</Label>
+                                <VoiceSelectorModal
+                                    provider="dograh"
+                                    value={dograh.voice}
+                                    onChange={(voice) => setDograh({ ...dograh, voice })}
+                                    allowManualInput={allowCustomVoice}
+                                />
                             </div>
 
-                            <Button type="button" className="mt-6 w-full" onClick={saveDograhConfiguration} disabled={isSavingDograh}>
-                                <Save className="mr-2 h-4 w-4" />
-                                {isSavingDograh ? "Saving..." : submitLabel}
-                            </Button>
-                        </CardContent>
-                    </Card>
+                            <div className="space-y-2 sm:col-span-2">
+                                <Label className="text-xs font-bold text-foreground">Language</Label>
+                                <Select value={dograh.language} onValueChange={(language) => setDograh({ ...dograh, language })}>
+                                    <SelectTrigger className="h-9 rounded-lg border-border bg-background text-xs">
+                                        <SelectValue placeholder="Select language" />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-lg text-xs">
+                                        {defaults.dograh.languages.map((language) => (
+                                            <SelectItem key={language} value={language} className="text-xs">
+                                                {LANGUAGE_DISPLAY_NAMES[language] || language}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {dograh.language === MULTILINGUAL_LANGUAGE_CODE && multilingualLanguageNames && (
+                                    <p className="text-[10px] text-muted-foreground/60 leading-normal">
+                                        Auto-detects {multilingualLanguageNames}.
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="dograh-speed" className="text-xs font-bold text-foreground">Speed</Label>
+                                <Input
+                                    id="dograh-speed"
+                                    type="number"
+                                    min={dograhSpeedRange.min}
+                                    max={dograhSpeedRange.max}
+                                    step={dograhSpeedRange.step ?? 0.1}
+                                    value={dograh.speed}
+                                    onChange={(event) => {
+                                        const speed = event.currentTarget.valueAsNumber;
+                                        setDograh({
+                                            ...dograh,
+                                            speed: Number.isFinite(speed) ? speed : defaults.dograh.defaults.speed,
+                                        });
+                                    }}
+                                    className="h-9 rounded-lg border-border bg-background text-xs"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="dograh-api-key" className="text-xs font-bold text-foreground">API Key</Label>
+                                <div className="relative">
+                                    <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        id="dograh-api-key"
+                                        className="pl-9 h-9 rounded-lg border-border bg-background text-xs"
+                                        value={dograh.api_key}
+                                        onChange={(event) => setDograh({ ...dograh, api_key: event.target.value })}
+                                        placeholder="Enter API key"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <Button type="button" className="mt-6 h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs transition-all cursor-pointer w-full" onClick={saveDograhConfiguration} disabled={isSavingDograh}>
+                            <Save className="mr-1.5 h-3.5 w-3.5" />
+                            {isSavingDograh ? "Saving..." : submitLabel}
+                        </Button>
+                    </div>
                 </TabsContent>
 
-                <TabsContent value="byok" className="mt-0">
-                    <p className="mb-4 text-sm text-muted-foreground">
+                <TabsContent value="byok" className="mt-0 space-y-4 focus-visible:outline-none">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                         Configure separate transcriber, LLM, and voice providers using your own API keys. An embeddings model can also be configured for knowledge retrieval.
                     </p>
                     <PricingSummary pricing={pricing} includeDograhModel={false} thirdPartyModels />

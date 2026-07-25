@@ -15,24 +15,15 @@ export function BrandLogo({
   inverse?: boolean;
   mark?: boolean;
 }) {
-  if (mark) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src="/dograh-mark.png" alt="Dograh" className={cn("w-auto select-none", className)} />
-    );
-  }
-  if (inverse) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src="/dograh-logo-inverse.png" alt="Dograh" className={cn("w-auto select-none", className)} />
-    );
-  }
   return (
-    <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/dograh-logo.png" alt="Dograh" className={cn("block w-auto select-none dark:hidden", className)} />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/dograh-logo-inverse.png" alt="Dograh" className={cn("hidden w-auto select-none dark:block", className)} />
-    </>
+    <span
+      className={cn(
+        "font-bold tracking-tight text-lg",
+        inverse ? "text-white" : "text-foreground dark:text-zinc-50",
+        className
+      )}
+    >
+      Nova
+    </span>
   );
 }

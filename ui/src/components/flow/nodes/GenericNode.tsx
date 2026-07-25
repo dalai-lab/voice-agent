@@ -299,7 +299,7 @@ function CanvasPreview({
     const hasDocRefs = spec.properties.some((p) => p.type === "document_refs");
     return (
         <>
-            <p className="text-sm text-muted-foreground line-clamp-5 leading-relaxed">
+            <p className="text-[11px] text-foreground/75 font-normal line-clamp-2 leading-relaxed">
                 {data.prompt || "No prompt configured"}
             </p>
             {hasToolRefs && data.tool_uuids && data.tool_uuids.length > 0 && (
@@ -641,6 +641,15 @@ export const GenericNode = memo(({ data, selected, id, type }: GenericNodeProps)
                 icon={<Icon />}
                 badgeLabel={badge.label}
                 badgeClassName={badge.className}
+                accentClassName={
+                    styleVariant === "start" ? "bg-emerald-500" :
+                    styleVariant === "end" ? "bg-rose-500" :
+                    styleVariant === "global" ? "bg-amber-500" :
+                    styleVariant === "trigger" ? "bg-purple-500" :
+                    styleVariant === "webhook" ? "bg-indigo-500" :
+                    styleVariant === "qa" ? "bg-teal-500" :
+                    styleVariant === "integration" ? "bg-cyan-500" : "bg-sky-500"
+                }
                 contentLabel={contentLabel}
                 hasSourceHandle={handles.source}
                 hasTargetHandle={handles.target}

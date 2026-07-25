@@ -30,8 +30,8 @@ export function CreateFolderButton() {
 
     return (
         <>
-            <Button variant="outline" onClick={() => setIsOpen(true)}>
-                <FolderPlus className="w-4 h-4 mr-2" />
+            <Button variant="outline" className="h-9 rounded-lg text-xs font-semibold cursor-pointer" onClick={() => setIsOpen(true)}>
+                <FolderPlus className="w-4 h-4 mr-1.5" />
                 New Folder
             </Button>
             <FolderFormDialog

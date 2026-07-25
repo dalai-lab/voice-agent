@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/auth';
 
 import CampaignAdvancedSettings, { getTimezoneValue, type TimeSlot } from '../../CampaignAdvancedSettings';
@@ -309,10 +310,10 @@ export default function EditCampaignPage() {
 
     if (isLoading) {
         return (
-            <div className="container mx-auto p-6 space-y-6 max-w-2xl">
-                <div className="animate-pulse">
-                    <div className="h-8 bg-muted rounded w-1/4 mb-4"></div>
-                    <div className="h-64 bg-muted rounded"></div>
+            <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background">
+                <div className="space-y-4">
+                    <Skeleton className="h-10 w-48 rounded-lg animate-pulse" />
+                    <Skeleton className="h-64 w-full rounded-xl animate-pulse" />
                 </div>
             </div>
         );
@@ -320,122 +321,122 @@ export default function EditCampaignPage() {
 
     if (!campaign) {
         return (
-            <div className="container mx-auto p-6 space-y-6 max-w-2xl">
-                <p className="text-center text-muted-foreground">Campaign not found</p>
+            <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background">
+                <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm mx-auto border border-border bg-card rounded-xl shadow-xs">
+                    <p className="text-xs text-muted-foreground">Campaign not found</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto p-6 pb-12 space-y-6 max-w-2xl">
-            <div>
-                <Button
-                    variant="ghost"
-                    onClick={handleBack}
-                    className="mb-4"
-                >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Campaign
-                </Button>
-                <h1 className="text-3xl font-bold mb-2">Edit Campaign</h1>
-                <p className="text-muted-foreground">Modify campaign settings</p>
+        <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+            {/* Header section */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/40">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Edit Campaign</h1>
+                    <p className="text-xs text-muted-foreground">Modify campaign settings, retry behavior, and calling windows</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={handleBack}
+                        className="h-9 text-xs font-semibold rounded-lg"
+                    >
+                        <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+                        Back to Campaign
+                    </Button>
+                </div>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Campaign Settings</CardTitle>
-                    <CardDescription>
-                        Update name, concurrency, retry, and schedule configuration
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Campaign Name */}
-                        <div className="space-y-2">
-                            <Label htmlFor="campaign-name">Campaign Name</Label>
-                            <Input
-                                id="campaign-name"
-                                placeholder="Enter campaign name"
-                                value={campaignName}
-                                onChange={(e) => setCampaignName(e.target.value)}
-                                maxLength={255}
-                                required
-                            />
-                        </div>
+            {/* Flat form configuration */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Campaign Name Card */}
+                <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-3">
+                    <Label htmlFor="campaign-name" className="text-xs font-bold text-foreground">Campaign Name</Label>
+                    <Input
+                        id="campaign-name"
+                        placeholder="Enter campaign name"
+                        value={campaignName}
+                        onChange={(e) => setCampaignName(e.target.value)}
+                        maxLength={255}
+                        required
+                        className="h-9 rounded-lg border-border bg-background text-xs"
+                    />
+                </div>
 
-                        <Separator />
+                <CampaignAdvancedSettings
+                    maxConcurrency={maxConcurrency}
+                    onMaxConcurrencyChange={setMaxConcurrency}
+                    effectiveLimit={effectiveLimit}
+                    orgConcurrentLimit={orgConcurrentLimit}
+                    fromNumbersCount={fromNumbersCount}
+                    retryEnabled={retryEnabled}
+                    onRetryEnabledChange={setRetryEnabled}
+                    maxRetries={maxRetries}
+                    onMaxRetriesChange={setMaxRetries}
+                    retryDelaySeconds={retryDelaySeconds}
+                    onRetryDelaySecondsChange={setRetryDelaySeconds}
+                    retryOnBusy={retryOnBusy}
+                    onRetryOnBusyChange={setRetryOnBusy}
+                    retryOnNoAnswer={retryOnNoAnswer}
+                    onRetryOnNoAnswerChange={setRetryOnNoAnswer}
+                    retryOnVoicemail={retryOnVoicemail}
+                    onRetryOnVoicemailChange={setRetryOnVoicemail}
+                    scheduleEnabled={scheduleEnabled}
+                    onScheduleEnabledChange={setScheduleEnabled}
+                    scheduleTimezone={scheduleTimezone}
+                    onScheduleTimezoneChange={setScheduleTimezone}
+                    timeSlots={timeSlots}
+                    onTimeSlotsChange={setTimeSlots}
+                    circuitBreakerEnabled={circuitBreakerEnabled}
+                    onCircuitBreakerEnabledChange={setCircuitBreakerEnabled}
+                    circuitBreakerFailureThreshold={circuitBreakerFailureThreshold}
+                    onCircuitBreakerFailureThresholdChange={setCircuitBreakerFailureThreshold}
+                    circuitBreakerWindowSeconds={circuitBreakerWindowSeconds}
+                    onCircuitBreakerWindowSecondsChange={setCircuitBreakerWindowSeconds}
+                    circuitBreakerMinCalls={circuitBreakerMinCalls}
+                    onCircuitBreakerMinCallsChange={setCircuitBreakerMinCalls}
+                    callbackEnabled={callbackEnabled}
+                    onCallbackEnabledChange={setCallbackEnabled}
+                    callbackSociableHoursStart={callbackSociableHoursStart}
+                    onCallbackSociableHoursStartChange={setCallbackSociableHoursStart}
+                    callbackSociableHoursEnd={callbackSociableHoursEnd}
+                    onCallbackSociableHoursEndChange={setCallbackSociableHoursEnd}
+                    callbackSociableHoursTimezone={callbackSociableHoursTimezone}
+                    onCallbackSociableHoursTimezoneChange={setCallbackSociableHoursTimezone}
+                    callbackHonorCampaignWindowForLongCallbacks={callbackHonorCampaignWindowForLongCallbacks}
+                    onCallbackHonorCampaignWindowForLongCallbacksChange={setCallbackHonorCampaignWindowForLongCallbacks}
+                    callbackLongCallbackThresholdMinutes={callbackLongCallbackThresholdMinutes}
+                    onCallbackLongCallbackThresholdMinutesChange={setCallbackLongCallbackThresholdMinutes}
+                />
 
-                        <CampaignAdvancedSettings
-                            maxConcurrency={maxConcurrency}
-                            onMaxConcurrencyChange={setMaxConcurrency}
-                            effectiveLimit={effectiveLimit}
-                            orgConcurrentLimit={orgConcurrentLimit}
-                            fromNumbersCount={fromNumbersCount}
-                            retryEnabled={retryEnabled}
-                            onRetryEnabledChange={setRetryEnabled}
-                            maxRetries={maxRetries}
-                            onMaxRetriesChange={setMaxRetries}
-                            retryDelaySeconds={retryDelaySeconds}
-                            onRetryDelaySecondsChange={setRetryDelaySeconds}
-                            retryOnBusy={retryOnBusy}
-                            onRetryOnBusyChange={setRetryOnBusy}
-                            retryOnNoAnswer={retryOnNoAnswer}
-                            onRetryOnNoAnswerChange={setRetryOnNoAnswer}
-                            retryOnVoicemail={retryOnVoicemail}
-                            onRetryOnVoicemailChange={setRetryOnVoicemail}
-                            scheduleEnabled={scheduleEnabled}
-                            onScheduleEnabledChange={setScheduleEnabled}
-                            scheduleTimezone={scheduleTimezone}
-                            onScheduleTimezoneChange={setScheduleTimezone}
-                            timeSlots={timeSlots}
-                            onTimeSlotsChange={setTimeSlots}
-                            circuitBreakerEnabled={circuitBreakerEnabled}
-                            onCircuitBreakerEnabledChange={setCircuitBreakerEnabled}
-                            circuitBreakerFailureThreshold={circuitBreakerFailureThreshold}
-                            onCircuitBreakerFailureThresholdChange={setCircuitBreakerFailureThreshold}
-                            circuitBreakerWindowSeconds={circuitBreakerWindowSeconds}
-                            onCircuitBreakerWindowSecondsChange={setCircuitBreakerWindowSeconds}
-                            circuitBreakerMinCalls={circuitBreakerMinCalls}
-                            onCircuitBreakerMinCallsChange={setCircuitBreakerMinCalls}
-                            callbackEnabled={callbackEnabled}
-                            onCallbackEnabledChange={setCallbackEnabled}
-                            callbackSociableHoursStart={callbackSociableHoursStart}
-                            onCallbackSociableHoursStartChange={setCallbackSociableHoursStart}
-                            callbackSociableHoursEnd={callbackSociableHoursEnd}
-                            onCallbackSociableHoursEndChange={setCallbackSociableHoursEnd}
-                            callbackSociableHoursTimezone={callbackSociableHoursTimezone}
-                            onCallbackSociableHoursTimezoneChange={setCallbackSociableHoursTimezone}
-                            callbackHonorCampaignWindowForLongCallbacks={callbackHonorCampaignWindowForLongCallbacks}
-                            onCallbackHonorCampaignWindowForLongCallbacksChange={setCallbackHonorCampaignWindowForLongCallbacks}
-                            callbackLongCallbackThresholdMinutes={callbackLongCallbackThresholdMinutes}
-                            onCallbackLongCallbackThresholdMinutesChange={setCallbackLongCallbackThresholdMinutes}
-                        />
+                {submitError && (
+                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-semibold">
+                        {submitError}
+                    </div>
+                )}
 
-                        {submitError && (
-                            <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
-                                {submitError}
-                            </div>
-                        )}
-
-                        <div className="flex gap-4 pt-4">
-                            <Button
-                                type="submit"
-                                disabled={isSubmitting || !campaignName.trim()}
-                            >
-                                {isSubmitting ? 'Saving...' : 'Save Changes'}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleBack}
-                                disabled={isSubmitting}
-                            >
-                                Cancel
-                            </Button>
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
+                {/* Form Buttons */}
+                <div className="flex gap-3 pt-2">
+                    <Button
+                        type="submit"
+                        disabled={isSubmitting || !campaignName.trim()}
+                        className="h-9 px-4 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer"
+                    >
+                        {isSubmitting ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleBack}
+                        disabled={isSubmitting}
+                        className="h-9 px-4 rounded-lg text-xs font-semibold"
+                    >
+                        Cancel
+                    </Button>
+                </div>
+            </form>
         </div>
     );
 }

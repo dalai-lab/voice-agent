@@ -198,18 +198,23 @@ export default function ReportsPage() {
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold">Daily Reports</h1>
+    <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+      {/* Header & Date Navigation & Workflow Selector */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-2 border-b border-border/40">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Daily Reports</h1>
+          <div className="text-[11px] text-muted-foreground font-semibold">
+            Showing data for {timezone} timezone
+            {selectedWorkflow !== 'all' && (
+              <span> • Filtered by: {workflows.find(w => w.id.toString() === selectedWorkflow)?.name}</span>
+            )}
+          </div>
         </div>
 
-        {/* Date Navigation & Workflow Selector */}
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           {/* Workflow Selector */}
           <Select value={selectedWorkflow} onValueChange={setSelectedWorkflow}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[180px] h-9 rounded-lg border-border text-xs">
               <SelectValue placeholder="Select workflow" />
             </SelectTrigger>
             <SelectContent>
@@ -223,10 +228,11 @@ export default function ReportsPage() {
           </Select>
 
           {/* Date Navigation */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
               size="icon"
+              className="h-9 w-9 rounded-lg"
               onClick={handlePreviousDay}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -234,12 +240,12 @@ export default function ReportsPage() {
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-[200px]">
-                  <Calendar className="mr-2 h-4 w-4" />
+                <Button variant="outline" className="w-[150px] h-9 rounded-lg text-xs font-semibold">
+                  <Calendar className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
                   {format(selectedDate, 'MMM dd, yyyy')}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
+              <PopoverContent className="w-auto p-0 rounded-xl border border-border shadow-lg">
                 <CalendarPicker
                   mode="single"
                   selected={selectedDate}
@@ -252,81 +258,73 @@ export default function ReportsPage() {
             <Button
               variant="outline"
               size="icon"
+              className="h-9 w-9 rounded-lg"
               onClick={handleNextDay}
               disabled={isToday}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-        </div>
-      </div>
 
-      {/* Timezone Display and Download Button */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-        <div className="text-sm text-muted-foreground">
-          Showing data for {timezone} timezone
-          {selectedWorkflow !== 'all' && (
-            <span> • Filtered by: {workflows.find(w => w.id.toString() === selectedWorkflow)?.name}</span>
+          {/* Download CSV Button */}
+          {!loading && report && report.metrics.total_runs > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadCSV}
+              className="h-9 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download CSV
+            </Button>
           )}
         </div>
-
-        {/* Download CSV Button */}
-        {!loading && report && report.metrics.total_runs > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDownloadCSV}
-            className="flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download CSV
-          </Button>
-        )}
       </div>
 
       {/* Loading State */}
       {loading && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Skeleton className="h-[120px]" />
-            <Skeleton className="h-[120px]" />
+            <Skeleton className="h-24 rounded-xl animate-pulse" />
+            <Skeleton className="h-24 rounded-xl animate-pulse" />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Skeleton className="h-[300px]" />
-            <Skeleton className="h-[300px]" />
+            <Skeleton className="h-64 rounded-xl animate-pulse" />
+            <Skeleton className="h-64 rounded-xl animate-pulse" />
           </div>
         </div>
       )}
 
       {/* Error State */}
       {error && !loading && (
-        <Card className="p-6">
-          <p className="text-center text-red-500">{error}</p>
-        </Card>
+        <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm mx-auto border border-border bg-card rounded-xl shadow-xs">
+          <p className="text-xs font-semibold text-destructive">{error}</p>
+        </div>
       )}
 
       {/* Report Content */}
       {report && !loading && !error && (
-        <>
+        <div className="space-y-6">
           {/* Metrics Cards */}
           <MetricsCards metrics={report.metrics} />
 
           {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <DispositionChart data={report.disposition_distribution} />
-            <DurationChart data={report.call_duration_distribution} />
-          </div>
-
-          {/* No Data Message */}
-          {report.metrics.total_runs === 0 && (
-            <Card className="p-6">
-              <p className="text-center text-muted-foreground">
-                No workflow runs found for {format(selectedDate, 'MMMM dd, yyyy')}
-                {selectedWorkflow !== 'all' && ' for the selected workflow'}
-              </p>
-            </Card>
+          {report.metrics.total_runs > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <DispositionChart data={report.disposition_distribution} />
+              <DurationChart data={report.call_duration_distribution} />
+            </div>
+          ) : (
+            <div className="flex items-center justify-center w-full py-12">
+              <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm w-full border border-border bg-card rounded-xl shadow-xs">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  No workflow runs found for {format(selectedDate, 'MMMM dd, yyyy')}
+                  {selectedWorkflow !== 'all' && ' for the selected workflow'}.
+                </p>
+              </div>
+            </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

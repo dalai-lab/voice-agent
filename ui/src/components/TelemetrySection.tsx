@@ -88,32 +88,34 @@ export function TelemetrySection() {
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-4">
-      <p className="text-sm text-muted-foreground">
+    <form onSubmit={handleSave} className="space-y-4 pt-1">
+      <p className="text-[10px] text-muted-foreground/60 leading-normal">
         Connect your Langfuse project to receive call tracing data.
       </p>
       <div className="space-y-2">
-        <Label htmlFor="langfuse-host">Host</Label>
+        <Label htmlFor="langfuse-host" className="text-xs font-bold text-foreground">Host</Label>
         <Input
           id="langfuse-host"
           placeholder="https://cloud.langfuse.com"
           value={credentials.host}
           onChange={(e) => setCredentials({ ...credentials, host: e.target.value })}
           required
+          className="h-9 rounded-lg border-border bg-background text-xs"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="langfuse-public-key">Public Key</Label>
+        <Label htmlFor="langfuse-public-key" className="text-xs font-bold text-foreground">Public Key</Label>
         <Input
           id="langfuse-public-key"
           placeholder="pk-lf-..."
           value={credentials.public_key}
           onChange={(e) => setCredentials({ ...credentials, public_key: e.target.value })}
           required
+          className="h-9 rounded-lg border-border bg-background text-xs"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="langfuse-secret-key">Secret Key</Label>
+        <Label htmlFor="langfuse-secret-key" className="text-xs font-bold text-foreground">Secret Key</Label>
         <Input
           id="langfuse-secret-key"
           type="password"
@@ -121,17 +123,18 @@ export function TelemetrySection() {
           value={credentials.secret_key}
           onChange={(e) => setCredentials({ ...credentials, secret_key: e.target.value })}
           required
+          className="h-9 rounded-lg border-border bg-background text-xs"
         />
       </div>
-      <div className="flex gap-2">
-        <Button type="submit" disabled={saving}>
-          {saving ? "Saving..." : "Save"}
-        </Button>
+      <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
         {credentials.configured && (
-          <Button type="button" variant="destructive" disabled={saving} onClick={handleDelete}>
-            Remove
+          <Button type="button" variant="destructive" disabled={saving} onClick={handleDelete} className="h-9 px-4 rounded-lg text-xs font-semibold">
+            Remove Credentials
           </Button>
         )}
+        <Button type="submit" disabled={saving} className="h-9 px-4 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs transition-all cursor-pointer">
+          {saving ? "Saving..." : "Save Credentials"}
+        </Button>
       </div>
     </form>
   );

@@ -159,10 +159,10 @@ export default function CampaignAdvancedSettings({
     const timezoneSelectId = useId();
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Max Concurrent Calls */}
-            <div className="space-y-2">
-                <Label htmlFor="max-concurrency">Max Concurrent Calls</Label>
+            <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-3">
+                <Label htmlFor="max-concurrency" className="text-xs font-bold text-foreground">Max Concurrent Calls</Label>
                 <Input
                     id="max-concurrency"
                     type="number"
@@ -171,29 +171,32 @@ export default function CampaignAdvancedSettings({
                     onChange={(e) => onMaxConcurrencyChange(e.target.value)}
                     min={1}
                     max={effectiveLimit}
+                    className="h-9 rounded-lg border-border bg-background text-xs"
                 />
-                <p className="text-sm text-muted-foreground">
-                    Maximum number of simultaneous calls. Leave empty to use {effectiveLimit}.
-                    {fromNumbersCount > 0 && ` You have ${fromNumbersCount} CLI${fromNumbersCount !== 1 ? 's' : ''} and an org limit of ${orgConcurrentLimit}.`}
-                </p>
-                {fromNumbersCount > 0 && fromNumbersCount < orgConcurrentLimit && (
-                    <p className="text-sm text-amber-600 dark:text-amber-400">
-                        Concurrency is limited to {fromNumbersCount} by your configured phone numbers. To use the full org limit of {orgConcurrentLimit}, add more CLIs in <Link href="/telephony-configurations" className="underline font-medium">Telephony Configuration</Link>.
+                <div className="space-y-1 text-[10px] text-muted-foreground/60 leading-relaxed font-semibold">
+                    <p>
+                        Maximum number of simultaneous calls. Leave empty to use {effectiveLimit}.
+                        {fromNumbersCount > 0 && ` You have ${fromNumbersCount} CLI${fromNumbersCount !== 1 ? 's' : ''} and an org limit of ${orgConcurrentLimit}.`}
                     </p>
-                )}
-                {fromNumbersCount === 0 && (
-                    <p className="text-sm text-amber-600 dark:text-amber-400">
-                        No phone numbers configured. Add CLIs in <Link href="/telephony-configurations" className="underline font-medium">Telephony Configuration</Link> before running the campaign.
-                    </p>
-                )}
+                    {fromNumbersCount > 0 && fromNumbersCount < orgConcurrentLimit && (
+                        <p className="text-amber-600 dark:text-amber-400">
+                            Concurrency is limited to {fromNumbersCount} by your configured phone numbers. To use the full org limit of {orgConcurrentLimit}, add more CLIs in <Link href="/telephony-configurations" className="underline font-bold">Telephony Configuration</Link>.
+                        </p>
+                    )}
+                    {fromNumbersCount === 0 && (
+                        <p className="text-amber-600 dark:text-amber-400 font-bold">
+                            No phone numbers configured. Add CLIs in <Link href="/telephony-configurations" className="underline font-bold">Telephony Configuration</Link> before running the campaign.
+                        </p>
+                    )}
+                </div>
             </div>
 
             {/* Retry Configuration */}
-            <div className="space-y-4">
+            <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
-                    <div>
-                        <Label htmlFor="retry-enabled">Enable Retries</Label>
-                        <p className="text-sm text-muted-foreground">
+                    <div className="space-y-0.5">
+                        <Label htmlFor="retry-enabled" className="text-xs font-bold text-foreground">Enable Retries</Label>
+                        <p className="text-[10px] text-muted-foreground/60 font-semibold">
                             Automatically retry failed calls
                         </p>
                     </div>
@@ -205,10 +208,10 @@ export default function CampaignAdvancedSettings({
                 </div>
 
                 {retryEnabled && (
-                    <div className="space-y-4 pl-4 border-l-2 border-muted">
+                    <div className="space-y-4 pt-3 border-t border-border/40">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="max-retries">Max Retries</Label>
+                                <Label htmlFor="max-retries" className="text-xs font-bold text-foreground">Max Retries</Label>
                                 <Input
                                     id="max-retries"
                                     type="number"
@@ -216,10 +219,11 @@ export default function CampaignAdvancedSettings({
                                     onChange={(e) => onMaxRetriesChange(e.target.value)}
                                     min={0}
                                     max={10}
+                                    className="h-9 rounded-lg border-border bg-background text-xs"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="retry-delay">Retry Delay (seconds)</Label>
+                                <Label htmlFor="retry-delay" className="text-xs font-bold text-foreground">Retry Delay (seconds)</Label>
                                 <Input
                                     id="retry-delay"
                                     type="number"
@@ -227,23 +231,24 @@ export default function CampaignAdvancedSettings({
                                     onChange={(e) => onRetryDelaySecondsChange(e.target.value)}
                                     min={30}
                                     max={3600}
+                                    className="h-9 rounded-lg border-border bg-background text-xs"
                                 />
                             </div>
                         </div>
 
                         <div className="space-y-3">
-                            <Label>Retry On</Label>
-                            <div className="space-y-2">
+                            <Label className="text-xs font-bold text-foreground">Retry On</Label>
+                            <div className="space-y-2 bg-muted/30 border border-border/50 rounded-xl p-4">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-sm">Busy Signal</span>
+                                    <span className="text-xs font-semibold text-foreground">Busy Signal</span>
                                     <Switch checked={retryOnBusy} onCheckedChange={onRetryOnBusyChange} />
                                 </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm">No Answer</span>
+                                <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                                    <span className="text-xs font-semibold text-foreground">No Answer</span>
                                     <Switch checked={retryOnNoAnswer} onCheckedChange={onRetryOnNoAnswerChange} />
                                 </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm">Voicemail</span>
+                                <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                                    <span className="text-xs font-semibold text-foreground">Voicemail</span>
                                     <Switch checked={retryOnVoicemail} onCheckedChange={onRetryOnVoicemailChange} />
                                 </div>
                             </div>
@@ -252,14 +257,12 @@ export default function CampaignAdvancedSettings({
                 )}
             </div>
 
-            <Separator />
-
             {/* Call Schedule */}
-            <div className="space-y-4">
+            <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
-                    <div>
-                        <Label htmlFor="schedule-enabled">Call Schedule</Label>
-                        <p className="text-sm text-muted-foreground">
+                    <div className="space-y-0.5">
+                        <Label htmlFor="schedule-enabled" className="text-xs font-bold text-foreground">Call Schedule</Label>
+                        <p className="text-[10px] text-muted-foreground/60 font-semibold">
                             Restrict when calls are made
                         </p>
                     </div>
@@ -271,9 +274,9 @@ export default function CampaignAdvancedSettings({
                 </div>
 
                 {scheduleEnabled && (
-                    <div className="space-y-4 pl-4 border-l-2 border-muted">
+                    <div className="space-y-4 pt-3 border-t border-border/40">
                         <div className="space-y-2">
-                            <Label>Timezone</Label>
+                            <Label className="text-xs font-bold text-foreground">Timezone</Label>
                             <TimezoneSelect
                                 instanceId={timezoneSelectId}
                                 value={scheduleTimezone}
@@ -283,66 +286,70 @@ export default function CampaignAdvancedSettings({
                         </div>
 
                         <div className="space-y-3">
-                            <Label>Time Slots</Label>
-                            {timeSlots.map((slot, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                    <Select
-                                        value={String(slot.day_of_week)}
-                                        onValueChange={(val) => {
-                                            const updated = [...timeSlots];
-                                            updated[index] = { ...updated[index], day_of_week: parseInt(val) };
-                                            onTimeSlotsChange(updated);
-                                        }}
-                                    >
-                                        <SelectTrigger className="w-[120px]">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
-                                                <SelectItem key={i} value={String(i)}>{day}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <Input
-                                        type="time"
-                                        value={slot.start_time}
-                                        onChange={(e) => {
-                                            const updated = [...timeSlots];
-                                            updated[index] = { ...updated[index], start_time: e.target.value };
-                                            onTimeSlotsChange(updated);
-                                        }}
-                                        className="w-[130px]"
-                                    />
-                                    <span className="text-sm text-muted-foreground">to</span>
-                                    <Input
-                                        type="time"
-                                        value={slot.end_time}
-                                        onChange={(e) => {
-                                            const updated = [...timeSlots];
-                                            updated[index] = { ...updated[index], end_time: e.target.value };
-                                            onTimeSlotsChange(updated);
-                                        }}
-                                        className="w-[130px]"
-                                    />
-                                    {timeSlots.length > 1 && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => onTimeSlotsChange(timeSlots.filter((_, i) => i !== index))}
+                            <Label className="text-xs font-bold text-foreground">Time Slots</Label>
+                            <div className="space-y-2">
+                                {timeSlots.map((slot, index) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                        <Select
+                                            value={String(slot.day_of_week)}
+                                            onValueChange={(val) => {
+                                                const updated = [...timeSlots];
+                                                updated[index] = { ...updated[index], day_of_week: parseInt(val) };
+                                                onTimeSlotsChange(updated);
+                                            }}
                                         >
-                                            <X className="h-4 w-4" />
-                                        </Button>
-                                    )}
-                                </div>
-                            ))}
+                                            <SelectTrigger className="w-[120px] h-9 rounded-lg text-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
+                                                    <SelectItem key={i} value={String(i)} className="text-xs">{day}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <Input
+                                            type="time"
+                                            value={slot.start_time}
+                                            onChange={(e) => {
+                                                const updated = [...timeSlots];
+                                                updated[index] = { ...updated[index], start_time: e.target.value };
+                                                onTimeSlotsChange(updated);
+                                            }}
+                                            className="w-[130px] h-9 rounded-lg text-xs"
+                                        />
+                                        <span className="text-xs text-muted-foreground">to</span>
+                                        <Input
+                                            type="time"
+                                            value={slot.end_time}
+                                            onChange={(e) => {
+                                                const updated = [...timeSlots];
+                                                updated[index] = { ...updated[index], end_time: e.target.value };
+                                                onTimeSlotsChange(updated);
+                                            }}
+                                            className="w-[130px] h-9 rounded-lg text-xs"
+                                        />
+                                        {timeSlots.length > 1 && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => onTimeSlotsChange(timeSlots.filter((_, i) => i !== index))}
+                                                className="h-9 w-9 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                             <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
                                 onClick={() => onTimeSlotsChange([...timeSlots, { day_of_week: 0, start_time: '09:00', end_time: '17:00' }])}
+                                className="h-8 rounded-lg text-xs font-semibold"
                             >
-                                <Plus className="h-4 w-4 mr-1" />
+                                <Plus className="h-3.5 w-3.5 mr-1" />
                                 Add Time Slot
                             </Button>
                         </div>
@@ -350,14 +357,12 @@ export default function CampaignAdvancedSettings({
                 )}
             </div>
 
-            <Separator />
-
             {/* Circuit Breaker */}
-            <div className="space-y-4">
+            <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
-                    <div>
-                        <Label htmlFor="circuit-breaker-enabled">Circuit Breaker</Label>
-                        <p className="text-sm text-muted-foreground">
+                    <div className="space-y-0.5">
+                        <Label htmlFor="circuit-breaker-enabled" className="text-xs font-bold text-foreground">Circuit Breaker</Label>
+                        <p className="text-[10px] text-muted-foreground/60 font-semibold">
                             Auto-pause campaign on high failure rates
                         </p>
                     </div>
@@ -369,9 +374,9 @@ export default function CampaignAdvancedSettings({
                 </div>
 
                 {circuitBreakerEnabled && (
-                    <div className="space-y-4 pl-4 border-l-2 border-muted">
+                    <div className="space-y-4 pt-3 border-t border-border/40">
                         <div className="space-y-2">
-                            <Label htmlFor="cb-failure-threshold">Failure Threshold (%)</Label>
+                            <Label htmlFor="cb-failure-threshold" className="text-xs font-bold text-foreground">Failure Threshold (%)</Label>
                             <Input
                                 id="cb-failure-threshold"
                                 type="number"
@@ -379,14 +384,15 @@ export default function CampaignAdvancedSettings({
                                 onChange={(e) => onCircuitBreakerFailureThresholdChange(e.target.value)}
                                 min={1}
                                 max={100}
+                                className="h-9 rounded-lg border-border bg-background text-xs"
                             />
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-[10px] text-muted-foreground/60 font-semibold">
                                 Pause when failure rate exceeds this percentage
                             </p>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="cb-window">Window (seconds)</Label>
+                                <Label htmlFor="cb-window" className="text-xs font-bold text-foreground">Window (seconds)</Label>
                                 <Input
                                     id="cb-window"
                                     type="number"
@@ -394,10 +400,11 @@ export default function CampaignAdvancedSettings({
                                     onChange={(e) => onCircuitBreakerWindowSecondsChange(e.target.value)}
                                     min={30}
                                     max={600}
+                                    className="h-9 rounded-lg border-border bg-background text-xs"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="cb-min-calls">Min Calls in Window</Label>
+                                <Label htmlFor="cb-min-calls" className="text-xs font-bold text-foreground">Min Calls in Window</Label>
                                 <Input
                                     id="cb-min-calls"
                                     type="number"
@@ -405,6 +412,7 @@ export default function CampaignAdvancedSettings({
                                     onChange={(e) => onCircuitBreakerMinCallsChange(e.target.value)}
                                     min={1}
                                     max={100}
+                                    className="h-9 rounded-lg border-border bg-background text-xs"
                                 />
                             </div>
                         </div>
@@ -412,14 +420,12 @@ export default function CampaignAdvancedSettings({
                 )}
             </div>
 
-            <Separator />
-
             {/* Callback Settings */}
-            <div className="space-y-4">
+            <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
-                    <div>
-                        <Label htmlFor="callback-enabled">Callback Settings</Label>
-                        <p className="text-sm text-muted-foreground">
+                    <div className="space-y-0.5">
+                        <Label htmlFor="callback-enabled" className="text-xs font-bold text-foreground">Callback Settings</Label>
+                        <p className="text-[10px] text-muted-foreground/60 font-semibold">
                             Configure callback handling for this campaign
                         </p>
                     </div>
@@ -431,40 +437,43 @@ export default function CampaignAdvancedSettings({
                 </div>
 
                 {callbackEnabled && (
-                    <div className="space-y-4 pl-4 border-l-2 border-muted">
+                    <div className="space-y-4 pt-3 border-t border-border/40">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="cb-sociable-start">Sociable Hours Start</Label>
+                                <Label htmlFor="cb-sociable-start" className="text-xs font-bold text-foreground">Sociable Hours Start</Label>
                                 <Input
                                     id="cb-sociable-start"
                                     type="time"
                                     value={callbackSociableHoursStart}
                                     onChange={(e) => onCallbackSociableHoursStartChange(e.target.value)}
+                                    className="h-9 rounded-lg border-border bg-background text-xs"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="cb-sociable-end">Sociable Hours End</Label>
+                                <Label htmlFor="cb-sociable-end" className="text-xs font-bold text-foreground">Sociable Hours End</Label>
                                 <Input
                                     id="cb-sociable-end"
                                     type="time"
                                     value={callbackSociableHoursEnd}
                                     onChange={(e) => onCallbackSociableHoursEndChange(e.target.value)}
+                                    className="h-9 rounded-lg border-border bg-background text-xs"
                                 />
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="cb-sociable-timezone">Sociable Hours Timezone</Label>
+                            <Label htmlFor="cb-sociable-timezone" className="text-xs font-bold text-foreground">Sociable Hours Timezone</Label>
                             <TimezoneSelect
                                 id="cb-sociable-timezone"
                                 value={callbackSociableHoursTimezone}
                                 onChange={onCallbackSociableHoursTimezoneChange}
+                                styles={timezoneSelectStyles}
                             />
                         </div>
 
-                        <div className="flex items-center justify-between mt-4">
-                            <div>
-                                <Label htmlFor="cb-honor-campaign">Honor Campaign Window for Long Callbacks</Label>
-                                <p className="text-sm text-muted-foreground">
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/40">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="cb-honor-campaign" className="text-xs font-bold text-foreground">Honor Campaign Window for Long Callbacks</Label>
+                                <p className="text-[10px] text-muted-foreground/60 font-semibold">
                                     Hold long callbacks until the next schedule window opens
                                 </p>
                             </div>
@@ -476,14 +485,15 @@ export default function CampaignAdvancedSettings({
                         </div>
 
                         {callbackHonorCampaignWindowForLongCallbacks && (
-                            <div className="space-y-2 mt-2">
-                                <Label htmlFor="cb-long-threshold">Long Callback Threshold (minutes)</Label>
+                            <div className="space-y-2 mt-2 pt-2 border-t border-border/40">
+                                <Label htmlFor="cb-long-threshold" className="text-xs font-bold text-foreground">Long Callback Threshold (minutes)</Label>
                                 <Input
                                     id="cb-long-threshold"
                                     type="number"
                                     value={callbackLongCallbackThresholdMinutes}
                                     onChange={(e) => onCallbackLongCallbackThresholdMinutesChange(e.target.value)}
                                     min={0}
+                                    className="h-9 rounded-lg border-border bg-background text-xs"
                                 />
                             </div>
                         )}

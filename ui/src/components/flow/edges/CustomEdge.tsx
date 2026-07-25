@@ -72,68 +72,93 @@ const EdgeDetailsDialog = ({ open, onOpenChange, data, onSave }: EdgeDetailsDial
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitle>Edit Condition</DialogTitle>
+            <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col p-6">
+                <DialogHeader className="border-b border-border pb-4">
+                    <DialogTitle className="text-lg font-bold">Edit Condition</DialogTitle>
                     {data?.invalid && data.validationMessage && (
-                        <div className="mt-2 flex items-center gap-2 rounded-md bg-red-50 p-2 text-sm text-red-500 border border-red-200">
+                        <div className="mt-2 flex items-center gap-2 rounded-md bg-red-50 p-2.5 text-xs text-red-500 border border-red-200">
                             <AlertCircle className="h-4 w-4" />
                             <span>{data.validationMessage}</span>
                         </div>
                     )}
                 </DialogHeader>
-                <div className="grid gap-4 py-4 overflow-y-auto">
-                    <div className="grid gap-2">
-                        <Label>Condition Label</Label>
-                        <Label className="text-xs text-muted-foreground">
-                            Enter a short label which helps identify this pathway in logs
-                        </Label>
-                        <Input
-                            type="text"
-                            value={label}
-                            maxLength={64}
-                            onChange={(e) => setLabel(e.target.value)}
-                        />
-                        <div className="text-xs text-muted-foreground">
-                            {label.length}/64 characters
+
+                <div className="py-4 overflow-y-auto no-scrollbar flex-1">
+                    <div className="grid grid-cols-12 gap-6 w-full">
+                        {/* Main Controls (Left Column) */}
+                        <div className="col-span-12 md:col-span-7 lg:col-span-8 flex flex-col gap-5">
+                            {/* Condition Card */}
+                            <div className="bg-card border border-border rounded-xl p-5 shadow-xs flex flex-col gap-2">
+                                <Label className="font-bold text-sm">Condition</Label>
+                                <Label className="text-xs text-muted-foreground">
+                                    Describe a condition that will be evaluated to determine if this pathway should be taken
+                                </Label>
+                                <Textarea
+                                    value={condition}
+                                    onChange={(e) => setCondition(e.target.value)}
+                                    className="min-h-[110px] font-mono text-xs leading-relaxed resize-y mt-2"
+                                />
+                            </div>
+
+                            {/* Transition Speech Card */}
+                            <div className="bg-card border border-border rounded-xl p-5 shadow-xs flex flex-col gap-2">
+                                <Label className="font-bold text-sm">Transition Speech</Label>
+                                <Label className="text-xs text-muted-foreground">
+                                    Optional text or audio played right before transitioning to the next step
+                                </Label>
+                                <div className="mt-2">
+                                    <TextOrAudioInput
+                                        type={transitionSpeechType}
+                                        onTypeChange={setTransitionSpeechType}
+                                        recordingId={transitionSpeechRecordingId}
+                                        onRecordingIdChange={setTransitionSpeechRecordingId}
+                                        recordings={recordings ?? []}
+                                    >
+                                        <>
+                                            <StaticTextWarning />
+                                            <Textarea
+                                                value={transitionSpeech}
+                                                placeholder="e.g. Let me transfer you to our billing department..."
+                                                onChange={(e) => setTransitionSpeech(e.target.value)}
+                                                className="min-h-[90px] font-mono text-xs leading-relaxed resize-y mt-2"
+                                            />
+                                        </>
+                                    </TextOrAudioInput>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Sidebar Configuration (Right Column) */}
+                        <div className="col-span-12 md:col-span-5 lg:col-span-4 flex flex-col gap-5">
+                            <div className="bg-card border border-border rounded-xl p-6 shadow-xs space-y-5.5">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border pb-2.5">
+                                    Parameters
+                                </h4>
+                                <div className="flex flex-col gap-4">
+                                    <div className="flex flex-col gap-2">
+                                        <Label className="font-semibold text-xs text-foreground">Condition Label</Label>
+                                        <Label className="text-[10px] text-muted-foreground leading-normal">
+                                            Enter a short label to help identify this pathway in logs
+                                        </Label>
+                                        <Input
+                                            type="text"
+                                            value={label}
+                                            maxLength={64}
+                                            onChange={(e) => setLabel(e.target.value)}
+                                            className="mt-1"
+                                        />
+                                        <div className="text-[10px] text-muted-foreground text-right mt-1 font-mono">
+                                            {label.length}/64 characters
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div className="grid gap-2">
-                        <Label>Condition</Label>
-                        <Label className="text-xs text-muted-foreground">
-                            Describe a condition that will be evaluated to determine if this pathway should be taken
-                        </Label>
-                        <Textarea
-                            value={condition}
-                            onChange={(e) => setCondition(e.target.value)}
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>Transition Speech</Label>
-                        <Label className="text-xs text-muted-foreground">
-                            Optional text or audio the assistant will play right before transitioning to the node.
-                            This will not be attached in Conversation Context. Use this as simple filler to reduce latency.
-                        </Label>
-                        <TextOrAudioInput
-                            type={transitionSpeechType}
-                            onTypeChange={setTransitionSpeechType}
-                            recordingId={transitionSpeechRecordingId}
-                            onRecordingIdChange={setTransitionSpeechRecordingId}
-                            recordings={recordings ?? []}
-                        >
-                            <>
-                                <StaticTextWarning />
-                                <Textarea
-                                    value={transitionSpeech}
-                                    placeholder="e.g. Let me transfer you to our billing department..."
-                                    onChange={(e) => setTransitionSpeech(e.target.value)}
-                                />
-                            </>
-                        </TextOrAudioInput>
-                    </div>
                 </div>
-                <DialogFooter>
-                    <div className="flex items-center gap-2">
+
+                <DialogFooter className="border-t border-border pt-4 mt-2">
+                    <div className="flex items-center gap-2 justify-end w-full">
                         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                         <Button onClick={handleSave} disabled={readOnly}>
                             {readOnly ? "Read Only" : "Save"}
@@ -274,16 +299,14 @@ export default function CustomEdge(props: CustomEdgeProps) {
                     style={{
                         ...style,
                         stroke: selected
-                            ? '#3B82F6'  // blue-500 when selected
+                            ? 'var(--cta)'  // brand crimson when selected
                             : isHovered
-                                ? '#60A5FA'  // blue-400 when hovered
-                                : data?.invalid ? '#EF4444' : '#94A3B8',
-                        strokeWidth: selected ? 4 : isHovered ? 3 : 2.5,
+                                ? 'var(--cta)'  // brand crimson when hovered
+                                : data?.invalid ? '#EF4444' : 'var(--muted-foreground)',
+                        strokeWidth: selected ? 4 : isHovered ? 3.5 : 2.5,
                         filter: selected
-                            ? 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.6))'
-                            : isHovered
-                                ? 'drop-shadow(0 0 6px rgba(96, 165, 250, 0.4))'
-                                : 'none',
+                            ? 'drop-shadow(0 0 6px var(--ring))'
+                            : 'none',
                         transition: 'stroke 0.2s ease, stroke-width 0.2s ease, filter 0.2s ease',
                     }}
                     interactionWidth={20}
@@ -310,24 +333,24 @@ export default function CustomEdge(props: CustomEdgeProps) {
                             "flex flex-col gap-2 bg-card rounded-lg border min-w-[220px]",
                             "animate-in fade-in zoom-in duration-200",
                             data?.invalid
-                                ? "border-destructive/50 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                                ? "border-destructive/50 shadow-md bg-destructive/[0.02]"
                                 : selected
-                                    ? "border-primary ring-2 ring-primary/40 shadow-[0_0_20px_rgba(59,130,246,0.5)]"
-                                    : "border-border shadow-xl"
+                                    ? "border-cta/50 ring-2 ring-cta/15 shadow-md"
+                                    : "border-border shadow-md"
                         )}>
                             {/* Header with label */}
                             <div className={cn(
-                                "flex items-center justify-between px-3 py-2 border-b",
+                                "flex items-center justify-between px-3 py-1.5 border-b text-[10px]",
                                 data?.invalid ? "bg-destructive/10 border-destructive/30" : "bg-muted/50 border-border"
                             )}>
-                                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                <span className="font-semibold text-muted-foreground uppercase tracking-wider">
                                     Condition
                                 </span>
                                 <div className="flex items-center gap-1">
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
+                                        className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
                                         onClick={handleDeleteEdge}
                                     >
                                         <Trash2 className="h-3 w-3" />
@@ -335,7 +358,7 @@ export default function CustomEdge(props: CustomEdgeProps) {
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-6 w-6 p-0 hover:bg-muted text-muted-foreground"
+                                        className="h-5 w-5 p-0 hover:bg-muted text-muted-foreground"
                                         onClick={() => setOpen(true)}
                                     >
                                         <Pencil className="h-3 w-3" />
@@ -343,20 +366,19 @@ export default function CustomEdge(props: CustomEdgeProps) {
                                 </div>
                             </div>
                             {/* Content */}
-                            <div className="px-3 pb-3">
-                                <div className="text-sm font-medium text-card-foreground break-words">
+                            <div className="px-3 pb-3 pt-1">
+                                <div className="text-xs font-semibold text-card-foreground break-words leading-relaxed">
                                     {data?.label || data?.condition || 'Click to set condition'}
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        /* Simple label shown by default - amber/orange colored pill style */
+                        /* Simple label shown by default - theme-aware flat rounded card */
                         <div className={cn(
-                            "px-3 py-1.5 rounded-full text-xs font-medium shadow-md",
-                            "transition-all duration-200",
+                            "px-3.5 py-1.5 rounded-lg text-xs font-extrabold border shadow-xs transition-all duration-200 select-none",
                             data?.invalid
-                                ? "bg-destructive text-destructive-foreground"
-                                : "bg-amber-500 text-amber-950"
+                                ? "bg-destructive/15 border-destructive/35 text-destructive"
+                                : "bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/80 dark:border-amber-800/60 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/60"
                         )}>
                             {data?.label || data?.condition || 'No condition'}
                         </div>

@@ -86,62 +86,77 @@ export const NodeEditDialog = ({
         <>
             <Dialog open={open} onOpenChange={handleOpenChange}>
                 <DialogContent
-                    className="w-full max-w-xl bg-background border border-border/80 rounded-xl p-0 gap-0 shadow-lg"
+                    className="w-[94vw] sm:max-w-5xl h-[88vh] max-h-[900px] bg-background border border-border rounded-xl p-0 gap-0 shadow-lg flex flex-col overflow-hidden"
                 >
                     {/* Header Container */}
-                    <div className="p-5 border-b border-border/40 space-y-2">
-                        <div className="flex items-center justify-between">
-                            <DialogTitle className="text-sm font-bold tracking-tight text-foreground">{title}</DialogTitle>
+                    <div className="px-6 py-4 border-b border-border bg-card flex items-center justify-between shrink-0">
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-3">
+                                <DialogTitle className="text-base font-bold tracking-tight text-foreground">{title}</DialogTitle>
+                                {isDirty && (
+                                    <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-500 border border-amber-500/20">
+                                        Unsaved changes
+                                    </span>
+                                )}
+                            </div>
+                            <DialogDescription className="text-xs text-muted-foreground">
+                                Configure the settings and runtime prompts for this node in your workflow.
+                            </DialogDescription>
+                        </div>
+
+                        <div className="flex items-center gap-4 pr-6">
                             {documentationUrl && (
                                 <a
                                     href={documentationUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors pr-6"
+                                    className="flex items-center gap-1.5 text-xs font-semibold text-cta hover:text-cta/80 transition-colors"
                                 >
                                     Docs
-                                    <ExternalLink className="h-3 w-3" />
+                                    <ExternalLink className="h-3.5 w-3.5" />
                                 </a>
                             )}
                         </div>
-                        <DialogDescription className="text-xs text-muted-foreground/60">
-                            Configure the settings for this node in your workflow.
-                        </DialogDescription>
-                        {nodeData.invalid && nodeData.validationMessage && (
-                            <div className="mt-2 flex items-center gap-2 rounded-lg bg-destructive/5 p-2.5 text-xs text-destructive border border-destructive/20 font-medium">
-                                <AlertCircle className="h-3.5 w-3.5" />
-                                <span>{nodeData.validationMessage}</span>
-                            </div>
-                        )}
                     </div>
 
-                    {/* Form Content - Scrollable area */}
-                    <div className="max-h-[55vh] overflow-y-auto p-5 space-y-4">
+                    {/* Invalid State Alert Banner */}
+                    {nodeData.invalid && nodeData.validationMessage && (
+                        <div className="mx-6 mt-4 flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-xs text-destructive border border-destructive/20 font-medium shrink-0">
+                            <AlertCircle className="h-4 w-4 shrink-0" />
+                            <span>{nodeData.validationMessage}</span>
+                        </div>
+                    )}
+
+                    {/* Form Content - Spacious Scrollable Body */}
+                    <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
                         {children}
                     </div>
 
                     {error && (
-                        <div className="mx-5 mb-4 flex items-center gap-2 rounded-lg bg-destructive/5 p-3 text-xs text-destructive border border-destructive/20 font-medium">
-                            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                        <div className="mx-6 mb-4 flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-xs text-destructive border border-destructive/20 font-medium shrink-0">
+                            <AlertCircle className="h-4 w-4 shrink-0" />
                             <span>{error}</span>
                         </div>
                     )}
 
                     {/* Footer Container */}
-                    <div className="p-4 border-t border-border/40 bg-muted/10">
-                        <div className="flex items-center justify-end gap-2.5">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="px-3.5"
-                                onClick={isDirty ? () => setShowDiscardAlert(true) : handleClose}
-                            >
-                                Cancel
-                            </Button>
-                            <Button onClick={handleSave} size="sm" className="px-3.5" disabled={readOnly}>
-                                {readOnly ? "Read Only" : "Save"}
-                            </Button>
-                        </div>
+                    <div className="px-6 py-4 border-t border-border bg-card flex items-center justify-end gap-3 shrink-0">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="px-4 h-9 text-xs rounded-lg font-medium"
+                            onClick={isDirty ? () => setShowDiscardAlert(true) : handleClose}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSave}
+                            size="sm"
+                            className="px-5 h-9 text-xs rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold transition-all cursor-pointer"
+                            disabled={readOnly}
+                        >
+                            {readOnly ? "Read Only" : "Save Changes"}
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>

@@ -96,7 +96,7 @@ export default function ModelConfigurationV2({ docsUrl }: { docsUrl?: string }) 
 
     if (loading) {
         return (
-            <div className="w-full max-w-4xl mx-auto space-y-6">
+            <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background">
                 <Skeleton className="h-10 w-80" />
                 <Skeleton className="h-28 w-full" />
                 <Skeleton className="h-96 w-full" />
@@ -105,15 +105,15 @@ export default function ModelConfigurationV2({ docsUrl }: { docsUrl?: string }) 
     }
 
     return (
-        <div className="w-full max-w-4xl mx-auto space-y-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold">AI Models Configuration</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">AI Models Configuration</h1>
+                    <p className="text-xs text-muted-foreground">
                         Organization-scoped model settings.{" "}
                         {docsUrl && (
-                            <a href={docsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline">
-                                Learn more <ExternalLink className="h-3 w-3" />
+                            <a href={docsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline font-semibold">
+                                Learn more <ExternalLink className="h-3.5 w-3.5" />
                             </a>
                         )}
                     </p>
@@ -121,12 +121,12 @@ export default function ModelConfigurationV2({ docsUrl }: { docsUrl?: string }) 
             </div>
 
             {error && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-semibold">
                     {error}
                 </div>
             )}
             {notice && (
-                <div className="rounded-md border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-300">
+                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-600 font-semibold dark:text-emerald-400">
                     {notice}
                 </div>
             )}

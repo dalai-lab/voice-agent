@@ -149,176 +149,177 @@ export default function TelephonyConfigurationsPage() {
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Telephony configurations</h1>
-            <p className="text-muted-foreground">
-              Connect one or more telephony provider accounts. Each campaign uses one
-              configuration; inbound calls are routed to the right one by account ID.{" "}
-              <a
-                href="https://docs.dograh.com/integrations/telephony/overview"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-0.5 underline"
-              >
-                Learn more <ExternalLink className="h-3 w-3" />
-              </a>
-            </p>
-          </div>
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Add configuration
-          </Button>
+    <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Telephony configurations</h1>
+          <p className="text-xs text-muted-foreground">
+            Connect one or more telephony provider accounts. Each campaign uses one
+            configuration; inbound calls are routed to the right one by account ID.{" "}
+            <a
+              href="https://docs.dograh.com/integrations/telephony/overview"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-0.5 underline font-semibold text-foreground"
+            >
+              Learn more <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </p>
         </div>
+        <Button onClick={() => setCreateOpen(true)} className="h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer">
+          <Plus className="h-4 w-4 mr-1.5" /> Add configuration
+        </Button>
+      </div>
 
-        {telnyxMissingWebhookPublicKeyCount > 0 && (
-          <div className="mb-6 rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
-              <div className="space-y-1 text-sm">
-                <p className="font-medium">Webhook public key not configured</p>
-                <p>
-                  {telnyxMissingWebhookPublicKeyCount === 1
-                    ? "1 Telnyx configuration is"
-                    : `${telnyxMissingWebhookPublicKeyCount} Telnyx configurations are`}{" "}
-                  missing a webhook public key. Without it, Telnyx call status
-                  updates and inbound calls are being rejected. Copy your
-                  public key from{" "}
-                  <span className="whitespace-nowrap">
-                    Mission Control Portal → Keys &amp; Credentials → Public Key
-                  </span>{" "}
-                  and paste it into the affected Telnyx configuration below.
-                </p>
-              </div>
+      {/* Warning Banners */}
+      {telnyxMissingWebhookPublicKeyCount > 0 && (
+        <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-4 text-amber-900 dark:text-amber-200">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs">
+              <p className="font-bold">Webhook public key not configured</p>
+              <p className="leading-relaxed">
+                {telnyxMissingWebhookPublicKeyCount === 1
+                  ? "1 Telnyx configuration is"
+                  : `${telnyxMissingWebhookPublicKeyCount} Telnyx configurations are`}{" "}
+                missing a webhook public key. Without it, Telnyx call status
+                updates and inbound calls are being rejected. Copy your
+                public key from{" "}
+                <span className="font-semibold">
+                  Mission Control Portal → Keys &amp; Credentials → Public Key
+                </span>{" "}
+                and paste it into the affected Telnyx configuration below.
+              </p>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {vonageMissingSignatureSecretCount > 0 && (
-          <div className="mb-6 rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
-              <div className="space-y-1 text-sm">
-                <p className="font-medium">Signature secret not configured</p>
-                <p>
-                  {vonageMissingSignatureSecretCount === 1
-                    ? "1 Vonage configuration is"
-                    : `${vonageMissingSignatureSecretCount} Vonage configurations are`}{" "}
-                  missing a signature secret. Without it, Vonage signed webhooks
-                  are rejected, so inbound calls and call status updates will not
-                  work. Copy the signature secret from your Vonage account and
-                  paste it into the affected Vonage configuration below.
-                </p>
-              </div>
+      {vonageMissingSignatureSecretCount > 0 && (
+        <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-4 text-amber-900 dark:text-amber-200">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs">
+              <p className="font-bold">Signature secret not configured</p>
+              <p className="leading-relaxed">
+                {vonageMissingSignatureSecretCount === 1
+                  ? "1 Vonage configuration is"
+                  : `${vonageMissingSignatureSecretCount} Vonage configurations are`}{" "}
+                missing a signature secret. Without it, Vonage signed webhooks
+                are rejected, so inbound calls and call status updates will not
+                work. Copy the signature secret from your Vonage account and
+                paste it into the affected Vonage configuration below.
+              </p>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {loading ? (
-          <div className="grid gap-3">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
+      {/* Main List */}
+      {loading ? (
+        <div className="grid gap-3">
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-20 w-full rounded-xl" />
+        </div>
+      ) : items.length === 0 ? (
+        <div className="flex items-center justify-center w-full py-12">
+          <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm w-full border border-border bg-card rounded-xl shadow-xs">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted/30 text-muted-foreground mb-4">
+              <Plus className="h-6 w-6" />
+            </div>
+            <h3 className="text-xs font-bold text-foreground tracking-tight mb-2 uppercase">No telephony configurations yet</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed mb-6">Add one to enable outbound calls and receive inbound calls.</p>
+            <Button onClick={() => setCreateOpen(true)} className="h-9 px-4 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs transition-all cursor-pointer">
+              <Plus className="h-4 w-4 mr-1.5" /> Add configuration
+            </Button>
           </div>
-        ) : items.length === 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>No telephony configurations yet</CardTitle>
-              <CardDescription>
-                Add one to enable outbound calls and receive inbound calls.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => setCreateOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" /> Add configuration
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3">
-            {items.map((item) => (
-              <Card key={item.id}>
-                <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center">
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {items.map((item) => (
+            <div key={item.id} className="flex flex-col gap-4 p-5 border border-border bg-card hover:bg-card/90 transition-all rounded-xl shadow-xs sm:flex-row sm:items-center sm:justify-between group">
+              <Link
+                href={`/telephony-configurations/${item.id}`}
+                className="flex-1 min-w-0"
+              >
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm text-foreground group-hover:text-cta transition-colors truncate">{item.name}</span>
+                    <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md border-border/60 bg-muted/40">{item.provider}</Badge>
+                    {item.is_default_outbound && (
+                      <Badge className="gap-1 text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md bg-cta text-cta-foreground">
+                        <Star className="h-2.5 w-2.5 fill-current" />
+                        Default
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {item.phone_number_count} phone{" "}
+                    {item.phone_number_count === 1 ? "number" : "numbers"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      navigator.clipboard
+                        .writeText(String(item.id))
+                        .then(() => toast.success("Configuration ID copied"))
+                        .catch(() => toast.error("Failed to copy ID"));
+                    }}
+                    title="Click to copy"
+                    className="inline-flex items-center gap-1 self-start rounded font-mono text-[10px] text-muted-foreground/60 hover:text-foreground"
+                  >
+                    <span className="truncate">ID: {item.id}</span>
+                    <Copy className="h-2.5 w-2.5 shrink-0" />
+                  </button>
+                </div>
+              </Link>
+              <div className="flex w-full flex-wrap items-center justify-end gap-1.5 sm:w-auto sm:flex-nowrap pt-2 border-t border-border/40 sm:pt-0 sm:border-t-0">
+                {!item.is_default_outbound && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg"
+                    onClick={() => onSetDefault(item)}
+                    title="Set as default outbound"
+                  >
+                    <Star className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg"
+                  onClick={() => onEdit(item)}
+                  title="Edit"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg"
+                  onClick={() => setDeleteTarget(item)}
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-xs font-semibold rounded-lg" asChild>
                   <Link
                     href={`/telephony-configurations/${item.id}`}
-                    className="flex flex-1 items-center gap-4 min-w-0"
+                    aria-label={`Manage phone numbers for ${item.name}`}
                   >
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium truncate">{item.name}</span>
-                        <Badge variant="secondary">{item.provider}</Badge>
-                        {item.is_default_outbound && (
-                          <Badge className="gap-1">
-                            <Star className="h-3 w-3 fill-current" />
-                            Default
-                          </Badge>
-                        )}
-                      </div>
-                      <span className="text-sm text-muted-foreground">
-                        {item.phone_number_count} phone{" "}
-                        {item.phone_number_count === 1 ? "number" : "numbers"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          navigator.clipboard
-                            .writeText(String(item.id))
-                            .then(() => toast.success("Configuration ID copied"))
-                            .catch(() => toast.error("Failed to copy ID"));
-                        }}
-                        title="Click to copy"
-                        className="inline-flex items-center gap-1 self-start rounded font-mono text-xs text-muted-foreground hover:text-foreground"
-                      >
-                        <span className="truncate">Configuration ID: {item.id}</span>
-                        <Copy className="h-3 w-3 shrink-0" />
-                      </button>
-                    </div>
+                    Manage Numbers
+                    <ChevronRight className="h-3.5 w-3.5 ml-1" />
                   </Link>
-                  <div className="flex w-full flex-wrap items-center justify-end gap-1 sm:w-auto sm:flex-nowrap">
-                    {!item.is_default_outbound && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onSetDefault(item)}
-                        title="Set as default outbound"
-                      >
-                        <Star className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onEdit(item)}
-                      title="Edit"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeleteTarget(item)}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link
-                        href={`/telephony-configurations/${item.id}`}
-                        aria-label={`Manage phone numbers for ${item.name}`}
-                      >
-                        Manage Phone Numbers
-                        <ChevronRight className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <ConfigFormDialog
         open={createOpen}

@@ -142,20 +142,20 @@ export function WorkflowTesterPanel({
         !testerBlocked;
 
     return (
-        <div className={cn("flex h-full min-h-0 flex-col bg-background", className)}>
+        <div className={cn("flex h-full min-h-0 flex-col bg-card border-l border-border shadow-lg", className)}>
             <Tabs
                 value={activeMode}
                 onValueChange={(value) => setActiveMode(value as "audio" | "text")}
                 className="min-h-0 flex-1 gap-0"
             >
-                <div className="border-b border-border/70 px-4 py-3">
+                <div className="border-b border-border px-4 py-3">
                     <div className="flex items-center gap-3">
-                        <TabsList className="h-9 flex-1 justify-start gap-4">
-                            <TabsTrigger value="audio" className="text-xs">
+                        <TabsList className="h-9 justify-start">
+                            <TabsTrigger value="audio">
                                 <PhosphorIcons.Microphone className="h-4 w-4" />
                                 Test Audio
                             </TabsTrigger>
-                            <TabsTrigger value="text" className="text-xs">
+                            <TabsTrigger value="text">
                                 <PhosphorIcons.ChatCircleText className="h-4 w-4" />
                                 Test Chat
                             </TabsTrigger>
@@ -165,7 +165,7 @@ export function WorkflowTesterPanel({
                                 variant="ghost"
                                 size="icon"
                                 onClick={onClose}
-                                className="shrink-0 text-muted-foreground hover:text-foreground h-8 w-8 rounded-lg"
+                                className="shrink-0 text-muted-foreground hover:text-foreground h-8 w-8 rounded-md"
                                 aria-label="Close tester panel"
                             >
                                 <PhosphorIcons.X className="h-4 w-4" />
@@ -178,8 +178,8 @@ export function WorkflowTesterPanel({
                     <div className="flex h-full min-h-0 flex-col gap-3">
                         {!tokenReady ? (
                             <div className="space-y-4">
-                                <Skeleton className="h-14 rounded-xl" />
-                                <Skeleton className="h-80 rounded-xl" />
+                                <Skeleton className="h-14 rounded-lg" />
+                                <Skeleton className="h-80 rounded-lg" />
                             </div>
                         ) : !accessToken ? (
                             <DisabledNotice
@@ -196,9 +196,8 @@ export function WorkflowTesterPanel({
                             />
                         ) : (
                             <>
-                                {effectiveDisabledReason ? <DisabledNotice reason={effectiveDisabledReason} /> : null}
                                 <EmptyState
-                                    icon={<PhosphorIcons.Phone className="h-7 w-7" />}
+                                    icon={<PhosphorIcons.Phone className="h-5 w-5" />}
                                     title="Call this agent in the browser"
                                     description="Test the agent over a voice call. Some telephony-only tools, like call transfer, are not yet supported here."
                                     action={
@@ -206,6 +205,7 @@ export function WorkflowTesterPanel({
                                             ref={runTestButtonRef}
                                             onClick={createVoiceRun}
                                             disabled={creatingVoiceRun || testerBlocked}
+                                            className="h-8 gap-1.5 px-3 rounded-md bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs transition-all duration-150 active:scale-[0.98] cursor-pointer"
                                         >
                                             {creatingVoiceRun ? (
                                                 <>
@@ -214,7 +214,7 @@ export function WorkflowTesterPanel({
                                                 </>
                                             ) : (
                                                 <>
-                                                    <PhosphorIcons.Play className="h-4 w-4" />
+                                                    <PhosphorIcons.Play className="h-4 w-4 fill-current" />
                                                     Run Test
                                                 </>
                                             )}

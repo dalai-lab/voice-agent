@@ -1,10 +1,5 @@
 "use client";
 
-import posthog from "posthog-js";
-import { useEffect, useState } from "react";
-
-import { PostHogEvent } from "@/constants/posthog-events";
-import { cn } from "@/lib/utils";
 
 interface GitHubStarBadgeProps {
   className?: string;

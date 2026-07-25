@@ -1,14 +1,14 @@
 "use client";
 
-import Link from 'next/link';
-import { 
-    ArrowUpRight, 
-    BookOpen, 
-    Github, 
-    Layers, 
-    Cpu, 
-    Phone 
+import {
+    ArrowUpRight,
+    BookOpen,
+    Cpu,
+    Github,
+    Layers,
+    Phone
 } from 'lucide-react';
+import Link from 'next/link';
 
 import { useAuth } from '@/lib/auth';
 
@@ -35,8 +35,8 @@ export default function OverviewPage() {
             {/* Quick Actions Grid - Triple Minimal Rows */}
             <div className="space-y-4">
                 {/* Voice Agents */}
-                <Link 
-                    href="/workflow" 
+                <Link
+                    href="/workflow"
                     className="group flex items-start justify-between p-5 rounded-xl border border-border bg-card/30 hover:border-cta/25 hover:bg-card/50 transition-all duration-200 shadow-xs"
                 >
                     <div className="flex gap-4">
@@ -56,8 +56,8 @@ export default function OverviewPage() {
                 </Link>
 
                 {/* AI Services */}
-                <Link 
-                    href="/model-configurations" 
+                <Link
+                    href="/model-configurations"
                     className="group flex items-start justify-between p-5 rounded-xl border border-border bg-card/30 hover:border-foreground/20 hover:bg-card/50 transition-all duration-200 shadow-xs"
                 >
                     <div className="flex gap-4">
@@ -77,8 +77,8 @@ export default function OverviewPage() {
                 </Link>
 
                 {/* Telephony Configurations */}
-                <Link 
-                    href="/telephony-configurations" 
+                <Link
+                    href="/telephony-configurations"
                     className="group flex items-start justify-between p-5 rounded-xl border border-border bg-card/30 hover:border-foreground/20 hover:bg-card/50 transition-all duration-200 shadow-xs"
                 >
                     <div className="flex gap-4">
@@ -102,10 +102,10 @@ export default function OverviewPage() {
             <div className="pt-6 border-t border-border/40 space-y-3.5">
                 <h2 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Resources</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    <a 
-                        href="https://docs.dograh.com" 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                    <a
+                        href="https://docs.dograh.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="group flex items-center justify-between p-4 rounded-xl border border-border/60 bg-card/20 hover:bg-muted/40 transition-colors shadow-xs"
                     >
                         <div className="flex items-center gap-2">
@@ -114,10 +114,10 @@ export default function OverviewPage() {
                         </div>
                         <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/60 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                     </a>
-                    <a 
-                        href="https://github.com/dograh-hq/dograh/issues" 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
+                    <a
+                        href="https://github.com/dograh-hq/dograh/issues"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="group flex items-center justify-between p-4 rounded-xl border border-border/60 bg-card/20 hover:bg-muted/40 transition-colors shadow-xs"
                     >
                         <div className="flex items-center gap-2">

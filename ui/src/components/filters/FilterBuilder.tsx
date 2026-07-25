@@ -10,7 +10,6 @@ import { RadioFilter } from "@/components/filters/RadioFilter";
 import { TagInputFilter } from "@/components/filters/TagInputFilter";
 import { TextFilter } from "@/components/filters/TextFilter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,

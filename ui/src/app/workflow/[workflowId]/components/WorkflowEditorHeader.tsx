@@ -1,8 +1,8 @@
 "use client";
 
-import { ReactFlowInstance } from "@xyflow/react";
-import { AlertCircle, ArrowLeft, Bot, Clipboard, Copy, Download, Eye, History, LoaderCircle, Menu, MoreVertical, Pencil, Phone, Rocket } from "lucide-react";
 import * as PhosphorIcons from "@phosphor-icons/react";
+import { ReactFlowInstance } from "@xyflow/react";
+import { AlertCircle, ArrowLeft, Eye, History, LoaderCircle, Menu, MoreVertical, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -13,7 +13,6 @@ import {
 } from "@/client/sdk.gen";
 import { WorkflowError } from "@/client/types.gen";
 import { FlowEdge, FlowNode } from "@/components/flow/types";
-import { GitHubStarBadge } from "@/components/layout/GitHubStarBadge";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,

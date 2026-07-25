@@ -6,7 +6,6 @@ import {
     CircleDollarSign,
     CreditCard,
     ExternalLink,
-    Info,
     RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
@@ -18,7 +17,6 @@ import { createMpsCreditPurchaseUrlApiV1OrganizationsUsageMpsCreditsPurchaseUrlP
 import type { MpsBillingCreditsResponse, MpsCreditLedgerEntryResponse } from "@/client/types.gen";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {

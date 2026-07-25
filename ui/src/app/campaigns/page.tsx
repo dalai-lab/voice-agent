@@ -8,15 +8,6 @@ import { getCampaignsApiV1CampaignGet } from '@/client/sdk.gen';
 import type { CampaignsResponse } from '@/client/types.gen';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import { useOrganizationTimezone } from '@/hooks/useOrganizationTimezone';
 import { useAuth } from '@/lib/auth';
 import { formatDate } from '@/lib/dateTime';
@@ -118,7 +109,7 @@ export default function CampaignsPage() {
                     {campaignsData.campaigns.map((campaign) => {
                         const totalQueued = campaign.total_queued_count ?? 0;
                         const executed = campaign.executed_count ?? 0;
-                        const progressPercent = totalQueued > 0 
+                        const progressPercent = totalQueued > 0
                             ? Math.min(100, Math.round((executed / totalQueued) * 100))
                             : 0;
 
@@ -153,7 +144,7 @@ export default function CampaignsPage() {
                                             </span>
                                         </div>
                                         <div className="w-full bg-muted/60 h-1.5 rounded-full overflow-hidden border border-border/10">
-                                            <div 
+                                            <div
                                                 className="bg-cta h-full rounded-full transition-all duration-300"
                                                 style={{ width: `${progressPercent}%` }}
                                             />

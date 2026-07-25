@@ -12,7 +12,6 @@ import type { DocumentResponseSchema } from '@/client/types.gen';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useOrganizationTimezone } from '@/hooks/useOrganizationTimezone';
 import { formatDateTime } from '@/lib/dateTime';
 import logger from '@/lib/logger';

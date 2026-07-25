@@ -1,16 +1,13 @@
 "use client";
 
+import * as PhosphorIcons from "@phosphor-icons/react";
 import {
   AlertTriangle,
   ArrowUpCircle,
-  AudioLines,
-  Brain,
-  CalendarClock,
   ChevronLeft,
   ChevronRight,
   LogOut,
   Settings,
-  TrendingUp,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -51,8 +48,6 @@ import { useLatestReleaseVersion } from "@/hooks/useLatestReleaseVersion";
 import type { LocalUser } from "@/lib/auth";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-
-import * as PhosphorIcons from "@phosphor-icons/react";
 
 type SidebarNavItem = {
   title: string;

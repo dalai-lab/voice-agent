@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ArrowRight, ArrowUpRight, Cpu, Shield, Terminal } from "lucide-react";
+import { ArrowRight, Cpu, Shield, Terminal } from "lucide-react";
 import Link from "next/link";
+import { useEffect,useState } from "react";
 
 import { BrandLogo } from "@/components/BrandLogo";
 import ThemeToggle from "@/components/ThemeSwitcher";
@@ -25,7 +25,7 @@ export default function LandingPage() {
     let index = 0;
     const text = SIMULATED_TURNS[turnIndex].text;
     setDisplayedText("");
-    
+
     const timer = setInterval(() => {
       index++;
       setDisplayedText(text.substring(0, index));

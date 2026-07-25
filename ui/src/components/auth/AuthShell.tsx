@@ -36,7 +36,7 @@ export function AuthShell({
       <main className="auth-imprint flex min-h-screen flex-col overflow-y-auto relative bg-background/30">
         {/* Soft background ambient glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-cta/[0.02] dark:bg-cta/[0.03] rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="flex min-h-full items-center justify-center p-6 sm:p-10 z-10">
           <div className="w-full max-w-[390px] space-y-6 rounded-2xl border border-border/50 bg-card/60 backdrop-blur-md p-6 shadow-xl dark:shadow-black/40 sm:p-8">
             {/* Mobile-only wordmark */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -15,8 +15,6 @@ import {
 } from '@/client/sdk.gen';
 import type { TelephonyConfigurationListItem, WorkflowSummaryResponse } from '@/client/types.gen';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -446,7 +444,7 @@ export default function NewCampaignPage() {
                             {activeTab === "details" && (
                                 <div className="space-y-5">
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80 border-b border-border pb-2">Campaign Details</h3>
-                                    
+
                                     {/* Campaign Name */}
                                     <div className="space-y-2">
                                         <Label htmlFor="campaign-name" className="text-xs font-bold text-foreground">Campaign Name</Label>
@@ -555,7 +553,7 @@ export default function NewCampaignPage() {
                             {activeTab === "source" && (
                                 <div className="space-y-5">
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80 border-b border-border pb-2">Data Source (CSV)</h3>
-                                    
+
                                     <div className="space-y-2">
                                         <Label htmlFor="source-type" className="text-xs font-bold text-foreground">Data Source Type</Label>
                                         <Select

@@ -22,7 +22,6 @@ import {
     getPropertyColumnSpan,
     isFractionalNumberInput,
 } from "./propertyRendererOptions";
-import { cn } from "@/lib/utils";
 
 export interface RendererContext {
     tools: ToolResponse[];

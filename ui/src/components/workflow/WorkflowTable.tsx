@@ -4,13 +4,10 @@ import {
     Archive,
     Check,
     Folder as FolderIcon,
-    FolderInput,
     Inbox,
-    Play,
-    Settings,
     MoreHorizontal,
     RotateCcw,
-    Trash2,
+    Settings,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
@@ -22,8 +19,6 @@ import {
 } from '@/client/sdk.gen';
 import type { FolderResponse } from '@/client/types.gen';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { useOrganizationTimezone } from '@/hooks/useOrganizationTimezone';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -32,6 +27,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useOrganizationTimezone } from '@/hooks/useOrganizationTimezone';
 
 
 interface Workflow {
@@ -119,8 +115,8 @@ export function WorkflowTable({
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {workflows.map((workflow) => (
-                <div 
-                    key={workflow.id} 
+                <div
+                    key={workflow.id}
                     className="relative flex flex-col justify-between p-4 border border-border bg-card rounded-xl hover:bg-card/90 transition-all shadow-xs group"
                 >
                     {/* Top Row: Name and Actions */}
@@ -129,7 +125,7 @@ export function WorkflowTable({
                             <span className="font-bold text-sm text-foreground group-hover:text-cta transition-colors">
                                 {workflow.name}
                             </span>
-                            
+
                             <div className="flex items-center gap-1 shrink-0">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -165,8 +161,8 @@ export function WorkflowTable({
                                                 <DropdownMenuSeparator />
                                             </>
                                         )}
-                                        
-                                        <DropdownMenuItem 
+
+                                        <DropdownMenuItem
                                             onClick={() => handleArchiveToggle(workflow.id, workflow.status)}
                                             className={showArchived ? "text-xs font-semibold" : "text-xs font-semibold text-destructive focus:text-destructive"}
                                         >

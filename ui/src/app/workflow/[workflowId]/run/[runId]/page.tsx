@@ -1,7 +1,6 @@
 'use client';
 
 import {
-    Bot,
     Check,
     Clock,
     Copy,
@@ -11,7 +10,6 @@ import {
     Loader2,
     Pause,
     Play,
-    UserRound,
     Video,
 } from 'lucide-react';
 import Link from 'next/link';

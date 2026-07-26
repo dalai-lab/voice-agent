@@ -7,24 +7,14 @@ const LogoMark = ({ className }: { className?: string }) => (
     xmlns="http://www.w3.org/2000/svg"
     className={className}
   >
-    <defs>
-      <linearGradient id="nova-gradient-mark" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#e11d48" />
-        <stop offset="100%" stopColor="#ff5a79" />
-      </linearGradient>
-    </defs>
+    <circle cx="16" cy="16" r="15" fill="#E11D48" />
     <circle
       cx="16"
       cy="16"
-      r="13"
-      stroke="url(#nova-gradient-mark)"
-      strokeWidth="2"
-      strokeDasharray="4 3"
-      className="opacity-40"
-    />
-    <path
-      d="M16 6C16 11.5 11.5 16 6 16C11.5 16 16 20.5 16 26C16 20.5 20.5 16 26 16C20.5 16 16 11.5 16 6Z"
-      fill="url(#nova-gradient-mark)"
+      r="8"
+      stroke="#FFFFFF"
+      strokeWidth="3.5"
+      fill="none"
     />
   </svg>
 );
@@ -33,21 +23,36 @@ export function BrandLogo({
   className,
   inverse = false,
   mark = false,
+  size = "md",
 }: {
   className?: string;
   inverse?: boolean;
   mark?: boolean;
+  size?: "sm" | "md" | "lg";
 }) {
   if (mark) {
     return <LogoMark className={cn("h-7 w-7", className)} />;
   }
 
+  const iconSizes = {
+    sm: "h-5 w-5",
+    md: "h-6 w-6",
+    lg: "h-7.5 w-7.5",
+  };
+
+  const textSizes = {
+    sm: "text-base",
+    md: "text-xl",
+    lg: "text-2xl",
+  };
+
   return (
-    <div className={cn("flex items-center gap-2 text-left", className)}>
-      <LogoMark className="h-6 w-6 shrink-0" />
+    <div className={cn("flex items-center gap-2.5 text-left select-none", className)}>
+      <LogoMark className={cn("shrink-0", iconSizes[size])} />
       <span
         className={cn(
-          "font-black tracking-widest uppercase text-base",
+          "font-extrabold tracking-tight font-sans leading-none",
+          textSizes[size],
           inverse ? "text-white" : "text-foreground dark:text-zinc-50"
         )}
       >

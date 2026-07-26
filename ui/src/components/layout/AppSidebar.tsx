@@ -87,11 +87,6 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         icon: PhosphorIcons.Megaphone,
       },
       {
-        title: "Callbacks",
-        url: "/callbacks",
-        icon: PhosphorIcons.PhoneCall,
-      },
-      {
         title: "Tools",
         url: "/tools",
         icon: PhosphorIcons.Wrench,
@@ -146,6 +141,11 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         title: "Agent Logs",
         url: "/runs",
         icon: PhosphorIcons.ClockCounterClockwise,
+      },
+      {
+        title: "Callback Logs",
+        url: "/callbacks",
+        icon: PhosphorIcons.PhoneCall,
       },
       {
         title: "Usage",

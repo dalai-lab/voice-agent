@@ -11,6 +11,14 @@ import { Button } from '@/components/ui/button';
 import { useOrganizationTimezone } from '@/hooks/useOrganizationTimezone';
 import { useAuth } from '@/lib/auth';
 import { formatDate } from '@/lib/dateTime';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 
 export default function CampaignsPage() {
     const { user, getAccessToken, redirectToLogin, loading } = useAuth();
@@ -84,7 +92,7 @@ export default function CampaignsPage() {
     };
 
     return (
-        <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+        <div className="container mx-auto px-6 py-8 max-w-6xl space-y-6 bg-background text-foreground">
             {/* Header section */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-1">
@@ -99,80 +107,114 @@ export default function CampaignsPage() {
 
             {/* Content Loader */}
             {isLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[...Array(6)].map((_, i) => (
-                        <div key={i} className="h-40 rounded-xl bg-card border border-border animate-pulse" />
-                    ))}
+                <div className="border border-border bg-card rounded-xl overflow-hidden shadow-xs">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="border-b border-border hover:bg-transparent">
+                                <TableHead className="w-[80px]">ID</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Workflow</TableHead>
+                                <TableHead className="w-[120px]">Status</TableHead>
+                                <TableHead className="min-w-[180px]">Progress</TableHead>
+                                <TableHead className="w-[150px]">Created At</TableHead>
+                                <TableHead className="w-[100px] text-right"></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {[...Array(5)].map((_, i) => (
+                                <TableRow key={i} className="border-b border-border/50 hover:bg-transparent">
+                                    <TableCell><div className="h-4 w-8 bg-muted animate-pulse rounded" /></TableCell>
+                                    <TableCell><div className="h-4 w-32 bg-muted animate-pulse rounded" /></TableCell>
+                                    <TableCell><div className="h-4 w-48 bg-muted animate-pulse rounded" /></TableCell>
+                                    <TableCell><div className="h-5 w-16 bg-muted animate-pulse rounded" /></TableCell>
+                                    <TableCell>
+                                        <div className="space-y-2">
+                                            <div className="h-3 w-12 bg-muted animate-pulse rounded" />
+                                            <div className="h-1.5 w-full bg-muted animate-pulse rounded" />
+                                        </div>
+                                    </TableCell>
+                                    <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded" /></TableCell>
+                                    <TableCell><div className="h-7 w-20 bg-muted animate-pulse rounded ml-auto" /></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </div>
             ) : campaignsData && campaignsData.campaigns.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {campaignsData.campaigns.map((campaign) => {
-                        const totalQueued = campaign.total_queued_count ?? 0;
-                        const executed = campaign.executed_count ?? 0;
-                        const progressPercent = totalQueued > 0
-                            ? Math.min(100, Math.round((executed / totalQueued) * 100))
-                            : 0;
+                <div className="border border-border bg-card rounded-xl overflow-hidden shadow-sm">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="border-b border-border bg-muted/10 hover:bg-muted/10">
+                                <TableHead className="font-semibold text-xs py-3 w-[80px]">ID</TableHead>
+                                <TableHead className="font-semibold text-xs py-3">Name</TableHead>
+                                <TableHead className="font-semibold text-xs py-3">Workflow</TableHead>
+                                <TableHead className="font-semibold text-xs py-3 w-[120px]">Status</TableHead>
+                                <TableHead className="font-semibold text-xs py-3 min-w-[200px]">Progress</TableHead>
+                                <TableHead className="font-semibold text-xs py-3 w-[150px]">Created At</TableHead>
+                                <TableHead className="w-[120px] text-right"></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {campaignsData.campaigns.map((campaign) => {
+                                const totalQueued = campaign.total_queued_count ?? 0;
+                                const executed = campaign.executed_count ?? 0;
+                                const progressPercent = totalQueued > 0
+                                    ? Math.min(100, Math.round((executed / totalQueued) * 100))
+                                    : 0;
 
-                        return (
-                            <div
-                                key={campaign.id}
-                                className="relative flex flex-col justify-between p-5 border border-border bg-card hover:bg-card/90 transition-all duration-200 group rounded-xl hover:shadow-sm cursor-pointer"
-                                onClick={() => handleRowClick(campaign.id)}
-                            >
-                                <div className="space-y-3">
-                                    {/* Top row: Name and Badge */}
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="space-y-0.5">
-                                            <span className="font-bold tracking-tight text-foreground text-sm group-hover:text-cta transition-colors truncate block max-w-[160px]">
-                                                {campaign.name}
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground font-medium block">
-                                                Workflow: {campaign.workflow_name}
-                                            </span>
-                                        </div>
-                                        <Badge variant={getStateBadgeVariant(campaign.state)} className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md">
-                                            {campaign.state}
-                                        </Badge>
-                                    </div>
-
-                                    {/* Progress Area */}
-                                    <div className="space-y-1.5 pt-2">
-                                        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                            <span>Progress</span>
-                                            <span className="font-semibold text-foreground">
-                                                {executed} / {totalQueued} ({progressPercent}%)
-                                            </span>
-                                        </div>
-                                        <div className="w-full bg-muted/60 h-1.5 rounded-full overflow-hidden border border-border/10">
-                                            <div
-                                                className="bg-cta h-full rounded-full transition-all duration-300"
-                                                style={{ width: `${progressPercent}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Footer Row */}
-                                <div className="flex items-center justify-between mt-5 pt-4 border-t border-border/60 text-[10px] text-muted-foreground">
-                                    <div className="flex flex-col">
-                                        <span>ID: {campaign.id}</span>
-                                        <span>{formatDate(campaign.created_at, organizationTimezone)}</span>
-                                    </div>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRowClick(campaign.id);
-                                        }}
-                                        className="h-7 px-3 rounded-lg text-xs font-semibold"
+                                return (
+                                    <TableRow
+                                        key={campaign.id}
+                                        className="border-b border-border/50 hover:bg-muted/30 transition-colors duration-150 cursor-pointer group"
+                                        onClick={() => handleRowClick(campaign.id)}
                                     >
-                                        View Details
-                                    </Button>
-                                </div>
-                            </div>
-                        );
-                    })}
+                                        <TableCell className="font-mono text-xs text-muted-foreground">
+                                            #{campaign.id}
+                                        </TableCell>
+                                        <TableCell className="font-semibold text-foreground text-sm group-hover:text-cta transition-colors">
+                                            {campaign.name}
+                                        </TableCell>
+                                        <TableCell className="text-xs text-muted-foreground">
+                                            {campaign.workflow_name}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={getStateBadgeVariant(campaign.state)} className="text-[9px] uppercase tracking-wider py-0.5 px-1.5 font-bold rounded-md">
+                                                {campaign.state}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="space-y-1.5 max-w-[240px]">
+                                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                                    <span className="font-semibold text-foreground">
+                                                        {executed} / {totalQueued} ({progressPercent}%)
+                                                    </span>
+                                                </div>
+                                                <div className="w-full bg-muted/60 h-1.5 rounded-full overflow-hidden border border-border/10">
+                                                    <div
+                                                        className="bg-cta h-full rounded-full transition-all duration-300"
+                                                        style={{ width: `${progressPercent}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                                            {formatDate(campaign.created_at, organizationTimezone)}
+                                        </TableCell>
+                                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleRowClick(campaign.id)}
+                                                className="h-7 px-3 rounded-lg text-xs font-semibold cursor-pointer"
+                                            >
+                                                View Details
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
                 </div>
             ) : (
                 <div className="flex items-center justify-center w-full py-12">

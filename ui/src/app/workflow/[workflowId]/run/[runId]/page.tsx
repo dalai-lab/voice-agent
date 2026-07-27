@@ -224,6 +224,7 @@ function SplitTracksSection({
 }) {
     const userAudioRef = useRef<HTMLAudioElement | null>(null);
     const botAudioRef = useRef<HTMLAudioElement | null>(null);
+    const timelineRef = useRef<HTMLDivElement | null>(null);
     const [signedUrls, setSignedUrls] = useState<{ user: string | null; bot: string | null }>({
         user: null,
         bot: null,
@@ -238,7 +239,12 @@ function SplitTracksSection({
     const [playbackMode, setPlaybackMode] = useState<SplitTrackPlaybackMode>('both');
     const [isDragging, setIsDragging] = useState(false);
 
-    const canPlay = Boolean(signedUrls.user || signedUrls.bot);
+    const canPlay =
+        playbackMode === 'both'
+            ? Boolean(signedUrls.user && signedUrls.bot)
+            : playbackMode === 'user'
+                ? Boolean(signedUrls.user)
+                : Boolean(signedUrls.bot);
 
     const getPlaybackAudios = (mode: SplitTrackPlaybackMode) => {
         const audios: HTMLAudioElement[] = [];
@@ -449,12 +455,6 @@ function SplitTracksSection({
         };
     }, [isDragging, canPlay, playbackMode]);
 
-    const canPlay =
-        playbackMode === 'both'
-            ? Boolean(signedUrls.user && signedUrls.bot)
-            : playbackMode === 'user'
-                ? Boolean(signedUrls.user)
-                : Boolean(signedUrls.bot);
     const progressPercent = Math.round(progress * 1000) / 10;
     const userTrackActive = playbackMode !== 'bot';
     const botTrackActive = playbackMode !== 'user';

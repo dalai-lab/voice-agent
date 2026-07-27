@@ -96,20 +96,20 @@ export function CampaignAnalytics({ campaignId }: { campaignId: number }) {
                 <p className="text-[10px] text-muted-foreground/60 mt-0.5">Disposition breakdown and performance metrics</p>
             </div>
             
-            <div className="grid grid-cols-3 gap-4 pt-2 border-t border-border/40">
-                <div className="bg-muted/20 p-4 rounded-xl border border-border/40 flex flex-col justify-center items-center">
-                    <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-1">Total Calls</span>
-                    <span className="text-2xl font-bold text-foreground">{kpis.totalCalls}</span>
+                    <div className="grid grid-cols-3 gap-4 pt-2 border-t border-border/40">
+                <div className="p-4 rounded-xl border border-border bg-card/30 shadow-xs space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Calls</p>
+                    <p className="text-2xl font-bold text-foreground">{kpis.totalCalls}</p>
                 </div>
-                <div className="bg-muted/20 p-4 rounded-xl border border-border/40 flex flex-col justify-center items-center">
-                    <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-1">Completed</span>
-                    <span className="text-2xl font-bold text-foreground">{kpis.completedCalls}</span>
+                <div className="p-4 rounded-xl border border-border bg-card/30 shadow-xs space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Completed</p>
+                    <p className="text-2xl font-bold text-foreground">{kpis.completedCalls}</p>
                 </div>
-                <div className="bg-muted/20 p-4 rounded-xl border border-border/40 flex flex-col justify-center items-center">
-                    <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-1">Avg Duration</span>
-                    <span className="text-2xl font-bold text-foreground">
+                <div className="p-4 rounded-xl border border-border bg-card/30 shadow-xs space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Avg Duration</p>
+                    <p className="text-2xl font-bold text-foreground">
                         {Math.floor(kpis.avgDuration / 60)}m {kpis.avgDuration % 60}s
-                    </span>
+                    </p>
                 </div>
             </div>
 

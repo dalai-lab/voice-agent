@@ -473,6 +473,13 @@ export const WorkflowEditorHeader = ({
                             View Runs
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                            onClick={() => router.push(`/workflow/${workflowId}/analytics`)}
+                            className="text-foreground hover:bg-foreground/[0.03] cursor-pointer"
+                        >
+                            <PhosphorIcons.ChartBar className="w-4 h-4 mr-2" />
+                            View Analytics
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                             onClick={handleDuplicate}
                             disabled={duplicating}
                             className="text-foreground hover:bg-foreground/[0.03] cursor-pointer"

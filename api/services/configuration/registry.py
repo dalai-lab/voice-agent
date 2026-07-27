@@ -890,6 +890,9 @@ class ElevenlabsTTSConfiguration(BaseServiceConfiguration):
     voice: str = Field(
         default="21m00Tcm4TlvDq8ikWAM",
         description="ElevenLabs voice ID from your Voice Library.",
+        json_schema_extra={
+            "allow_custom_input": True,
+        },
     )
     speed: float = Field(default=1.0, ge=0.1, le=2.0, description="Speed of the voice.")
     model: str = Field(

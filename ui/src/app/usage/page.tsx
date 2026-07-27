@@ -2,7 +2,7 @@
 
 import { ChevronLeft, ChevronRight, Download, Globe } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, Fragment } from 'react';
 import TimezoneSelect, { type ITimezoneOption } from 'react-timezone-select';
 import { toast } from 'sonner';
 
@@ -58,6 +58,8 @@ const buildAgentFilterAttributes = (
     });
 };
 
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+
 export default function UsagePage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -73,6 +75,7 @@ export default function UsagePage() {
     });
     const [isExecutingFilters, setIsExecutingFilters] = useState(false);
     const [isDownloadingReport, setIsDownloadingReport] = useState(false);
+    const [expandedRunId, setExpandedRunId] = useState<number | null>(null);
     const [agentFilterOptions, setAgentFilterOptions] = useState<NumberFilterOption[] | null>(null);
     const [isLoadingAgentFilterOptions, setIsLoadingAgentFilterOptions] = useState(false);
     const availableUsageFilterAttributes = useMemo(
@@ -399,6 +402,16 @@ export default function UsagePage() {
         return `${minutes}m ${remainingSeconds}s`;
     };
 
+    const dispositionCounts = useMemo(() => {
+        if (!usageHistory?.runs) return [];
+        const counts: Record<string, number> = {};
+        usageHistory.runs.forEach(run => {
+            const disp = (run as any).gathered_context?.mapped_call_disposition || run.disposition || 'Unknown';
+            counts[disp] = (counts[disp] || 0) + 1;
+        });
+        return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    }, [usageHistory]);
+
     return (
         <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
             {/* Header section */}
@@ -533,6 +546,33 @@ export default function UsagePage() {
                     </div>
                 ) : usageHistory && usageHistory.runs.length > 0 ? (
                     <div className="space-y-4">
+                        {/* Disposition Summary Bar */}
+                        <div className="space-y-2">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Disposition Summary (Visible Runs)</h3>
+                            <div className="flex items-center gap-1 w-full h-3 bg-muted/30 rounded-full overflow-hidden p-0.5 border border-border/40">
+                                {dispositionCounts.map(([name, count], idx) => {
+                                    const percentage = (count / usageHistory.runs.length) * 100;
+                                    return (
+                                        <div 
+                                            key={name} 
+                                            className="h-full rounded-full transition-all" 
+                                            style={{ width: `${percentage}%`, backgroundColor: COLORS[idx % COLORS.length] }} 
+                                            title={`${name}: ${count} (${percentage.toFixed(1)}%)`}
+                                        />
+                                    );
+                                })}
+                            </div>
+                            <div className="flex flex-wrap gap-3 mt-2">
+                                {dispositionCounts.map(([name, count], idx) => (
+                                    <div key={name} className="flex items-center gap-1.5 text-[10px]">
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+                                        <span className="text-muted-foreground font-medium">{name}</span>
+                                        <span className="font-bold text-foreground">{count}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                         {/* Flat Table container */}
                         <div className="bg-card border border-border rounded-xl overflow-hidden shadow-xs w-full">
                             <Table>
@@ -553,55 +593,95 @@ export default function UsagePage() {
                                 </TableHeader>
                                 <TableBody>
                                     {usageHistory.runs.map((run) => (
-                                        <TableRow
-                                            key={run.id}
-                                            className="hover:bg-muted/40 transition-colors border-b border-border/50"
-                                        >
-                                            <TableCell
-                                                className="font-mono text-xs text-muted-foreground cursor-pointer hover:underline"
-                                                onClick={() => handleRowClick(run)}
+                                        <Fragment key={run.id}>
+                                            <TableRow
+                                                className="hover:bg-muted/40 transition-colors border-b border-border/50 cursor-pointer"
+                                                onClick={() => setExpandedRunId(prev => prev === run.id ? null : run.id)}
                                             >
-                                                #{run.id}
-                                            </TableCell>
-                                            <TableCell className="text-xs font-bold text-foreground">{run.workflow_name || 'Unknown'}</TableCell>
-                                            <TableCell>
-                                                <CallTypeCell mode={run.mode} callType={run.call_type} />
-                                            </TableCell>
-                                            <TableCell className="text-xs text-muted-foreground">
-                                                {(run.call_type === 'inbound'
-                                                    ? run.caller_number
-                                                    : run.called_number) || '-'}
-                                            </TableCell>
-                                            <TableCell>
-                                                {run.disposition ? (
-                                                    <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md border-border/60 bg-muted/40 text-foreground">
-                                                        {run.disposition}
-                                                    </Badge>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground/60">-</span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-xs text-muted-foreground">{formatDateTime(run.created_at, effectiveTimezone)}</TableCell>
-                                            <TableCell className="text-xs text-right font-medium text-foreground">
-                                                {formatDuration(run.call_duration_seconds)}
-                                            </TableCell>
-                                            {organizationPricing?.price_per_second_usd && (
-                                                <TableCell className="text-xs text-right font-bold text-foreground">
-                                                    {run.charge_usd !== undefined && run.charge_usd !== null
-                                                        ? `$${run.charge_usd.toFixed(2)}`
-                                                        : '-'
-                                                    }
+                                                <TableCell
+                                                    className="font-mono text-xs text-muted-foreground hover:underline"
+                                                    onClick={(e) => { e.stopPropagation(); handleRowClick(run); }}
+                                                >
+                                                    #{run.id}
                                                 </TableCell>
+                                                <TableCell className="text-xs font-bold text-foreground">{run.workflow_name || 'Unknown'}</TableCell>
+                                                <TableCell>
+                                                    <CallTypeCell mode={run.mode} callType={run.call_type} />
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">
+                                                    {(run.call_type === 'inbound'
+                                                        ? run.caller_number
+                                                        : run.called_number) || '-'}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {run.disposition ? (
+                                                        <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md border-border/60 bg-muted/40 text-foreground">
+                                                            {run.disposition}
+                                                        </Badge>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground/60">-</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">{formatDateTime(run.created_at, effectiveTimezone)}</TableCell>
+                                                <TableCell className="text-xs text-right font-medium text-foreground">
+                                                    {formatDuration(run.call_duration_seconds)}
+                                                </TableCell>
+                                                {organizationPricing?.price_per_second_usd && (
+                                                    <TableCell className="text-xs text-right font-bold text-foreground">
+                                                        {run.charge_usd !== undefined && run.charge_usd !== null
+                                                            ? `$${run.charge_usd.toFixed(2)}`
+                                                            : '-'
+                                                        }
+                                                    </TableCell>
+                                                )}
+                                                <TableCell className="text-right pr-6" onClick={(e) => e.stopPropagation()}>
+                                                    <MediaPreviewButton
+                                                        recordingUrl={run.recording_url}
+                                                        transcriptUrl={run.transcript_url}
+                                                        runId={run.id}
+                                                        onOpenPreview={mediaPreview.openPreview}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                            {expandedRunId === run.id && (
+                                                <TableRow className="bg-muted/10 border-b border-border/50">
+                                                    <TableCell colSpan={9} className="p-4">
+                                                        <div className="grid grid-cols-2 gap-6">
+                                                            {/* Initial Context */}
+                                                            <div className="space-y-2">
+                                                                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Initial Context</h4>
+                                                                {(run as any).initial_context && Object.keys((run as any).initial_context).length > 0 ? (
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {Object.entries((run as any).initial_context).map(([k, v]) => (
+                                                                            <Badge key={k} variant="secondary" className="text-[10px] font-mono border-border/50">
+                                                                                <span className="text-muted-foreground mr-1">{k}:</span> {String(v)}
+                                                                            </Badge>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-xs text-muted-foreground/60">No initial context</span>
+                                                                )}
+                                                            </div>
+                                                            {/* Gathered Context */}
+                                                            <div className="space-y-2">
+                                                                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Gathered Context</h4>
+                                                                {(run as any).gathered_context && Object.keys((run as any).gathered_context).length > 0 ? (
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {Object.entries((run as any).gathered_context).map(([k, v]) => (
+                                                                            <Badge key={k} variant="outline" className="text-[10px] font-mono border-blue-500/30 bg-blue-500/5 text-blue-600">
+                                                                                <span className="opacity-70 mr-1">{k}:</span> {String(v)}
+                                                                            </Badge>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-xs text-muted-foreground/60">No gathered context</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
                                             )}
-                                            <TableCell className="text-right pr-6">
-                                                <MediaPreviewButton
-                                                    recordingUrl={run.recording_url}
-                                                    transcriptUrl={run.transcript_url}
-                                                    runId={run.id}
-                                                    onOpenPreview={mediaPreview.openPreview}
-                                                />
-                                            </TableCell>
-                                        </TableRow>
+                                        </Fragment>
                                     ))}
                                 </TableBody>
                             </Table>

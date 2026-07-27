@@ -44,6 +44,7 @@ import { UnsavedChangesProvider, useUnsavedChanges, useUnsavedChangesContext } f
 import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 import { detailFromError } from "@/lib/apiError";
 import { useAuth } from "@/lib/auth";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import logger from "@/lib/logger";
 import { fetchModelConfigurationPricing } from "@/lib/modelConfigurationPricing";
 import {
@@ -1330,7 +1331,7 @@ function VoicemailSection({
 function AgentUuidSection({ workflowUuid }: { workflowUuid: string }) {
     const handleCopy = async () => {
         try {
-            await navigator.clipboard.writeText(workflowUuid);
+            await copyTextToClipboard(workflowUuid);
             toast.success("Agent UUID copied");
         } catch {
             toast.error("Failed to copy Agent UUID");

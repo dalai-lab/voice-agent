@@ -95,6 +95,12 @@ export function WorkflowRunsTable({
 
     const formatDate = (dateString: string) => new Date(dateString).toLocaleString();
 
+    // Compute dynamic custom columns from the first run's gathered_context
+    const SYSTEM_KEYS = new Set(['mapped_call_disposition', 'customer_phone_number', 'call_id', 'call_tags']);
+    const dynamicColumns = runs.length > 0 && runs[0].gathered_context
+        ? Object.keys(runs[0].gathered_context).filter(k => !SYSTEM_KEYS.has(k)).slice(0, 3)
+        : [];
+
     const handleRowClick = (runId: number, runWorkflowId: number) => {
         router.push(`/workflow/${runWorkflowId}/run/${runId}`);
     };
@@ -177,6 +183,11 @@ export function WorkflowRunsTable({
                                         </div>
                                     </TableHead>
                                     <TableHead className="font-bold text-xs text-foreground py-3">Disposition</TableHead>
+                                    {dynamicColumns.map(col => (
+                                        <TableHead key={col} className="font-bold text-xs text-foreground py-3 uppercase truncate max-w-[120px]" title={col.replace(/_/g, ' ')}>
+                                            {col.replace(/_/g, ' ')}
+                                        </TableHead>
+                                    ))}
                                     <TableHead className="font-bold text-xs text-foreground py-3 text-right pr-6">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -216,6 +227,11 @@ export function WorkflowRunsTable({
                                                 <span className="text-xs text-muted-foreground/60">-</span>
                                             )}
                                         </TableCell>
+                                        {dynamicColumns.map(col => (
+                                            <TableCell key={col} className="text-xs text-foreground max-w-[150px] truncate" title={run.gathered_context?.[col] ? String(run.gathered_context[col]) : ""}>
+                                                {run.gathered_context?.[col] ? String(run.gathered_context[col]) : <span className="text-muted-foreground/40">-</span>}
+                                            </TableCell>
+                                        ))}
                                         <TableCell className="text-right pr-6" onClick={(e) => e.stopPropagation()}>
                                             <div className="inline-flex items-center gap-1.5">
                                                 <MediaPreviewButton

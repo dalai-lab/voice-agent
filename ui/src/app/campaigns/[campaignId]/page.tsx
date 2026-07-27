@@ -27,6 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CampaignAnalytics } from '@/components/analytics/CampaignAnalytics';
 import { CampaignRuns } from '@/components/workflow-runs';
 import { useOrganizationTimezone } from '@/hooks/useOrganizationTimezone';
 import { useAuth } from '@/lib/auth';
@@ -821,6 +822,9 @@ export default function CampaignDetailPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Campaign Analytics */}
+            <CampaignAnalytics campaignId={campaignId} />
 
             {/* Activity Log */}
             <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">

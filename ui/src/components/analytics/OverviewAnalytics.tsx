@@ -2,26 +2,25 @@
 
 import { useEffect, useState } from "react";
 import {
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
     CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    PieChart,
-    Pie,
     Cell,
-    Legend
-} from "recharts";
+    Legend,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis} from "recharts";
 
 import {
     getCurrentPeriodUsageApiV1OrganizationsUsageCurrentPeriodGet,
     getDailyUsageBreakdownApiV1OrganizationsUsageDailyBreakdownGet,
     getUsageHistoryApiV1OrganizationsUsageRunsGet
 } from "@/client/sdk.gen";
-import { useAuth } from "@/lib/auth";
 import { useUserConfig } from "@/context/UserConfigContext";
+import { useAuth } from "@/lib/auth";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
@@ -71,7 +70,7 @@ export function OverviewAnalytics() {
                             return {
                                 date: new Date(day.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
                                 calls: day.call_count,
-                                duration: day.duration_seconds
+                                duration: day.minutes * 60
                             };
                         }).reverse(); // API usually returns descending, we want ascending for chart
                         setDailyData(formattedDaily);
@@ -82,11 +81,11 @@ export function OverviewAnalytics() {
                 const usageRes = await getUsageHistoryApiV1OrganizationsUsageRunsGet({
                     query: { limit: 100 }
                 });
-                
+
                 if (usageRes.data) {
                     const runs = usageRes.data.runs || [];
                     const totalCount = usageRes.data.total_count || runs.length;
-                    
+
                     // Update KPI with total calls
                     setKpiData(prev => prev ? {
                         ...prev,
@@ -100,12 +99,12 @@ export function OverviewAnalytics() {
                         const disp = (run.gathered_context as any)?.mapped_call_disposition || "Unknown";
                         dispMap[disp] = (dispMap[disp] || 0) + 1;
                     });
-                    
+
                     const formattedDisp = Object.entries(dispMap)
                         .map(([name, value]) => ({ name, value }))
                         .sort((a, b) => b.value - a.value)
                         .slice(0, 5); // Top 5
-                        
+
                     setDispositionData(formattedDisp);
                 }
 
@@ -164,7 +163,7 @@ export function OverviewAnalytics() {
                                     <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                                     <XAxis dataKey="date" tick={{fontSize: 10}} stroke="#666" />
                                     <YAxis tick={{fontSize: 10}} stroke="#666" allowDecimals={false} />
-                                    <Tooltip 
+                                    <Tooltip
                                         contentStyle={{ backgroundColor: '#1f1f1f', borderColor: '#333', fontSize: '12px' }}
                                     />
                                     <Line type="monotone" dataKey="calls" stroke="#00C49F" strokeWidth={2} dot={{r: 2}} activeDot={{r: 4}} />
@@ -173,7 +172,7 @@ export function OverviewAnalytics() {
                         </div>
                     </div>
                 )}
-                
+
                 {dispositionData.length > 0 && (
                     <div className="p-5 rounded-xl border border-border bg-card/30 shadow-xs">
                         <h3 className="text-sm font-semibold mb-4">Top Call Outcomes</h3>

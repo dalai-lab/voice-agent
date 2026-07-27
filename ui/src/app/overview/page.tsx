@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { OverviewAnalytics } from '@/components/analytics/OverviewAnalytics';
 import { useAuth } from '@/lib/auth';
 
 export default function OverviewPage() {
@@ -31,6 +32,9 @@ export default function OverviewPage() {
                     Build and manage your low-latency voice AI configurations.
                 </p>
             </div>
+
+            {/* Dashboard Analytics Section */}
+            <OverviewAnalytics />
 
             {/* Quick Actions Grid - Triple Minimal Rows */}
             <div className="space-y-4">

@@ -232,10 +232,13 @@ function SplitTracksSection({
         user: null,
         bot: null,
     });
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
     const [playbackMode, setPlaybackMode] = useState<SplitTrackPlaybackMode>('both');
+    const [isDragging, setIsDragging] = useState(false);
+
+    const canPlay = Boolean(signedUrls.user || signedUrls.bot);
 
     const getPlaybackAudios = (mode: SplitTrackPlaybackMode) => {
         const audios: HTMLAudioElement[] = [];
@@ -403,6 +406,49 @@ function SplitTracksSection({
         }
     };
 
+    const handleSeek = (clientX: number) => {
+        if (!timelineRef.current || !canPlay) return;
+
+        const rect = timelineRef.current.getBoundingClientRect();
+        // Clamp the clientX to the bounds of the container
+        const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+        const percentage = x / rect.width;
+
+        const playbackAudios = getPlaybackAudios(playbackMode);
+        const { duration } = getAudioTimelineState(playbackAudios);
+        
+        if (duration > 0) {
+            const newTime = percentage * duration;
+            if (userAudioRef.current) userAudioRef.current.currentTime = newTime;
+            if (botAudioRef.current) botAudioRef.current.currentTime = newTime;
+            setProgress(percentage);
+        }
+    };
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        setIsDragging(true);
+        handleSeek(e.clientX);
+    };
+
+    useEffect(() => {
+        if (!isDragging) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            handleSeek(e.clientX);
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging, canPlay, playbackMode]);
+
     const canPlay =
         playbackMode === 'both'
             ? Boolean(signedUrls.user && signedUrls.bot)
@@ -486,7 +532,14 @@ function SplitTracksSection({
                 >
                     {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
                 </button>
-                <div className="relative h-24 min-w-0 flex-1 overflow-hidden rounded-lg border border-border/75 bg-secondary/15">
+                <div 
+                    ref={timelineRef}
+                    className={cn(
+                        "relative h-24 min-w-0 flex-1 overflow-hidden rounded-lg border border-border/75 bg-secondary/15 transition-colors",
+                        canPlay ? "cursor-pointer hover:border-border" : "opacity-50 cursor-not-allowed"
+                    )}
+                    onMouseDown={canPlay ? handleMouseDown : undefined}
+                >
                     <div className="absolute left-3 right-3 top-1/2 h-px bg-border/40" />
                     <WaveformLane peaks={peaks.user} track="user" position="top" isActive={userTrackActive} />
                     <WaveformLane peaks={peaks.bot} track="bot" position="bottom" isActive={botTrackActive} />

@@ -86,12 +86,21 @@ export function OverviewAnalytics() {
                     const runs = usageRes.data.runs || [];
                     const totalCount = usageRes.data.total_count || runs.length;
 
+                    let runsDuration = 0;
+                    runs.forEach(r => { runsDuration += r.call_duration_seconds || 0; });
+
                     // Update KPI with total calls
-                    setKpiData(prev => prev ? {
-                        ...prev,
-                        calls: Math.max(totalCallsFromDaily, totalCount),
-                        avgDuration: prev.duration > 0 && totalCount > 0 ? prev.duration / totalCount : 0
-                    } : null);
+                    setKpiData(prev => {
+                        if (!prev) return null;
+                        const duration = prev.duration > 0 ? prev.duration : runsDuration;
+                        const calls = Math.max(totalCallsFromDaily, totalCount);
+                        return {
+                            ...prev,
+                            duration,
+                            calls,
+                            avgDuration: duration > 0 && calls > 0 ? duration / calls : 0
+                        };
+                    });
 
                     // Group by disposition
                     const dispMap: Record<string, number> = {};

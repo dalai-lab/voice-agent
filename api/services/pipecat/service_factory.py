@@ -554,9 +554,9 @@ def create_tts_service(
     elif user_config.tts.provider == ServiceProviders.ELEVENLABS.value:
         # Backward compatible with older configuration "Name - voice_id"
         try:
-            voice_id = user_config.tts.voice.split(" - ")[1].strip()
+            voice_id = user_config.tts.voice.split(" - ")[1]
         except IndexError:
-            voice_id = user_config.tts.voice.strip()
+            voice_id = user_config.tts.voice
         # ElevenLabs TTS consumes the full normalized WebSocket URL. Realtime
         # STT uses the same normalization before adapting it to Pipecat's
         # scheme-less base_url contract.
@@ -564,7 +564,7 @@ def create_tts_service(
         elevenlabs_url = _elevenlabs_websocket_url(user_config.tts.base_url)
         return ElevenLabsTTSService(
             reconnect_on_error=False,
-            api_key=(user_config.tts.api_key.strip() if user_config.tts.api_key else user_config.tts.api_key),
+            api_key=user_config.tts.api_key,
             url=elevenlabs_url,
             settings=ElevenLabsTTSSettings(
                 voice=voice_id,

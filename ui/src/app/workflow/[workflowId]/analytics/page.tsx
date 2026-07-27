@@ -39,7 +39,7 @@ export default function AgentAnalyticsPage() {
                 setLoading(true);
                 const res = await getWorkflowRunsApiV1WorkflowWorkflowIdRunsGet({
                     path: { workflow_id: workflowId },
-                    query: { limit: 500 }
+                    query: { limit: 100 }
                 });
                 
                 if (res.data?.runs) {
@@ -122,7 +122,7 @@ export default function AgentAnalyticsPage() {
                     <div>
                         <h2 className="text-2xl font-bold tracking-tight text-foreground">Agent Performance Overview</h2>
                         <p className="text-xs text-muted-foreground mt-1">
-                            Analyze call volume, outcomes, and durations for this specific agent over its last 500 runs.
+                            Analyze call volume, outcomes, and durations for this specific agent over its last 100 runs.
                         </p>
                     </div>
 

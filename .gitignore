@@ -27,3 +27,9 @@ node_modules/
 .superpowers/
 docs/superpowers/
 .gstack/
+
+# Custom user files
+admissions_dashboard.html
+crm_dashboard.html
+worflow.json
+ui/openapi-ts-error-*.log

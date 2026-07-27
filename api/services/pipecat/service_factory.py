@@ -562,6 +562,11 @@ def create_tts_service(
         # scheme-less base_url contract.
         _validate_runtime_service_url(user_config.tts.base_url, "base_url")
         elevenlabs_url = _elevenlabs_websocket_url(user_config.tts.base_url)
+        api_key_hint = (user_config.tts.api_key or "")[:8] + "..." if user_config.tts.api_key else "(empty)"
+        logger.info(
+            f"[ELEVENLABS TTS] voice_id={voice_id!r} model={user_config.tts.model!r} "
+            f"url={elevenlabs_url!r} api_key={api_key_hint!r}"
+        )
         return ElevenLabsTTSService(
             reconnect_on_error=False,
             api_key=user_config.tts.api_key,

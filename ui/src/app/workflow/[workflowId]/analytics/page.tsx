@@ -145,34 +145,19 @@ export default function AgentAnalyticsPage() {
                         <>
                             {/* KPIs */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="bg-card border border-border rounded-xl p-5 shadow-xs flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
-                                        <Phone className="w-5 h-5 text-blue-500" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-1">Total Calls</p>
-                                        <p className="text-2xl font-bold text-foreground leading-none">{kpis.totalCalls}</p>
-                                    </div>
+                                <div className="p-4 rounded-xl border border-border bg-card/30 shadow-xs space-y-1">
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Calls</p>
+                                    <p className="text-2xl font-bold text-foreground">{kpis.totalCalls}</p>
                                 </div>
-                                <div className="bg-card border border-border rounded-xl p-5 shadow-xs flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
-                                        <CheckCircle2 className="w-5 h-5 text-green-500" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-1">Completed Runs</p>
-                                        <p className="text-2xl font-bold text-foreground leading-none">{kpis.completedCalls}</p>
-                                    </div>
+                                <div className="p-4 rounded-xl border border-border bg-card/30 shadow-xs space-y-1">
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Completed Runs</p>
+                                    <p className="text-2xl font-bold text-foreground">{kpis.completedCalls}</p>
                                 </div>
-                                <div className="bg-card border border-border rounded-xl p-5 shadow-xs flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
-                                        <Clock className="w-5 h-5 text-amber-500" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mb-1">Avg Duration</p>
-                                        <p className="text-2xl font-bold text-foreground leading-none">
-                                            {Math.floor(kpis.avgDuration / 60)}m {kpis.avgDuration % 60}s
-                                        </p>
-                                    </div>
+                                <div className="p-4 rounded-xl border border-border bg-card/30 shadow-xs space-y-1">
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Avg Duration</p>
+                                    <p className="text-2xl font-bold text-foreground">
+                                        {Math.floor(kpis.avgDuration / 60)}m {kpis.avgDuration % 60}s
+                                    </p>
                                 </div>
                             </div>
 

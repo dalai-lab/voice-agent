@@ -668,7 +668,7 @@ export default function UsagePage() {
                                                                 {(run as any).gathered_context && Object.keys((run as any).gathered_context).length > 0 ? (
                                                                     <div className="flex flex-wrap gap-2">
                                                                         {Object.entries((run as any).gathered_context).map(([k, v]) => (
-                                                                            <Badge key={k} variant="outline" className="text-[10px] font-mono border-blue-500/30 bg-blue-500/5 text-blue-600">
+                                                                            <Badge key={k} variant="outline" className="text-[10px] font-mono border-border bg-muted/40 text-foreground">
                                                                                 <span className="opacity-70 mr-1">{k}:</span> {String(v)}
                                                                             </Badge>
                                                                         ))}

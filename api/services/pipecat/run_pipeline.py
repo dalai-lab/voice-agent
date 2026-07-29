@@ -20,10 +20,10 @@ from api.services.integrations import (
     IntegrationRuntimeContext,
     create_runtime_sessions,
 )
-from api.services.pipecat.active_calls import (
+from api.services.observability.active_calls import (
     register_active_call as register_worker_active_call,
 )
-from api.services.pipecat.active_calls import (
+from api.services.observability.active_calls import (
     unregister_active_call as unregister_worker_active_call,
 )
 from api.services.pipecat.audio_config import AudioConfig, create_audio_config
@@ -979,12 +979,14 @@ async def _run_pipeline_impl(
             voicemail_llm = create_llm_service(
                 user_config,
                 correlation_id=mps_correlation_id,
+                usage_context="voicemail_detection",
             )
         else:
             voicemail_llm = create_llm_service_from_provider(
                 provider=voicemail_config.get("provider", "openai"),
                 model=voicemail_config.get("model", "gpt-4.1"),
                 api_key=voicemail_config.get("api_key", ""),
+                usage_context="voicemail_detection",
             )
 
         long_speech_timeout = voicemail_config.get("long_speech_timeout", 8.0)

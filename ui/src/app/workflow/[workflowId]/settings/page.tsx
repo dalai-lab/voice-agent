@@ -1511,7 +1511,6 @@ function WorkflowModelOverridesSection({
                                 {hasSavedModelOverride && (
                                     <Button
                                         type="button"
-                                        variant="outline"
                                         className="mt-3"
                                         onClick={removeV2Override}
                                         disabled={isRemovingOverride}

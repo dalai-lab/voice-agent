@@ -189,6 +189,14 @@ export type ActiveCallsResponse = {
      * Active Calls
      */
     active_calls: number;
+    /**
+     * Loop Lag P95 Ms
+     */
+    loop_lag_p95_ms?: number;
+    /**
+     * Loop Lag Max Ms
+     */
+    loop_lag_max_ms?: number;
 };
 
 /**
@@ -311,6 +319,16 @@ export type AuthUserResponse = {
      * Is Superuser
      */
     is_superuser: boolean;
+};
+
+/**
+ * AutoscaleMetricResponse
+ */
+export type AutoscaleMetricResponse = {
+    /**
+     * Value
+     */
+    value: number;
 };
 
 /**
@@ -8209,38 +8227,6 @@ export type HandlePlivoRingCallbackApiV1TelephonyPlivoRingCallbackWorkflowRunIdP
     200: unknown;
 };
 
-export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostData = {
-    body?: never;
-    path: {
-        /**
-         * Workflow Run Id
-         */
-        workflow_run_id: number;
-    };
-    query?: never;
-    url: '/api/v1/telephony/plivo/dtmf-callback/{workflow_run_id}';
-};
-
-export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostErrors = {
-    /**
-     * Not found
-     */
-    404: unknown;
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostError = HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostErrors[keyof HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostErrors];
-
-export type HandlePlivoDtmfCallbackApiV1TelephonyPlivoDtmfCallbackWorkflowRunIdPostResponses = {
-    /**
-     * Successful Response
-     */
-    200: unknown;
-};
-
 export type HandleTelnyxEventsApiV1TelephonyTelnyxEventsWorkflowRunIdPostData = {
     body?: never;
     path: {
@@ -15120,3 +15106,43 @@ export type ActiveCallsApiV1HealthActiveCallsGetResponses = {
 };
 
 export type ActiveCallsApiV1HealthActiveCallsGetResponse = ActiveCallsApiV1HealthActiveCallsGetResponses[keyof ActiveCallsApiV1HealthActiveCallsGetResponses];
+
+export type AutoscaleMetricApiV1HealthAutoscaleMetricGetData = {
+    body?: never;
+    headers?: {
+        /**
+         * X-Dograh-Devops-Secret
+         */
+        'X-Dograh-Devops-Secret'?: string | null;
+    };
+    path?: never;
+    query?: {
+        /**
+         * Buffer
+         */
+        buffer?: number;
+    };
+    url: '/api/v1/health/autoscale-metric';
+};
+
+export type AutoscaleMetricApiV1HealthAutoscaleMetricGetErrors = {
+    /**
+     * Not found
+     */
+    404: unknown;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AutoscaleMetricApiV1HealthAutoscaleMetricGetError = AutoscaleMetricApiV1HealthAutoscaleMetricGetErrors[keyof AutoscaleMetricApiV1HealthAutoscaleMetricGetErrors];
+
+export type AutoscaleMetricApiV1HealthAutoscaleMetricGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: AutoscaleMetricResponse;
+};
+
+export type AutoscaleMetricApiV1HealthAutoscaleMetricGetResponse = AutoscaleMetricApiV1HealthAutoscaleMetricGetResponses[keyof AutoscaleMetricApiV1HealthAutoscaleMetricGetResponses];

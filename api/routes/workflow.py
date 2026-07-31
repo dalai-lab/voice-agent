@@ -277,6 +277,7 @@ class WorkflowResponse(BaseModel):
     current_definition_id: int | None
     template_context_variables: dict | None = None
     call_disposition_codes: CallDispositionCodes | None = None
+    post_call_schema: list | None = None
     total_runs: int | None = None
     workflow_configurations: dict | None = None
     enable_dtmf: bool = False
@@ -324,6 +325,7 @@ class WorkflowTemplateResponse(BaseModel):
 class CreateWorkflowRequest(BaseModel):
     name: str
     workflow_definition: dict
+    post_call_schema: list | None = None
 
 
 class DuplicateTemplateRequest(BaseModel):
@@ -334,6 +336,7 @@ class DuplicateTemplateRequest(BaseModel):
 class UpdateWorkflowRequest(BaseModel):
     name: str | None = None
     workflow_definition: dict | None = None
+    post_call_schema: list | None = None
     template_context_variables: dict | None = None
     # Typed so field constraints (e.g. the max_call_duration cap) are
     # enforced by FastAPI; extra="allow" keeps passthrough keys like
@@ -353,6 +356,7 @@ class WorkflowVersionResponse(BaseModel):
     workflow_json: dict
     workflow_configurations: dict | None = None
     template_context_variables: dict | None = None
+    post_call_schema: list | None = None
 
 
 class UpdateWorkflowStatusRequest(BaseModel):
@@ -596,6 +600,7 @@ async def create_workflow_from_template(
             workflow_definition=workflow_def,
             user_id=user.id,
             organization_id=user.selected_organization_id,
+            post_call_schema=request.post_call_schema,
         )
 
         capture_event(
@@ -1286,6 +1291,7 @@ async def update_workflow(
             workflow_definition=workflow_definition,
             template_context_variables=request.template_context_variables,
             workflow_configurations=workflow_configurations,
+            post_call_schema=request.post_call_schema,
             enable_dtmf=request.enable_dtmf,
             enable_callbacks=request.enable_callbacks,
             callback_resume_mode=request.callback_resume_mode,
@@ -1488,6 +1494,7 @@ async def get_workflow_run(
         "call_type": run.call_type,
         "logs": run.logs,
         "annotations": run.annotations,
+        "extracted_data": run.extracted_data,
     }
 
 

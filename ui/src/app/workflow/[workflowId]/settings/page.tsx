@@ -96,6 +96,7 @@ const NAV_ITEMS = [
     { id: "models", label: "Model Overrides", icon: Brain },
     { id: "variables", label: "Template Variables", icon: Variable },
     { id: "dictionary", label: "Dictionary", icon: BookA },
+    { id: "pci", label: "Intelligence", icon: Brain },
     { id: "voicemail", label: "Voicemail Detection", icon: PhoneOff },
     { id: "recordings", label: "Recordings", icon: Mic },
     { id: "deployment", label: "Add to Website", icon: Rocket },
@@ -1110,6 +1111,99 @@ function TemplateVariablesSection({
 // Section: Dictionary
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Section: Post-Call Intelligence
+// ---------------------------------------------------------------------------
+
+function PostCallIntelligenceSection({
+    postCallSchema,
+    onSave,
+}: {
+    postCallSchema: Record<string, unknown>[] | null;
+    onSave: (schema: Record<string, unknown>[] | null) => Promise<void>;
+}) {
+    const defaultSchemaStr = "[\n  {\n    \"name\": \"summary\",\n    \"type\": \"string\",\n    \"description\": \"A brief summary of the call\"\n  }\n]";
+    const initialStr = postCallSchema ? JSON.stringify(postCallSchema, null, 2) : defaultSchemaStr;
+    const [schemaStr, setSchemaStr] = useState(initialStr);
+    const [isEnabled, setIsEnabled] = useState(postCallSchema !== null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const isDirty = isEnabled !== (postCallSchema !== null) || (isEnabled && schemaStr !== initialStr);
+    useUnsavedChanges("pci", isDirty);
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        setError(null);
+        try {
+            let parsedSchema: Record<string, unknown>[] | null = null;
+            if (isEnabled) {
+                try {
+                    parsedSchema = JSON.parse(schemaStr);
+                    if (!Array.isArray(parsedSchema)) {
+                        throw new Error("Schema must be an array of objects");
+                    }
+                } catch (e: any) {
+                    setError("Invalid JSON: " + e.message);
+                    setIsSaving(false);
+                    return;
+                }
+            }
+            await onSave(parsedSchema);
+        } catch (error) {
+            console.error("Failed to save post-call schema:", error);
+            setError("Failed to save. Check console for details.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <Card id="pci" className="border border-border bg-card rounded-xl shadow-xs">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                    <Brain className="h-4 w-4" />
+                    Post-Call Intelligence
+                </CardTitle>
+                <CardDescription>
+                    Automatically extract structured data using an LLM after the call ends.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="flex items-center space-x-2">
+                    <Switch
+                        id="enable-pci"
+                        checked={isEnabled}
+                        onCheckedChange={setIsEnabled}
+                    />
+                    <Label htmlFor="enable-pci">Enable Post-Call Intelligence</Label>
+                </div>
+                {isEnabled && (
+                    <div className="space-y-2">
+                        <Label>JSON Schema Array</Label>
+                        <p className="text-sm text-muted-foreground">
+                            Define the fields to extract. Each object should have a name, type, and description.
+                        </p>
+                        <Textarea
+                            value={schemaStr}
+                            onChange={(e) => setSchemaStr(e.target.value)}
+                            className="font-mono text-xs h-64"
+                            placeholder={defaultSchemaStr}
+                        />
+                        {error && <p className="text-sm text-red-500">{error}</p>}
+                    </div>
+                )}
+            </CardContent>
+            <CardFooter className="bg-muted/50 py-4 px-6 flex justify-end">
+                <Button onClick={handleSave} disabled={!isDirty || isSaving} className="min-w-24">
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Changes
+                </Button>
+            </CardFooter>
+        </Card>
+    );
+}
+
 function DictionarySection({
     dictionary,
     onSave,
@@ -1651,9 +1745,11 @@ function WorkflowSettingsInner({
         workflowConfigurations,
         templateContextVariables,
         dictionary,
+        postCallSchema,
         saveWorkflowConfigurations,
         saveTemplateContextVariables,
         saveDictionary,
+        savePostCallSchema,
     } = useWorkflowState({
         initialWorkflowName: workflow.name,
         workflowId,
@@ -1814,6 +1910,14 @@ function WorkflowSettingsInner({
                             {/* Dictionary Section */}
                             {activeSection === "dictionary" && (
                                 <DictionarySection dictionary={dictionary} onSave={saveDictionary} />
+                            )}
+
+                            {/* PCI Section */}
+                            {activeSection === "pci" && (
+                                <PostCallIntelligenceSection
+                                    postCallSchema={postCallSchema}
+                                    onSave={savePostCallSchema}
+                                />
                             )}
 
                             {/* Voicemail Classifier Section */}

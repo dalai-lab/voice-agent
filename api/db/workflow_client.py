@@ -27,6 +27,7 @@ class WorkflowClient(BaseDBClient):
         workflow_definition: dict,
         user_id: int,
         organization_id: int = None,
+        post_call_schema: list | None = None,
     ) -> WorkflowModel:
         async with self.async_session() as session:
             try:
@@ -35,6 +36,7 @@ class WorkflowClient(BaseDBClient):
                     workflow_definition=workflow_definition,  # Keep for backwards compatibility
                     user_id=user_id,
                     organization_id=organization_id,
+                    post_call_schema=post_call_schema or [],
                 )
                 session.add(new_workflow)
                 await session.flush()  # Flush to get the workflow ID
@@ -50,6 +52,7 @@ class WorkflowClient(BaseDBClient):
                     workflow_configurations=new_workflow.workflow_configurations or {},
                     template_context_variables=new_workflow.template_context_variables
                     or {},
+                    post_call_schema=new_workflow.post_call_schema or [],
                 )
                 session.add(definition)
                 await session.flush()
@@ -74,6 +77,7 @@ class WorkflowClient(BaseDBClient):
         workflow_definition: dict | None = None,
         workflow_configurations: dict | None = None,
         template_context_variables: dict | None = None,
+        post_call_schema: list | None = None,
     ) -> WorkflowDefinitionModel:
         """Create or update a draft version for this workflow.
 
@@ -98,6 +102,8 @@ class WorkflowClient(BaseDBClient):
                     draft.workflow_configurations = workflow_configurations
                 if template_context_variables is not None:
                     draft.template_context_variables = template_context_variables
+                if post_call_schema is not None:
+                    draft.post_call_schema = post_call_schema
             else:
                 # Get current published to use as base for unspecified fields
                 pub_result = await session.execute(
@@ -121,6 +127,9 @@ class WorkflowClient(BaseDBClient):
                     template_context_variables=template_context_variables
                     if template_context_variables is not None
                     else (published.template_context_variables if published else {}),
+                    post_call_schema=post_call_schema
+                    if post_call_schema is not None
+                    else (published.post_call_schema if published else []),
                     status="draft",
                     version_number=next_version,
                     is_current=False,
@@ -136,6 +145,7 @@ class WorkflowClient(BaseDBClient):
                 workflow.workflow_definition = draft.workflow_json
                 workflow.workflow_configurations = draft.workflow_configurations
                 workflow.template_context_variables = draft.template_context_variables
+                workflow.post_call_schema = draft.post_call_schema
 
             try:
                 await session.commit()
@@ -524,6 +534,7 @@ class WorkflowClient(BaseDBClient):
         workflow_definition: dict | None,
         template_context_variables: dict | None,
         workflow_configurations: dict | None,
+        post_call_schema: list | None = None,
         enable_dtmf: bool | None = None,
         enable_callbacks: bool | None = None,
         callback_resume_mode: str | None = None,
@@ -543,6 +554,7 @@ class WorkflowClient(BaseDBClient):
             workflow_definition: The new workflow definition
             template_context_variables: The template context variables
             workflow_configurations: The workflow configurations
+            post_call_schema: The post call schema
             user_id: The user ID (for backwards compatibility)
             organization_id: The organization ID
 
@@ -596,6 +608,7 @@ class WorkflowClient(BaseDBClient):
                 workflow_definition,
                 workflow_configurations,
                 template_context_variables,
+                post_call_schema,
             ]
         )
         if has_versioned_changes:
@@ -604,6 +617,7 @@ class WorkflowClient(BaseDBClient):
                 workflow_definition=workflow_definition,
                 workflow_configurations=workflow_configurations,
                 template_context_variables=template_context_variables,
+                post_call_schema=post_call_schema,
             )
             # Re-fetch with updated state
             workflow = await self.get_workflow(

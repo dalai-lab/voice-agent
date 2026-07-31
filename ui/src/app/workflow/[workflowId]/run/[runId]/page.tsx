@@ -54,6 +54,7 @@ interface WorkflowRunResponse {
     gathered_context: Record<string, string | number | boolean | object> | null;
     logs: WorkflowRunLogs | null;
     annotations: Record<string, unknown> | null;
+    extracted_data: Record<string, unknown> | null;
 }
 
 const RUN_SHELL_HEIGHT_CLASS = "h-[calc(100svh-49px)] md:h-[100svh] min-h-[calc(100svh-49px)] md:min-h-[100svh] max-h-[calc(100svh-49px)] md:max-h-[100svh]";
@@ -698,6 +699,7 @@ export default function WorkflowRunPage() {
                     gathered_context: runResponse.data?.gathered_context as Record<string, string> | null ?? null,
                     logs: runResponse.data?.logs as WorkflowRunLogs | null ?? null,
                     annotations: runResponse.data?.annotations as Record<string, unknown> | null ?? null,
+                    extracted_data: runResponse.data?.extracted_data as Record<string, unknown> | null ?? null,
                 };
                 setWorkflowRun(runData);
                 posthog.capture(PostHogEvent.WORKFLOW_RUN_DETAILS_VIEWED, {
@@ -859,6 +861,12 @@ export default function WorkflowRunPage() {
                                 title="Gathered Context"
                                 context={workflowRun?.gathered_context ?? null}
                             />
+                            {workflowRun?.extracted_data && Object.keys(workflowRun.extracted_data).length > 0 && (
+                                <ContextDisplay
+                                    title="Post-Call Intelligence"
+                                    context={workflowRun.extracted_data as Record<string, string | number | boolean | object>}
+                                />
+                            )}
                         </div>
 
                         {workflowRun?.annotations && Object.keys(workflowRun.annotations).length > 0 && (

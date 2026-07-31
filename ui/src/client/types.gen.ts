@@ -1748,6 +1748,10 @@ export type CreateWorkflowRequest = {
     workflow_definition: {
         [key: string]: unknown;
     };
+    /**
+     * Post Call Schema
+     */
+    post_call_schema?: Array<unknown> | null;
 };
 
 /**
@@ -6738,6 +6742,10 @@ export type UpdateWorkflowRequest = {
         [key: string]: unknown;
     } | null;
     /**
+     * Post Call Schema
+     */
+    post_call_schema?: Array<unknown> | null;
+    /**
      * Template Context Variables
      */
     template_context_variables?: {
@@ -7425,6 +7433,10 @@ export type WorkflowResponse = {
     } | null;
     call_disposition_codes?: CallDispositionCodes | null;
     /**
+     * Post Call Schema
+     */
+    post_call_schema?: Array<unknown> | null;
+    /**
      * Total Runs
      */
     total_runs?: number | null;
@@ -7601,6 +7613,12 @@ export type WorkflowRunResponseSchema = {
      * Annotations
      */
     annotations?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Extracted Data
+     */
+    extracted_data?: {
         [key: string]: unknown;
     } | null;
 };
@@ -7907,6 +7925,10 @@ export type WorkflowVersionResponse = {
     template_context_variables?: {
         [key: string]: unknown;
     } | null;
+    /**
+     * Post Call Schema
+     */
+    post_call_schema?: Array<unknown> | null;
 };
 
 /**

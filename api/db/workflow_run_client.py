@@ -330,6 +330,7 @@ class WorkflowRunClient(BaseDBClient):
                         "initial_context": run.initial_context,
                         "gathered_context": run.gathered_context,
                         "call_type": run.call_type,
+                        "extracted_data": run.extracted_data,
                     }
                 )
                 for run in result.scalars().all()
@@ -397,6 +398,7 @@ class WorkflowRunClient(BaseDBClient):
                             "initial_context": run.initial_context,
                             "gathered_context": run.gathered_context,
                             "call_type": run.call_type,
+                            "extracted_data": run.extracted_data,
                         }
                     )
                 )
@@ -417,6 +419,7 @@ class WorkflowRunClient(BaseDBClient):
         state: str | None = None,
         annotations: dict | None = None,
         extra: dict | None = None,
+        extracted_data: dict | None = None,
     ) -> WorkflowRunModel:
         async with self.async_session() as session:
             # Use SELECT FOR UPDATE to lock the row during the update
@@ -458,6 +461,8 @@ class WorkflowRunClient(BaseDBClient):
                 run.annotations = {**run.annotations, **annotations}
             if extra:
                 run.extra = {**run.extra, **extra}
+            if extracted_data is not None:
+                run.extracted_data = extracted_data
             if is_completed:
                 run.is_completed = is_completed
             if state:

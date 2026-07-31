@@ -103,6 +103,7 @@ interface UseWorkflowStateProps {
     };
     initialTemplateContextVariables?: Record<string, string>;
     initialWorkflowConfigurations?: WorkflowConfigurations;
+    initialPostCallSchema?: Record<string, unknown>[] | null;
     user: { id: string; email?: string } | null;
 }
 
@@ -112,6 +113,7 @@ export const useWorkflowState = ({
     initialFlow,
     initialTemplateContextVariables,
     initialWorkflowConfigurations,
+    initialPostCallSchema,
     user,
 }: UseWorkflowStateProps) => {
     const router = useRouter();
@@ -145,8 +147,10 @@ export const useWorkflowState = ({
         setWorkflowValidationErrors,
         setTemplateContextVariables,
         setWorkflowConfigurations,
+        setPostCallSchema,
         setDictionary,
         dictionary,
+        postCallSchema,
         clearValidationErrors,
         markNodeAsInvalid,
         markEdgeAsInvalid,
@@ -222,7 +226,7 @@ export const useWorkflowState = ({
 
         const resolvedInitialWorkflowConfigurations = resolveWorkflowConfigurations(
             initialWorkflowConfigurations,
-            workflowConfigurationDefaults,
+            workflowConfigurationDefaults
         );
 
         initializeWorkflow(
@@ -232,7 +236,8 @@ export const useWorkflowState = ({
             initialFlow?.edges ?? [],
             initialTemplateContextVariables,
             resolvedInitialWorkflowConfigurations,
-            resolvedInitialWorkflowConfigurations.dictionary ?? ''
+            resolvedInitialWorkflowConfigurations.dictionary ?? '',
+            initialPostCallSchema
         );
     }, [workflowId, initialWorkflowName, initialFlow?.nodes, initialFlow?.edges, initialTemplateContextVariables, initialWorkflowConfigurations, initializeWorkflow, specsLoading, bySpecName, workflowConfigurationDefaultsLoaded, workflowConfigurationDefaults]);
 
@@ -386,6 +391,7 @@ export const useWorkflowState = ({
                 body: {
                     name: workflowName,
                     workflow_definition: updateWorkflowDefinition ? flow : null,
+                    post_call_schema: postCallSchema,
                 },
             });
             if (response.error) {
@@ -441,6 +447,7 @@ export const useWorkflowState = ({
         validateWorkflow,
         applyWorkflowErrors,
         specs,
+        postCallSchema,
     ]);
 
     // Set up keyboard shortcut for save (Cmd/Ctrl + S)
@@ -526,6 +533,7 @@ export const useWorkflowState = ({
                     name: workflowName,
                     workflow_definition: null,
                     template_context_variables: variables,
+                    post_call_schema: postCallSchema,
                 },
             });
             setTemplateContextVariables(variables);
@@ -534,7 +542,7 @@ export const useWorkflowState = ({
             logger.error(`Error saving template context variables: ${error}`);
             throw error;
         }
-    }, [workflowId, workflowName, user, setTemplateContextVariables]);
+    }, [workflowId, workflowName, user, setTemplateContextVariables, postCallSchema]);
 
     // Save workflow configurations
     const saveWorkflowConfigurations = useCallback(async (configurations: WorkflowConfigurations, newWorkflowName: string, enableDtmf?: boolean, enableCallbacks?: boolean, callbackResumeMode?: "fresh" | "last_node") => {
@@ -551,6 +559,7 @@ export const useWorkflowState = ({
                     name: newWorkflowName,
                     workflow_definition: null,
                     workflow_configurations: configurationsWithDictionary as Record<string, unknown>,
+                    post_call_schema: postCallSchema,
                     enable_dtmf: enableDtmf,
                     enable_callbacks: enableCallbacks,
                     callback_resume_mode: callbackResumeMode,
@@ -586,28 +595,25 @@ export const useWorkflowState = ({
             logger.error(`Error saving workflow configurations: ${error}`);
             throw error;
         }
-    }, [workflowId, user, setWorkflowConfigurations, workflowConfigurationDefaults]);
+    }, [workflowId, user, setWorkflowConfigurations, workflowConfigurationDefaults, postCallSchema]);
 
     // Save dictionary
     const saveDictionary = useCallback(async (newDictionary: string) => {
-        if (!user) return;
-        const currentConfigurations =
-            useWorkflowStore.getState().workflowConfigurations
-            ?? resolveWorkflowConfigurations(null, workflowConfigurationDefaults);
-        const updatedConfigurations: WorkflowConfigurations = { ...currentConfigurations, dictionary: newDictionary };
+        if (!user?.id) return;
         try {
-            await updateWorkflowApiV1WorkflowWorkflowIdPut({
+            const response = await updateWorkflowApiV1WorkflowWorkflowIdPut({
                 path: {
                     workflow_id: workflowId,
                 },
                 body: {
                     name: workflowName,
                     workflow_definition: null,
-                    workflow_configurations: updatedConfigurations as Record<string, unknown>,
+                    workflow_configurations: { ...(workflowConfigurations || {}), dictionary: newDictionary } as Record<string, unknown>,
+                    post_call_schema: postCallSchema,
                 },
             });
             setDictionary(newDictionary);
-            setWorkflowConfigurations(updatedConfigurations);
+            setWorkflowConfigurations({ ...(workflowConfigurations || {}), dictionary: newDictionary } as WorkflowConfigurations);
         } catch (error) {
             logger.error(`Error saving dictionary: ${error}`);
             throw error;
@@ -626,6 +632,34 @@ export const useWorkflowState = ({
         validateWorkflow();
     }, [validateWorkflow]);
 
+    const savePostCallSchema = useCallback(async (newSchema: Record<string, unknown>[] | null) => {
+        if (!user?.id) return;
+        try {
+            const response = await updateWorkflowApiV1WorkflowWorkflowIdPut({
+                path: {
+                    workflow_id: workflowId,
+                },
+                body: {
+                    name: workflowName,
+                    workflow_definition: null,
+                    post_call_schema: newSchema,
+                } as any,
+            });
+
+            if (response.error) {
+                toast.error("Failed to save post-call schema");
+                return;
+            }
+
+            setPostCallSchema(newSchema);
+            setIsDirty(false);
+            toast.success("Post-call schema saved successfully");
+        } catch (error) {
+            logger.error(`Error saving post-call schema: ${error}`);
+            toast.error("An unexpected error occurred while saving.");
+        }
+    }, [workflowId, workflowName, setPostCallSchema, setIsDirty, user]);
+
     return {
         rfInstance,
         nodes,
@@ -636,6 +670,7 @@ export const useWorkflowState = ({
         workflowValidationErrors,
         templateContextVariables,
         workflowConfigurations,
+        postCallSchema,
         dictionary,
         setNodes,
         setEdges,
@@ -652,6 +687,7 @@ export const useWorkflowState = ({
         saveTemplateContextVariables,
         saveWorkflowConfigurations,
         saveDictionary,
+        savePostCallSchema,
         // Export undo/redo state
         undo,
         redo,

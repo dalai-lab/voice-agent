@@ -33,3 +33,10 @@ This document tracks future features and UI/UX improvements that need to be buil
   - When a digit is pressed, store it and reset a short timer (e.g., 3 seconds).
   - While typing, pause the `UserIdleHandler` so the bot doesn't say "Are you still there?".
   - When the user presses a terminator (like `#`) or the timer expires, send the entire buffered string (e.g., *"12345"*) to the LLM context as a single message.
+
+## 5. Upstream Maintenance (Custom Fork)
+**Goal:** Prevent custom features (like Callbacks) from breaking when pulling updates from upstream Dograh `main`.
+- **Merge Conflicts:** Custom integrations in shared files (e.g., `api/routes/campaign.py`, `ui/src/middleware.ts`) will likely cause conflicts during `git pull upstream main`. Always resolve these carefully to preserve custom callback code.
+- **Frontend SDK Sync:** Pulling backend changes often updates the OpenAPI spec. After pulling upstream, **always** run the backend, fetch the latest `openapi.json`, and run `npm run generate-client` in `ui/`. Otherwise, custom API methods (like `cancelCallbackApiV1...`) will be missing from the generated `index.ts` and break the frontend build.
+- **Submodules:** Pulling upstream changes the commit hash of submodules (like `pipecat`). Always run `git submodule update --init --recursive` after pulling upstream (both locally and on the deployment server) before building Docker images.
+- **Database Migrations:** Ensure custom Alembic migrations for Callbacks do not conflict with new upstream migrations (watch out for multiple head revisions).

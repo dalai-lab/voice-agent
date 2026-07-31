@@ -49,12 +49,22 @@ import type { LocalUser } from "@/lib/auth";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-type SidebarNavItem = {
+type SidebarSingleItem = {
+  type?: "single";
   title: string;
   url: string;
   icon: React.ComponentType<any>;
   showsTelephonyWarning?: boolean;
 };
+
+type SidebarGroupItem = {
+  type: "group";
+  title: string;
+  icon: React.ComponentType<any>;
+  items: SidebarSingleItem[];
+};
+
+type SidebarNavItem = SidebarSingleItem | SidebarGroupItem;
 
 type SidebarNavSection = {
   label?: string;
@@ -71,11 +81,6 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         url: "/overview",
         icon: PhosphorIcons.SquaresFour,
       },
-    ],
-  },
-  {
-    label: "BUILD",
-    items: [
       {
         title: "Voice Agents",
         url: "/workflow",
@@ -87,81 +92,97 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         icon: PhosphorIcons.Megaphone,
       },
       {
-        title: "Tools",
-        url: "/tools",
-        icon: PhosphorIcons.Wrench,
-      },
-    ],
-  },
-  {
-    label: "RESOURCES",
-    items: [
-      {
-        title: "Knowledge Base",
-        url: "/files",
-        icon: PhosphorIcons.Database,
-      },
-      {
-        title: "Audio Recordings",
-        url: "/recordings",
-        icon: PhosphorIcons.VinylRecord,
-      },
-    ],
-  },
-  {
-    label: "CONFIGURE",
-    items: [
-      {
-        title: "AI Models",
-        url: "/model-configurations",
-        icon: PhosphorIcons.Brain,
-      },
-      {
-        title: "Telephony",
-        url: "/telephony-configurations",
-        icon: PhosphorIcons.Phone,
-        showsTelephonyWarning: true,
-      },
-      {
-        title: "Developers",
-        url: "/api-keys",
-        icon: PhosphorIcons.Key,
-      },
-      {
-        title: "Platform Settings",
-        url: "/settings",
-        icon: PhosphorIcons.Gear,
-      },
-    ],
-  },
-  {
-    label: "MANAGE",
-    items: [
-      {
-        title: "Agent Logs",
-        url: "/runs",
-        icon: PhosphorIcons.ClockCounterClockwise,
-      },
-      {
-        title: "Callback Logs",
-        url: "/callbacks",
-        icon: PhosphorIcons.PhoneCall,
-      },
-      {
-        title: "Usage",
-        url: "/usage",
-        icon: PhosphorIcons.TrendUp,
-      },
-      {
-        title: "Billing",
-        url: "/billing",
-        icon: PhosphorIcons.CreditCard,
-      },
-      {
-        title: "Reports",
+        title: "Reports & Analytics",
         url: "/reports",
         icon: PhosphorIcons.ChartBar,
-      }
+      },
+    ],
+  },
+  {
+    label: "OPERATIONS",
+    items: [
+      {
+        type: "group",
+        title: "Call Activity",
+        icon: PhosphorIcons.PhoneCall,
+        items: [
+          {
+            title: "Call History",
+            url: "/runs",
+            icon: PhosphorIcons.ClockCounterClockwise,
+          },
+          {
+            title: "Scheduled Callbacks",
+            url: "/callbacks",
+            icon: PhosphorIcons.PhoneCall,
+          },
+          {
+            title: "Audio Recordings",
+            url: "/recordings",
+            icon: PhosphorIcons.VinylRecord,
+          },
+        ],
+      },
+      {
+        type: "group",
+        title: "Agent Resources",
+        icon: PhosphorIcons.Wrench,
+        items: [
+          {
+            title: "Tools & Integrations",
+            url: "/tools",
+            icon: PhosphorIcons.Wrench,
+          },
+          {
+            title: "Knowledge Base",
+            url: "/files",
+            icon: PhosphorIcons.Database,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    label: "ADMINISTRATION",
+    items: [
+      {
+        type: "group",
+        title: "Account & Settings",
+        icon: PhosphorIcons.Gear,
+        items: [
+          {
+            title: "General Settings",
+            url: "/settings",
+            icon: PhosphorIcons.Gear,
+          },
+          {
+            title: "Telephony & Providers",
+            url: "/telephony-configurations",
+            icon: PhosphorIcons.Phone,
+            showsTelephonyWarning: true,
+          },
+          {
+            title: "AI Models",
+            url: "/model-configurations",
+            icon: PhosphorIcons.Brain,
+          },
+          {
+            title: "API Keys",
+            url: "/api-keys",
+            icon: PhosphorIcons.Key,
+          },
+          {
+            title: "Usage & Logs",
+            url: "/usage",
+            icon: PhosphorIcons.TrendUp,
+          },
+          {
+            title: "Billing & Plans",
+            url: "/billing",
+            icon: PhosphorIcons.CreditCard,
+          },
+        ],
+      },
     ],
   },
 ];
@@ -197,7 +218,28 @@ export function AppSidebar() {
     }
   };
 
-  const SidebarLink = ({ item }: { item: SidebarNavItem }) => {
+  const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>({});
+
+  React.useEffect(() => {
+    const nextState: Record<string, boolean> = {};
+    NAV_SECTIONS.forEach((section) => {
+      section.items.forEach((item) => {
+        if (item.type === "group") {
+          const hasActiveChild = item.items.some((child) => isActive(child.url));
+          if (hasActiveChild) {
+            nextState[item.title] = true;
+          }
+        }
+      });
+    });
+    setOpenGroups((prev) => ({ ...nextState, ...prev }));
+  }, [pathname]);
+
+  const toggleGroup = (title: string) => {
+    setOpenGroups((prev) => ({ ...prev, [title]: !prev[title] }));
+  };
+
+  const SidebarSingleLink = ({ item, isSubItem = false }: { item: SidebarSingleItem; isSubItem?: boolean }) => {
     const isItemActive = isActive(item.url);
     const Icon = item.icon;
     const showWarningDot = item.showsTelephonyWarning && hasTelephonyWarning;
@@ -227,7 +269,11 @@ export function AppSidebar() {
         tooltip={tooltip}
         className={cn(
           "rounded-lg transition-all duration-150 text-xs font-medium select-none border relative",
-          isCollapsed ? "mx-auto h-8.5" : "mx-2 w-[calc(100%-16px)] h-8.5",
+          isCollapsed
+            ? "mx-auto h-8.5"
+            : isSubItem
+            ? "ml-6 mr-2 w-[calc(100%-32px)] h-8"
+            : "mx-2 w-[calc(100%-16px)] h-8.5",
           isItemActive
             ? "bg-cta/[0.05] border-transparent text-cta font-semibold before:absolute before:left-0.5 before:top-[20%] before:h-[60%] before:w-0.75 before:rounded-full before:bg-cta"
             : "border-transparent text-sidebar-foreground/75 hover:bg-sidebar-accent/30 hover:text-sidebar-foreground"
@@ -236,12 +282,13 @@ export function AppSidebar() {
         <Link
           href={item.url}
           onClick={handleMobileNavClick}
-          className={cn("flex items-center gap-3 px-3", isCollapsed && "justify-center px-0 w-full h-full")}
+          className={cn("flex items-center gap-2.5 px-2.5", isCollapsed && "justify-center px-0 w-full h-full")}
           translate="no"
         >
           <Icon
             className={cn(
-              "h-4 w-4 shrink-0 transition-colors",
+              "shrink-0 transition-colors",
+              isSubItem ? "h-3.5 w-3.5" : "h-4 w-4",
               isItemActive ? "text-cta" : "text-muted-foreground group-hover:text-sidebar-foreground"
             )}
           />
@@ -267,6 +314,61 @@ export function AppSidebar() {
           )}
         </Link>
       </SidebarMenuButton>
+    );
+  };
+
+  const SidebarGroupMenu = ({ group }: { group: SidebarGroupItem }) => {
+    const isExpanded = !!openGroups[group.title];
+    const hasActiveChild = group.items.some((child) => isActive(child.url));
+    const hasGroupWarning = group.items.some((child) => child.showsTelephonyWarning && hasTelephonyWarning);
+    const Icon = group.icon;
+
+    if (isCollapsed) {
+      return (
+        <div className="space-y-1">
+          {group.items.map((child) => (
+            <SidebarMenuItem key={child.title}>
+              <SidebarSingleLink item={child} />
+            </SidebarMenuItem>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-0.5">
+        <SidebarMenuButton
+          onClick={() => toggleGroup(group.title)}
+          className={cn(
+            "mx-2 w-[calc(100%-16px)] h-8.5 rounded-lg transition-all duration-150 text-xs font-medium select-none border border-transparent px-2.5 flex items-center justify-between text-sidebar-foreground/80 hover:bg-sidebar-accent/30 hover:text-sidebar-foreground cursor-pointer",
+            hasActiveChild && "text-sidebar-foreground font-semibold"
+          )}
+        >
+          <div className="flex items-center gap-2.5 truncate">
+            <Icon className={cn("h-4 w-4 shrink-0", hasActiveChild ? "text-cta" : "text-muted-foreground")} />
+            <span className="truncate text-xs font-sans tracking-tight">{group.title}</span>
+            {hasGroupWarning && (
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0" />
+            )}
+          </div>
+          <ChevronRight
+            className={cn(
+              "h-3.5 w-3.5 text-muted-foreground/70 transition-transform duration-200 shrink-0",
+              isExpanded && "rotate-90 text-sidebar-foreground"
+            )}
+          />
+        </SidebarMenuButton>
+
+        {isExpanded && (
+          <div className="space-y-0.5 relative before:absolute before:left-5 before:top-1 before:bottom-1 before:w-px before:bg-sidebar-border/60">
+            {group.items.map((child) => (
+              <SidebarMenuItem key={child.title}>
+                <SidebarSingleLink item={child} isSubItem />
+              </SidebarMenuItem>
+            ))}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -392,26 +494,30 @@ export function AppSidebar() {
       <SidebarContent className="notranslate py-4 space-y-4 no-scrollbar" translate="no">
         {NAV_SECTIONS.map((section) => (
           <SidebarGroup
-            key={section.label ?? "overview"}
+            key={section.label ?? "main"}
             className="p-0 space-y-1"
           >
             {section.label && (
               <SidebarGroupLabel
                 className={cn(
-                  "notranslate text-[10px] font-semibold capitalize tracking-wide text-muted-foreground/45 px-5 h-6 mb-0.5 mt-2 first:mt-0",
+                  "notranslate text-[10px] font-semibold tracking-wider text-muted-foreground/45 px-5 h-6 mb-0.5 mt-2 first:mt-0 uppercase",
                   isCollapsed && "hidden"
                 )}
                 translate="no"
               >
-                {section.label.toLowerCase()}
+                {section.label}
               </SidebarGroupLabel>
             )}
             <SidebarMenu className="space-y-0.5">
-              {section.items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarLink item={item} />
-                </SidebarMenuItem>
-              ))}
+              {section.items.map((item) =>
+                item.type === "group" ? (
+                  <SidebarGroupMenu key={item.title} group={item} />
+                ) : (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarSingleLink item={item} />
+                  </SidebarMenuItem>
+                )
+              )}
             </SidebarMenu>
           </SidebarGroup>
         ))}
@@ -439,7 +545,7 @@ export function AppSidebar() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => router.push("/settings")} className="cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />
-                    Platform Settings
+                    General Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => logout()} className="cursor-pointer text-red-500 focus:text-red-500">

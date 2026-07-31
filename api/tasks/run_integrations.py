@@ -25,6 +25,7 @@ from api.services.workflow.dto import (
     WebhookNodeData,
     WebhookRFNode,
 )
+from api.services.workflow.post_call_intelligence import run_post_call_intelligence
 from api.services.workflow.qa import run_per_node_qa_analysis
 from api.tasks.function_names import FunctionNames
 from api.utils.recording_artifacts import get_recording_storage_key
@@ -223,13 +224,25 @@ async def run_integrations_post_workflow_run(_ctx, workflow_run_id: int):
 
         # Step 4: Generate a public access token for any run that needs post-call work.
         has_campaign = workflow_run.campaign_id is not None
+        post_call_schema = None
+        if workflow_run.definition and getattr(
+            workflow_run.definition, "post_call_schema", None
+        ):
+            post_call_schema = workflow_run.definition.post_call_schema
+        elif workflow_run.workflow and getattr(
+            workflow_run.workflow, "post_call_schema", None
+        ):
+            post_call_schema = workflow_run.workflow.post_call_schema
+        has_pci = bool(post_call_schema)
+
         if (
             not webhook_nodes
             and not qa_nodes
             and not has_registered_integrations
             and not has_campaign
+            and not has_pci
         ):
-            logger.debug("No integration nodes and no campaign, skipping")
+            logger.debug("No integration nodes, PCI, or campaign, skipping")
             return
 
         public_token = await db_client.ensure_public_access_token(workflow_run_id)
@@ -268,6 +281,20 @@ async def run_integrations_post_workflow_run(_ctx, workflow_run_id: int):
                 )
 
                 # Re-fetch workflow_run to get updated annotations
+                workflow_run, _ = await db_client.get_workflow_run_with_context(
+                    workflow_run_id
+                )
+
+        # Step 5b: Run Post-Call Intelligence
+        if post_call_schema:
+            logger.info(f"Running PCI extraction for run {workflow_run_id}")
+            extracted_data = await run_post_call_intelligence(
+                workflow_run, post_call_schema
+            )
+            if extracted_data and "_error" not in extracted_data:
+                await db_client.update_workflow_run(
+                    workflow_run_id, extracted_data=extracted_data
+                )
                 workflow_run, _ = await db_client.get_workflow_run_with_context(
                     workflow_run_id
                 )
@@ -360,6 +387,7 @@ def _build_render_context(
         "cost_info": workflow_run.usage_info or {},
         # Annotations (includes QA results)
         "annotations": workflow_run.annotations or {},
+        "extracted_data": workflow_run.extracted_data or {},
         "extra": extra,
     }
 

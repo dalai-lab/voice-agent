@@ -378,6 +378,9 @@ class WorkflowDefinitionModel(Base):
     template_context_variables = Column(
         JSON, nullable=False, default=dict, server_default=text("'{}'::json")
     )
+    post_call_schema = Column(
+        JSON, nullable=False, default=list, server_default=text("'[]'::json")
+    )
 
     # Table constraints and indexes — unique hash constraint removed (no more dedup)
     __table_args__ = (
@@ -452,6 +455,9 @@ class WorkflowModel(Base):
     workflow_definition = Column(JSON, nullable=False, default=dict)
     template_context_variables = Column(JSON, nullable=False, default=dict)
     call_disposition_codes = Column(JSON, nullable=False, default=dict)
+    post_call_schema = Column(
+        JSON, nullable=False, default=list, server_default=text("'[]'::json")
+    )
     workflow_configurations = Column(
         JSON, nullable=False, default=dict, server_default=text("'{}'::json")
     )
@@ -550,6 +556,7 @@ class WorkflowRunModel(Base):
     is_completed = Column(Boolean, default=False)
     recording_url = Column(String, nullable=True)
     transcript_url = Column(String, nullable=True)
+    extracted_data = Column(JSON, nullable=True)
     extra = Column(
         JSON, nullable=False, default=dict, server_default=text("'{}'::json")
     )

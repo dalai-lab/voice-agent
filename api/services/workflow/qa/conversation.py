@@ -34,7 +34,7 @@ def build_conversation_structure(logs: list[dict]) -> list[dict]:
     if not logs:
         return []
 
-    start_time = datetime.fromisoformat(logs[0]["timestamp"])
+    start_time = _safe_parse_timestamp(logs[0]) or datetime.now()
 
     conversation = []
     for event in logs:

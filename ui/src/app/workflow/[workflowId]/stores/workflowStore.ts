@@ -35,6 +35,7 @@ interface WorkflowState {
   // Configuration
   templateContextVariables: Record<string, string>;
   workflowConfigurations: WorkflowConfigurations | null;
+  postCallSchema: Record<string, unknown>[] | null;
   dictionary: string;
 
   // ReactFlow instance reference
@@ -50,7 +51,8 @@ interface WorkflowActions {
     edges: FlowEdge[],
     templateContextVariables?: Record<string, string>,
     workflowConfigurations?: WorkflowConfigurations | null,
-    dictionary?: string
+    dictionary?: string,
+    postCallSchema?: Record<string, unknown>[] | null
   ) => void;
 
   // History management
@@ -76,6 +78,7 @@ interface WorkflowActions {
   setWorkflowName: (name: string) => void;
   setTemplateContextVariables: (variables: Record<string, string>) => void;
   setWorkflowConfigurations: (configurations: WorkflowConfigurations) => void;
+  setPostCallSchema: (schema: Record<string, unknown>[] | null) => void;
   setDictionary: (dictionary: string) => void;
 
   // UI state
@@ -137,23 +140,29 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   workflowValidationErrors: [],
   templateContextVariables: {},
   workflowConfigurations: null,
+  postCallSchema: null,
   dictionary: '',
   rfInstance: null,
 
   // Actions
-  initializeWorkflow: (workflowId, workflowName, nodes, edges, templateContextVariables = {}, workflowConfigurations = null, dictionary = '') => {
-    const initialHistory: HistoryState = { nodes, edges, workflowName };
+  initializeWorkflow: (workflowId, workflowName, nodes, edges, templateContextVariables = {}, workflowConfigurations = null, dictionary = '', postCallSchema = null) => {
+    const historyState = {
+      nodes: [...nodes],
+      edges: [...edges],
+      workflowName
+    };
     set({
       workflowId,
       workflowName,
-      nodes,
-      edges,
+      nodes: [...nodes],
+      edges: [...edges],
       templateContextVariables,
       workflowConfigurations,
       dictionary,
+      postCallSchema,
       isDirty: false,
       workflowValidationErrors: [],
-      history: [initialHistory],
+      history: [historyState],
       historyIndex: 0,
     });
   },
@@ -359,17 +368,13 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     );
   },
 
-  setTemplateContextVariables: (templateContextVariables) => {
-    set({ templateContextVariables });
-  },
+  setTemplateContextVariables: (variables) => set({ templateContextVariables: variables }),
+  
+  setWorkflowConfigurations: (configurations) => set({ workflowConfigurations: configurations }),
 
-  setWorkflowConfigurations: (workflowConfigurations) => {
-    set({ workflowConfigurations });
-  },
+  setPostCallSchema: (schema) => set({ postCallSchema: schema }),
 
-  setDictionary: (dictionary) => {
-    set({ dictionary });
-  },
+  setDictionary: (dictionary) => set({ dictionary }),
 
   setIsDirty: (isDirty) => {
     set({ isDirty });

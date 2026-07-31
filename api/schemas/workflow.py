@@ -31,3 +31,4 @@ class WorkflowRunResponseSchema(BaseModel):
     call_type: CallType
     logs: Dict[str, Any] | None = None
     annotations: Dict[str, Any] | None = None
+    extracted_data: Dict[str, Any] | None = None

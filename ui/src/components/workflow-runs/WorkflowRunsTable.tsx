@@ -18,6 +18,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { getDispositionBadge, formatContactOrigin } from "@/lib/dispositionLabels";
 import { useOrganizationTimezone } from "@/hooks/useOrganizationTimezone";
 import { formatDateTime } from "@/lib/dateTime";
 import { ActiveFilter, FilterAttribute } from "@/types/filters";
@@ -227,11 +228,14 @@ export function WorkflowRunsTable({
                                                 : "-"}
                                         </TableCell>
                                         <TableCell>
-                                            {run.gathered_context?.mapped_call_disposition ? (
-                                                <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0.5 font-bold rounded-md border-border/60 bg-muted/40 text-foreground">
-                                                    {run.gathered_context.mapped_call_disposition as string}
-                                                </Badge>
-                                            ) : (
+                                            {run.gathered_context?.mapped_call_disposition ? (() => {
+                                                const { label: dispLabel, className: dispClass } = getDispositionBadge(run.gathered_context.mapped_call_disposition as string);
+                                                return (
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${dispClass}`}>
+                                                        {dispLabel}
+                                                    </span>
+                                                );
+                                            })() : (
                                                 <span className="text-xs text-muted-foreground/60">-</span>
                                             )}
                                         </TableCell>

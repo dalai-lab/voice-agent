@@ -10,8 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PieChart } from 'lucide-react';
 
 interface DispositionData {
   disposition: string;
@@ -24,12 +23,12 @@ interface DispositionChartProps {
 }
 
 const COLORS = [
-  '#3b82f6', // blue-500
-  '#10b981', // emerald-500
-  '#f59e0b', // amber-500
-  '#8b5cf6', // violet-500
-  '#ef4444', // red-500
-  '#6b7280', // gray-500 for "Other"
+  '#6366F1', // Indigo
+  '#10B981', // Emerald
+  '#F59E0B', // Amber
+  '#EC4899', // Pink
+  '#8B5CF6', // Violet
+  '#64748B', // Slate
 ];
 
 export function DispositionChart({ data }: DispositionChartProps) {
@@ -40,12 +39,12 @@ export function DispositionChart({ data }: DispositionChartProps) {
 
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: DispositionData & { fill: string } }> }) => {
     if (active && payload && payload[0]) {
-      const data = payload[0].payload;
+      const item = payload[0].payload;
       return (
-        <div className="bg-background border rounded-lg shadow-lg p-3">
-          <p className="font-semibold">{data.disposition}</p>
-          <p className="text-sm">Count: {data.count}</p>
-          <p className="text-sm">{data.percentage}% of total</p>
+        <div className="bg-[#171717] border border-[#333] rounded-lg shadow-lg p-3 text-xs space-y-1">
+          <p className="font-semibold text-foreground">{item.disposition}</p>
+          <p className="text-muted-foreground">Count: <span className="text-foreground font-mono">{item.count}</span></p>
+          <p className="text-muted-foreground"><span className="text-foreground font-semibold">{item.percentage}%</span> of total</p>
         </div>
       );
     }
@@ -53,33 +52,38 @@ export function DispositionChart({ data }: DispositionChartProps) {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Disposition Distribution</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {data.length === 0 ? (
-          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-            No disposition data available
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height={300}>
+    <div className="p-5 rounded-xl border border-border/60 bg-card/30 shadow-xs space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <PieChart className="w-3.5 h-3.5 text-indigo-400" />
+          Disposition Distribution
+        </h3>
+      </div>
+
+      {data.length === 0 ? (
+        <div className="h-[280px] flex items-center justify-center text-muted-foreground text-xs font-medium">
+          No disposition data available for this range
+        </div>
+      ) : (
+        <div className="h-[280px]">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
-              layout="horizontal"
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              margin={{ top: 10, right: 20, left: 0, bottom: 45 }}
             >
-              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
               <XAxis
                 dataKey="disposition"
-                angle={-45}
+                angle={-35}
                 textAnchor="end"
-                height={80}
                 interval={0}
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 10, fill: '#888' }}
+                stroke="#333"
               />
               <YAxis
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 10, fill: '#888' }}
+                stroke="#333"
+                allowDecimals={false}
               />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
@@ -89,8 +93,8 @@ export function DispositionChart({ data }: DispositionChartProps) {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+    </div>
   );
 }

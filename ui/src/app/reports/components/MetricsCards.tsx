@@ -1,6 +1,4 @@
-import { Phone,PhoneForwarded } from 'lucide-react';
-
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Phone, PhoneForwarded, Percent, Clock } from 'lucide-react';
 
 interface MetricsCardsProps {
   metrics: {
@@ -10,33 +8,39 @@ interface MetricsCardsProps {
 }
 
 export function MetricsCards({ metrics }: MetricsCardsProps) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Workflow Runs</CardTitle>
-          <Phone className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{metrics.total_runs.toLocaleString()}</div>
-          <p className="text-xs text-muted-foreground">
-            Total calls processed today
-          </p>
-        </CardContent>
-      </Card>
+  const transferRate = metrics.total_runs > 0 ? ((metrics.xfer_count / metrics.total_runs) * 100).toFixed(1) : "0.0";
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Transfer Dispositions</CardTitle>
-          <PhoneForwarded className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{metrics.xfer_count.toLocaleString()}</div>
-          <p className="text-xs text-muted-foreground">
-            Calls transferred (XFER)
-          </p>
-        </CardContent>
-      </Card>
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="p-4 rounded-xl border border-border/60 bg-card/30 hover:bg-card/50 transition-all duration-200 shadow-xs flex items-center justify-between">
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Workflow Runs</p>
+          <p className="text-2xl font-bold tracking-tight text-foreground">{metrics.total_runs.toLocaleString()}</p>
+        </div>
+        <div className="w-9 h-9 rounded-lg bg-cta/10 flex items-center justify-center text-cta border border-cta/15">
+          <Phone className="w-4.5 h-4.5" />
+        </div>
+      </div>
+
+      <div className="p-4 rounded-xl border border-border/60 bg-card/30 hover:bg-card/50 transition-all duration-200 shadow-xs flex items-center justify-between">
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Transferred Calls</p>
+          <p className="text-2xl font-bold tracking-tight text-foreground">{metrics.xfer_count.toLocaleString()}</p>
+        </div>
+        <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/15">
+          <PhoneForwarded className="w-4.5 h-4.5" />
+        </div>
+      </div>
+
+      <div className="p-4 rounded-xl border border-border/60 bg-card/30 hover:bg-card/50 transition-all duration-200 shadow-xs flex items-center justify-between">
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Transfer Rate</p>
+          <p className="text-2xl font-bold tracking-tight text-foreground">{transferRate}%</p>
+        </div>
+        <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/15">
+          <Percent className="w-4.5 h-4.5" />
+        </div>
+      </div>
     </div>
   );
 }

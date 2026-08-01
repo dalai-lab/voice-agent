@@ -1,0 +1,90 @@
+cubic-dev-ai Bot reviewed 8 minutes ago
+cubic-dev-ai Bot
+left a comment
+Contributor
+6 issues found across 22 files
+
+Not reviewed (too large): ui/src/client/index.ts (~4 lines) - if these are generated or fixture files, add them to ignored paths to exclude them from future reviews.
+
+Prompt for AI agents (unresolved issues)
+Tip: cubic can generate docs of your entire codebase and keep them up to date. Try it here.
+
+Re-trigger cubic
+
+api/services/workflow/tools/custom_tool.py
+    """
+    # Build param name → declared type for post-render coercion.
+    param_type_map: dict[str, str] = {
+        p.get("name", ""): p.get("type", "string")
+@cubic-dev-ai
+cubic-dev-ai Bot
+8 minutes ago
+Contributor
+P1: A whitespace-padded legacy preset named initial_context silently sends the call-context object instead of its resolved preset value. _resolve_preset_parameters trims names but param_type_map and the reserved-name guard do not; normalize before both checks or reject such stored configs explicitly.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+ui/src/app/tools/[toolUuid]/page.tsx
+            (parameters.length > 0 || presetParameters.length > 0);
+            (useBodyTemplate ? (bodyTemplate !== null) : (parameters.length > 0 || presetParameters.length > 0));
+
+        const bodyOutput = useBodyTemplate && bodyTemplate ? bodyTemplate : exampleBody;
+@cubic-dev-ai
+cubic-dev-ai Bot
+8 minutes ago
+Contributor
+P2: Copying this preview for a templated tool sends literal {{...}} strings, since no runtime renderer exists in the generated fetch code. Show concrete sample values or label/omit the body as server-side-only configuration rather than presenting it as an executable API-call preview.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+ui/src/app/tools/[toolUuid]/components/HttpApiToolConfig.tsx
+                                        onChange={onBodyTemplateChange}
+                                        enabled={["POST", "PUT", "PATCH"].includes(httpMethod) && useBodyTemplate}
+                                        onValidityChange={onBodyTemplateValidityChange}
+                                        availableParams={Array.from(new Set([
+@cubic-dev-ai
+cubic-dev-ai Bot
+8 minutes ago
+Contributor
+P2: Body-template badges normalize whitespace while save sends the raw parameter names, so whitespace-padded names can produce a template that looks valid but cannot be saved. Validate/normalize names consistently before exposing placeholders and before building the request, or show an inline parameter-name error.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+api/services/workflow/tools/custom_tool.py
+    # Captures the top-level variable name before any dot path or fallback filter.
+    # Matches {{name}}, {{name.path}}, {{name | fallback}}, {{name.path | fallback}}.
+    _TMPL_VAR_RE = _re.compile(
+        r"\{\{\s*([^.|\s}]+)(?:\.[^|\s}]+)*(?:\s*\|[^}]*)?\s*\}\}"
+@cubic-dev-ai
+cubic-dev-ai Bot
+8 minutes ago
+Contributor
+P2: Parameters accepted by the API such as order|id cannot be interpolated: {{order|id}} is parsed as order with fallback id, producing an incorrect or blank outbound field. Restrict parameter names to template-safe identifiers across authoring surfaces, or reject unsupported names before rendering.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+api/services/workflow/tools/custom_tool.py
+                        "The agent must collect this before calling the tool."
+                    )
+            for dotted_path in required_dotted_paths:
+                if dotted_path.startswith(f"{name}."):
+@cubic-dev-ai
+cubic-dev-ai Bot
+8 minutes ago
+Contributor
+P2: For a required object parameter, the new pre-render validation treats every dotted reference inside the body template ({{customer.phone}}) as a mandatory non-empty nested field. If the supplied object is present but a nested sub-field is legitimately absent (and not written with a | fallback), the whole URI/body build fails with 'Required parameter path ... has no value' rather than sending the object. Since the whole-object required check already runs above, consider limiting the per-dotted-path hard failure to cases where it is actually intended, or documenting that every nested reference under a required parameter must be non-empty.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+ui/src/components/http/body-template-editor.tsx
+    return new RegExp(`\\{\\{\\s*${escaped}(?:[\\s|}.}])`).test(raw);
+}
+
+function getObjectDepth(value: unknown): number {
+@cubic-dev-ai
+cubic-dev-ai Bot
+8 minutes ago
+Contributor
+P3: Deep but valid JSON templates can overflow this recursive traversal before the depth limit is applied, so users see an incorrect “Invalid JSON” error instead of the nesting-limit message. An iterative traversal keeps the editor responsive and enforces the stated limit for pasted input.
+
+Prompt for AI agents

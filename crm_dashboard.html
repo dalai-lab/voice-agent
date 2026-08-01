@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dograh CRM Dashboard & API Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #090c10;
+      --bg-card: #111723;
+      --bg-card-hover: #161e2e;
+      --bg-input: #0c1017;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-highlight: rgba(225, 29, 72, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --accent-crimson: #e11d48;
+      --accent-crimson-hover: #f43f5e;
+      --accent-glow: rgba(225, 29, 72, 0.25);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --info: #3b82f6;
+      --radius: 12px;
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding-bottom: 60px;
+      background-image: 
+        radial-gradient(circle at 15% 10%, rgba(225, 29, 72, 0.1) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(59, 130, 246, 0.08) 0%, transparent 40%);
+      background-attachment: fixed;
+    }
+
+    /* Top Navigation & Header */
+    header {
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(17, 23, 35, 0.8);
+      backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent-crimson), #9f1239);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 20px;
+      color: #fff;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(to right, #fff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.9); }
+    }
+
+    /* Container */
+    .container {
+      max-width: 1400px;
+      margin: 24px auto;
+      padding: 0 24px;
+    }
+
+    /* Configuration Panel */
+    .config-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-end;
+    }
+
+    .form-group {
+      flex: 1;
+      min-width: 250px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-control {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text-main);
+      font-family: monospace;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--accent-crimson);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent-crimson);
+      color: #fff;
+      box-shadow: 0 4px 15px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-crimson-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .stat-card:hover {
+      border-color: var(--border-highlight);
+      transform: translateY(-2px);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .stat-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .stat-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Navigation Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 24px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .tab-btn {
+      padding: 12px 18px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      color: var(--accent-crimson);
+      border-bottom-color: var(--accent-crimson);
+    }
+
+    /* Tab Content Area */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .section-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    /* Table Styles */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      margin-bottom: 28px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 14px 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    td {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 14px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover {
+      background: var(--bg-card-hover);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .badge-warning {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-info {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .badge-crimson {
+      background: rgba(225, 29, 72, 0.15);
+      color: #fb7185;
+      border: 1px solid rgba(225, 29, 72, 0.3);
+    }
+
+    /* Card Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .item-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 16px;
+      transition: all 0.2s;
+    }
+
+    .item-card:hover {
+      border-color: var(--border-highlight);
+      transform: translateY(-2px);
+    }
+
+    .item-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .item-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* Charts / Visual Bars */
+    .bar-row {
+      margin-bottom: 14px;
+    }
+
+    .bar-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .bar-bg {
+      width: 100%;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 5px;
+      background: linear-gradient(90deg, var(--accent-crimson), #fb7185);
+      transition: width 0.8s ease-out;
+    }
+
+    /* JSON Drawer / Modal */
+    pre.json-view {
+      background: #06080c;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #a7f3d0;
+      overflow-x: auto;
+      max-height: 400px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-muted);
+    }
+
+    .loader {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-radius: 50%;
+      border-top-color: var(--accent-crimson);
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">D</div>
+      <div>
+        <div class="brand-title">Dograh CRM Dashboard</div>
+        <div class="brand-subtitle">Voice AI & Telephony Analytics Explorer</div>
+      </div>
+    </div>
+    <div class="status-badge" id="connStatus">
+      <div class="status-dot"></div>
+      <span>Connected to Live API</span>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="container">
+
+    <!-- Configuration Panel -->
+    <div class="config-panel">
+      <div class="form-group">
+        <label for="apiUrl">Base API URL</label>
+        <input type="text" id="apiUrl" class="form-control" value="https://voiceagent.dalai.in/api/v1" />
+      </div>
+      <div class="form-group">
+        <label for="apiKey">X-API-Key</label>
+        <input type="password" id="apiKey" class="form-control" value="dgr_C1ngWUuFV_A7J0XhOFwAbcStiZ11eXgjCQuhhBaEI5E" />
+      </div>
+      <button class="btn btn-primary" onclick="refreshAllData()">
+        <span>Refresh All Data</span>
+      </button>
+    </div>
+
+    <!-- Stats Overview Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">
+          <span>Active Voice Agents</span>
+          <span class="badge badge-info">Workflows</span>
+        </div>
+        <div class="stat-value" id="statWorkflows">-</div>
+        <div class="stat-sub" id="statWorkflowsSub">Loading...</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">
+          <span>Total Call Runs (WF 4)</span>
+          <span class="badge badge-success">Live Call Logs</span>
+        </div>
+        <div class="stat-value" id="statCalls">-</div>
+        <div class="stat-sub">Virtual Receptionist - inbound</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">
+          <span>Scheduled Callbacks</span>
+          <span class="badge badge-warning">Telephony</span>
+        </div>
+        <div class="stat-value" id="statCallbacks">-</div>
+        <div class="stat-sub" id="statCallbacksSub">Completed / Pending</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">
+          <span>Outbound Campaigns</span>
+          <span class="badge badge-crimson">Campaigns</span>
+        </div>
+        <div class="stat-value" id="statCampaigns">-</div>
+        <div class="stat-sub" id="statCampaignsSub">Loading...</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">
+          <span>Organization Profile</span>
+          <span class="badge badge-info">Auth</span>
+        </div>
+        <div class="stat-value" id="statOrg">Org #2</div>
+        <div class="stat-sub" id="statEmail">it@4thorbit.in</div>
+      </div>
+    </div>
+
+    <!-- Tabs Navigation -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('callsTab', this)">📞 Live Call Logs & Transcripts</button>
+      <button class="tab-btn" onclick="switchTab('callbacksTab', this)">⏰ Scheduled Callback Logs</button>
+      <button class="tab-btn" onclick="switchTab('campaignsTab', this)">📢 Outbound Campaigns</button>
+      <button class="tab-btn" onclick="switchTab('kbTab', this)">📚 Knowledge Base & Folders</button>
+      <button class="tab-btn" onclick="switchTab('reportsTab', this)">📊 Daily Metrics & Analytics</button>
+      <button class="tab-btn" onclick="switchTab('agentsTab', this)">🤖 AI Workflows & Providers</button>
+      <button class="tab-btn" onclick="switchTab('jsonTab', this)">🛠️ Raw API Explorer</button>
+      <button class="tab-btn" onclick="switchTab('dialerTab', this)" style="color:#fb7185; font-weight:700;">🚀 API Call Dialer</button>
+      <a href="admissions_dashboard.html" class="tab-btn" style="text-decoration:none; color:#a78bfa; font-weight:700; border-color:rgba(139, 92, 246, 0.4);">🎓 Admissions CRM & Transcript Portal →</a>
+    </div>
+
+    <!-- TAB 1: Live Call Logs -->
+    <div id="callsTab" class="tab-content active">
+      <div class="section-header">
+        <div class="section-title">Call Logs & Run History</div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <label style="font-size: 13px; color: var(--text-muted);">Workflow ID:</label>
+          <input type="number" id="wfIdInput" class="form-control" style="width: 80px; padding: 6px 10px;" value="4" onchange="fetchCallLogs()" />
+          <button class="btn btn-secondary" onclick="fetchCallLogs()">Reload Calls</button>
+        </div>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Run ID</th>
+              <th>Type</th>
+              <th>Caller → Called</th>
+              <th>Duration</th>
+              <th>Disposition</th>
+              <th>Summary / Details</th>
+              <th>Transcript</th>
+            </tr>
+          </thead>
+          <tbody id="callLogsTableBody">
+            <tr><td colspan="7" class="empty-state"><div class="loader"></div> Loading Call Logs...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 2: Scheduled Callbacks -->
+    <div id="callbacksTab" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Scheduled Callback Logs</div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary" onclick="fetchCallbackLogs('all')">All</button>
+          <button class="btn btn-secondary" onclick="fetchCallbackLogs('completed')">Completed</button>
+          <button class="btn btn-secondary" onclick="fetchCallbackLogs('pending')">Pending</button>
+        </div>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Callback ID</th>
+              <th>Scheduled Time</th>
+              <th>To → From Number</th>
+              <th>Status</th>
+              <th>Original Run ID</th>
+              <th>Conversation Summary</th>
+            </tr>
+          </thead>
+          <tbody id="callbackLogsTableBody">
+            <tr><td colspan="6" class="empty-state"><div class="loader"></div> Loading Callback Logs...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 3: Outbound Campaigns -->
+    <div id="campaignsTab" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Outbound Telephony Campaigns (/campaign/)</div>
+        <button class="btn btn-secondary" onclick="fetchCampaigns()">Reload Campaigns</button>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Campaign ID</th>
+              <th>Name</th>
+              <th>Workflow ID</th>
+              <th>Status</th>
+              <th>Total Contacts</th>
+              <th>Processed</th>
+              <th>Created At</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="campaignsTableBody">
+            <tr><td colspan="8" class="empty-state"><div class="loader"></div> Loading Campaigns...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 4: Knowledge Base & Folders -->
+    <div id="kbTab" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Knowledge Base Documents (/knowledge-base/documents)</div>
+        <button class="btn btn-secondary" onclick="fetchKnowledgeBase()">Reload Documents</button>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Doc ID</th>
+              <th>File Name / Title</th>
+              <th>Doc Type</th>
+              <th>Status</th>
+              <th>Word Count</th>
+              <th>Uploaded Date</th>
+            </tr>
+          </thead>
+          <tbody id="kbTableBody">
+            <tr><td colspan="6" class="empty-state"><div class="loader"></div> Loading Knowledge Base...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-header" style="margin-top: 32px;">
+        <div class="section-title">Organization Folders (/folder/)</div>
+        <button class="btn btn-secondary" onclick="fetchFolders()">Reload Folders</button>
+      </div>
+      <div class="cards-grid" id="foldersGrid">
+        <div class="empty-state"><div class="loader"></div> Loading Folders...</div>
+      </div>
+    </div>
+
+    <!-- TAB 5: Daily Analytics Report -->
+    <div id="reportsTab" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Daily CRM Call Metrics (/organizations/reports/daily)</div>
+        <div>
+          <input type="date" id="reportDate" class="form-control" style="width: 160px; display: inline-block;" onchange="fetchDailyReport()" />
+          <button class="btn btn-secondary" onclick="fetchDailyReport()">Load Date</button>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+        <div class="stat-card">
+          <div class="section-title" style="font-size: 16px; margin-bottom: 16px;">Call Disposition Distribution</div>
+          <div id="dispositionChartArea">
+            <div class="loader"></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="section-title" style="font-size: 16px; margin-bottom: 16px;">Call Duration Distribution</div>
+          <div id="durationChartArea">
+            <div class="loader"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: Workflows & Telephony -->
+    <div id="agentsTab" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Active AI Voice Workflows (/workflow/fetch)</div>
+        <button class="btn btn-secondary" onclick="fetchWorkflows()">Reload Agents</button>
+      </div>
+      <div class="cards-grid" id="workflowsGrid" style="margin-bottom: 32px;">
+        <div class="empty-state"><div class="loader"></div> Loading Workflows...</div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Telephony Providers (/organizations/telephony-configs) & API Keys (/user/service-keys)</div>
+      </div>
+      <div class="cards-grid" id="providersGrid">
+        <div class="empty-state"><div class="loader"></div> Loading Telephony Configs...</div>
+      </div>
+    </div>
+
+    <!-- TAB 7: Raw API Explorer -->
+    <div id="jsonTab" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Raw REST API Response Viewer</div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn btn-secondary" onclick="viewRaw('/auth/me')">/auth/me</button>
+          <button class="btn btn-secondary" onclick="viewRaw('/workflow/fetch')">/workflow/fetch</button>
+          <button class="btn btn-secondary" onclick="viewRaw('/workflow/4/runs?limit=5')">/workflow/4/runs</button>
+          <button class="btn btn-secondary" onclick="viewRaw('/callbacks?limit=10')">/callbacks</button>
+          <button class="btn btn-secondary" onclick="viewRaw('/campaign/')">/campaign/</button>
+          <button class="btn btn-secondary" onclick="viewRaw('/knowledge-base/documents')">/knowledge-base/documents</button>
+          <button class="btn btn-secondary" onclick="viewRaw('/folder/')">/folder/</button>
+          <button class="btn btn-secondary" onclick="viewRaw('/organizations/reports/daily?date=' + getTodayDate() + '&timezone=UTC')">/reports/daily</button>
+          <button class="btn btn-secondary" onclick="viewRaw('/user/service-keys')">/user/service-keys</button>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div id="rawUrlDisplay" style="font-family: monospace; color: var(--accent-crimson); margin-bottom: 12px; font-weight: 600;">Select an API above to inspect raw JSON</div>
+        <pre class="json-view" id="rawJsonBody">// Click a button above to execute live request and view formatted JSON</pre>
+      </div>
+    </div>
+
+    <!-- TAB 8: API Call Dialer -->
+    <div id="dialerTab" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">📞 Live Outbound Call Dialer (/public/agent/workflow/{uuid})</div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 24px;">
+        <div class="stat-card" style="display: flex; flex-direction: column; gap: 16px;">
+          <h3 class="item-title" style="color: #fb7185;">1. Initiate Outbound Phone Call</h3>
+          <div class="form-group">
+            <label>Select AI Voice Workflow</label>
+            <select id="dialerWfSelect" class="form-control" onchange="updateDialerCode()"></select>
+          </div>
+          <div class="form-group">
+            <label>Agent Version Mode</label>
+            <select id="dialerModeSelect" class="form-control" onchange="updateDialerCode()">
+              <option value="live">Published / Released Version (/public/agent/workflow/)</option>
+              <option value="test">Draft / Test Version (/public/agent/test/workflow/)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Customer Phone Number</label>
+            <input type="text" id="dialerPhoneInput" class="form-control" placeholder="+919876543210" value="+919876543210" oninput="updateDialerCode()" />
+          </div>
+          <div class="form-group">
+            <label>Initial Context Variables (JSON)</label>
+            <textarea id="dialerContextInput" class="form-control" rows="4" style="font-family: monospace;" oninput="updateDialerCode()">{
+  "customer_name": "Test Customer",
+  "source": "api_dialer"
+}</textarea>
+          </div>
+          <button class="btn btn-primary" id="dialerBtn" style="justify-content: center; margin-top: 8px;" onclick="triggerOutboundCall()">
+            <span>📞 Trigger Phone Call Now</span>
+          </button>
+          <div id="dialerResult" style="margin-top: 8px;"></div>
+        </div>
+
+        <div class="stat-card" style="display: flex; flex-direction: column; gap: 16px;">
+          <h3 class="item-title" style="color: #60a5fa;">2. cURL & Python API Integration Code</h3>
+          <p style="font-size: 13px; color: var(--text-muted);">Use this live generated command in your CRM, server, or script to trigger phone calls programmatically:</p>
+          <pre class="json-view" id="dialerCurlPreview" style="max-height: 350px; white-space: pre-wrap; font-size: 12px;"></pre>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JavaScript -->
+  <script>
+    // Helper to get API headers
+    function getHeaders() {
+      const apiKey = document.getElementById('apiKey').value.trim();
+      return {
+        'X-API-Key': apiKey,
+        'Content-Type': 'application/json'
+      };
+    }
+
+    function getBaseUrl() {
+      return document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
+    }
+
+    function getTodayDate() {
+      return new Date().toISOString().split('T')[0];
+    }
+
+    // Initialize default date
+    document.getElementById('reportDate').value = getTodayDate();
+
+    // Tab Switching
+    function switchTab(tabId, btnElem) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btnElem.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    // Refresh all overview & active tab data
+    async function refreshAllData() {
+      await Promise.all([
+        fetchUserProfile(),
+        fetchWorkflows(),
+        fetchCallLogs(),
+        fetchCallbackLogs('all'),
+        fetchCampaigns(),
+        fetchKnowledgeBase(),
+        fetchFolders(),
+        fetchDailyReport(),
+        fetchTelephonyConfigs()
+      ]);
+    }
+
+    // 1. Fetch User Profile
+    async function fetchUserProfile() {
+      try {
+        const res = await fetch(`${getBaseUrl()}/auth/me`, { headers: getHeaders() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        document.getElementById('statOrg').textContent = `Org #${data.organization_id || '-'}`;
+        document.getElementById('statEmail').textContent = data.email || data.id;
+        document.getElementById('connStatus').innerHTML = `<div class="status-dot"></div><span>Connected (${data.email})</span>`;
+      } catch (err) {
+        document.getElementById('connStatus').innerHTML = `<span style="color:var(--danger)">⚠️ Connection Error</span>`;
+      }
+    }
+
+    // 2. Fetch Workflows
+    async function fetchWorkflows() {
+      try {
+        const res = await fetch(`${getBaseUrl()}/workflow/fetch`, { headers: getHeaders() });
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          document.getElementById('statWorkflows').textContent = data.length;
+          const totalRuns = data.reduce((sum, wf) => sum + (wf.total_runs || 0), 0);
+          document.getElementById('statWorkflowsSub').textContent = `${totalRuns} total historical runs`;
+
+          // Render Grid
+          const grid = document.getElementById('workflowsGrid');
+          grid.innerHTML = data.map(wf => `
+            <div class="item-card">
+              <div class="item-card-header">
+                <div>
+                  <span class="badge badge-info">ID: #${wf.id}</span>
+                  <h3 class="item-title" style="margin-top: 8px;">${wf.name}</h3>
+                </div>
+                <span class="badge ${wf.status === 'active' ? 'badge-success' : 'badge-warning'}">${wf.status}</span>
+              </div>
+              <div style="font-size: 13px; color: var(--text-muted);">
+                <div>Total Runs: <strong style="color: #fff;">${wf.total_runs || 0}</strong></div>
+                <div>Created: ${new Date(wf.created_at).toLocaleDateString()}</div>
+              </div>
+              <button class="btn btn-secondary" style="width: 100%; justify-content: center;" onclick="document.getElementById('wfIdInput').value='${wf.id}'; fetchCallLogs(); switchTab('callsTab', document.querySelectorAll('.tab-btn')[0]);">View Call Logs →</button>
+            </div>
+          `).join('');
+
+          const select = document.getElementById('dialerWfSelect');
+          if (select) {
+            select.innerHTML = data.map(wf => {
+              const uuid = wf.workflow_uuid || wf.uuid || '';
+              return `<option value="${uuid}" data-id="${wf.id}">${wf.name} (#${wf.id} — UUID: ${uuid})</option>`;
+            }).join('');
+            if (typeof updateDialerCode === 'function') updateDialerCode();
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // 3. Fetch Call Logs
+    async function fetchCallLogs() {
+      const tbody = document.getElementById('callLogsTableBody');
+      const wfId = document.getElementById('wfIdInput').value || 4;
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><div class="loader"></div> Loading calls for Workflow #${wfId}...</td></tr>`;
+
+      try {
+        const res = await fetch(`${getBaseUrl()}/workflow/${wfId}/runs?limit=15`, { headers: getHeaders() });
+        const data = await res.json();
+
+        if (data && data.total_count !== undefined) {
+          document.getElementById('statCalls').textContent = data.total_count;
+        }
+
+        const runs = data.runs || [];
+        if (runs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No calls found for Workflow #${wfId}.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = runs.map(r => {
+          const disposition = r.gathered_context?.call_disposition || 'unknown';
+          let badgeClass = 'badge-info';
+          if (disposition === 'end_call_tool') badgeClass = 'badge-success';
+          if (disposition === 'no-answer' || disposition === 'failed') badgeClass = 'badge-danger';
+          if (disposition === 'voicemail_detected') badgeClass = 'badge-warning';
+
+          const duration = r.cost_info?.call_duration_seconds || 0;
+          const caller = r.initial_context?.caller_number || r.initial_context?.from_number || '-';
+          const called = r.initial_context?.called_number || r.initial_context?.to_number || '-';
+          const summary = r.initial_context?.conversation_summary || r.name || '-';
+
+          return `
+            <tr>
+              <td><strong>#${r.id}</strong></td>
+              <td><span class="badge ${r.call_type === 'inbound' ? 'badge-info' : 'badge-crimson'}">${r.call_type || 'outbound'}</span></td>
+              <td style="font-family: monospace;">${caller} → ${called}</td>
+              <td>${duration}s</td>
+              <td><span class="badge ${badgeClass}">${disposition}</span></td>
+              <td style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${summary}">${summary}</td>
+              <td>
+                ${r.transcript_url ? `<span class="badge badge-success" style="cursor:pointer;" onclick="viewRaw('/workflow/${r.workflow_id}/runs?limit=5')">Text Available</span>` : `<span style="color:var(--text-muted)">-</span>`}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:var(--danger)">Failed to load call logs. Check API connection.</td></tr>`;
+      }
+    }
+
+    // 4. Fetch Callback Logs
+    async function fetchCallbackLogs(statusFilter = 'all') {
+      const tbody = document.getElementById('callbackLogsTableBody');
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="loader"></div> Loading callbacks...</td></tr>`;
+
+      try {
+        let url = `${getBaseUrl()}/callbacks?limit=25&source=all`;
+        if (statusFilter !== 'all') url += `&status=${statusFilter}`;
+        const res = await fetch(url, { headers: getHeaders() });
+        const data = await res.json();
+
+        if (data && data.total !== undefined) {
+          document.getElementById('statCallbacks').textContent = data.total;
+        }
+
+        const items = data.items || [];
+        if (items.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No callback logs found.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = items.map(cb => {
+          let badgeClass = 'badge-info';
+          if (cb.status === 'completed') badgeClass = 'badge-success';
+          if (cb.status === 'pending') badgeClass = 'badge-warning';
+          if (cb.status === 'cancelled' || cb.status === 'failed') badgeClass = 'badge-danger';
+
+          return `
+            <tr>
+              <td><strong>#${cb.id}</strong></td>
+              <td>${cb.scheduled_for ? new Date(cb.scheduled_for).toLocaleString() : '-'}</td>
+              <td style="font-family: monospace;">${cb.to_number || '-'} ← ${cb.from_number || '-'}</td>
+              <td><span class="badge ${badgeClass}">${cb.status}</span></td>
+              <td>${cb.original_run_id ? `<strong style="color:var(--accent-crimson)">#${cb.original_run_id}</strong>` : '-'}</td>
+              <td>${cb.conversation_summary || '-'}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:var(--danger)">Failed to load callbacks.</td></tr>`;
+      }
+    }
+
+    // 5. Fetch Outbound Campaigns (/campaign/)
+    async function fetchCampaigns() {
+      const tbody = document.getElementById('campaignsTableBody');
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="loader"></div> Loading Campaigns...</td></tr>`;
+
+      try {
+        const res = await fetch(`${getBaseUrl()}/campaign/`, { headers: getHeaders() });
+        const data = await res.json();
+        const campaigns = Array.isArray(data) ? data : (data.campaigns || data.items || []);
+
+        document.getElementById('statCampaigns').textContent = campaigns.length;
+        document.getElementById('statCampaignsSub').textContent = `${campaigns.length} total campaigns`;
+
+        if (campaigns.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No outbound campaigns found.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = campaigns.map(camp => {
+          const state = camp.state || camp.status || 'draft';
+          let badgeClass = 'badge-info';
+          if (state === 'completed') badgeClass = 'badge-success';
+          if (state === 'running' || state === 'paused') badgeClass = 'badge-warning';
+          if (state === 'failed') badgeClass = 'badge-danger';
+
+          const processed = camp.processed_rows !== undefined ? camp.processed_rows : (camp.executed_count || 0);
+          const total = camp.total_rows !== undefined ? camp.total_rows : (camp.total_queued_count || 0);
+          const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
+          const wfLabel = camp.workflow_name ? `${camp.workflow_name}` : `WF #${camp.workflow_id || '-'}`;
+
+          return `
+            <tr>
+              <td><strong>#${camp.id}</strong></td>
+              <td><strong style="color:#fff">${camp.name}</strong></td>
+              <td><span class="badge badge-info" title="Workflow #${camp.workflow_id}">${wfLabel}</span></td>
+              <td><span class="badge ${badgeClass}">${state}</span></td>
+              <td><strong>${total}</strong></td>
+              <td><strong>${processed} / ${total} (${pct}%)</strong></td>
+              <td>${camp.created_at ? new Date(camp.created_at).toLocaleDateString() : '-'}</td>
+              <td>
+                ${camp.workflow_id ? `<button class="btn btn-secondary" style="padding: 4px 10px; font-size:12px;" onclick="document.getElementById('wfIdInput').value='${camp.workflow_id}'; fetchCallLogs(); switchTab('callsTab', document.querySelectorAll('.tab-btn')[0]);">View Calls →</button>` : '-'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:var(--danger)">Failed to load campaigns.</td></tr>`;
+      }
+    }
+
+    // 6. Fetch Knowledge Base Documents (/knowledge-base/documents)
+    async function fetchKnowledgeBase() {
+      const tbody = document.getElementById('kbTableBody');
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="loader"></div> Loading Documents...</td></tr>`;
+
+      try {
+        const res = await fetch(`${getBaseUrl()}/knowledge-base/documents`, { headers: getHeaders() });
+        const data = await res.json();
+        const docs = Array.isArray(data) ? data : (data.documents || data.items || []);
+
+        if (docs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No knowledge base documents uploaded.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = docs.map(doc => {
+          const status = doc.processing_status || doc.status || 'ready';
+          let badgeClass = 'badge-info';
+          if (status === 'ready' || status === 'completed') badgeClass = 'badge-success';
+          if (status === 'processing') badgeClass = 'badge-warning';
+          if (status === 'failed') badgeClass = 'badge-danger';
+
+          const sizeKb = doc.file_size_bytes ? `${Math.round(doc.file_size_bytes / 1024)} KB` : '-';
+
+          return `
+            <tr>
+              <td><strong>#${doc.id}</strong></td>
+              <td><strong style="color:#fff">${doc.filename || doc.name || doc.title || 'Untitled Doc'}</strong></td>
+              <td><span class="badge badge-info">${(doc.mime_type || doc.type || 'file').split('/').pop().toUpperCase()}</span></td>
+              <td><span class="badge ${badgeClass}">${status}</span></td>
+              <td>${doc.total_chunks || 0} chunks (${sizeKb})</td>
+              <td>${doc.created_at ? new Date(doc.created_at).toLocaleDateString() : '-'}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:var(--danger)">Failed to load knowledge base.</td></tr>`;
+      }
+    }
+
+    // 7. Fetch Folders (/folder/)
+    async function fetchFolders() {
+      const grid = document.getElementById('foldersGrid');
+      grid.innerHTML = `<div class="empty-state"><div class="loader"></div> Loading Folders...</div>`;
+
+      try {
+        const res = await fetch(`${getBaseUrl()}/folder/`, { headers: getHeaders() });
+        const data = await res.json();
+        const folders = Array.isArray(data) ? data : (data.folders || data.items || []);
+
+        if (folders.length === 0) {
+          grid.innerHTML = `<div class="empty-state">No organization folders created yet.</div>`;
+          return;
+        }
+
+        grid.innerHTML = folders.map(f => `
+          <div class="item-card">
+            <div class="item-card-header">
+              <div>
+                <span class="badge badge-info">Folder #${f.id}</span>
+                <h3 class="item-title" style="margin-top: 8px;">📁 ${f.name}</h3>
+              </div>
+              <span class="badge badge-success">${(f.folder_type || 'GENERAL').toUpperCase()}</span>
+            </div>
+            <div style="font-size: 13px; color: var(--text-muted);">
+              <div>Description: <strong style="color: #fff;">${f.description || 'No description'}</strong></div>
+              <div>Created: ${f.created_at ? new Date(f.created_at).toLocaleDateString() : '-'}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        grid.innerHTML = `<div class="empty-state" style="color:var(--danger)">Error loading folders.</div>`;
+      }
+    }
+
+    // 8. Fetch Daily Analytics Report
+    async function fetchDailyReport() {
+      const dateVal = document.getElementById('reportDate').value || getTodayDate();
+      const dispArea = document.getElementById('dispositionChartArea');
+      const durArea = document.getElementById('durationChartArea');
+
+      try {
+        const res = await fetch(`${getBaseUrl()}/organizations/reports/daily?date=${dateVal}&timezone=UTC`, { headers: getHeaders() });
+        const data = await res.json();
+
+        // Render Dispositions
+        const disps = data.disposition_distribution || [];
+        if (disps.length === 0) {
+          dispArea.innerHTML = `<div class="empty-state">No calls on ${dateVal}</div>`;
+        } else {
+          dispArea.innerHTML = disps.map(d => `
+            <div class="bar-row">
+              <div class="bar-header">
+                <span><strong>${d.disposition}</strong> (${d.count} calls)</span>
+                <span>${d.percentage}%</span>
+              </div>
+              <div class="bar-bg">
+                <div class="bar-fill" style="width: ${d.percentage}%"></div>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        // Render Durations
+        const durs = data.call_duration_distribution || [];
+        if (durs.length === 0) {
+          durArea.innerHTML = `<div class="empty-state">No duration stats</div>`;
+        } else {
+          durArea.innerHTML = durs.map(d => `
+            <div class="bar-row">
+              <div class="bar-header">
+                <span><strong>${d.bucket} sec</strong> (${d.count} calls)</span>
+                <span>${d.percentage}%</span>
+              </div>
+              <div class="bar-bg">
+                <div class="bar-fill" style="width: ${d.percentage}%; background: linear-gradient(90deg, #3b82f6, #60a5fa)"></div>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        dispArea.innerHTML = `<div style="color:var(--danger)">Failed to load report.</div>`;
+      }
+    }
+
+    // 9. Fetch Telephony Configs & Service Keys
+    async function fetchTelephonyConfigs() {
+      const grid = document.getElementById('providersGrid');
+      try {
+        const [telRes, keyRes] = await Promise.all([
+          fetch(`${getBaseUrl()}/organizations/telephony-configs`, { headers: getHeaders() }),
+          fetch(`${getBaseUrl()}/user/service-keys`, { headers: getHeaders() })
+        ]);
+        const telData = await telRes.json();
+        const keyData = await keyRes.json();
+
+        const configs = telData.configurations || [];
+        const keys = Array.isArray(keyData) ? keyData : [];
+
+        grid.innerHTML = [
+          ...configs.map(c => `
+            <div class="item-card">
+              <div class="item-card-header">
+                <div>
+                  <span class="badge badge-info">Phone Provider</span>
+                  <h3 class="item-title" style="margin-top:8px;">${c.name}</h3>
+                </div>
+                <span class="badge badge-success">${c.provider.toUpperCase()}</span>
+              </div>
+              <div style="font-size:13px; color:var(--text-muted);">
+                <div>Outbound Default: <strong style="color:#fff">${c.is_default_outbound ? 'Yes' : 'No'}</strong></div>
+                <div>Created: ${new Date(c.created_at).toLocaleDateString()}</div>
+              </div>
+            </div>
+          `),
+          ...keys.map(k => `
+            <div class="item-card">
+              <div class="item-card-header">
+                <div>
+                  <span class="badge badge-crimson">Service API Key</span>
+                  <h3 class="item-title" style="margin-top:8px;">${k.name}</h3>
+                </div>
+                <span class="badge badge-success">ACTIVE</span>
+              </div>
+              <div style="font-size:13px; color:var(--text-muted);">
+                <div>Prefix: <code style="color:#fff">${k.key_prefix}...</code></div>
+                <div>Created: ${new Date(k.created_at).toLocaleDateString()}</div>
+              </div>
+            </div>
+          `)
+        ].join('');
+      } catch (err) {
+        grid.innerHTML = `<div class="empty-state" style="color:var(--danger)">Error loading provider info.</div>`;
+      }
+    }
+
+    // 10. Raw JSON Viewer
+    async function viewRaw(endpoint) {
+      document.getElementById('rawUrlDisplay').textContent = `GET ${getBaseUrl()}${endpoint}`;
+      const pre = document.getElementById('rawJsonBody');
+      pre.textContent = '// Loading JSON...';
+      try {
+        const res = await fetch(`${getBaseUrl()}${endpoint}`, { headers: getHeaders() });
+        const data = await res.json();
+        pre.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        pre.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    // 11. API Call Dialer Functions
+    function updateDialerCode() {
+      const select = document.getElementById('dialerWfSelect');
+      const wfUuid = select ? select.value : 'YOUR_WORKFLOW_UUID';
+      const mode = document.getElementById('dialerModeSelect')?.value || 'live';
+      const phone = document.getElementById('dialerPhoneInput')?.value || '+919876543210';
+      const contextStr = document.getElementById('dialerContextInput')?.value || '{}';
+      const apiKey = document.getElementById('apiKey').value.trim();
+      const endpoint = mode === 'test' ? `/public/agent/test/workflow/${wfUuid}` : `/public/agent/workflow/${wfUuid}`;
+      const url = `${getBaseUrl()}${endpoint}`;
+
+      const preview = document.getElementById('dialerCurlPreview');
+      if (preview) {
+        preview.textContent = `# 1. cURL Command:
+curl -X POST "${url}" \\
+  -H "X-API-Key: ${apiKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '${JSON.stringify({
+    phone_number: phone,
+    initial_context: JSON.parse(contextStr || '{}')
+  }, null, 2)}'
+
+# 2. Python (requests) Example:
+import requests
+
+url = "${url}"
+headers = {
+    "X-API-Key": "${apiKey}",
+    "Content-Type": "application/json"
+}
+payload = {
+    "phone_number": "${phone}",
+    "initial_context": ${contextStr}
+}
+
+response = requests.post(url, headers=headers, json=payload)
+print(response.json())`;
+      }
+    }
+
+    async function triggerOutboundCall() {
+      const select = document.getElementById('dialerWfSelect');
+      const wfUuid = select ? select.value : null;
+      if (!wfUuid) {
+        alert('Please select a workflow first.');
+        return;
+      }
+      const mode = document.getElementById('dialerModeSelect').value;
+      const phone = document.getElementById('dialerPhoneInput').value.trim();
+      let contextObj = {};
+      try {
+        contextObj = JSON.parse(document.getElementById('dialerContextInput').value || '{}');
+      } catch (e) {
+        alert('Invalid JSON in Initial Context field: ' + e.message);
+        return;
+      }
+
+      const btn = document.getElementById('dialerBtn');
+      const resultDiv = document.getElementById('dialerResult');
+      btn.disabled = true;
+      btn.innerHTML = `<div class="loader"></div> Calling ${phone}...`;
+      resultDiv.innerHTML = '';
+
+      const endpoint = mode === 'test' ? `/public/agent/test/workflow/${wfUuid}` : `/public/agent/workflow/${wfUuid}`;
+      try {
+        const res = await fetch(`${getBaseUrl()}${endpoint}`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({
+            phone_number: phone,
+            initial_context: contextObj
+          })
+        });
+        const data = await res.json();
+        btn.disabled = false;
+        btn.innerHTML = `<span>📞 Trigger Phone Call Now</span>`;
+
+        if (res.ok && (data.status === 'success' || data.status === 'initiated' || data.workflow_run_id)) {
+          resultDiv.innerHTML = `
+            <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); padding: 12px; border-radius: 8px; color: #34d399;">
+              <strong>🎉 Call Successfully Initiated!</strong><br/>
+              <span>Run ID: <strong style="color:#fff;">#${data.workflow_run_id}</strong> (${data.workflow_run_name || ''})</span><br/>
+              <button class="btn btn-secondary" style="margin-top: 8px; padding: 6px 12px; font-size:12px;" onclick="document.getElementById('wfIdInput').value='${select.options[select.selectedIndex].getAttribute('data-id')}'; fetchCallLogs(); switchTab('callsTab', document.querySelectorAll('.tab-btn')[0]);">Inspect Run in Call Logs →</button>
+            </div>
+          `;
+        } else {
+          let extraTip = '';
+          if (res.status === 404) {
+            extraTip = `<div style="margin-top:6px; font-size:12px; color:#ffedd5;">💡 Tip: If your workflow has not been published yet, switch <b>Agent Version Mode</b> to <b>"Draft / Test Version"</b>!</div>`;
+          }
+          resultDiv.innerHTML = `
+            <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); padding: 12px; border-radius: 8px; color: #f87171;">
+              <strong>⚠️ Call Initiation Failed (${res.status})</strong><br/>
+              <span>${data.detail || data.message || JSON.stringify(data)}</span>
+              ${extraTip}
+            </div>
+          `;
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<span>📞 Trigger Phone Call Now</span>`;
+        resultDiv.innerHTML = `<div style="color:var(--danger)">Network Error: ${err.message}</div>`;
+      }
+    }
+
+    // Auto-load on open
+    window.addEventListener('DOMContentLoaded', () => {
+      refreshAllData();
+    });
+  </script>
+</body>
+</html>

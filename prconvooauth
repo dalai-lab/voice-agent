@@ -1,0 +1,163 @@
+
+cubic-dev-ai Bot reviewed 4 minutes ago
+cubic-dev-ai Bot
+left a comment
+Contributor
+17 issues found across 25 files
+
+Not reviewed (too large): ui/src/client/index.ts (~2 lines) - if these are generated or fixture files, add them to ignored paths to exclude them from future reviews.
+
+Prompt for AI agents (unresolved issues)
+Reply with feedback, questions, or to request a fix.
+
+Re-trigger cubic
+
+api/tasks/webhook_delivery.py
+                    except httpx.HTTPStatusError as retry_exc:
+                        retry_status = retry_exc.response.status_code
+                        retry_err = f"HTTP {retry_status} after OAuth token refresh"
+                        await _handle_transient_failure(delivery, attempt, retry_err, retry_status)
+@cubic-dev-ai
+cubic-dev-ai Bot
+4 minutes ago
+Contributor
+P1: A rejected OAuth replay is queued as a transient failure, so a second 401 and other permanent 4xx produce another outbound request rather than ending after the single refresh replay. Classify retry_status here: back off only _RETRYABLE_STATUS_CODES; dead-letter other responses.
+
+Prompt for AI agents
+Suggested change
+                        await _handle_transient_failure(delivery, attempt, retry_err, retry_status)
+                        if retry_status in _RETRYABLE_STATUS_CODES:
+                            await _handle_transient_failure(
+                                delivery, attempt, retry_err, retry_status
+                            )
+                        else:
+                            await db_client.mark_webhook_delivery_dead_letter(
+                                delivery.id, attempt, retry_err, retry_status
+                            )
+@arnofrxdd	Reply...
+api/utils/oauth2_token_cache.py
+                redis_client = None
+                try:
+                    redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
+                    await redis_client.setex(cache_key, cache_ttl, token)
+@cubic-dev-ai
+cubic-dev-ai Bot
+4 minutes ago
+Contributor
+P1: Credential rotation or a token URL/client change can be undone by an in-flight old fetch: it writes its old token after invalidate_token() deletes the key, so new requests reuse credentials from the prior configuration. Serialize invalidation and fetches with a shared/distributed generation or lock so an invalidation cannot be followed by an older write.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+api/alembic/versions/1236f759fffe_add_oauth2_client_credentials.py
+    # config) without operator consent is data loss. Refuse the downgrade if any
+    # such rows still exist so the operator can migrate or delete them explicitly.
+    conn = op.get_bind()
+    result = conn.execute(
+@cubic-dev-ai
+cubic-dev-ai Bot
+4 minutes ago
+Contributor
+P2: A concurrent credential create can pass this check and make the downgrade fail during enum conversion. Lock external_credentials before counting so inserts cannot race the guard.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+api/services/workflow/tools/transfer_resolver.py
+            try:
+                auth = await build_auth_header(credential)
+                if auth:
+                    headers.update(auth)
+@cubic-dev-ai
+cubic-dev-ai Bot
+4 minutes ago
+Contributor
+P2: A resolver configured with lowercase authorization sends that stale value alongside credential-generated Authorization on the first request, because Python dict keys are case-sensitive while HTTP header names are not. Remove case-insensitive collisions before the initial merge too, so OAuth credentials reliably override configured auth and no unintended authorization value is sent.
+
+Prompt for AI agents
+Suggested change
+                    headers.update(auth)
+                    for auth_key in auth:
+                        for header_key in list(headers):
+                            if header_key.lower() == auth_key.lower():
+                                del headers[header_key]
+                    headers.update(auth)
+@arnofrxdd	Reply...
+api/services/pipecat/pre_call_fetch.py
+                                if existing_key.lower() == fresh_key.lower():
+                                    del headers[existing_key]
+                        headers.update(credential_headers)
+                    response = await client.post(url, headers=headers, json=payload)
+@cubic-dev-ai
+cubic-dev-ai Bot
+4 minutes ago
+Contributor
+P2: A 401 can now hold call startup far beyond PRE_CALL_FETCH_TIMEOUT_SECONDS: up to 10s for token fetch, 10s for the original POST, and another 10s for this retry. Use one end-to-end deadline (including token refresh) or skip retry when its remaining budget is exhausted so the ringer/call startup remains bounded by the configured pre-call timeout.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+7 hidden conversations
+Load more…
+api/utils/oauth2_token_cache.py
+            return token
+    finally:
+        lock = _locks.get(credential_uuid)
+        if lock is not None and not lock.locked():
+@cubic-dev-ai
+cubic-dev-ai Bot
+4 minutes ago
+Contributor
+P2: The per-credential lock that is meant to prevent concurrent OAuth2 token fetches (and the 'recheck cache after acquiring lock' stampede guard) is silently defeated by the cleanup in this finally block. When the async with _get_lock(...) block exits, the lock is released but a queued waiter hasn't been scheduled to run yet, so lock.locked() is False and the code pops the lock out of _locks. A new caller then creates a fresh lock and proceeds in parallel with the still-waiting task, so both fetch tokens concurrently and each writes to the cache (last write wins). Recommend not removing the lock from the dict while a waiter could still be queued (e.g. leave the lock in place, or track waiter counts) so single-flight is preserved.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+api/routes/credentials.py
+        validate_credential_data(request.credential_type, request.credential_data)
+    # Fetch the existing credential so we can resolve the effective type even
+    # when the caller doesn't resend credential_type on a data-only update.
+    existing = await db_client.get_credential_by_uuid(
+@cubic-dev-ai
+cubic-dev-ai Bot
+4 minutes ago
+Contributor
+P3: Every credential update now performs two ownership reads, and the route bypasses the required service boundary. Move existing-credential lookup and effective-type validation into credential_service so the service can reuse one scoped read for validation, invalidation, and update.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+api/services/workflow/tools/transfer_resolver.py
+            )
+
+            # 401 token invalidation and single retry
+            if (
+@cubic-dev-ai
+cubic-dev-ai Bot
+4 minutes ago
+Contributor
+P3: The new transfer-resolver OAuth 401 replay path lacks regression coverage. Add a test that returns 401 then 200 and verifies invalidation/rebuild is called once, the stale Authorization header is replaced, and exactly two requests are sent.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+api/services/workflow/tools/transfer_resolver.py
+                json=body,
+            )
+
+            # 401 token invalidation and single retry
+@cubic-dev-ai
+cubic-dev-ai Bot
+4 minutes ago
+Contributor
+P3: OAuth 401 replay behavior now exists as near-identical request-path code in both transfer resolvers and custom tools. Extracting the shared refresh/header-replacement operation would keep retry semantics and later fixes aligned across outbound integrations.
+
+Prompt for AI agents
+@arnofrxdd	Reply...
+api/utils/oauth2_token_cache.py
+    if not force_refresh:
+        redis_client = None
+        try:
+            redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
+@cubic-dev-ai
+cubic-dev-ai Bot
+4 minutes ago
+Contributor
+P3: This OAuth2 cache creates a brand-new Redis connection pool on every call and immediately closes it, up to three times per token fetch (initial read, post-lock recheck, and the setex write), and again in invalidate_token(). Since this cache sits on the webhook/custom-tool request path, the repeated pool construction adds needless overhead that undermines the point of a cache. Consider creating one module-level shared Redis client (or an async pool) and reusing it across reads/writes/invalidation instead of calling from_url()/aclose() per operation.
+
+Prompt for AI agents
+@arnofrxdd	Reply...

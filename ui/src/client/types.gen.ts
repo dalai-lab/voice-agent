@@ -3158,12 +3158,6 @@ export type HttpApiConfig = {
      */
     url: string;
     /**
-     * Body Template
-     *
-     * Optional nested JSON body template for POST/PUT/PATCH requests.
-     */
-    body_template?: { [key: string]: unknown } | null;
-    /**
      * Headers
      *
      * Static headers to include with every request.
@@ -3213,6 +3207,14 @@ export type HttpApiConfig = {
      * Recording ID for an audio custom message.
      */
     customMessageRecordingId?: string | null;
+    /**
+     * Body Template
+     *
+     * Optional nested JSON body template for POST/PUT/PATCH requests. Use {{placeholder}} for LLM/preset parameters, {{initial_context.*}} for call context, {{gathered_context.*}} for conversation context. When set, replaces the default flat-dict body. Static values in the template are sent as-is.
+     */
+    body_template?: {
+        [key: string]: unknown;
+    } | null;
 };
 
 /**
@@ -7262,7 +7264,7 @@ export type WaitToolDefinition = {
  *
  * Webhook credential authentication types
  */
-export type WebhookCredentialType = 'none' | 'api_key' | 'bearer_token' | 'basic_auth' | 'custom_header';
+export type WebhookCredentialType = 'none' | 'api_key' | 'bearer_token' | 'basic_auth' | 'custom_header' | 'oauth2_client_credentials';
 
 /**
  * WorkflowConfigurationDefaults
@@ -7965,7 +7967,6 @@ export type XaittsConfiguration = {
 
 export type InitiateCallApiV1TelephonyInitiateCallPostData = {
     body: InitiateCallRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -8503,7 +8504,6 @@ export type HandleVonageEventsWithoutRunApiV1TelephonyVonageEventsPostResponses 
 
 export type ImpersonateApiV1SuperuserImpersonatePostData = {
     body: ImpersonateRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -8543,7 +8543,6 @@ export type ImpersonateApiV1SuperuserImpersonatePostResponse = ImpersonateApiV1S
 
 export type GetWorkflowRunsApiV1SuperuserWorkflowRunsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -8614,7 +8613,6 @@ export type GetWorkflowRunsApiV1SuperuserWorkflowRunsGetResponse = GetWorkflowRu
 
 export type ValidateWorkflowApiV1WorkflowWorkflowIdValidatePostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -8659,7 +8657,6 @@ export type ValidateWorkflowApiV1WorkflowWorkflowIdValidatePostResponse = Valida
 
 export type CreateWorkflowApiV1WorkflowCreateDefinitionPostData = {
     body: CreateWorkflowRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -8699,7 +8696,6 @@ export type CreateWorkflowApiV1WorkflowCreateDefinitionPostResponse = CreateWork
 
 export type CreateWorkflowFromTemplateApiV1WorkflowCreateTemplatePostData = {
     body: CreateWorkflowTemplateRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -8739,7 +8735,6 @@ export type CreateWorkflowFromTemplateApiV1WorkflowCreateTemplatePostResponse = 
 
 export type GetWorkflowCountApiV1WorkflowCountGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -8779,7 +8774,6 @@ export type GetWorkflowCountApiV1WorkflowCountGetResponse = GetWorkflowCountApiV
 
 export type GetWorkflowsApiV1WorkflowFetchGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -8828,7 +8822,6 @@ export type GetWorkflowsApiV1WorkflowFetchGetResponse = GetWorkflowsApiV1Workflo
 
 export type GetWorkflowApiV1WorkflowFetchWorkflowIdGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -8873,7 +8866,6 @@ export type GetWorkflowApiV1WorkflowFetchWorkflowIdGetResponse = GetWorkflowApiV
 
 export type GetWorkflowVersionsApiV1WorkflowWorkflowIdVersionsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -8929,7 +8921,6 @@ export type GetWorkflowVersionsApiV1WorkflowWorkflowIdVersionsGetResponse = GetW
 
 export type PublishWorkflowApiV1WorkflowWorkflowIdPublishPostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -8972,7 +8963,6 @@ export type PublishWorkflowApiV1WorkflowWorkflowIdPublishPostResponses = {
 
 export type CreateWorkflowDraftApiV1WorkflowWorkflowIdCreateDraftPostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9017,7 +9007,6 @@ export type CreateWorkflowDraftApiV1WorkflowWorkflowIdCreateDraftPostResponse = 
 
 export type GetWorkflowsSummaryApiV1WorkflowSummaryGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9066,7 +9055,6 @@ export type GetWorkflowsSummaryApiV1WorkflowSummaryGetResponse = GetWorkflowsSum
 
 export type UpdateWorkflowStatusApiV1WorkflowWorkflowIdStatusPutData = {
     body: UpdateWorkflowStatusRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9111,7 +9099,6 @@ export type UpdateWorkflowStatusApiV1WorkflowWorkflowIdStatusPutResponse = Updat
 
 export type MoveWorkflowToFolderApiV1WorkflowWorkflowIdFolderPutData = {
     body: MoveWorkflowToFolderRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9156,7 +9143,6 @@ export type MoveWorkflowToFolderApiV1WorkflowWorkflowIdFolderPutResponse = MoveW
 
 export type UpdateWorkflowApiV1WorkflowWorkflowIdPutData = {
     body: UpdateWorkflowRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9201,7 +9187,6 @@ export type UpdateWorkflowApiV1WorkflowWorkflowIdPutResponse = UpdateWorkflowApi
 
 export type DuplicateWorkflowEndpointApiV1WorkflowWorkflowIdDuplicatePostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9246,7 +9231,6 @@ export type DuplicateWorkflowEndpointApiV1WorkflowWorkflowIdDuplicatePostRespons
 
 export type GetWorkflowRunsApiV1WorkflowWorkflowIdRunsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9322,7 +9306,6 @@ export type GetWorkflowRunsApiV1WorkflowWorkflowIdRunsGetResponse = GetWorkflowR
 
 export type CreateWorkflowRunApiV1WorkflowWorkflowIdRunsPostData = {
     body: CreateWorkflowRunRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9367,7 +9350,6 @@ export type CreateWorkflowRunApiV1WorkflowWorkflowIdRunsPostResponse = CreateWor
 
 export type GetWorkflowRunApiV1WorkflowWorkflowIdRunsRunIdGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9416,7 +9398,6 @@ export type GetWorkflowRunApiV1WorkflowWorkflowIdRunsRunIdGetResponse = GetWorkf
 
 export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9483,7 +9464,6 @@ export type GetAllWorkflowRunsApiV1WorkflowRunsAllGetResponse = GetAllWorkflowRu
 
 export type DownloadWorkflowReportApiV1WorkflowWorkflowIdReportGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9564,7 +9544,6 @@ export type GetWorkflowTemplatesApiV1WorkflowTemplatesGetResponse = GetWorkflowT
 
 export type DuplicateWorkflowTemplateApiV1WorkflowTemplatesDuplicatePostData = {
     body: DuplicateTemplateRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9604,7 +9583,6 @@ export type DuplicateWorkflowTemplateApiV1WorkflowTemplatesDuplicatePostResponse
 
 export type GetAmbientNoiseUploadUrlApiV1WorkflowAmbientNoiseUploadUrlPostData = {
     body: AmbientNoiseUploadRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9644,7 +9622,6 @@ export type GetAmbientNoiseUploadUrlApiV1WorkflowAmbientNoiseUploadUrlPostRespon
 
 export type CreateTextChatSessionApiV1WorkflowWorkflowIdTextChatSessionsPostData = {
     body: CreateTextChatSessionRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9689,7 +9666,6 @@ export type CreateTextChatSessionApiV1WorkflowWorkflowIdTextChatSessionsPostResp
 
 export type GetTextChatSessionApiV1WorkflowWorkflowIdTextChatSessionsRunIdGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9738,7 +9714,6 @@ export type GetTextChatSessionApiV1WorkflowWorkflowIdTextChatSessionsRunIdGetRes
 
 export type AppendTextChatMessageApiV1WorkflowWorkflowIdTextChatSessionsRunIdMessagesPostData = {
     body: AppendTextChatMessageRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9787,7 +9762,6 @@ export type AppendTextChatMessageApiV1WorkflowWorkflowIdTextChatSessionsRunIdMes
 
 export type RewindTextChatSessionApiV1WorkflowWorkflowIdTextChatSessionsRunIdRewindPostData = {
     body: RewindTextChatSessionRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9859,7 +9833,6 @@ export type GetDefaultConfigurationsApiV1UserConfigurationsDefaultsGetResponse =
 
 export type GetAuthUserApiV1UserAuthUserGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9899,7 +9872,6 @@ export type GetAuthUserApiV1UserAuthUserGetResponse = GetAuthUserApiV1UserAuthUs
 
 export type GetUserConfigurationsApiV1UserConfigurationsUserGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9939,7 +9911,6 @@ export type GetUserConfigurationsApiV1UserConfigurationsUserGetResponse = GetUse
 
 export type UpdateUserConfigurationsApiV1UserConfigurationsUserPutData = {
     body: UserConfigurationRequestResponseSchema;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -9979,7 +9950,6 @@ export type UpdateUserConfigurationsApiV1UserConfigurationsUserPutResponse = Upd
 
 export type GetUserOnboardingStateApiV1UserOnboardingStateGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10019,7 +9989,6 @@ export type GetUserOnboardingStateApiV1UserOnboardingStateGetResponse = GetUserO
 
 export type UpdateUserOnboardingStateApiV1UserOnboardingStatePutData = {
     body: OnboardingStateUpdate;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10059,7 +10028,6 @@ export type UpdateUserOnboardingStateApiV1UserOnboardingStatePutResponse = Updat
 
 export type ValidateUserConfigurationsApiV1UserConfigurationsUserValidateGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10104,7 +10072,6 @@ export type ValidateUserConfigurationsApiV1UserConfigurationsUserValidateGetResp
 
 export type GetApiKeysApiV1UserApiKeysGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10151,7 +10118,6 @@ export type GetApiKeysApiV1UserApiKeysGetResponse = GetApiKeysApiV1UserApiKeysGe
 
 export type CreateApiKeyApiV1UserApiKeysPostData = {
     body: CreateApiKeyRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10191,7 +10157,6 @@ export type CreateApiKeyApiV1UserApiKeysPostResponse = CreateApiKeyApiV1UserApiK
 
 export type ArchiveApiKeyApiV1UserApiKeysApiKeyIdDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10240,7 +10205,6 @@ export type ArchiveApiKeyApiV1UserApiKeysApiKeyIdDeleteResponse = ArchiveApiKeyA
 
 export type ReactivateApiKeyApiV1UserApiKeysApiKeyIdReactivatePutData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10289,7 +10253,6 @@ export type ReactivateApiKeyApiV1UserApiKeysApiKeyIdReactivatePutResponse = Reac
 
 export type GetVoicesApiV1UserConfigurationsVoicesProviderGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10355,7 +10318,6 @@ export type GetVoicesApiV1UserConfigurationsVoicesProviderGetResponse = GetVoice
 
 export type ListCallbacksApiV1CallbacksGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10424,7 +10386,6 @@ export type ListCallbacksApiV1CallbacksGetResponse = ListCallbacksApiV1Callbacks
 
 export type CancelCallbackApiV1CallbacksCallbackIdDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10478,7 +10439,6 @@ export type CancelCallbackApiV1CallbacksCallbackIdDeleteResponse = CancelCallbac
 
 export type CreateCampaignApiV1CampaignCreatePostData = {
     body: CreateCampaignRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10518,7 +10478,6 @@ export type CreateCampaignApiV1CampaignCreatePostResponse = CreateCampaignApiV1C
 
 export type GetCampaignsApiV1CampaignGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10558,7 +10517,6 @@ export type GetCampaignsApiV1CampaignGetResponse = GetCampaignsApiV1CampaignGetR
 
 export type GetCampaignApiV1CampaignCampaignIdGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10603,7 +10561,6 @@ export type GetCampaignApiV1CampaignCampaignIdGetResponse = GetCampaignApiV1Camp
 
 export type UpdateCampaignApiV1CampaignCampaignIdPatchData = {
     body: UpdateCampaignRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10648,7 +10605,6 @@ export type UpdateCampaignApiV1CampaignCampaignIdPatchResponse = UpdateCampaignA
 
 export type StartCampaignApiV1CampaignCampaignIdStartPostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10693,7 +10649,6 @@ export type StartCampaignApiV1CampaignCampaignIdStartPostResponse = StartCampaig
 
 export type PauseCampaignApiV1CampaignCampaignIdPausePostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10738,7 +10693,6 @@ export type PauseCampaignApiV1CampaignCampaignIdPausePostResponse = PauseCampaig
 
 export type GetCampaignRunsApiV1CampaignCampaignIdRunsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10814,7 +10768,6 @@ export type GetCampaignRunsApiV1CampaignCampaignIdRunsGetResponse = GetCampaignR
 
 export type RedialCampaignApiV1CampaignCampaignIdRedialPostData = {
     body: RedialCampaignRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10859,7 +10812,6 @@ export type RedialCampaignApiV1CampaignCampaignIdRedialPostResponse = RedialCamp
 
 export type ResumeCampaignApiV1CampaignCampaignIdResumePostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10904,7 +10856,6 @@ export type ResumeCampaignApiV1CampaignCampaignIdResumePostResponse = ResumeCamp
 
 export type GetCampaignProgressApiV1CampaignCampaignIdProgressGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10949,7 +10900,6 @@ export type GetCampaignProgressApiV1CampaignCampaignIdProgressGetResponse = GetC
 
 export type GetCampaignSourceDownloadUrlApiV1CampaignCampaignIdSourceDownloadUrlGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -10994,7 +10944,6 @@ export type GetCampaignSourceDownloadUrlApiV1CampaignCampaignIdSourceDownloadUrl
 
 export type DownloadCampaignReportApiV1CampaignCampaignIdReportGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11050,7 +10999,6 @@ export type DownloadCampaignReportApiV1CampaignCampaignIdReportGetResponses = {
 
 export type ListCampaignCallbacksApiV1CampaignCampaignIdCallbacksGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11110,7 +11058,6 @@ export type ListCampaignCallbacksApiV1CampaignCampaignIdCallbacksGetResponse = L
 
 export type ListCredentialsApiV1CredentialsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11152,7 +11099,6 @@ export type ListCredentialsApiV1CredentialsGetResponse = ListCredentialsApiV1Cre
 
 export type CreateCredentialApiV1CredentialsPostData = {
     body: CreateCredentialRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11192,7 +11138,6 @@ export type CreateCredentialApiV1CredentialsPostResponse = CreateCredentialApiV1
 
 export type DeleteCredentialApiV1CredentialsCredentialUuidDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11241,7 +11186,6 @@ export type DeleteCredentialApiV1CredentialsCredentialUuidDeleteResponse = Delet
 
 export type GetCredentialApiV1CredentialsCredentialUuidGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11286,7 +11230,6 @@ export type GetCredentialApiV1CredentialsCredentialUuidGetResponse = GetCredenti
 
 export type UpdateCredentialApiV1CredentialsCredentialUuidPutData = {
     body: UpdateCredentialRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11331,7 +11274,6 @@ export type UpdateCredentialApiV1CredentialsCredentialUuidPutResponse = UpdateCr
 
 export type ListToolsApiV1ToolsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11382,7 +11324,6 @@ export type ListToolsApiV1ToolsGetResponse = ListToolsApiV1ToolsGetResponses[key
 
 export type CreateToolApiV1ToolsPostData = {
     body: CreateToolRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11422,7 +11363,6 @@ export type CreateToolApiV1ToolsPostResponse = CreateToolApiV1ToolsPostResponses
 
 export type DeleteToolApiV1ToolsToolUuidDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11471,7 +11411,6 @@ export type DeleteToolApiV1ToolsToolUuidDeleteResponse = DeleteToolApiV1ToolsToo
 
 export type GetToolApiV1ToolsToolUuidGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11516,7 +11455,6 @@ export type GetToolApiV1ToolsToolUuidGetResponse = GetToolApiV1ToolsToolUuidGetR
 
 export type UpdateToolApiV1ToolsToolUuidPutData = {
     body: UpdateToolRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11561,7 +11499,6 @@ export type UpdateToolApiV1ToolsToolUuidPutResponse = UpdateToolApiV1ToolsToolUu
 
 export type RefreshMcpToolsApiV1ToolsToolUuidMcpRefreshPostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11606,7 +11543,6 @@ export type RefreshMcpToolsApiV1ToolsToolUuidMcpRefreshPostResponse = RefreshMcp
 
 export type TestToolApiV1ToolsToolUuidTestPostData = {
     body: ToolTestRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11651,7 +11587,6 @@ export type TestToolApiV1ToolsToolUuidTestPostResponse = TestToolApiV1ToolsToolU
 
 export type UnarchiveToolApiV1ToolsToolUuidUnarchivePostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11696,7 +11631,6 @@ export type UnarchiveToolApiV1ToolsToolUuidUnarchivePostResponse = UnarchiveTool
 
 export type GetCurrentOrganizationContextApiV1OrganizationsContextGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11736,7 +11670,6 @@ export type GetCurrentOrganizationContextApiV1OrganizationsContextGetResponse = 
 
 export type GetTelephonyProvidersMetadataApiV1OrganizationsTelephonyProvidersMetadataGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11776,7 +11709,6 @@ export type GetTelephonyProvidersMetadataApiV1OrganizationsTelephonyProvidersMet
 
 export type GetTelephonyConfigWarningsApiV1OrganizationsTelephonyConfigWarningsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11816,7 +11748,6 @@ export type GetTelephonyConfigWarningsApiV1OrganizationsTelephonyConfigWarningsG
 
 export type GetModelConfigurationV2DefaultsApiV1OrganizationsModelConfigurationsV2DefaultsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11854,7 +11785,6 @@ export type GetModelConfigurationV2DefaultsApiV1OrganizationsModelConfigurations
 
 export type GetModelConfigurationV2ApiV1OrganizationsModelConfigurationsV2GetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11894,7 +11824,6 @@ export type GetModelConfigurationV2ApiV1OrganizationsModelConfigurationsV2GetRes
 
 export type SaveModelConfigurationV2ApiV1OrganizationsModelConfigurationsV2PutData = {
     body: OrganizationAiModelConfigurationV2;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11934,7 +11863,6 @@ export type SaveModelConfigurationV2ApiV1OrganizationsModelConfigurationsV2PutRe
 
 export type GetModelConfigurationPricingApiV1OrganizationsModelConfigurationsV2PricingGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -11974,7 +11902,6 @@ export type GetModelConfigurationPricingApiV1OrganizationsModelConfigurationsV2P
 
 export type PreviewModelConfigurationV2MigrationApiV1OrganizationsModelConfigurationsV2MigrationPreviewGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12012,7 +11939,6 @@ export type PreviewModelConfigurationV2MigrationApiV1OrganizationsModelConfigura
 
 export type MigrateModelConfigurationV2ApiV1OrganizationsModelConfigurationsV2MigratePostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12057,7 +11983,6 @@ export type MigrateModelConfigurationV2ApiV1OrganizationsModelConfigurationsV2Mi
 
 export type GetPreferencesApiV1OrganizationsPreferencesGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12097,7 +12022,6 @@ export type GetPreferencesApiV1OrganizationsPreferencesGetResponse = GetPreferen
 
 export type SavePreferencesApiV1OrganizationsPreferencesPutData = {
     body: OrganizationPreferences;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12137,7 +12061,6 @@ export type SavePreferencesApiV1OrganizationsPreferencesPutResponse = SavePrefer
 
 export type ListTelephonyConfigurationsApiV1OrganizationsTelephonyConfigsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12177,7 +12100,6 @@ export type ListTelephonyConfigurationsApiV1OrganizationsTelephonyConfigsGetResp
 
 export type CreateTelephonyConfigurationApiV1OrganizationsTelephonyConfigsPostData = {
     body: TelephonyConfigurationCreateRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12217,7 +12139,6 @@ export type CreateTelephonyConfigurationApiV1OrganizationsTelephonyConfigsPostRe
 
 export type DeleteTelephonyConfigurationApiV1OrganizationsTelephonyConfigsConfigIdDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12260,7 +12181,6 @@ export type DeleteTelephonyConfigurationApiV1OrganizationsTelephonyConfigsConfig
 
 export type GetTelephonyConfigurationByIdApiV1OrganizationsTelephonyConfigsConfigIdGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12305,7 +12225,6 @@ export type GetTelephonyConfigurationByIdApiV1OrganizationsTelephonyConfigsConfi
 
 export type UpdateTelephonyConfigurationApiV1OrganizationsTelephonyConfigsConfigIdPutData = {
     body: TelephonyConfigurationUpdateRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12350,7 +12269,6 @@ export type UpdateTelephonyConfigurationApiV1OrganizationsTelephonyConfigsConfig
 
 export type SetDefaultOutboundApiV1OrganizationsTelephonyConfigsConfigIdSetDefaultOutboundPostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12395,7 +12313,6 @@ export type SetDefaultOutboundApiV1OrganizationsTelephonyConfigsConfigIdSetDefau
 
 export type ListPhoneNumbersApiV1OrganizationsTelephonyConfigsConfigIdPhoneNumbersGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12440,7 +12357,6 @@ export type ListPhoneNumbersApiV1OrganizationsTelephonyConfigsConfigIdPhoneNumbe
 
 export type CreatePhoneNumberApiV1OrganizationsTelephonyConfigsConfigIdPhoneNumbersPostData = {
     body: PhoneNumberCreateRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12485,7 +12401,6 @@ export type CreatePhoneNumberApiV1OrganizationsTelephonyConfigsConfigIdPhoneNumb
 
 export type DeletePhoneNumberApiV1OrganizationsTelephonyConfigsConfigIdPhoneNumbersPhoneNumberIdDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12532,7 +12447,6 @@ export type DeletePhoneNumberApiV1OrganizationsTelephonyConfigsConfigIdPhoneNumb
 
 export type GetPhoneNumberApiV1OrganizationsTelephonyConfigsConfigIdPhoneNumbersPhoneNumberIdGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12581,7 +12495,6 @@ export type GetPhoneNumberApiV1OrganizationsTelephonyConfigsConfigIdPhoneNumbers
 
 export type UpdatePhoneNumberApiV1OrganizationsTelephonyConfigsConfigIdPhoneNumbersPhoneNumberIdPutData = {
     body: PhoneNumberUpdateRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12630,7 +12543,6 @@ export type UpdatePhoneNumberApiV1OrganizationsTelephonyConfigsConfigIdPhoneNumb
 
 export type SetDefaultCallerIdApiV1OrganizationsTelephonyConfigsConfigIdPhoneNumbersPhoneNumberIdSetDefaultCallerPostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12679,7 +12591,6 @@ export type SetDefaultCallerIdApiV1OrganizationsTelephonyConfigsConfigIdPhoneNum
 
 export type GetTelephonyConfigurationApiV1OrganizationsTelephonyConfigGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12736,7 +12647,6 @@ export type SaveTelephonyConfigurationApiV1OrganizationsTelephonyConfigPostData 
     } & VobizConfigurationRequest) | ({
         provider: 'vonage';
     } & VonageConfigurationRequest);
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12774,7 +12684,6 @@ export type SaveTelephonyConfigurationApiV1OrganizationsTelephonyConfigPostRespo
 
 export type DeleteLangfuseCredentialsApiV1OrganizationsLangfuseCredentialsDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12812,7 +12721,6 @@ export type DeleteLangfuseCredentialsApiV1OrganizationsLangfuseCredentialsDelete
 
 export type GetLangfuseCredentialsApiV1OrganizationsLangfuseCredentialsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12852,7 +12760,6 @@ export type GetLangfuseCredentialsApiV1OrganizationsLangfuseCredentialsGetRespon
 
 export type SaveLangfuseCredentialsApiV1OrganizationsLangfuseCredentialsPostData = {
     body: LangfuseCredentialsRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12890,7 +12797,6 @@ export type SaveLangfuseCredentialsApiV1OrganizationsLangfuseCredentialsPostResp
 
 export type GetCampaignDefaultsApiV1OrganizationsCampaignDefaultsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12930,7 +12836,6 @@ export type GetCampaignDefaultsApiV1OrganizationsCampaignDefaultsGetResponse = G
 
 export type GetSignedUrlApiV1S3SignedUrlGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -12991,7 +12896,6 @@ export type GetSignedUrlApiV1S3SignedUrlGetResponse = GetSignedUrlApiV1S3SignedU
 
 export type GetFileMetadataApiV1S3FileMetadataGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13038,7 +12942,6 @@ export type GetFileMetadataApiV1S3FileMetadataGetResponse = GetFileMetadataApiV1
 
 export type GetPresignedUploadUrlApiV1S3PresignedUploadUrlPostData = {
     body: PresignedUploadUrlRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13078,7 +12981,6 @@ export type GetPresignedUploadUrlApiV1S3PresignedUploadUrlPostResponse = GetPres
 
 export type GetServiceKeysApiV1UserServiceKeysGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13125,7 +13027,6 @@ export type GetServiceKeysApiV1UserServiceKeysGetResponse = GetServiceKeysApiV1U
 
 export type CreateServiceKeyApiV1UserServiceKeysPostData = {
     body: CreateServiceKeyRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13165,7 +13066,6 @@ export type CreateServiceKeyApiV1UserServiceKeysPostResponse = CreateServiceKeyA
 
 export type ArchiveServiceKeyApiV1UserServiceKeysServiceKeyIdDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13208,7 +13108,6 @@ export type ArchiveServiceKeyApiV1UserServiceKeysServiceKeyIdDeleteResponses = {
 
 export type ReactivateServiceKeyApiV1UserServiceKeysServiceKeyIdReactivatePutData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13251,7 +13150,6 @@ export type ReactivateServiceKeyApiV1UserServiceKeysServiceKeyIdReactivatePutRes
 
 export type GetCurrentPeriodUsageApiV1OrganizationsUsageCurrentPeriodGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13291,7 +13189,6 @@ export type GetCurrentPeriodUsageApiV1OrganizationsUsageCurrentPeriodGetResponse
 
 export type GetBillingCreditsApiV1OrganizationsBillingCreditsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13340,7 +13237,6 @@ export type GetBillingCreditsApiV1OrganizationsBillingCreditsGetResponse = GetBi
 
 export type CreateMpsCreditPurchaseUrlApiV1OrganizationsUsageMpsCreditsPurchaseUrlPostData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13380,7 +13276,6 @@ export type CreateMpsCreditPurchaseUrlApiV1OrganizationsUsageMpsCreditsPurchaseU
 
 export type GetUsageHistoryApiV1OrganizationsUsageRunsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13468,7 +13363,6 @@ export type GetUsageHistoryApiV1OrganizationsUsageRunsGetResponse = GetUsageHist
 
 export type DownloadUsageRunsReportApiV1OrganizationsUsageRunsReportGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13546,7 +13440,6 @@ export type DownloadUsageRunsReportApiV1OrganizationsUsageRunsReportGetResponses
 
 export type GetDailyUsageBreakdownApiV1OrganizationsUsageDailyBreakdownGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13593,7 +13486,6 @@ export type GetDailyUsageBreakdownApiV1OrganizationsUsageDailyBreakdownGetRespon
 
 export type GetDailyReportApiV1OrganizationsReportsDailyGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13652,7 +13544,6 @@ export type GetDailyReportApiV1OrganizationsReportsDailyGetResponse = GetDailyRe
 
 export type GetWorkflowOptionsApiV1OrganizationsReportsWorkflowsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13694,7 +13585,6 @@ export type GetWorkflowOptionsApiV1OrganizationsReportsWorkflowsGetResponse = Ge
 
 export type GetDailyRunsDetailApiV1OrganizationsReportsDailyRunsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -13755,7 +13645,6 @@ export type GetDailyRunsDetailApiV1OrganizationsReportsDailyRunsGetResponse = Ge
 
 export type GetTurnCredentialsApiV1TurnCredentialsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14180,7 +14069,6 @@ export type DownloadWorkflowArtifactApiV1PublicDownloadWorkflowTokenArtifactType
 
 export type DeactivateEmbedTokenApiV1WorkflowWorkflowIdEmbedTokenDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14229,7 +14117,6 @@ export type DeactivateEmbedTokenApiV1WorkflowWorkflowIdEmbedTokenDeleteResponse 
 
 export type GetEmbedTokenApiV1WorkflowWorkflowIdEmbedTokenGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14276,7 +14163,6 @@ export type GetEmbedTokenApiV1WorkflowWorkflowIdEmbedTokenGetResponse = GetEmbed
 
 export type CreateOrUpdateEmbedTokenApiV1WorkflowWorkflowIdEmbedTokenPostData = {
     body: EmbedTokenRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14321,7 +14207,6 @@ export type CreateOrUpdateEmbedTokenApiV1WorkflowWorkflowIdEmbedTokenPostRespons
 
 export type GetUploadUrlApiV1KnowledgeBaseUploadUrlPostData = {
     body: DocumentUploadRequestSchema;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14361,7 +14246,6 @@ export type GetUploadUrlApiV1KnowledgeBaseUploadUrlPostResponse = GetUploadUrlAp
 
 export type ProcessDocumentApiV1KnowledgeBaseProcessDocumentPostData = {
     body: ProcessDocumentRequestSchema;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14401,7 +14285,6 @@ export type ProcessDocumentApiV1KnowledgeBaseProcessDocumentPostResponse = Proce
 
 export type ListDocumentsApiV1KnowledgeBaseDocumentsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14456,7 +14339,6 @@ export type ListDocumentsApiV1KnowledgeBaseDocumentsGetResponse = ListDocumentsA
 
 export type DeleteDocumentApiV1KnowledgeBaseDocumentsDocumentUuidDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14499,7 +14381,6 @@ export type DeleteDocumentApiV1KnowledgeBaseDocumentsDocumentUuidDeleteResponses
 
 export type GetDocumentApiV1KnowledgeBaseDocumentsDocumentUuidGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14544,7 +14425,6 @@ export type GetDocumentApiV1KnowledgeBaseDocumentsDocumentUuidGetResponse = GetD
 
 export type SearchChunksApiV1KnowledgeBaseSearchPostData = {
     body: ChunkSearchRequestSchema;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14584,7 +14464,6 @@ export type SearchChunksApiV1KnowledgeBaseSearchPostResponse = SearchChunksApiV1
 
 export type GetUploadUrlsApiV1WorkflowRecordingsUploadUrlPostData = {
     body: BatchRecordingUploadRequestSchema;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14624,7 +14503,6 @@ export type GetUploadUrlsApiV1WorkflowRecordingsUploadUrlPostResponse = GetUploa
 
 export type ListRecordingsApiV1WorkflowRecordingsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14689,7 +14567,6 @@ export type ListRecordingsApiV1WorkflowRecordingsGetResponse = ListRecordingsApi
 
 export type CreateRecordingsApiV1WorkflowRecordingsPostData = {
     body: BatchRecordingCreateRequestSchema;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14729,7 +14606,6 @@ export type CreateRecordingsApiV1WorkflowRecordingsPostResponse = CreateRecordin
 
 export type DeleteRecordingApiV1WorkflowRecordingsRecordingIdDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14772,7 +14648,6 @@ export type DeleteRecordingApiV1WorkflowRecordingsRecordingIdDeleteResponses = {
 
 export type UpdateRecordingApiV1WorkflowRecordingsIdPatchData = {
     body: RecordingUpdateRequestSchema;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14817,7 +14692,6 @@ export type UpdateRecordingApiV1WorkflowRecordingsIdPatchResponse = UpdateRecord
 
 export type TranscribeAudioApiV1WorkflowRecordingsTranscribePostData = {
     body: BodyTranscribeAudioApiV1WorkflowRecordingsTranscribePost;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14855,7 +14729,6 @@ export type TranscribeAudioApiV1WorkflowRecordingsTranscribePostResponses = {
 
 export type ListFoldersApiV1FolderGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14897,7 +14770,6 @@ export type ListFoldersApiV1FolderGetResponse = ListFoldersApiV1FolderGetRespons
 
 export type CreateFolderApiV1FolderPostData = {
     body: CreateFolderRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14937,7 +14809,6 @@ export type CreateFolderApiV1FolderPostResponse = CreateFolderApiV1FolderPostRes
 
 export type DeleteFolderApiV1FolderFolderIdDeleteData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -14986,7 +14857,6 @@ export type DeleteFolderApiV1FolderFolderIdDeleteResponse = DeleteFolderApiV1Fol
 
 export type RenameFolderApiV1FolderFolderIdPutData = {
     body: UpdateFolderRequest;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -15089,7 +14959,6 @@ export type LoginApiV1AuthLoginPostResponse = LoginApiV1AuthLoginPostResponses[k
 
 export type GetCurrentUserApiV1AuthMeGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -15129,7 +14998,6 @@ export type GetCurrentUserApiV1AuthMeGetResponse = GetCurrentUserApiV1AuthMeGetR
 
 export type ListNodeTypesApiV1NodeTypesGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -15169,7 +15037,6 @@ export type ListNodeTypesApiV1NodeTypesGetResponse = ListNodeTypesApiV1NodeTypes
 
 export type GetNodeTypeApiV1NodeTypesNameGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * Authorization
@@ -15237,7 +15104,6 @@ export type HealthApiV1HealthGetResponse = HealthApiV1HealthGetResponses[keyof H
 
 export type ActiveCallsApiV1HealthActiveCallsGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * X-Dograh-Devops-Secret
@@ -15273,7 +15139,6 @@ export type ActiveCallsApiV1HealthActiveCallsGetResponse = ActiveCallsApiV1Healt
 
 export type AutoscaleMetricApiV1HealthAutoscaleMetricGetData = {
     body?: never;
-    body_template?: { [key: string]: unknown } | null;
     headers?: {
         /**
          * X-Dograh-Devops-Secret

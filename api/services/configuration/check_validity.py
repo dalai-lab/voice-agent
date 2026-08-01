@@ -1,5 +1,6 @@
 from typing import Optional
 
+
 import httpx
 import openai
 from deepgram import DeepgramClient

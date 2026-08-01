@@ -1,0 +1,529 @@
+From 54a5e1207195190eb8db679015ee912cdf9f34e9 Mon Sep 17 00:00:00 2001
+From: arnofrxdd <bazzukagaming317@gmail.com>
+Date: Sat, 1 Aug 2026 22:24:51 +0530
+Subject: [PATCH 03/18] fix(oauth): address PR review security and reliability
+ feedback
+
+- fix(alembic): fix migration chain down_revision for oauth2_client_credentials
+- fix(cache): add single-flight Redis lock with cache re-check inside lock
+- fix(cache): treat missing expires_in as 0 (unknown expiry) so tokens without explicit lifetime are not cached
+- fix(tools): initialize credential to None in custom_tool and transfer_resolver to prevent UnboundLocalError on 401 responses
+- fix(auth): reject empty required fields in OAuth2 credential validation and raise ValueError in credential_auth
+- fix(webhook): propagate OAuth token fetch errors as httpx.RequestError so webhook delivery retries instead of sending unauthenticated requests
+- fix(auth): add shared invalidate_and_rebuild_auth helper for 401 retry recovery across tools and webhook delivery
+- fix(credentials): validate credential_data whenever not None (including empty dict {})
+- fix(compat): import TypedDict from typing_extensions for Python <3.12 compatibility
+- test: add unit tests for missing expires_in and webhook OAuth token fetch retry
+---
+ ...6f759fffe_add_oauth2_client_credentials.py |  4 +-
+ api/routes/credentials.py                     | 12 +--
+ api/routes/s3_signed_url.py                   |  3 +-
+ api/routes/user.py                            |  3 +-
+ api/services/configuration/check_validity.py  |  3 +-
+ api/services/workflow/errors.py               |  2 +-
+ api/services/workflow/tools/custom_tool.py    | 27 ++++--
+ .../workflow/tools/transfer_resolver.py       | 24 +++--
+ api/tasks/webhook_delivery.py                 | 14 +--
+ api/tests/test_oauth2_token_cache.py          | 22 +++++
+ api/tests/test_run_integrations_webhook.py    | 20 ++++
+ api/utils/credential_auth.py                  | 16 +++-
+ api/utils/oauth2_token_cache.py               | 93 ++++++++++++-------
+ 13 files changed, 171 insertions(+), 72 deletions(-)
+
+diff --git a/api/alembic/versions/1236f759fffe_add_oauth2_client_credentials.py b/api/alembic/versions/1236f759fffe_add_oauth2_client_credentials.py
+index df06bfc1..e0842d17 100644
+--- a/api/alembic/versions/1236f759fffe_add_oauth2_client_credentials.py
++++ b/api/alembic/versions/1236f759fffe_add_oauth2_client_credentials.py
+@@ -1,7 +1,7 @@
+ """add_oauth2_client_credentials
+ 
+ Revision ID: 1236f759fffe
+-Revises: hh22ee334455
++Revises: 00b0201ad918
+ Create Date: 2026-08-01 17:02:51.904611
+ 
+ """
+@@ -14,7 +14,7 @@ import sqlalchemy as sa
+ 
+ # revision identifiers, used by Alembic.
+ revision: str = '1236f759fffe'
+-down_revision: Union[str, None] = 'fec0fb9a8db7'
++down_revision: Union[str, None] = '00b0201ad918'
+ branch_labels: Union[str, Sequence[str], None] = None
+ depends_on: Union[str, Sequence[str], None] = None
+ 
+diff --git a/api/routes/credentials.py b/api/routes/credentials.py
+index e78f12cb..3c429135 100644
+--- a/api/routes/credentials.py
++++ b/api/routes/credentials.py
+@@ -97,16 +97,16 @@ def validate_credential_data(
+             
+     elif credential_type == WebhookCredentialType.OAUTH2_CLIENT_CREDENTIALS:
+         required = {"client_id", "client_secret", "token_url"}
+-        missing = required - credential_data.keys()
+-        if missing:
++        missing_or_empty = [k for k in sorted(required) if not credential_data.get(k)]
++        if missing_or_empty:
+             raise HTTPException(
+                 status_code=400,
+                 detail=(
+-                    f"OAuth2 Client Credentials requires fields: "
+-                    f"{', '.join(sorted(missing))}"
++                    f"OAuth2 Client Credentials requires non-empty fields: "
++                    f"{', '.join(missing_or_empty)}"
+                 ),
+             )
+-        token_url = credential_data.get("token_url", "")
++        token_url = str(credential_data.get("token_url", ""))
+         if not token_url.startswith("https://"):
+             raise HTTPException(
+                 status_code=400,
+@@ -268,7 +268,7 @@ async def update_credential(
+         effective_type = None
+ 
+     # Validate credential data against the effective type whenever data is provided.
+-    if request.credential_data and effective_type:
++    if request.credential_data is not None and effective_type:
+         validate_credential_data(effective_type, request.credential_data)
+ 
+     try:
+diff --git a/api/routes/s3_signed_url.py b/api/routes/s3_signed_url.py
+index 9129a6c0..7df8b186 100644
+--- a/api/routes/s3_signed_url.py
++++ b/api/routes/s3_signed_url.py
+@@ -1,6 +1,7 @@
+ import re
+ import uuid
+-from typing import Annotated, Any, Dict, Optional, TypedDict
++from typing import Annotated, Any, Dict, Optional
++from typing_extensions import TypedDict
+ 
+ from botocore.exceptions import ClientError
+ from fastapi import APIRouter, Depends, HTTPException, Query
+diff --git a/api/routes/user.py b/api/routes/user.py
+index 2622b167..dda5b575 100644
+--- a/api/routes/user.py
++++ b/api/routes/user.py
+@@ -1,5 +1,6 @@
+ from datetime import datetime, timedelta
+-from typing import List, Literal, Optional, TypedDict, Union
++from typing import List, Literal, Optional, Union
++from typing_extensions import TypedDict
+ 
+ from fastapi import APIRouter, Depends, HTTPException, Query
+ from loguru import logger
+diff --git a/api/services/configuration/check_validity.py b/api/services/configuration/check_validity.py
+index c431481f..b5bd6a7a 100644
+--- a/api/services/configuration/check_validity.py
++++ b/api/services/configuration/check_validity.py
+@@ -1,4 +1,5 @@
+-from typing import Optional, TypedDict
++from typing import Optional
++from typing_extensions import TypedDict
+ 
+ import httpx
+ import openai
+diff --git a/api/services/workflow/errors.py b/api/services/workflow/errors.py
+index 103ebca4..697042af 100644
+--- a/api/services/workflow/errors.py
++++ b/api/services/workflow/errors.py
+@@ -1,6 +1,6 @@
+ # api/services/workflow/errors.py
+ from enum import Enum
+-from typing import TypedDict
++from typing_extensions import TypedDict
+ 
+ 
+ class ItemKind(str, Enum):
+diff --git a/api/services/workflow/tools/custom_tool.py b/api/services/workflow/tools/custom_tool.py
+index 2a5662e5..efc9e12b 100644
+--- a/api/services/workflow/tools/custom_tool.py
++++ b/api/services/workflow/tools/custom_tool.py
+@@ -9,7 +9,7 @@ from loguru import logger
+ 
+ from api.db import db_client
+ from api.services.configuration.masking import mask_key
+-from api.utils.credential_auth import build_auth_header
++from api.utils.credential_auth import build_auth_header, invalidate_and_rebuild_auth
+ from api.utils.template_renderer import render_template
+ 
+ # Map tool parameter types to JSON schema types
+@@ -273,6 +273,7 @@ async def execute_http_tool(
+ 
+     # Add auth header if credential is configured. Keep track of which headers
+     # came from the credential so only those values are masked in test previews.
++    credential = None
+     credential_headers: Dict[str, str] = {}
+     credential_uuid = config.get("credential_uuid")
+     if credential_uuid and organization_id:
+@@ -288,8 +289,22 @@ async def execute_http_tool(
+                 logger.warning(
+                     f"Credential {credential_uuid} not found for tool '{tool.name}'"
+                 )
++        except ValueError as e:
++            logger.error(f"Authentication failed for tool '{tool.name}': {e}")
++            return build_result(
++                {
++                    "status": "error",
++                    "error": f"Authentication failed: {e}",
++                }
++            )
+         except Exception as e:
+             logger.error(f"Failed to fetch credential for tool '{tool.name}': {e}")
++            return build_result(
++                {
++                    "status": "error",
++                    "error": f"Tool execution failed: {e}",
++                }
++            )
+ 
+     request_headers: Dict[str, str] = {}
+     if include_request_headers:
+@@ -351,12 +366,10 @@ async def execute_http_tool(
+                 and credential
+                 and getattr(credential, "credential_type", None) == "oauth2_client_credentials"
+             ):
+-                from api.utils.oauth2_token_cache import invalidate_token
+-                await invalidate_token(str(credential.credential_uuid))
+-                logger.info(f"Invalidated OAuth2 token for credential {credential_uuid} after 401 response. Retrying once...")
+-                
+-                # Retry once with a fresh token.
+-                credential_headers = await build_auth_header(credential)
++                logger.info(
++                    f"Invalidated OAuth2 token for credential {credential_uuid} after 401 response. Retrying once..."
++                )
++                credential_headers = await invalidate_and_rebuild_auth(credential)
+                 if credential_headers:
+                     headers.update(credential_headers)
+                 
+diff --git a/api/services/workflow/tools/transfer_resolver.py b/api/services/workflow/tools/transfer_resolver.py
+index ad3d6846..6c8bc667 100644
+--- a/api/services/workflow/tools/transfer_resolver.py
++++ b/api/services/workflow/tools/transfer_resolver.py
+@@ -13,7 +13,7 @@ from loguru import logger
+ from api.db import db_client
+ from api.services.organization_preferences import external_pbx_integrations_enabled
+ from api.services.workflow.tools.custom_tool import _resolve_preset_parameters
+-from api.utils.credential_auth import build_auth_header
++from api.utils.credential_auth import build_auth_header, invalidate_and_rebuild_auth
+ from api.utils.template_renderer import render_template
+ from api.utils.url_security import validate_user_configured_service_url
+ 
+@@ -219,15 +219,22 @@ async def _execute_http_resolver(
+     if method in ("POST", "PUT", "PATCH"):
+         headers.setdefault("Content-Type", "application/json")
+ 
++    credential = None
+     credential_uuid = resolver.get("credential_uuid")
+     if credential_uuid and organization_id:
+         credential = await db_client.get_credential_by_uuid(
+             credential_uuid, organization_id
+         )
+         if credential:
+-            auth = await build_auth_header(credential)
+-            if auth:
+-                headers.update(auth)
++            try:
++                auth = await build_auth_header(credential)
++                if auth:
++                    headers.update(auth)
++            except ValueError as e:
++                raise TransferResolutionError(
++                    "credential_auth_error",
++                    f"Authentication failed for transfer resolver credential: {e}",
++                ) from e
+         else:
+             raise TransferResolutionError(
+                 "credential_not_found",
+@@ -260,11 +267,10 @@ async def _execute_http_resolver(
+                 and credential
+                 and getattr(credential, "credential_type", None) == "oauth2_client_credentials"
+             ):
+-                from api.utils.oauth2_token_cache import invalidate_token
+-                await invalidate_token(str(credential.credential_uuid))
+-                logger.info(f"Invalidated OAuth2 token for credential {credential.credential_uuid} after 401 response in transfer resolver. Retrying once...")
+-                
+-                credential_headers = await build_auth_header(credential)
++                logger.info(
++                    f"Invalidated OAuth2 token for credential {credential.credential_uuid} after 401 response in transfer resolver. Retrying once..."
++                )
++                credential_headers = await invalidate_and_rebuild_auth(credential)
+                 if credential_headers:
+                     headers.update(credential_headers)
+                 
+diff --git a/api/tasks/webhook_delivery.py b/api/tasks/webhook_delivery.py
+index ee828c35..a0765473 100644
+--- a/api/tasks/webhook_delivery.py
++++ b/api/tasks/webhook_delivery.py
+@@ -25,7 +25,7 @@ from api.constants import DEFAULT_WEBHOOK_DELIVERY_CONFIG
+ from api.db import db_client
+ from api.db.models import WebhookDeliveryModel
+ from api.tasks.function_names import FunctionNames
+-from api.utils.credential_auth import build_auth_header
++from api.utils.credential_auth import build_auth_header, invalidate_and_rebuild_auth
+ 
+ # HTTP statuses that are worth retrying even though the server answered.
+ _RETRYABLE_STATUS_CODES = {408, 425, 429, 500, 502, 503, 504}
+@@ -88,12 +88,9 @@ async def _build_headers(delivery: WebhookDeliveryModel, attempt: int) -> dict:
+                 if auth:
+                     headers.update(auth)
+             except ValueError as exc:
+-                # OAuth2 token fetch failed. Log and continue — the request
+-                # will fail with a 401 which ARQ will retry with backoff.
+-                logger.warning(
+-                    f"OAuth2 token fetch failed for webhook "
+-                    f"'{delivery.webhook_name}' credential: {exc}"
+-                )
++                raise httpx.RequestError(
++                    f"OAuth2 token fetch failed for webhook '{delivery.webhook_name}': {exc}"
++                ) from exc
+         else:
+             logger.warning(
+                 f"Credential {delivery.credential_uuid} not found for webhook "
+@@ -202,8 +199,7 @@ async def deliver_webhook(_ctx, delivery_id: int) -> None:
+                     delivery.credential_uuid, delivery.organization_id
+                 )
+                 if credential and credential.credential_type == "oauth2_client_credentials":
+-                    from api.utils.oauth2_token_cache import invalidate_token
+-                    await invalidate_token(str(credential.credential_uuid))
++                    await invalidate_and_rebuild_auth(credential)
+                     # Treat this as a transient failure so the fresh token is used.
+                     await _handle_transient_failure(delivery, attempt, error, status_code)
+                     return
+diff --git a/api/tests/test_oauth2_token_cache.py b/api/tests/test_oauth2_token_cache.py
+index 7c54ce17..5a386e35 100644
+--- a/api/tests/test_oauth2_token_cache.py
++++ b/api/tests/test_oauth2_token_cache.py
+@@ -95,6 +95,28 @@ class TestOAuth2TokenCache:
+         # net_ttl = 60 - 60 = 0 → must NOT be cached
+         mock_redis.setex.assert_not_called()
+ 
++    @pytest.mark.asyncio
++    async def test_get_valid_token_omitted_expires_in_skips_cache(self, mock_redis, mock_httpx):
++        """Tokens omitting expires_in are treated as having unknown lifetime and must NOT be cached."""
++        mock_redis.get.return_value = None
++
++        mock_response = AsyncMock()
++        mock_response.status_code = 200
++        mock_response.json = lambda: {
++            "access_token": "new_token_unknown_expiry",
++        }
++        mock_httpx.post.return_value = mock_response
++
++        token = await OAuth2TokenCache.get_valid_token(
++            credential_uuid="test-uuid",
++            token_url="https://test.example.com/token",
++            client_id="test-client",
++            client_secret="test-secret"
++        )
++
++        assert token == "new_token_unknown_expiry"
++        mock_redis.setex.assert_not_called()
++
+     @pytest.mark.asyncio
+     async def test_get_valid_token_raises_on_http_error(self, mock_redis, mock_httpx):
+         mock_redis.get.return_value = None
+diff --git a/api/tests/test_run_integrations_webhook.py b/api/tests/test_run_integrations_webhook.py
+index d81736f0..ae7bd5e4 100644
+--- a/api/tests/test_run_integrations_webhook.py
++++ b/api/tests/test_run_integrations_webhook.py
+@@ -403,6 +403,26 @@ async def test_deliver_webhook_transient_error_schedules_retry():
+     assert enqueue.call_args.kwargs["_defer_by"] > 0
+ 
+ 
++@pytest.mark.asyncio
++async def test_deliver_webhook_oauth_token_fetch_failure_schedules_retry():
++    delivery = _fake_delivery(attempt_count=0, credential_uuid="test-uuid")
++    db = _delivery_db(delivery)
++    db.get_credential_by_uuid = AsyncMock(return_value=MagicMock(credential_type="oauth2_client_credentials"))
++    enqueue = AsyncMock()
++
++    with (
++        patch("api.tasks.webhook_delivery.db_client", db),
++        patch("api.tasks.webhook_delivery.build_auth_header", AsyncMock(side_effect=ValueError("token fetch failed"))),
++        patch("api.tasks.arq.enqueue_job", enqueue),
++    ):
++        await deliver_webhook(None, delivery.id)
++
++    db.schedule_webhook_delivery_retry.assert_awaited_once()
++    assert db.schedule_webhook_delivery_retry.call_args.kwargs["attempt_count"] == 1
++    db.mark_webhook_delivery_dead_letter.assert_not_called()
++    enqueue.assert_awaited_once()
++
++
+ @pytest.mark.asyncio
+ async def test_deliver_webhook_permanent_4xx_dead_letters():
+     delivery = _fake_delivery()
+diff --git a/api/utils/credential_auth.py b/api/utils/credential_auth.py
+index 8125fff3..81368441 100644
+--- a/api/utils/credential_auth.py
++++ b/api/utils/credential_auth.py
+@@ -63,11 +63,10 @@ async def build_auth_header(credential: "ExternalCredentialModel") -> Dict[str,
+         audience = cred_data.get("audience") or None
+ 
+         if not (token_url and client_id and client_secret and cred_uuid):
+-            logger.error(
++            raise ValueError(
+                 f"Missing required OAuth2 fields for credential {cred_uuid}. "
+                 f"Requires token_url, client_id, and client_secret."
+             )
+-            return {}
+ 
+         try:
+             token = await get_or_fetch_token(
+@@ -91,6 +90,19 @@ async def build_auth_header(credential: "ExternalCredentialModel") -> Dict[str,
+     return {}
+ 
+ 
++async def invalidate_and_rebuild_auth(
++    credential: "ExternalCredentialModel",
++) -> Dict[str, str]:
++    """Invalidate cached OAuth2 token and rebuild auth headers for retry after 401."""
++    if getattr(credential, "credential_type", None) == "oauth2_client_credentials":
++        from api.utils.oauth2_token_cache import invalidate_token
++
++        cred_uuid = getattr(credential, "credential_uuid", None)
++        if cred_uuid:
++            await invalidate_token(str(cred_uuid))
++    return await build_auth_header(credential)
++
++
+ def build_auth_header_from_data(
+     credential_type: str,
+     credential_data: Optional[Dict[str, Any]] = None,
+diff --git a/api/utils/oauth2_token_cache.py b/api/utils/oauth2_token_cache.py
+index 152ec1c1..4ce6381c 100644
+--- a/api/utils/oauth2_token_cache.py
++++ b/api/utils/oauth2_token_cache.py
+@@ -7,6 +7,7 @@ TTL:   max(30, expires_in - 60) seconds
+ Spec §5.2 interface: module-level functions get_or_fetch_token() and invalidate_token().
+ """
+ 
++import asyncio
+ from typing import Optional
+ 
+ import httpx
+@@ -19,6 +20,15 @@ from api.utils.url_security import validate_user_configured_service_url
+ _MIN_TTL = 30          # Floor: never cache for less than 30s
+ _EXPIRY_MARGIN = 60    # Pre-expire: refresh 60s before real expiry
+ _FETCH_TIMEOUT = 10.0  # Token endpoint timeout in seconds
++_locks: dict[str, asyncio.Lock] = {}
++
++
++def _get_lock(credential_uuid: str) -> asyncio.Lock:
++    lock = _locks.get(credential_uuid)
++    if lock is None:
++        lock = asyncio.Lock()
++        _locks[credential_uuid] = lock
++    return lock
+ 
+ 
+ async def get_or_fetch_token(
+@@ -57,48 +67,65 @@ async def get_or_fetch_token(
+                 pass
+             redis_client = None
+ 
+-    # Cache miss (or Redis down) — fetch a fresh token.
+-    logger.info(f"Fetching new OAuth2 token for credential {credential_uuid}")
+-    token, expires_in = await _fetch_token(
+-        client_id=client_id,
+-        client_secret=client_secret,
+-        token_url=token_url,
+-        scope=scope,
+-        audience=audience,
+-    )
+-
+-    # Write to cache if Redis is available.
+-    # Only cache when the token will still be valid after our pre-expiry margin.
+-    # Short-lived tokens (expires_in <= _EXPIRY_MARGIN) must not be cached
+-    # with the _MIN_TTL floor — that would serve an already-expired token.
+-    net_ttl = expires_in - _EXPIRY_MARGIN
+-    if net_ttl > 0:
+-        cache_ttl = max(_MIN_TTL, net_ttl)
+-        redis_client = None
++    async with _get_lock(credential_uuid):
++        # Recheck cache after acquiring lock to prevent stampeding
+         try:
+             redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
+-            await redis_client.setex(cache_key, cache_ttl, token)
+-            logger.debug(
+-                f"OAuth2 token cached for {credential_uuid} "
+-                f"(TTL={cache_ttl}s, provider expires_in={expires_in}s)"
+-            )
+-        except Exception as exc:
+-            logger.warning(
+-                f"OAuth2 token cache write failed for {credential_uuid}: {exc}"
+-            )
++            cached = await redis_client.get(cache_key)
++            if cached:
++                logger.debug(f"Using cached OAuth2 token for credential {credential_uuid} on recheck")
++                return cached
++        except Exception:
++            pass
+         finally:
+             if redis_client is not None:
+                 try:
+                     await redis_client.aclose()
+                 except Exception:
+                     pass
+-    else:
+-        logger.debug(
+-            f"OAuth2 token for {credential_uuid} has expires_in={expires_in}s "
+-            f"(<= margin {_EXPIRY_MARGIN}s); skipping cache to avoid serving expired token."
++                redis_client = None
++
++        # Cache miss (or Redis down) — fetch a fresh token.
++        logger.info(f"Fetching new OAuth2 token for credential {credential_uuid}")
++        token, expires_in = await _fetch_token(
++            client_id=client_id,
++            client_secret=client_secret,
++            token_url=token_url,
++            scope=scope,
++            audience=audience,
+         )
+ 
+-    return token
++        # Write to cache if Redis is available.
++        # Only cache when the token will still be valid after our pre-expiry margin.
++        # Short-lived tokens (expires_in <= _EXPIRY_MARGIN) must not be cached.
++        net_ttl = expires_in - _EXPIRY_MARGIN
++        if net_ttl > 0:
++            cache_ttl = net_ttl
++            redis_client = None
++            try:
++                redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
++                await redis_client.setex(cache_key, cache_ttl, token)
++                logger.debug(
++                    f"OAuth2 token cached for {credential_uuid} "
++                    f"(TTL={cache_ttl}s, provider expires_in={expires_in}s)"
++                )
++            except Exception as exc:
++                logger.warning(
++                    f"OAuth2 token cache write failed for {credential_uuid}: {exc}"
++                )
++            finally:
++                if redis_client is not None:
++                    try:
++                        await redis_client.aclose()
++                    except Exception:
++                        pass
++        else:
++            logger.debug(
++                f"OAuth2 token for {credential_uuid} has expires_in={expires_in}s "
++                f"(<= margin {_EXPIRY_MARGIN}s); skipping cache to avoid serving expired token."
++            )
++
++        return token
+ 
+ 
+ async def invalidate_token(credential_uuid: str) -> None:
+@@ -219,5 +246,5 @@ async def _fetch_token(
+             "OAuth2 token endpoint response missing 'access_token' field."
+         )
+ 
+-    expires_in = int(body.get("expires_in", 3600))
++    expires_in = int(body.get("expires_in", 0))
+     return token, expires_in
+-- 
+2.47.0.windows.2
+

@@ -1,0 +1,46 @@
+From 2b41accce23d9ae09b8f66dfc66caf1d4c055ba1 Mon Sep 17 00:00:00 2001
+From: arnofrxdd <bazzukagaming317@gmail.com>
+Date: Sun, 2 Aug 2026 12:27:01 +0530
+Subject: [PATCH 16/18] fix(ci): robust NLTK CWD bypass in dump_docs_openapi
+ script
+
+---
+ .github/workflows/pre-pr-drift-check.yml | 1 -
+ scripts/dump_docs_openapi.py             | 9 +++++++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/.github/workflows/pre-pr-drift-check.yml b/.github/workflows/pre-pr-drift-check.yml
+index 83c29544..42f12ee1 100644
+--- a/.github/workflows/pre-pr-drift-check.yml
++++ b/.github/workflows/pre-pr-drift-check.yml
+@@ -77,7 +77,6 @@ jobs:
+           ENABLE_AWS_S3: "false"
+           MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+           DEPLOYMENT_MODE: oss
+-          PYTHONPATH: "."
+         run: python -u scripts/dump_docs_openapi.py
+ 
+       - name: Check for OpenAPI drift
+diff --git a/scripts/dump_docs_openapi.py b/scripts/dump_docs_openapi.py
+index 3f1fbdd1..cb5f7592 100644
+--- a/scripts/dump_docs_openapi.py
++++ b/scripts/dump_docs_openapi.py
+@@ -15,6 +15,15 @@ from loguru import logger
+ 
+ logger.remove()
+ 
++import sys
++import os
++
++# Prevent NLTK from crashing on Python 3.13 due to CWD in sys.path.
++# NLTK strictly checks if sys.path[0] in ("", ".", os.getcwd()).
++# We insert the repo root with a trailing slash to bypass the string match.
++ROOT_PATH = str(Path(__file__).resolve().parent.parent)
++sys.path.insert(0, ROOT_PATH + os.sep)
++
+ from fastapi.openapi.utils import get_openapi  # noqa: E402
+ 
+ from api.app import app  # noqa: E402
+-- 
+2.47.0.windows.2
+

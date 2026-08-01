@@ -600,7 +600,6 @@ async def create_workflow_from_template(
             workflow_definition=workflow_def,
             user_id=user.id,
             organization_id=user.selected_organization_id,
-            post_call_schema=request.post_call_schema,
         )
 
         capture_event(

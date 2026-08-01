@@ -200,7 +200,7 @@ export default function ReportsPage() {
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
 
   return (
-    <div className="container mx-auto px-6 py-8 max-w-6xl space-y-6 bg-background text-foreground">
+    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6 bg-background text-foreground">
       {/* Header & Date Navigation & Workflow Selector */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-border/40">
         <div className="space-y-1">

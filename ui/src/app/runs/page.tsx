@@ -172,7 +172,7 @@ function RunsView() {
     }, [fetchWorkflowRuns, currentPage, appliedFilters, sortBy, sortOrder]);
 
     return (
-        <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6 bg-background text-foreground">
             <WorkflowRunsTable
                 runs={workflowRuns}
                 loading={loading}
@@ -192,8 +192,8 @@ function RunsView() {
                 sortOrder={sortOrder}
                 onSort={handleSort}
                 onReload={handleReload}
-                title="Global Agent Logs"
-                subtitle={`Showing ${workflowRuns.length} of ${totalCount} total runs across all agents`}
+                title="Call History"
+                subtitle={`Showing ${workflowRuns.length} of ${totalCount} total call logs across all agents`}
             />
         </div>
     );

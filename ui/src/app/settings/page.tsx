@@ -9,10 +9,10 @@ import { TelemetrySection } from "@/components/TelemetrySection";
 
 export default function SettingsPage() {
   return (
-    <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
-      <div className="pb-2 border-b border-border/40">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Platform Settings</h1>
-        <p className="text-xs text-muted-foreground">
+    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6 bg-background text-foreground">
+      <div className="pb-4 border-b border-border/40">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">Platform Settings</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">
           Manage your platform configuration and integrations.
         </p>
       </div>

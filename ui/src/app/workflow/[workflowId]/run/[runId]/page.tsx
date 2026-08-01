@@ -10,6 +10,7 @@ import {
     Loader2,
     Pause,
     Play,
+    Sparkles,
     Video,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -603,7 +604,14 @@ function RunMetricsSection({
     );
 }
 
-function ContextDisplay({ title, context }: { title: string; context: Record<string, string | number | boolean | object> | null }) {
+function BusinessJsonViewer({
+    title,
+    context,
+}: {
+    title: string;
+    context: Record<string, string | number | boolean | object> | null;
+}) {
+    const [viewMode, setViewMode] = useState<'cards' | 'json'>('cards');
     const [copied, setCopied] = useState(false);
 
     const handleCopy = async () => {
@@ -619,25 +627,89 @@ function ContextDisplay({ title, context }: { title: string; context: Record<str
 
     if (!context || Object.keys(context).length === 0) {
         return (
-            <div className="border border-border bg-card/30 backdrop-blur-md rounded-xl p-5 shadow-xs space-y-2 text-left">
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-foreground">{title}</h3>
-                <p className="text-xs text-muted-foreground">No data available</p>
+            <div className="border border-border/70 bg-card/60 backdrop-blur-md rounded-xl p-5 shadow-xs space-y-2 text-left">
+                <div className="flex items-center gap-2 border-b border-border/40 pb-2.5">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">{title}</h3>
+                </div>
+                <p className="text-xs text-muted-foreground font-medium pt-1">No data available for this section.</p>
             </div>
         );
     }
 
+    const entries = Object.entries(context);
+
     return (
-        <div className="border border-border bg-card/30 backdrop-blur-md rounded-xl p-5 shadow-xs space-y-3 text-left">
-            <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-foreground">{title}</h3>
-                <Button variant="ghost" size="sm" onClick={handleCopy} className="h-6 gap-1 px-2 text-[10px] font-bold">
-                    {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                    {copied ? 'Copied' : 'Copy'}
-                </Button>
+        <div className="border border-border/70 bg-card/60 backdrop-blur-md rounded-xl p-5 shadow-xs space-y-3.5 text-left">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2.5">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">{title}</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/80 text-muted-foreground border border-border/60">
+                        {entries.length} {entries.length === 1 ? 'field' : 'fields'}
+                    </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    {/* View Switcher: Cards vs Raw JSON */}
+                    <div className="flex items-center gap-1 border border-border bg-secondary/40 rounded-lg p-0.5">
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('cards')}
+                            className={cn(
+                                'px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors cursor-pointer',
+                                viewMode === 'cards' ? 'bg-background text-foreground shadow-2xs' : 'text-muted-foreground hover:text-foreground'
+                            )}
+                        >
+                            Cards View
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('json')}
+                            className={cn(
+                                'px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors cursor-pointer',
+                                viewMode === 'json' ? 'bg-background text-foreground shadow-2xs' : 'text-muted-foreground hover:text-foreground'
+                            )}
+                        >
+                            Raw JSON
+                        </button>
+                    </div>
+
+                    <Button variant="ghost" size="sm" onClick={handleCopy} className="h-7 gap-1 px-2 text-[10px] font-bold">
+                        {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                        {copied ? 'Copied' : 'Copy'}
+                    </Button>
+                </div>
             </div>
-            <pre className="text-xs bg-secondary/35 border border-border p-3 rounded-lg overflow-auto max-h-64 font-mono text-muted-foreground leading-relaxed">
-                {JSON.stringify(context, null, 2)}
-            </pre>
+
+            {viewMode === 'cards' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {entries.map(([key, val]) => (
+                        <div key={key} className="p-3 rounded-lg border border-border/60 bg-background/60 space-y-1 hover:border-border transition-colors">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground/70 dark:text-muted-foreground">
+                                {key.replace(/_/g, ' ')}
+                            </span>
+                            <div className="text-xs font-semibold text-foreground break-words">
+                                {typeof val === 'boolean' ? (
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${val ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/80 dark:text-rose-300'}`}>
+                                        {String(val)}
+                                    </span>
+                                ) : typeof val === 'object' && val !== null ? (
+                                    <pre className="text-[11px] font-mono text-muted-foreground bg-muted/40 p-2 rounded border border-border/40 overflow-x-auto max-h-32">
+                                        {JSON.stringify(val, null, 2)}
+                                    </pre>
+                                ) : (
+                                    <span>{String(val)}</span>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <pre className="text-xs bg-slate-950 text-slate-100 border border-slate-800 p-3.5 rounded-lg overflow-auto max-h-72 font-mono leading-relaxed shadow-inner">
+                    {JSON.stringify(context, null, 2)}
+                </pre>
+            )}
         </div>
     );
 }
@@ -852,29 +924,28 @@ export default function WorkflowRunPage() {
                             gatheredContext={workflowRun?.gathered_context ?? null}
                         />
 
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <ContextDisplay
-                                title="Initial Context"
-                                context={workflowRun?.initial_context ?? null}
-                            />
-                            <ContextDisplay
-                                title="Gathered Context"
+                        <div className="space-y-6">
+                            <BusinessJsonViewer
+                                title="Gathered Call Context"
                                 context={workflowRun?.gathered_context ?? null}
                             />
                             {workflowRun?.extracted_data && Object.keys(workflowRun.extracted_data).length > 0 && (
-                                <ContextDisplay
+                                <BusinessJsonViewer
                                     title="Post-Call Intelligence"
                                     context={workflowRun.extracted_data as Record<string, string | number | boolean | object>}
                                 />
                             )}
-                        </div>
-
-                        {workflowRun?.annotations && Object.keys(workflowRun.annotations).length > 0 && (
-                            <ContextDisplay
-                                title="QA Results"
-                                context={workflowRun.annotations as Record<string, string | number | boolean | object>}
+                            <BusinessJsonViewer
+                                title="Initial Session Context"
+                                context={workflowRun?.initial_context ?? null}
                             />
-                        )}
+                            {workflowRun?.annotations && Object.keys(workflowRun.annotations).length > 0 && (
+                                <BusinessJsonViewer
+                                    title="QA & Evaluation Results"
+                                    context={workflowRun.annotations as Record<string, string | number | boolean | object>}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
 

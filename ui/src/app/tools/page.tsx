@@ -286,19 +286,19 @@ export default function ToolsPage() {
     }
 
     return (
-        <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background text-foreground">
+        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6 bg-background text-foreground">
             {/* Header section */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="space-y-1">
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Tools</h1>
-                    <p className="text-xs text-muted-foreground">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border/40">
+                <div>
+                    <h1 className="text-xl font-bold tracking-tight text-foreground">Tools</h1>
+                    <p className="text-xs text-muted-foreground mt-0.5">
                         Manage reusable tools that can be used across your workflows.{" "}
                         <a href="https://docs.dograh.com/voice-agent/tools/introduction" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 underline font-semibold text-foreground">
                             Learn more <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                     </p>
                 </div>
-                <Button onClick={() => setIsCreateDialogOpen(true)} className="h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer">
+                <Button onClick={() => setIsCreateDialogOpen(true)} className="h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-xs font-semibold text-xs cursor-pointer">
                     <Plus className="w-4 h-4 mr-1.5" />
                     Create Tool
                 </Button>

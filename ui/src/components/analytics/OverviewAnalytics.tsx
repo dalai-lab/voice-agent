@@ -14,7 +14,7 @@ import {
     XAxis,
     YAxis
 } from "recharts";
-import { Phone, Clock, Timer, Bot, ArrowRight, Megaphone, Calendar, PhoneForwarded, CheckCircle2, TrendingUp } from "lucide-react";
+import { Phone, Clock, Bot, ArrowRight, Megaphone, Calendar, PhoneForwarded, CheckCircle2, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 import {
@@ -30,11 +30,11 @@ import { useAuth } from "@/lib/auth";
 import { formatDispositionLabel, getDispositionBadge, formatContactOrigin } from "@/lib/dispositionLabels";
 
 const CHART_COLORS = [
-    '#6366F1', // Indigo
-    '#10B981', // Emerald
-    '#F59E0B', // Amber
-    '#EC4899', // Pink
-    '#8B5CF6', // Purple
+    '#3b82f6', // blue
+    '#10b981', // emerald
+    '#f59e0b', // amber
+    '#8b5cf6', // purple
+    '#64748b', // slate
 ];
 
 export function OverviewAnalytics() {
@@ -98,7 +98,7 @@ export function OverviewAnalytics() {
                     console.error("Failed to fetch callbacks:", e);
                 }
 
-                // 4. Fetch Period Usage & Daily Breakdown (always fetch daily trends)
+                // 4. Fetch Period Usage & Daily Breakdown
                 const periodRes = await getCurrentPeriodUsageApiV1OrganizationsUsageCurrentPeriodGet();
                 const period = periodRes.data;
 
@@ -132,6 +132,25 @@ export function OverviewAnalytics() {
                     const totalCount = usageRes.data.total_count || runs.length;
                     setRecentRuns(runs.slice(0, 5));
 
+                    // Fallback: If daily usage endpoint was empty or errored, aggregate daily trend from runs
+                    if (dailyData.length === 0 && runs.length > 0) {
+                        const dailyMap: Record<string, { calls: number; minutes: number }> = {};
+                        runs.forEach(r => {
+                            if (r.created_at) {
+                                const dStr = new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                                if (!dailyMap[dStr]) dailyMap[dStr] = { calls: 0, minutes: 0 };
+                                dailyMap[dStr].calls += 1;
+                                dailyMap[dStr].minutes += (r.call_duration_seconds || 0) / 60;
+                            }
+                        });
+                        const fallbackDaily = Object.entries(dailyMap).map(([date, stats]) => ({
+                            date,
+                            Calls: stats.calls,
+                            Minutes: Math.round(stats.minutes * 10) / 10
+                        }));
+                        setDailyData(fallbackDaily);
+                    }
+
                     let runsDuration = 0;
                     let xferCount = 0;
                     let productiveCount = 0;
@@ -146,7 +165,6 @@ export function OverviewAnalytics() {
                             xferCount++;
                         }
 
-                        // Productive outcomes count towards business resolution
                         if (["transfer_call", "xfer", "call_transferred", "end_call_tool", "user_qualified", "completed", "answered"].includes(disp)) {
                             productiveCount++;
                         }
@@ -157,7 +175,6 @@ export function OverviewAnalytics() {
                     const transferRate = calls > 0 ? (xferCount / Math.min(runs.length, calls)) * 100 : 0;
                     const resolutionRate = runs.length > 0 ? (productiveCount / runs.length) * 100 : 0;
 
-                    // Format talk time nicely (e.g. "1.5h" or "42m")
                     let talkTimeFormatted = "0m";
                     if (duration >= 3600) {
                         talkTimeFormatted = `${(duration / 3600).toFixed(1)}h`;
@@ -175,7 +192,6 @@ export function OverviewAnalytics() {
                         talkTimeFormatted,
                     });
 
-                    // Group by formatted business disposition label
                     const dispMap: Record<string, number> = {};
                     runs.forEach(run => {
                         const rawDisp = (run.gathered_context as any)?.mapped_call_disposition || "completed";
@@ -201,16 +217,10 @@ export function OverviewAnalytics() {
         fetchAnalytics();
     }, [isAuthenticated, organizationPricing]);
 
-    const formatDuration = (seconds: number) => {
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        return `${m}m ${s}s`;
-    };
-
     if (loading) {
         return (
-            <div className="h-40 flex items-center justify-center rounded-xl border border-border/50 bg-card/20 text-muted-foreground text-xs font-medium">
-                <Clock className="w-4 h-4 mr-2 animate-spin text-cta" />
+            <div className="h-44 flex items-center justify-center rounded-lg border border-border/40 bg-card/30 text-muted-foreground text-xs font-medium">
+                <Clock className="w-4 h-4 mr-2 animate-spin text-muted-foreground" />
                 Loading operational metrics...
             </div>
         );
@@ -218,100 +228,100 @@ export function OverviewAnalytics() {
 
     return (
         <div className="space-y-6">
-            {/* KPI Cards Grid - Executive Operational Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-                <div className="p-4 rounded-xl border border-border/70 bg-card/60 hover:bg-card/80 transition-all duration-200 shadow-xs flex items-center justify-between">
+            {/* Minimal KPI Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="p-4 rounded-lg border border-border/50 bg-card flex items-center justify-between shadow-2xs">
                     <div className="space-y-1">
-                        <p className="text-[11px] font-bold text-foreground/70 dark:text-muted-foreground uppercase tracking-wider">Total Calls</p>
-                        <p className="text-2xl font-extrabold tracking-tight text-foreground">{kpiData?.calls || 0}</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">Total Calls</p>
+                        <p className="text-2xl font-bold tracking-tight text-foreground">{kpiData?.calls || 0}</p>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20 flex items-center justify-center">
-                        <Phone className="w-5 h-5" />
+                    <div className="p-2.5 rounded-lg bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20">
+                        <Phone className="w-4 h-4" />
                     </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/70 bg-card/60 hover:bg-card/80 transition-all duration-200 shadow-xs flex items-center justify-between">
+                <div className="p-4 rounded-lg border border-border/50 bg-card flex items-center justify-between shadow-2xs">
                     <div className="space-y-1">
-                        <p className="text-[11px] font-bold text-foreground/70 dark:text-muted-foreground uppercase tracking-wider">Total Talk Time</p>
-                        <p className="text-2xl font-extrabold tracking-tight text-foreground">{kpiData?.talkTimeFormatted || "0m"}</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">Total Talk Time</p>
+                        <p className="text-2xl font-bold tracking-tight text-foreground">{kpiData?.talkTimeFormatted || "0m"}</p>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center">
-                        <Clock className="w-5 h-5" />
+                    <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                        <Clock className="w-4 h-4" />
                     </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/70 bg-card/60 hover:bg-card/80 transition-all duration-200 shadow-xs flex items-center justify-between">
+                <div className="p-4 rounded-lg border border-border/50 bg-card flex items-center justify-between shadow-2xs">
                     <div className="space-y-1">
-                        <p className="text-[11px] font-bold text-foreground/70 dark:text-muted-foreground uppercase tracking-wider">Resolution Rate</p>
-                        <p className="text-2xl font-extrabold tracking-tight text-foreground">{kpiData?.resolutionRate || 0}%</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">Resolution Rate</p>
+                        <p className="text-2xl font-bold tracking-tight text-foreground">{kpiData?.resolutionRate || 0}%</p>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-                        <CheckCircle2 className="w-5 h-5" />
+                    <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        <CheckCircle2 className="w-4 h-4" />
                     </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/70 bg-card/60 hover:bg-card/80 transition-all duration-200 shadow-xs flex items-center justify-between">
+                <div className="p-4 rounded-lg border border-border/50 bg-card flex items-center justify-between shadow-2xs">
                     <div className="space-y-1">
-                        <p className="text-[11px] font-bold text-foreground/70 dark:text-muted-foreground uppercase tracking-wider">Transfer Rate</p>
-                        <p className="text-2xl font-extrabold tracking-tight text-foreground">{kpiData?.transferRate || 0}%</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">Transfer Rate</p>
+                        <p className="text-2xl font-bold tracking-tight text-foreground">{kpiData?.transferRate || 0}%</p>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
-                        <PhoneForwarded className="w-5 h-5" />
+                    <div className="p-2.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                        <PhoneForwarded className="w-4 h-4" />
                     </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-border/70 bg-card/60 hover:bg-card/80 transition-all duration-200 shadow-xs flex items-center justify-between sm:col-span-2 lg:col-span-1">
+                <div className="p-4 rounded-lg border border-border/50 bg-card flex items-center justify-between shadow-2xs sm:col-span-2 lg:col-span-1">
                     <div className="space-y-1">
-                        <p className="text-[11px] font-bold text-foreground/70 dark:text-muted-foreground uppercase tracking-wider">Active Agents</p>
-                        <p className="text-2xl font-extrabold tracking-tight text-foreground">{kpiData?.activeAgents || 0}</p>
+                        <p className="text-[11px] font-semibold text-muted-foreground tracking-wide uppercase">Active Agents</p>
+                        <p className="text-2xl font-bold tracking-tight text-foreground">{kpiData?.activeAgents || 0}</p>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center">
-                        <Bot className="w-5 h-5" />
+                    <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                        <Bot className="w-4 h-4" />
                     </div>
                 </div>
             </div>
 
-            {/* Row 2: Executive Charts - Call Volume Trend & Outcomes */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Charts Section - Clean & Minimalist */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {/* 14-Day Call Activity Trend Chart */}
-                <div className="p-5 rounded-xl border border-border/70 bg-card/60 shadow-xs space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/80 dark:text-muted-foreground flex items-center gap-2">
+                <div className="p-5 rounded-lg border border-border/50 bg-card shadow-2xs space-y-4">
+                    <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                        <h3 className="text-xs font-semibold text-foreground tracking-wide flex items-center gap-2">
                             <TrendingUp className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                             Call Volume Trend (Last 14 Days)
                         </h3>
                     </div>
-                    <div className="h-56 flex items-center justify-center">
+                    <div className="h-52 flex items-center justify-center">
                         {dailyData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={dailyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="callTrendGradient" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#6366F1" stopOpacity={0.4} />
-                                            <stop offset="95%" stopColor="#6366F1" stopOpacity={0.0} />
+                                            <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
+                                            <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} tickLine={false} />
-                                    <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} tickLine={false} />
+                                    <CartesianGrid strokeDasharray="2 2" vertical={false} stroke="var(--border)" opacity={0.4} />
+                                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
+                                    <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
                                     <Tooltip
                                         contentStyle={{
                                             backgroundColor: 'var(--popover)',
                                             borderColor: 'var(--border)',
-                                            borderRadius: '8px',
+                                            borderRadius: '6px',
                                             fontSize: '12px',
                                             color: 'var(--popover-foreground)',
-                                            fontWeight: 600
+                                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
                                         }}
                                     />
-                                    <Area type="monotone" dataKey="Calls" stroke="#6366F1" strokeWidth={2.5} fillOpacity={1} fill="url(#callTrendGradient)" />
+                                    <Area type="monotone" dataKey="Calls" stroke="var(--primary)" strokeWidth={1.5} fillOpacity={1} fill="url(#callTrendGradient)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         ) : (
                             <div className="text-center space-y-1">
-                                <Clock className="w-5 h-5 mx-auto text-foreground/40" />
-                                <p className="text-xs font-bold text-foreground">No call trend data available</p>
-                                <p className="text-[11px] text-foreground/70 dark:text-muted-foreground">Daily activity trends will appear as call volume logs.</p>
+                                <Clock className="w-4 h-4 mx-auto text-muted-foreground/50" />
+                                <p className="text-xs font-medium text-foreground">No call trend data available</p>
+                                <p className="text-[11px] text-muted-foreground">Daily activity trends will appear as calls occur.</p>
                             </div>
                         )}
                     </div>
@@ -319,25 +329,25 @@ export function OverviewAnalytics() {
 
                 {/* Outcomes Breakdown Chart */}
                 {dispositionData.length > 0 ? (
-                    <div className="p-5 rounded-xl border border-border/70 bg-card/60 shadow-xs space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/80 dark:text-muted-foreground flex items-center gap-2">
+                    <div className="p-5 rounded-lg border border-border/50 bg-card shadow-2xs space-y-4">
+                        <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                            <h3 className="text-xs font-semibold text-foreground tracking-wide">
                                 Top Call Outcomes
                             </h3>
                         </div>
-                        <div className="h-56 flex items-center justify-center">
+                        <div className="h-52 flex items-center justify-center">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
                                         data={dispositionData}
                                         cx="50%"
                                         cy="45%"
-                                        innerRadius={55}
-                                        outerRadius={78}
-                                        paddingAngle={4}
+                                        innerRadius={50}
+                                        outerRadius={72}
+                                        paddingAngle={3}
                                         dataKey="value"
-                                        stroke="var(--border)"
-                                        strokeWidth={1.5}
+                                        stroke="var(--card)"
+                                        strokeWidth={2}
                                     >
                                         {dispositionData.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
@@ -347,36 +357,36 @@ export function OverviewAnalytics() {
                                         contentStyle={{
                                             backgroundColor: 'var(--popover)',
                                             borderColor: 'var(--border)',
-                                            borderRadius: '8px',
+                                            borderRadius: '6px',
                                             fontSize: '12px',
                                             color: 'var(--popover-foreground)',
-                                            fontWeight: 600
+                                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
                                         }}
                                     />
-                                    <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 600, paddingTop: '8px' }} />
+                                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
                 ) : (
-                    <div className="p-5 rounded-xl border border-border/70 bg-card/60 shadow-xs flex flex-col items-center justify-center text-center space-y-2 py-12">
-                        <Phone className="w-6 h-6 text-foreground/40" />
-                        <p className="text-xs font-bold text-foreground">No call outcomes yet</p>
-                        <p className="text-[11px] text-foreground/70 dark:text-muted-foreground">Initiate a test call or publish a campaign to view live outcome metrics.</p>
+                    <div className="p-5 rounded-lg border border-border/50 bg-card shadow-2xs flex flex-col items-center justify-center text-center space-y-1.5 py-12">
+                        <Phone className="w-5 h-5 text-muted-foreground/40" />
+                        <p className="text-xs font-medium text-foreground">No call outcomes recorded yet</p>
+                        <p className="text-[11px] text-muted-foreground">Initiate calls to view live outcome distributions.</p>
                     </div>
                 )}
             </div>
 
-            {/* Row 3: Real Recent Calls Table & Operational Queues */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Real Recent Calls Table (Spans 2 Columns) */}
-                <div className="lg:col-span-2 p-5 rounded-xl border border-border/70 bg-card/60 shadow-xs space-y-3.5">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/80 dark:text-muted-foreground flex items-center gap-2">
+            {/* Recent Activity Table & Queues */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                {/* Recent Call Activity Table */}
+                <div className="lg:col-span-2 p-5 rounded-lg border border-border/50 bg-card shadow-2xs space-y-4">
+                    <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                        <h3 className="text-xs font-semibold text-foreground tracking-wide flex items-center gap-2">
                             <Phone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                             Recent Call Activity
                         </h3>
-                        <Link href="/runs" className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+                        <Link href="/runs" className="text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
                             View all calls <ArrowRight className="w-3 h-3" />
                         </Link>
                     </div>
@@ -385,11 +395,11 @@ export function OverviewAnalytics() {
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">
                                 <thead>
-                                    <tr className="border-b border-border/60 text-foreground/80 font-bold text-[10px] uppercase tracking-wider">
-                                        <th className="py-2.5 px-2">Phone / Contact</th>
-                                        <th className="py-2.5 px-2">Disposition</th>
-                                        <th className="py-2.5 px-2">Duration</th>
-                                        <th className="py-2.5 px-2">Time</th>
+                                    <tr className="border-b border-border/40 text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">
+                                        <th className="pb-2.5 px-2">Phone / Contact</th>
+                                        <th className="pb-2.5 px-2">Disposition</th>
+                                        <th className="pb-2.5 px-2">Duration</th>
+                                        <th className="pb-2.5 px-2">Time</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border/30">
@@ -402,15 +412,15 @@ export function OverviewAnalytics() {
                                         const dateStr = run.created_at ? new Date(run.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently";
 
                                         return (
-                                            <tr key={run.id || run.run_id} className="hover:bg-muted/30 transition-colors">
-                                                <td className="py-2.5 px-2 font-bold text-foreground">{phone}</td>
+                                            <tr key={run.id || run.run_id} className="hover:bg-muted/20 transition-colors">
+                                                <td className="py-2.5 px-2 font-medium text-foreground">{phone}</td>
                                                 <td className="py-2.5 px-2">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${dispClass}`}>
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border ${dispClass}`}>
                                                         {dispLabel}
                                                     </span>
                                                 </td>
-                                                <td className="py-2.5 px-2 font-semibold text-foreground/80">{duration}</td>
-                                                <td className="py-2.5 px-2 text-foreground/70 dark:text-muted-foreground font-medium text-[11px]">{dateStr}</td>
+                                                <td className="py-2.5 px-2 text-muted-foreground">{duration}</td>
+                                                <td className="py-2.5 px-2 text-muted-foreground text-[11px]">{dateStr}</td>
                                             </tr>
                                         );
                                     })}
@@ -418,10 +428,10 @@ export function OverviewAnalytics() {
                             </table>
                         </div>
                     ) : (
-                        <div className="flex flex-col items-center justify-center text-center space-y-2 py-12">
-                            <Clock className="w-6 h-6 text-foreground/40" />
-                            <p className="text-xs font-bold text-foreground">No recent calls recorded</p>
-                            <p className="text-[11px] text-foreground/70 dark:text-muted-foreground">Calls will show up here automatically when your agents interact with customers.</p>
+                        <div className="flex flex-col items-center justify-center text-center space-y-1.5 py-12">
+                            <Clock className="w-5 h-5 text-muted-foreground/40" />
+                            <p className="text-xs font-medium text-foreground">No recent calls recorded</p>
+                            <p className="text-[11px] text-muted-foreground">Calls will show up here automatically when agents interact with customers.</p>
                         </div>
                     )}
                 </div>
@@ -429,19 +439,19 @@ export function OverviewAnalytics() {
                 {/* Right Column: Outbound Campaigns & Pending Callbacks */}
                 <div className="space-y-4">
                     {/* Active Campaigns Progress */}
-                    <div className="p-5 rounded-xl border border-border/70 bg-card/60 shadow-xs space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-foreground/80 dark:text-muted-foreground flex items-center gap-2">
+                    <div className="p-5 rounded-lg border border-border/50 bg-card shadow-2xs space-y-4">
+                        <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                            <h3 className="text-xs font-semibold text-foreground tracking-wide flex items-center gap-2">
                                 <Megaphone className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                                 Outbound Campaigns
                             </h3>
-                            <Link href="/campaigns" className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+                            <Link href="/campaigns" className="text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
                                 Manage <ArrowRight className="w-3 h-3" />
                             </Link>
                         </div>
 
                         {activeCampaigns.length > 0 ? (
-                            <div className="space-y-3">
+                            <div className="space-y-2.5">
                                 {activeCampaigns.map((camp: any) => {
                                     const total = camp.total_contacts || camp.contacts_count || 1;
                                     const dialed = camp.dialed_count || camp.completed_count || 0;
@@ -451,21 +461,21 @@ export function OverviewAnalytics() {
                                         <Link
                                             key={camp.id || camp.campaign_id}
                                             href={`/campaigns/${camp.id || camp.campaign_id}`}
-                                            className="p-3.5 rounded-xl border border-border/60 bg-card/80 hover:bg-card transition-all space-y-2 block group"
+                                            className="p-3 rounded-lg border border-border/40 bg-muted/20 hover:bg-muted/40 transition-colors space-y-2 block group"
                                         >
                                             <div className="flex items-center justify-between">
-                                                <span className="text-xs font-bold text-foreground group-hover:text-indigo-600 dark:group-hover:text-indigo-400 truncate">{camp.name || "Campaign"}</span>
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800/80 capitalize">
+                                                <span className="text-xs font-medium text-foreground group-hover:underline truncate">{camp.name || "Campaign"}</span>
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground border border-border/40 capitalize">
                                                     {camp.status || "active"}
                                                 </span>
                                             </div>
                                             <div className="space-y-1">
-                                                <div className="flex justify-between text-[11px] font-semibold text-foreground/80">
+                                                <div className="flex justify-between text-[11px] text-muted-foreground">
                                                     <span>Progress ({dialed}/{total})</span>
                                                     <span>{pct}%</span>
                                                 </div>
-                                                <div className="w-full h-1.5 bg-muted/60 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-indigo-600 dark:bg-indigo-400 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+                                                <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                                                    <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
                                                 </div>
                                             </div>
                                         </Link>
@@ -473,24 +483,24 @@ export function OverviewAnalytics() {
                                 })}
                             </div>
                         ) : (
-                            <p className="text-[11px] text-foreground/70 dark:text-muted-foreground text-center py-4">No active campaigns running.</p>
+                            <p className="text-[11px] text-muted-foreground text-center py-4">No active campaigns running.</p>
                         )}
                     </div>
 
                     {/* Pending Callbacks Card */}
-                    <div className="p-4 rounded-xl border border-border/70 bg-card/60 shadow-xs space-y-2.5">
+                    <div className="p-4 rounded-lg border border-border/50 bg-card shadow-2xs space-y-2.5">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
+                                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
                                     <Calendar className="w-3.5 h-3.5" />
                                 </div>
-                                <span className="text-xs font-bold text-foreground">Scheduled Callbacks</span>
+                                <span className="text-xs font-semibold text-foreground">Scheduled Callbacks</span>
                             </div>
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-indigo-800">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted text-muted-foreground border border-border/40">
                                 {pendingCallbacks.length} Pending
                             </span>
                         </div>
-                        <Link href="/callbacks" className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center justify-end gap-1 pt-1">
+                        <Link href="/callbacks" className="text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center justify-end gap-1 pt-1">
                             View Queue <ArrowRight className="w-3 h-3" />
                         </Link>
                     </div>

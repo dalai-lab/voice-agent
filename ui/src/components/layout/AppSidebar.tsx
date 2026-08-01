@@ -116,11 +116,6 @@ const NAV_SECTIONS: SidebarNavSection[] = [
             url: "/callbacks",
             icon: PhosphorIcons.PhoneCall,
           },
-          {
-            title: "Audio Recordings",
-            url: "/recordings",
-            icon: PhosphorIcons.VinylRecord,
-          },
         ],
       },
       {
@@ -137,6 +132,11 @@ const NAV_SECTIONS: SidebarNavSection[] = [
             title: "Knowledge Base",
             url: "/files",
             icon: PhosphorIcons.Database,
+          },
+          {
+            title: "Audio Library",
+            url: "/recordings",
+            icon: PhosphorIcons.VinylRecord,
           },
         ],
       },

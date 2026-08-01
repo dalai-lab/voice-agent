@@ -313,51 +313,19 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({
   );
 
   return (
-    <div className="border border-border bg-card/30 rounded-xl p-5 shadow-xs mb-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-4 mb-4">
-        <div>
-          <h2 className="text-sm font-extrabold uppercase tracking-wider text-foreground">Filter Workflow Runs</h2>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Build custom filters to find specific workflow runs
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-semibold px-3 bg-card/40 hover:bg-muted border-border">
-                Templates
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[250px] border border-border bg-popover rounded-xl shadow-md p-1.5">
-              <DropdownMenuLabel className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground/60 px-2 py-1.5">Filter Templates</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-border/60 my-1" />
-              {filterTemplates.map((template) => (
-                <DropdownMenuItem
-                  key={template.id}
-                  onClick={() => applyTemplate(template)}
-                  className="rounded-lg px-2 py-1.5 cursor-pointer focus:bg-muted/80"
-                >
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-foreground">{template.name}</span>
-                    <span className="text-[10px] text-muted-foreground mt-0.5">
-                      {template.description}
-                    </span>
-                  </div>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {/* Add Filter Row */}
-        <div className="flex gap-2">
-          <Select value={selectedAttribute} onValueChange={(value) => {
-            addFilter(value);
-          }}>
-            <SelectTrigger className="flex-1 h-9 rounded-lg text-xs border border-border bg-card/30">
-              <SelectValue placeholder="Select attribute to filter by" />
+    <div className="w-full space-y-3 mb-6">
+      {/* Controls Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 flex-1">
+          {/* Add Filter Dropdown */}
+          <Select
+            value={selectedAttribute}
+            onValueChange={(value) => {
+              addFilter(value);
+            }}
+          >
+            <SelectTrigger className="h-8 text-xs border border-border/80 bg-background/60 hover:bg-accent/40 rounded-lg px-2.5 min-w-[180px] max-w-[240px]">
+              <SelectValue placeholder="+ Filter by attribute..." />
             </SelectTrigger>
             <SelectContent className="border border-border bg-popover rounded-xl shadow-md">
               {availableAttributesForAdding.map((attr) => (
@@ -370,116 +338,125 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({
               ))}
             </SelectContent>
           </Select>
-        </div>
 
-        {/* Active Filters */}
-        {activeFilters.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground/80">Active Filters</h4>
-              {activeFilters.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAllFilters}
-                  className="h-7 text-[10px] font-bold text-muted-foreground hover:text-foreground"
+          {/* Templates Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-medium px-2.5 bg-background/60 hover:bg-accent/40 border-border/80 text-muted-foreground hover:text-foreground">
+                Templates
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[240px] border border-border bg-popover rounded-xl shadow-md p-1.5">
+              <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-2 py-1">Filter Templates</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-border/60 my-1" />
+              {filterTemplates.map((template) => (
+                <DropdownMenuItem
+                  key={template.id}
+                  onClick={() => applyTemplate(template)}
+                  className="rounded-lg px-2 py-1.5 cursor-pointer focus:bg-accent/60"
                 >
-                  Clear All
-                </Button>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-foreground">{template.name}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {template.description}
+                    </span>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Auto-refresh toggle */}
+          {onAutoRefreshChange && (
+            <div className="flex items-center space-x-1.5 ml-2 border-l border-border/40 pl-3">
+              <Switch
+                checked={autoRefresh}
+                onCheckedChange={onAutoRefreshChange}
+                id="auto-refresh"
+                className="scale-90 data-[state=checked]:bg-cta"
+              />
+              <label htmlFor="auto-refresh" className="text-xs text-muted-foreground/80 cursor-pointer select-none">
+                Live (5s)
+              </label>
+              {autoRefresh && (
+                <RefreshCw className="h-3 w-3 text-muted-foreground/60 animate-spin" />
               )}
             </div>
+          )}
+        </div>
 
-            {activeFilters.map((filter, index) => (
-              <div
-                key={index}
-                className={`border border-border/80 bg-card/25 rounded-lg transition-all overflow-hidden ${
-                  filter.isValid ? "" : "border-rose-500/30 bg-rose-500/[0.02]"
-                }`}
-              >
-                <div
-                  className="flex items-center justify-between cursor-pointer px-4 py-3 hover:bg-muted/10 transition-colors"
-                  onClick={() => toggleFilterExpanded(index)}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="text-muted-foreground">
-                      {getFilterIcon(filter.attribute.type)}
-                    </div>
-                    <span className="text-xs font-bold text-foreground">{filter.attribute.label}</span>
-                    {!filter.isValid && (
-                      <AlertCircle className="h-3.5 w-3.5 text-rose-500" />
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    {!expandedFilters.has(index) && (
-                      <span className="text-xs font-semibold text-muted-foreground/80">
-                        {getFilterSummary(filter)}
-                      </span>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 rounded-md hover:bg-muted/80 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFilter(index);
-                      }}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-                {expandedFilters.has(index) && (
-                  <div className="border-t border-border/60 bg-card/10 px-4 py-4.5">
-                    {renderFilterInput(filter, index)}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Apply Filters Button */}
+        {/* Action Buttons on Right */}
         {(activeFilters.length > 0 || hasAppliedFilters) && (
-          <div className="flex justify-between items-center gap-2 pt-2 border-t border-border/40 mt-4">
-            {/* Auto-refresh toggle on the left */}
-            {onAutoRefreshChange && (
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={autoRefresh}
-                  onCheckedChange={onAutoRefreshChange}
-                  id="auto-refresh"
-                  className="data-[state=checked]:bg-cta"
-                />
-                <label htmlFor="auto-refresh" className="text-xs font-bold text-muted-foreground/85 cursor-pointer">
-                  Auto-refresh every 5s
-                </label>
-                {autoRefresh && (
-                  <RefreshCw className="h-3.5 w-3.5 text-muted-foreground/60 animate-spin" />
-                )}
-              </div>
-            )}
-
-            {/* Buttons on the right */}
-            <div className="flex gap-2 ml-auto">
-              <Button
-                variant="outline"
-                onClick={clearAllFilters}
-                className="h-8 text-xs rounded-lg font-semibold border-border hover:bg-muted"
-              >
-                Clear All
-              </Button>
-              <Button
-                onClick={onApplyFilters}
-                disabled={(activeFilters.length > 0 && !allFiltersValid) || isExecuting}
-                title={"Apply filters"}
-                className="h-8 text-xs rounded-lg font-bold bg-cta hover:bg-cta/90 text-white"
-              >
-                {isExecuting ? "Applying..." : `Apply (${navigator.userAgent.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl'}+Enter)`}
-              </Button>
-            </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAllFilters}
+              className="h-8 text-xs rounded-lg font-medium text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </Button>
+            <Button
+              onClick={onApplyFilters}
+              disabled={(activeFilters.length > 0 && !allFiltersValid) || isExecuting}
+              title={"Apply filters"}
+              className="h-8 text-xs rounded-lg font-semibold bg-cta hover:bg-cta/90 text-cta-foreground px-3"
+            >
+              {isExecuting ? "Applying..." : "Apply Filters"}
+            </Button>
           </div>
         )}
       </div>
+
+      {/* Active Filter Cards / Pills */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-2 border-t border-border/40">
+          {activeFilters.map((filter, index) => (
+            <div
+              key={index}
+              className={`border rounded-lg text-xs transition-all ${
+                filter.isValid
+                  ? "border-border/80 bg-background/80"
+                  : "border-rose-500/40 bg-rose-500/[0.04]"
+              }`}
+            >
+              <div
+                className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-accent/40 rounded-lg"
+                onClick={() => toggleFilterExpanded(index)}
+              >
+                <div className="text-muted-foreground">
+                  {getFilterIcon(filter.attribute.type)}
+                </div>
+                <span className="font-semibold text-foreground">{filter.attribute.label}:</span>
+                {!expandedFilters.has(index) && (
+                  <span className="text-muted-foreground font-medium">
+                    {getFilterSummary(filter)}
+                  </span>
+                )}
+                {!filter.isValid && (
+                  <AlertCircle className="h-3.5 w-3.5 text-rose-500" />
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground -mr-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFilter(index);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              {expandedFilters.has(index) && (
+                <div className="border-t border-border/60 bg-popover/90 p-3 rounded-b-lg">
+                  {renderFilterInput(filter, index)}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

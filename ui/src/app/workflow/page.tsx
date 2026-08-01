@@ -104,12 +104,12 @@ async function PageContent() {
     const workflowList = await WorkflowList();
 
     return (
-        <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
             {/* Page Header */}
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-6 border-b border-border/40">
-                <div className="space-y-1">
-                    <h1 className="text-2xl font-bold tracking-tight">Agents</h1>
-                    <p className="text-sm text-muted-foreground">Manage and deploy your voice communication workflows</p>
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-4 border-b border-border/40">
+                <div>
+                    <h1 className="text-xl font-bold tracking-tight text-foreground">Agents</h1>
+                    <p className="text-xs text-muted-foreground mt-0.5">Manage and deploy your voice communication workflows</p>
                 </div>
                 <div className="flex items-center gap-2.5">
                     <UploadWorkflowButton />
@@ -128,7 +128,7 @@ async function PageContent() {
 
 function WorkflowsLoading() {
     return (
-        <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-6 border-b border-border/40">
                 <div className="space-y-2">
                     <div className="h-7 w-28 bg-muted rounded-md animate-pulse"></div>

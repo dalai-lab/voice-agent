@@ -92,14 +92,14 @@ export default function CampaignsPage() {
     };
 
     return (
-        <div className="container mx-auto px-6 py-8 max-w-6xl space-y-6 bg-background text-foreground">
+        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6 bg-background text-foreground">
             {/* Header section */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="space-y-1">
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Campaigns</h1>
-                    <p className="text-xs text-muted-foreground">Manage and track your bulk workflow execution campaigns</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border/40">
+                <div>
+                    <h1 className="text-xl font-bold tracking-tight text-foreground">Campaigns</h1>
+                    <p className="text-xs text-muted-foreground mt-0.5">Manage and track your bulk workflow execution campaigns</p>
                 </div>
-                <Button onClick={handleCreateCampaign} className="h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer">
+                <Button onClick={handleCreateCampaign} className="h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-xs font-semibold text-xs cursor-pointer">
                     <Plus className="h-4 w-4 mr-1.5" />
                     Create Campaign
                 </Button>

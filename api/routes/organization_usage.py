@@ -493,13 +493,15 @@ async def get_daily_usage_breakdown(
         raise HTTPException(status_code=400, detail="No organization selected")
 
     try:
-        # Get organization to check if it has pricing
+        # Get organization
         org = await db_client.get_organization_by_id(user.selected_organization_id)
-        if not org or org.price_per_second_usd is None:
+        if not org:
             raise HTTPException(
-                status_code=400,
-                detail="Daily breakdown is only available for organizations with pricing configured",
+                status_code=404,
+                detail="Organization not found",
             )
+
+        price_per_second_usd = org.price_per_second_usd or 0.0
 
         # Calculate date range
         end_date = datetime.now()
@@ -511,7 +513,7 @@ async def get_daily_usage_breakdown(
             user.selected_organization_id,
             start_date,
             end_date,
-            org.price_per_second_usd,
+            price_per_second_usd,
         )
 
         return breakdown

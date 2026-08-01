@@ -7,16 +7,6 @@ interface SpinLoaderProps {
 export default function SpinLoader({ label }: SpinLoaderProps) {
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-            <style>{`
-                @keyframes loadingBar {
-                    0% { transform: translateX(-100%); }
-                    100% { transform: translateX(200%); }
-                }
-                .animate-loading-bar {
-                    animation: loadingBar 1.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
-                }
-            `}</style>
-
             <div className="flex flex-col items-center gap-4">
                 <BrandLogo className="animate-pulse" />
 

@@ -3,16 +3,21 @@
 import json
 import re
 from typing import Any
+import urllib.parse
 
 import httpx
+from loguru import logger
+
 from api.db import db_client
 from api.services.configuration.masking import mask_key
-from api.utils.credential_auth import (
-    build_auth_header,
-    rebuild_headers_after_401,
+from api.services.workflow.workflow_graph import TEMPLATE_VAR_PATTERN
+from api.utils.credential_auth import build_auth_header
+from api.utils.template_renderer import (
+    _extract_timezone_from_template,
+    _resolve_builtin_variable,
+    get_nested_value,
+    render_template,
 )
-from api.utils.template_renderer import render_template
-from loguru import logger
 
 # Map tool parameter types to JSON schema types
 TYPE_MAP = {
@@ -369,7 +374,6 @@ def render_body_template(
                 param_type_map[clean_name] = p.get("type", "string")
         except ValueError as e:
             raise ValueError(str(e))
-
     # Pre-render required parameter check (fast fail before any HTTP call).
     # 0, False, {}, [] are valid non-missing values — only None and "" trigger this.
     #
@@ -627,6 +631,105 @@ def _resolve_preset_parameters(
     return resolved
 
 
+def render_url_template(
+    url: str,
+    resolved_arguments: dict[str, Any],
+    call_context_vars: dict[str, Any] | None,
+    gathered_context_vars: dict[str, Any] | None,
+    param_type_map: dict[str, str],
+) -> tuple[str, set[str]]:
+    """Render {{placeholders}} in a URL string, percent-encoding each substituted value.
+
+    Returns:
+        (rendered_url, consumed_param_names)
+
+    Raises:
+        ValueError: If any required {{placeholder}} is unresolved, or template is malformed.
+    """
+
+    # Fast malformed checks
+    if url.count("{{") != url.count("}}"):
+        if url.count("{{") > url.count("}}"):
+            raise ValueError("Malformed URL template: unmatched '{{' found.")
+        else:
+            raise ValueError("Malformed URL template: unmatched '}}' found.")
+
+    if "{{{{" in url:
+        raise ValueError("Malformed URL template: nested '{{' found.")
+
+    if not url or "{{" not in url:
+        return url, set()
+
+    consumed_params = set()
+    default_tz = _extract_timezone_from_template(url)
+
+    def _replace(match: re.Match[str]) -> str:
+        variable_path = match.group(1).strip()
+        filter_name = match.group(2).strip() if match.group(2) else None
+        filter_value = match.group(3).strip() if match.group(3) else None
+
+        builtin_value = _resolve_builtin_variable(variable_path, default_tz)
+        if builtin_value is not None:
+            return urllib.parse.quote(builtin_value, safe="")
+
+        if variable_path.startswith("initial_context."):
+            key_path = variable_path[len("initial_context.") :]
+            val = get_nested_value(call_context_vars or {}, key_path)
+        elif variable_path.startswith("gathered_context."):
+            key_path = variable_path[len("gathered_context.") :]
+            val = get_nested_value(gathered_context_vars or {}, key_path)
+        else:
+            base_param_name = variable_path.split(".")[0]
+            if base_param_name not in param_type_map:
+                raise ValueError(
+                    f"Undeclared URL placeholder: '{base_param_name}' is not a configured parameter."
+                )
+
+            param_type = param_type_map[base_param_name]
+            if param_type == "array":
+                raise ValueError(
+                    "Array parameters cannot be used as URL path parameters."
+                )
+            if param_type == "object" and "." not in variable_path:
+                raise ValueError(
+                    "Object parameters cannot be used as URL path parameters directly."
+                )
+
+            consumed_params.add(base_param_name)
+            val = get_nested_value(resolved_arguments, variable_path)
+
+        # Fallback filter handling
+        if filter_name is not None:
+            if val is None or val == "":
+                if filter_name == "fallback":
+                    val = (
+                        filter_value
+                        if filter_value is not None
+                        else variable_path.title()
+                    )
+                else:
+                    val = filter_name if filter_name != "default" else ""
+
+        if val is None:
+            raise ValueError(
+                f"URL path parameter '{variable_path}' has no value. The agent must collect this before calling the tool."
+            )
+        if val == "" and filter_name is None:
+            raise ValueError(
+                f"URL path parameter '{variable_path}' resolved to an empty string."
+            )
+
+        if isinstance(val, bool):
+            val = str(val).lower()
+        else:
+            val = str(val)
+
+        return urllib.parse.quote(val, safe="")
+
+    rendered_url = re.sub(TEMPLATE_VAR_PATTERN, _replace, url)
+    return rendered_url, consumed_params
+
+
 async def execute_http_tool(
     tool: Any,
     arguments: dict[str, Any],
@@ -664,16 +767,6 @@ async def execute_http_tool(
 
     # Add auth header if credential is configured. Keep track of which headers
     # came from the credential so only those values are masked in test previews.
-    request_headers: dict[str, str] = {}
-    if include_request_headers:
-        request_headers = {str(name): str(value) for name, value in headers.items()}
-
-    def build_result(result: dict[str, Any]) -> dict[str, Any]:
-        if include_request_headers:
-            return {**result, "request_headers": request_headers}
-        return result
-
-    credential = None
     credential_headers: dict[str, str] = {}
     credential_uuid = config.get("credential_uuid")
     if credential_uuid and organization_id:
@@ -682,39 +775,15 @@ async def execute_http_tool(
                 credential_uuid, organization_id
             )
             if credential:
-                credential_headers = await build_auth_header(credential)
-                for fresh_key in credential_headers:
-                    for existing_key in list(headers):
-                        if existing_key.lower() == fresh_key.lower():
-                            del headers[existing_key]
+                credential_headers = build_auth_header(credential)
                 headers.update(credential_headers)
-                if include_request_headers:
-                    for fresh_key, fresh_value in credential_headers.items():
-                        for req_key in list(request_headers):
-                            if req_key.lower() == fresh_key.lower():
-                                del request_headers[req_key]
-                        request_headers[fresh_key] = mask_key(str(fresh_value))
                 logger.debug(f"Applied credential '{credential.name}' to tool request")
             else:
                 logger.warning(
                     f"Credential {credential_uuid} not found for tool '{tool.name}'"
                 )
-        except ValueError as e:
-            logger.error(f"Authentication failed for tool '{tool.name}': {e}")
-            return build_result(
-                {
-                    "status": "error",
-                    "error": f"Authentication failed: {e}",
-                }
-            )
         except Exception as e:
             logger.error(f"Failed to fetch credential for tool '{tool.name}': {e}")
-            return build_result(
-                {
-                    "status": "error",
-                    "error": f"Tool execution failed: {e}",
-                }
-            )
 
     request_headers: dict[str, str] = {}
     if include_request_headers:
@@ -727,6 +796,8 @@ async def execute_http_tool(
     # By the time build_result is first called (line 316 preset error path),
     # _body_preview must already be assigned.
     _body_preview: dict[str, Any] | None = None
+    _rendered_url: str | None = None
+    _url_consumed: set[str] = set()
 
     def build_result(result: dict[str, Any]) -> dict[str, Any]:
         if include_request_headers:
@@ -738,6 +809,8 @@ async def execute_http_tool(
                 **result,
                 "request_headers": request_headers,
                 "request_body_preview": _body_preview,  # reads cell at call time
+                "rendered_url": _rendered_url,
+                "consumed_path_params": list(_url_consumed),
             }
         return result
 
@@ -759,6 +832,44 @@ async def execute_http_tool(
 
     resolved_arguments = {**(arguments or {}), **preset_arguments}
 
+    # Build param_type_map to share between URL and body template rendering
+    parameters = [
+        *(config.get("parameters") or []),
+        *(config.get("preset_parameters") or []),
+    ]
+    param_type_map: dict[str, str] = {}
+    for p in parameters:
+        try:
+            clean_name = validate_parameter_name(p.get("name", ""))
+            if clean_name:
+                param_type_map[clean_name] = p.get("type", "string")
+        except ValueError as e:
+            logger.error(f"Custom tool '{tool.name}' parameter error: {e}")
+            return build_result({"status": "error", "error": str(e)})
+
+    # Render URL path parameters ({{paramName}} substitution).
+    # Must happen AFTER resolved_arguments is finalized and BEFORE body/query build.
+    try:
+        url, _url_consumed_res = render_url_template(
+            url=url,
+            resolved_arguments=resolved_arguments,
+            call_context_vars=call_context_vars,
+            gathered_context_vars=gathered_context_vars,
+            param_type_map=param_type_map,
+        )
+        _rendered_url = url
+        _url_consumed = _url_consumed_res
+
+        # Create a copy stripped of path params specifically for the query string
+        query_arguments = {
+            k: v for k, v in resolved_arguments.items() if k not in _url_consumed
+        }
+    except ValueError as e:
+        logger.error(f"Custom tool '{tool.name}' URL template render failed: {e}")
+        return build_result(
+            {"status": "error", "error": f"URL template rendering failed: {e!s}"}
+        )
+
     # Build request body or query params.
     body = None
     params = None
@@ -766,14 +877,10 @@ async def execute_http_tool(
 
     if method in ("POST", "PUT", "PATCH"):
         if body_template is not None:
-            parameters = [
-                *(config.get("parameters") or []),
-                *(config.get("preset_parameters") or []),
-            ]
             try:
                 body = render_body_template(
                     template=body_template,
-                    arguments=resolved_arguments,
+                    arguments=resolved_arguments,  # keep all params for body
                     parameters=parameters,
                     call_context_vars=call_context_vars,
                     gathered_context_vars=gathered_context_vars,
@@ -788,12 +895,11 @@ async def execute_http_tool(
                         "error": f"Body template rendering failed: {e!s}",
                     }
                 )
-                # _body_preview is still None here (set below, after this block). ✓
         else:
-            body = resolved_arguments  # flat mode — unchanged behaviour
+            body = query_arguments  # flat mode — don't duplicate path params into body
 
-    elif method in ("GET", "DELETE") and resolved_arguments:
-        params = serialize_query_params(resolved_arguments)
+    elif method in ("GET", "DELETE") and query_arguments:
+        params = serialize_query_params(query_arguments)
 
     # Capture final body for the test-mode preview.
     # The closure reads _body_preview at call time, after this assignment.
@@ -818,40 +924,7 @@ async def execute_http_tool(
                 params=params,
             )
 
-            if (
-                response.status_code == 401
-                and credential
-                and getattr(credential, "credential_type", None)
-                == "oauth2_client_credentials"
-            ):
-                logger.info(
-                    f"Invalidated OAuth2 token for credential {credential_uuid} after 401 response. Retrying once..."
-                )
-                try:
-                    credential_headers = await rebuild_headers_after_401(
-                        credential, headers
-                    )
-                except ValueError as e:
-                    logger.error(f"Authentication failed for tool '{tool.name}': {e}")
-                    return build_result(
-                        {
-                            "status": "error",
-                            "error": f"Authentication failed: {e}",
-                        }
-                    )
-                if include_request_headers and credential_headers:
-                    for header_name, header_value in credential_headers.items():
-                        request_headers[header_name] = mask_key(str(header_value))
-
-                response = await client.request(
-                    method=method,
-                    url=url,
-                    headers=headers,
-                    json=body,
-                    params=params,
-                )
-
-            # Try to parse JSON response again in case we retried
+            # Try to parse JSON response
             try:
                 response_data = response.json()
             except Exception:

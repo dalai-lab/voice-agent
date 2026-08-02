@@ -28,7 +28,6 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.services.llm_service import FunctionCallParams
-from pipecat.tests import MockLLMService, run_test
 from pydantic import ValidationError
 
 from api.enums import WorkflowRunMode
@@ -40,8 +39,10 @@ from api.services.workflow.tools.custom_tool import (
     _coerce_typed_leaves,
     execute_http_tool,
     render_body_template,
+    render_url_template,
     tool_to_function_schema,
 )
+from pipecat.tests import MockLLMService, run_test
 
 
 @dataclass
@@ -1267,6 +1268,7 @@ class TestExecuteHttpToolWithBodyTemplate:
                     "method": "PUT",
                     "url": "http://test",
                     "body_template": {"nested": "{{val}}"},
+                    "parameters": [{"name": "val", "type": "string"}],
                 }
             },
         )
@@ -1292,6 +1294,7 @@ class TestExecuteHttpToolWithBodyTemplate:
                     "method": "PATCH",
                     "url": "http://test",
                     "body_template": {"nested": "{{val}}"},
+                    "parameters": [{"name": "val", "type": "string"}],
                 }
             },
         )
@@ -1365,6 +1368,8 @@ class TestExecuteHttpToolWithBodyTemplate:
                     "method": "POST",
                     "url": "http://test",
                     "body_template": {"x": "{{llm_val}}", "y": "{{preset_val}}"},
+                    "parameters": [{"name": "llm_val", "type": "number"}],
+                    "preset_parameters": [{"name": "preset_val"}],
                 }
             },
         )
@@ -1374,7 +1379,7 @@ class TestExecuteHttpToolWithBodyTemplate:
             tool, {"llm_val": 1}, preset_params={"preset_val": 2}
         )
         kwargs = mock_request.call_args[1]
-        assert kwargs["json"] == {"x": "1", "y": "2"}
+        assert kwargs["json"] == {"x": 1, "y": "2"}
 
     @pytest.mark.asyncio
     @patch("api.services.workflow.tools.custom_tool.httpx.AsyncClient.request")
@@ -1665,8 +1670,7 @@ class TestTransferResolver:
 class TestAuthHeaders:
     """Tests for auth header building utilities."""
 
-    @pytest.mark.asyncio
-    async def test_bearer_token_auth(self):
+    def test_bearer_token_auth(self):
         """Test building bearer token auth header."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1674,12 +1678,11 @@ class TestAuthHeaders:
         mock_credential.credential_type = "bearer_token"
         mock_credential.credential_data = {"token": "abc123"}
 
-        header = await build_auth_header(mock_credential)
+        header = build_auth_header(mock_credential)
 
         assert header == {"Authorization": "Bearer abc123"}
 
-    @pytest.mark.asyncio
-    async def test_api_key_auth(self):
+    def test_api_key_auth(self):
         """Test building API key auth header."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1690,12 +1693,11 @@ class TestAuthHeaders:
             "api_key": "secret-key-123",
         }
 
-        header = await build_auth_header(mock_credential)
+        header = build_auth_header(mock_credential)
 
         assert header == {"X-API-Key": "secret-key-123"}
 
-    @pytest.mark.asyncio
-    async def test_basic_auth(self):
+    def test_basic_auth(self):
         """Test building basic auth header."""
         import base64
 
@@ -1708,13 +1710,12 @@ class TestAuthHeaders:
             "password": "pass123",
         }
 
-        header = await build_auth_header(mock_credential)
+        header = build_auth_header(mock_credential)
 
         expected_encoded = base64.b64encode(b"user:pass123").decode()
         assert header == {"Authorization": f"Basic {expected_encoded}"}
 
-    @pytest.mark.asyncio
-    async def test_custom_header_auth(self):
+    def test_custom_header_auth(self):
         """Test building custom header auth."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1725,12 +1726,11 @@ class TestAuthHeaders:
             "header_value": "custom-value-123",
         }
 
-        header = await build_auth_header(mock_credential)
+        header = build_auth_header(mock_credential)
 
         assert header == {"X-Custom-Auth": "custom-value-123"}
 
-    @pytest.mark.asyncio
-    async def test_unknown_auth_type_returns_empty(self):
+    def test_unknown_auth_type_returns_empty(self):
         """Test that unknown auth types return empty dict."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1738,12 +1738,11 @@ class TestAuthHeaders:
         mock_credential.credential_type = "unknown_type"
         mock_credential.credential_data = {}
 
-        header = await build_auth_header(mock_credential)
+        header = build_auth_header(mock_credential)
 
         assert header == {}
 
-    @pytest.mark.asyncio
-    async def test_none_credential_type_returns_empty(self):
+    def test_none_credential_type_returns_empty(self):
         """Test that 'none' credential type returns empty dict."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1751,17 +1750,12 @@ class TestAuthHeaders:
         mock_credential.credential_type = "none"
         mock_credential.credential_data = {}
 
-        header = await build_auth_header(mock_credential)
+        header = build_auth_header(mock_credential)
 
         assert header == {}
 
     def test_build_auth_header_from_data(self):
-        """Test building auth header from raw data.
-
-        Note: build_auth_header_from_data is synchronous and does NOT
-        support oauth2_client_credentials. Production code must use
-        the async build_auth_header instead.
-        """
+        """Test building auth header from raw data."""
         from api.utils.credential_auth import build_auth_header_from_data
 
         header = build_auth_header_from_data(
@@ -1771,8 +1765,7 @@ class TestAuthHeaders:
 
         assert header == {"Authorization": "Bearer my-token"}
 
-    @pytest.mark.asyncio
-    async def test_api_key_default_header_name(self):
+    def test_api_key_default_header_name(self):
         """Test that API key uses default header name if not specified."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1780,7 +1773,7 @@ class TestAuthHeaders:
         mock_credential.credential_type = "api_key"
         mock_credential.credential_data = {"api_key": "key123"}
 
-        header = await build_auth_header(mock_credential)
+        header = build_auth_header(mock_credential)
 
         assert header == {"X-API-Key": "key123"}
 
@@ -2634,82 +2627,450 @@ class TestUpdateLLMContext:
         assert schema.properties == {}
         assert schema.required == []
 
-    @pytest.mark.asyncio
-    async def test_transfer_resolver_oauth2_401_retry_flow(self):
-        """Transfer resolver retries once on 401 for OAuth2 credentials and replaces stale authorization header."""
-        from unittest.mock import AsyncMock, MagicMock, patch
 
-        from api.db.models import ExternalCredentialModel
-        from api.services.workflow.tools.transfer_resolver import (
-            resolve_transfer_config,
+class TestUrlPathParameters:
+    def test_single_path_param_substituted(self):
+        url, consumed = render_url_template(
+            "https://api.com/users/{{userId}}",
+            {"userId": "123"},
+            None,
+            None,
+            {"userId": "string"},
         )
+        assert url == "https://api.com/users/123"
+        assert consumed == {"userId"}
 
-        mock_cred = ExternalCredentialModel(
-            credential_uuid="cred-123",
-            organization_id=1,
-            name="test_oauth",
-            credential_type="oauth2_client_credentials",
-            credential_data={
-                "client_id": "c1",
-                "client_secret": "s1",
-                "token_url": "https://auth.example.com/token",
-            },
+    def test_multiple_path_params_substituted(self):
+        url, consumed = render_url_template(
+            "https://api.com/orgs/{{orgId}}/users/{{userId}}",
+            {"orgId": "abc", "userId": "123"},
+            None,
+            None,
+            {"orgId": "string", "userId": "string"},
         )
+        assert url == "https://api.com/orgs/abc/users/123"
+        assert consumed == {"orgId", "userId"}
 
-        resp_401 = MagicMock()
-        resp_401.status_code = 401
+    def test_preset_param_in_url(self):
+        url, consumed = render_url_template(
+            "https://api.com/props/{{propertyId}}",
+            {"propertyId": "prop-1"},
+            None,
+            None,
+            {"propertyId": "string"},
+        )
+        assert url == "https://api.com/props/prop-1"
+        assert consumed == {"propertyId"}
 
-        resp_200 = MagicMock()
-        resp_200.status_code = 200
-        resp_200.json.return_value = {
-            "transfer_context": {"destination": "+15551234567"}
-        }
+    def test_static_url_unchanged_and_zero_consumed(self):
+        url, consumed = render_url_template(
+            "https://api.com/static",
+            {"userId": "123"},
+            None,
+            None,
+            {"userId": "string"},
+        )
+        assert url == "https://api.com/static"
+        assert consumed == set()
 
-        mock_client = AsyncMock()
-        mock_client.request.side_effect = [resp_401, resp_200]
+    def test_fallback_filter_in_url_uses_fallback_when_empty(self):
+        url, consumed = render_url_template(
+            "https://api.com/users/{{userId | default}}",
+            {"userId": ""},
+            None,
+            None,
+            {"userId": "string"},
+        )
+        assert url == "https://api.com/users/"
+        assert consumed == {"userId"}
 
-        transfer_config = {
-            "destination_source": "dynamic",
-            "resolver": {
-                "url": "https://api.example.com/transfer",
-                "credential_uuid": "cred-123",
-                "headers": {"authorization": "Bearer stale_token"},
-            },
-        }
+        url2, consumed2 = render_url_template(
+            "https://api.com/users/{{userId | fallback:me}}",
+            {"userId": None},
+            None,
+            None,
+            {"userId": "string"},
+        )
+        assert url2 == "https://api.com/users/me"
 
-        with (
-            patch(
-                "api.services.workflow.tools.transfer_resolver.db_client.get_credential_by_uuid",
-                AsyncMock(return_value=mock_cred),
-            ),
-            patch(
-                "api.services.workflow.tools.transfer_resolver.validate_user_configured_service_url"
-            ),
-            patch(
-                "api.services.workflow.tools.transfer_resolver.httpx.AsyncClient",
-                return_value=MagicMock(__aenter__=AsyncMock(return_value=mock_client)),
-            ),
-            patch(
-                "api.services.oauth2_token_cache.get_or_fetch_token",
-                AsyncMock(side_effect=["old_tok", "new_tok"]),
-            ),
-            patch("api.services.oauth2_token_cache.invalidate_token", AsyncMock()),
-        ):
-            res = await resolve_transfer_config(
-                tool=MagicMock(),
-                config=transfer_config,
-                arguments={},
-                call_context_vars={},
-                gathered_context_vars={},
-                organization_id=1,
-                workflow_run_id=1,
+    def test_dot_notation_path_param_in_url(self):
+        url, consumed = render_url_template(
+            "https://api.com/users/{{user.id}}",
+            {"user": {"id": "456"}},
+            None,
+            None,
+            {"user": "object"},
+        )
+        assert url == "https://api.com/users/456"
+        assert consumed == {"user"}
+
+    def test_number_param_in_url_stringified(self):
+        url, consumed = render_url_template(
+            "https://api.com/users/{{userId}}",
+            {"userId": 123},
+            None,
+            None,
+            {"userId": "number"},
+        )
+        assert url == "https://api.com/users/123"
+
+    def test_boolean_param_in_url_stringified(self):
+        url, consumed = render_url_template(
+            "https://api.com/users/{{active}}",
+            {"active": True},
+            None,
+            None,
+            {"active": "boolean"},
+        )
+        assert url == "https://api.com/users/true"
+
+    def test_existing_query_string_preserved(self):
+        url, consumed = render_url_template(
+            "https://api.com/users/{{userId}}?limit=10&sort=desc",
+            {"userId": "123"},
+            None,
+            None,
+            {"userId": "string"},
+        )
+        assert url == "https://api.com/users/123?limit=10&sort=desc"
+
+    def test_unresolved_required_placeholder_raises(self):
+        with pytest.raises(ValueError, match="has no value"):
+            render_url_template(
+                "https://api.com/users/{{userId}}", {}, None, None, {"userId": "string"}
             )
 
-            assert res.destination == "+15551234567"
-            assert mock_client.request.call_count == 2
-            # Verify the second request carried the refreshed Authorization header
-            second_call_headers = mock_client.request.call_args_list[1].kwargs[
-                "headers"
-            ]
-            assert second_call_headers.get("Authorization") == "Bearer new_tok"
-            assert "authorization" not in second_call_headers
+    def test_empty_value_raises(self):
+        with pytest.raises(ValueError, match="resolved to an empty string"):
+            render_url_template(
+                "https://api.com/users/{{userId}}",
+                {"userId": ""},
+                None,
+                None,
+                {"userId": "string"},
+            )
+
+    def test_undeclared_placeholder_raises(self):
+        with pytest.raises(ValueError, match="is not a configured parameter"):
+            render_url_template(
+                "https://api.com/users/{{typo}}", {"typo": "123"}, None, None, {}
+            )
+
+    def test_malformed_open_brace_raises(self):
+        with pytest.raises(ValueError, match="unmatched '{{'"):
+            render_url_template("https://api.com/users/{{userId", {}, None, None, {})
+
+    def test_malformed_close_brace_raises(self):
+        with pytest.raises(ValueError, match="unmatched '}}'"):
+            render_url_template("https://api.com/users/userId}}", {}, None, None, {})
+
+    def test_nested_brace_raises(self):
+        with pytest.raises(ValueError, match="nested '{{'"):
+            render_url_template(
+                "https://api.com/users/{{{{userId}}}}", {}, None, None, {}
+            )
+
+    def test_array_param_in_url_raises(self):
+        with pytest.raises(ValueError, match="Array parameters cannot be used"):
+            render_url_template(
+                "https://api.com/users/{{ids}}",
+                {"ids": [1, 2, 3]},
+                None,
+                None,
+                {"ids": "array"},
+            )
+
+    def test_object_param_in_url_raises(self):
+        with pytest.raises(ValueError, match="Object parameters cannot be used"):
+            render_url_template(
+                "https://api.com/users/{{user}}",
+                {"user": {"id": 1}},
+                None,
+                None,
+                {"user": "object"},
+            )
+
+    def test_path_traversal_slash_is_encoded(self):
+        url, _ = render_url_template(
+            "https://api.com/users/{{userId}}",
+            {"userId": "../admin"},
+            None,
+            None,
+            {"userId": "string"},
+        )
+        assert url == "https://api.com/users/..%2Fadmin"
+
+    def test_query_injection_ampersand_is_encoded(self):
+        url, _ = render_url_template(
+            "https://api.com/users/{{userId}}",
+            {"userId": "123&evil=true"},
+            None,
+            None,
+            {"userId": "string"},
+        )
+        assert url == "https://api.com/users/123%26evil%3Dtrue"
+
+    def test_query_injection_question_mark_is_encoded(self):
+        url, _ = render_url_template(
+            "https://api.com/users/{{userId}}",
+            {"userId": "123?evil=true"},
+            None,
+            None,
+            {"userId": "string"},
+        )
+        assert url == "https://api.com/users/123%3Fevil%3Dtrue"
+
+    def test_space_in_value_is_encoded(self):
+        url, _ = render_url_template(
+            "https://api.com/users/{{userId}}",
+            {"userId": "john doe"},
+            None,
+            None,
+            {"userId": "string"},
+        )
+        assert url == "https://api.com/users/john%20doe"
+
+    def test_null_byte_is_encoded(self):
+        url, _ = render_url_template(
+            "https://api.com/users/{{userId}}",
+            {"userId": "123\x00"},
+            None,
+            None,
+            {"userId": "string"},
+        )
+        assert url == "https://api.com/users/123%00"
+
+    def test_initial_context_in_url(self):
+        url, _ = render_url_template(
+            "https://api.com/users/{{initial_context.phone}}",
+            {},
+            {"phone": "+1234567890"},
+            None,
+            {},
+        )
+        assert url == "https://api.com/users/%2B1234567890"
+
+    def test_gathered_context_in_url(self):
+        url, _ = render_url_template(
+            "https://api.com/users/{{gathered_context.email}}",
+            {},
+            None,
+            {"email": "test@example.com"},
+            {},
+        )
+        assert url == "https://api.com/users/test%40example.com"
+
+    @pytest.mark.asyncio
+    async def test_get_with_path_param_no_duplicate_query_param(self):
+        tool = MockToolModel(
+            tool_uuid="uuid",
+            name="Get User",
+            description="Get User",
+            category="http_api",
+            definition={
+                "config": {
+                    "method": "GET",
+                    "url": "https://api.com/users/{{userId}}",
+                    "parameters": [{"name": "userId", "type": "string"}],
+                }
+            },
+        )
+        with patch(
+            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
+        ) as mock_client:
+            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 200
+            mock_client.return_value.__aenter__.return_value.request.return_value.json.return_value = {}
+
+            await execute_http_tool(tool, {"userId": "123"})
+
+            mock_client.return_value.__aenter__.return_value.request.assert_called_once_with(
+                method="GET",
+                url="https://api.com/users/123",
+                headers={},
+                json=None,
+                params=None,
+            )
+
+    @pytest.mark.asyncio
+    async def test_put_cancel_url_with_path_param_no_body(self):
+        tool = MockToolModel(
+            tool_uuid="uuid",
+            name="Cancel",
+            description="Cancel",
+            category="http_api",
+            definition={
+                "config": {
+                    "method": "PUT",
+                    "url": "https://api.apaleo.com/booking/v1/reservations/{{reservationId}}/actions/cancel",
+                    "parameters": [{"name": "reservationId", "type": "string"}],
+                }
+            },
+        )
+        with patch(
+            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
+        ) as mock_client:
+            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 204
+
+            await execute_http_tool(tool, {"reservationId": "AWAEYPKI-1"})
+
+            mock_client.return_value.__aenter__.return_value.request.assert_called_once_with(
+                method="PUT",
+                url="https://api.apaleo.com/booking/v1/reservations/AWAEYPKI-1/actions/cancel",
+                headers={},
+                json={},
+                params=None,
+            )
+
+    @pytest.mark.asyncio
+    async def test_rendered_url_in_test_mode_result(self):
+        tool = MockToolModel(
+            tool_uuid="uuid",
+            name="Cancel",
+            description="Cancel",
+            category="http_api",
+            definition={
+                "config": {
+                    "method": "PUT",
+                    "url": "https://api.apaleo.com/booking/v1/reservations/{{reservationId}}/actions/cancel",
+                    "parameters": [{"name": "reservationId", "type": "string"}],
+                }
+            },
+        )
+        with patch(
+            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
+        ) as mock_client:
+            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 204
+
+            result = await execute_http_tool(
+                tool, {"reservationId": "123"}, include_request_headers=True
+            )
+            assert (
+                result.get("rendered_url")
+                == "https://api.apaleo.com/booking/v1/reservations/123/actions/cancel"
+            )
+            assert result.get("consumed_path_params") == ["reservationId"]
+
+    @pytest.mark.asyncio
+    async def test_consumed_path_params_absent_in_live_mode(self):
+        tool = MockToolModel(
+            tool_uuid="uuid",
+            name="Cancel",
+            description="Cancel",
+            category="http_api",
+            definition={
+                "config": {
+                    "method": "PUT",
+                    "url": "https://api.apaleo.com/booking/v1/reservations/{{reservationId}}/actions/cancel",
+                    "parameters": [{"name": "reservationId", "type": "string"}],
+                }
+            },
+        )
+        with patch(
+            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
+        ) as mock_client:
+            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 204
+
+            result = await execute_http_tool(
+                tool, {"reservationId": "123"}, include_request_headers=False
+            )
+            assert "rendered_url" not in result
+            assert "consumed_path_params" not in result
+
+    @pytest.mark.asyncio
+    async def test_param_in_both_url_and_body_template_works(self):
+        tool = MockToolModel(
+            tool_uuid="uuid",
+            name="Patch",
+            description="Patch",
+            category="http_api",
+            definition={
+                "config": {
+                    "method": "PATCH",
+                    "url": "https://api.com/users/{{userId}}",
+                    "body_template": {"id": "{{userId}}", "name": "test"},
+                    "parameters": [{"name": "userId", "type": "string"}],
+                }
+            },
+        )
+        with patch(
+            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
+        ) as mock_client:
+            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 200
+
+            await execute_http_tool(tool, {"userId": "123"})
+
+            mock_client.return_value.__aenter__.return_value.request.assert_called_once_with(
+                method="PATCH",
+                url="https://api.com/users/123",
+                headers={},
+                json={"id": "123", "name": "test"},
+                params=None,
+            )
+
+    def test_current_time_timezone_in_url(self):
+        url, _ = render_url_template(
+            "https://api.com/users/{{current_time_Europe/Berlin}}",
+            {},
+            None,
+            None,
+            {},
+        )
+        assert "https://api.com/users/" in url
+        # Output should be quoted datetime string. It'll have characters like %3A (encoded colon)
+        assert "%3A" in url or ":" in url
+
+    @pytest.mark.asyncio
+    async def test_delete_with_path_param(self):
+        tool = MockToolModel(
+            tool_uuid="uuid",
+            name="Delete User",
+            description="Delete User",
+            category="http_api",
+            definition={
+                "config": {
+                    "method": "DELETE",
+                    "url": "https://api.com/users/{{userId}}",
+                    "parameters": [{"name": "userId", "type": "string"}],
+                }
+            },
+        )
+        with patch(
+            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
+        ) as mock_client:
+            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 204
+
+            await execute_http_tool(tool, {"userId": "123"})
+
+            mock_client.return_value.__aenter__.return_value.request.assert_called_once_with(
+                method="DELETE",
+                url="https://api.com/users/123",
+                headers={},
+                json=None,
+                params=None,
+            )
+
+    @pytest.mark.asyncio
+    async def test_consumed_path_params_in_test_mode_result(self):
+        tool = MockToolModel(
+            tool_uuid="uuid",
+            name="Get User",
+            description="Get User",
+            category="http_api",
+            definition={
+                "config": {
+                    "method": "GET",
+                    "url": "https://api.com/users/{{userId}}",
+                    "parameters": [{"name": "userId", "type": "string"}],
+                }
+            },
+        )
+        with patch(
+            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
+        ) as mock_client:
+            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 200
+            mock_client.return_value.__aenter__.return_value.request.return_value.json.return_value = {}
+
+            result = await execute_http_tool(
+                tool, {"userId": "123"}, include_request_headers=True
+            )
+            assert result.get("consumed_path_params") == ["userId"]

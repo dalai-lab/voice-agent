@@ -1,12 +1,11 @@
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing import Any
 
 import redis.asyncio as aioredis
-from loguru import logger
-
 from api.constants import REDIS_URL
+from loguru import logger
 
 # Fleet-wide mirror of every live slot ("<org_id>:<slot_id>", scored by acquire
 # time), maintained by the acquire/release paths alongside the per-org sets so
@@ -26,7 +25,7 @@ class RateLimiter:
     """Sliding window rate limiter to enforce strict per-second limits and concurrent call limits"""
 
     def __init__(self):
-        self.redis_client: Optional[aioredis.Redis] = None
+        self.redis_client: aioredis.Redis | None = None
         self.stale_call_timeout = 1200  # 20 minutes in seconds
 
     async def _get_redis(self) -> Any:
@@ -118,7 +117,7 @@ class RateLimiter:
 
     async def try_acquire_concurrent_slot(
         self, organization_id: int, max_concurrent: int = 20
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Try to acquire a concurrent call slot.
         Returns a unique slot_id if successful, None if limit reached.
@@ -135,7 +134,7 @@ class RateLimiter:
         *,
         scope_key: str | None = None,
         scope_max_concurrent: int | None = None,
-    ) -> Optional[ConcurrentSlotAcquisition]:
+    ) -> ConcurrentSlotAcquisition | None:
         """
         Try to acquire a concurrent call slot.
         Returns the slot_id and post-acquire active count if successful,
@@ -379,7 +378,7 @@ class RateLimiter:
 
     async def get_workflow_slot_mapping(
         self, workflow_run_id: int
-    ) -> Optional[tuple[int, str, str | None]]:
+    ) -> tuple[int, str, str | None] | None:
         """
         Get the concurrent slot mapping for a workflow run.
         Returns (organization_id, slot_id, scope_key) or None if not found;
@@ -455,7 +454,7 @@ class RateLimiter:
 
     async def acquire_from_number(
         self, organization_id: int, telephony_configuration_id: int | None
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Atomically acquire an available from_number from the pool for the given
         (organization_id, telephony_configuration_id).
@@ -625,7 +624,7 @@ class RateLimiter:
 
     async def get_workflow_from_number_mapping(
         self, workflow_run_id: int
-    ) -> Optional[tuple[int, str, int | None]]:
+    ) -> tuple[int, str, int | None] | None:
         """
         Get the from_number mapping for a workflow run.
         Returns (organization_id, from_number, telephony_configuration_id) or

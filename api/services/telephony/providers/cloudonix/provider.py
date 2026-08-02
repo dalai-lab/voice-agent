@@ -4,13 +4,10 @@ Cloudonix implementation of the TelephonyProvider interface.
 
 import asyncio
 import json
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 import aiohttp
-from fastapi import HTTPException
-from loguru import logger
-
 from api.db import db_client
 from api.enums import TelephonyCallStatus, WorkflowRunMode
 from api.services.telephony import ws_auth
@@ -24,6 +21,8 @@ from api.services.telephony.base import (
 from api.services.workflow.initial_context import merge_external_initial_context
 from api.utils.common import get_backend_endpoints
 from api.utils.telephony_address import normalize_telephony_address
+from fastapi import HTTPException
+from loguru import logger
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -45,7 +44,7 @@ class CloudonixProvider(TelephonyProvider):
     PROVIDER_NAME = WorkflowRunMode.CLOUDONIX.value
     WEBHOOK_ENDPOINT = "twiml"  # Cloudonix is TwiML-compatible
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """
         Initialize CloudonixProvider with configuration.
 
@@ -70,7 +69,7 @@ class CloudonixProvider(TelephonyProvider):
         self.base_url = CLOUDONIX_API_BASE_URL
 
     @staticmethod
-    def _normalize_domain(domain: Optional[str]) -> Optional[str]:
+    def _normalize_domain(domain: str | None) -> str | None:
         """Ensure a Cloudonix domain is fully qualified.
 
         Cloudonix domains are always of the form ``<name>.cloudonix.net``.
@@ -87,7 +86,7 @@ class CloudonixProvider(TelephonyProvider):
             return domain
         return f"{domain}.cloudonix.net"
 
-    def _get_auth_headers(self) -> Dict[str, str]:
+    def _get_auth_headers(self) -> dict[str, str]:
         """Generate authorization headers for Cloudonix API."""
         return {
             "Authorization": f"Bearer {self.bearer_token}",
@@ -98,8 +97,8 @@ class CloudonixProvider(TelephonyProvider):
         self,
         to_number: str,
         webhook_url: str,
-        workflow_run_id: Optional[int] = None,
-        from_number: Optional[str] = None,
+        workflow_run_id: int | None = None,
+        from_number: str | None = None,
         **kwargs: Any,
     ) -> CallInitiationResult:
         """
@@ -135,7 +134,7 @@ class CloudonixProvider(TelephonyProvider):
         ws_url = ws_auth.build_media_ws_url(
             wss_backend_endpoint, workflow_id, organization_id, workflow_run_id
         )
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "destination": to_number,
             "cxml": f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -240,7 +239,7 @@ class CloudonixProvider(TelephonyProvider):
                     raw_response=response_data,
                 )
 
-    async def get_call_status(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_status(self, call_id: str) -> dict[str, Any]:
         """
         Get the current status of a Cloudonix call (session).
 
@@ -265,7 +264,7 @@ class CloudonixProvider(TelephonyProvider):
 
                 return await response.json()
 
-    async def get_available_phone_numbers(self) -> List[str]:
+    async def get_available_phone_numbers(self) -> list[str]:
         """
         Get list of available Cloudonix phone numbers (DNIDs).
         """
@@ -314,7 +313,7 @@ class CloudonixProvider(TelephonyProvider):
         return bool(self.bearer_token and self.domain_id)
 
     async def verify_webhook_signature(
-        self, url: str, params: Dict[str, Any], signature: str
+        self, url: str, params: dict[str, Any], signature: str
     ) -> bool:
         """
         Dummy implementation - Cloudonix doesn't use webhook signature verification.
@@ -331,7 +330,7 @@ class CloudonixProvider(TelephonyProvider):
         )
         return True
 
-    async def get_call_cost(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_cost(self, call_id: str) -> dict[str, Any]:
         """
         Get cost information for a completed Cloudonix call.
 
@@ -355,7 +354,7 @@ class CloudonixProvider(TelephonyProvider):
             "error": "Cloudonix does not support cost retrieval",
         }
 
-    def parse_status_callback(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_status_callback(self, data: dict[str, Any]) -> dict[str, Any]:
         """
         Parse Cloudonix status callback data into generic format.
 
@@ -392,7 +391,7 @@ class CloudonixProvider(TelephonyProvider):
         }
 
     @staticmethod
-    def parse_cdr_status_callback(data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_cdr_status_callback(data: dict[str, Any]) -> dict[str, Any]:
         """Parse Cloudonix CDR data into generic status callback format."""
         disposition_map = {
             "ANSWER": TelephonyCallStatus.COMPLETED,
@@ -529,7 +528,7 @@ class CloudonixProvider(TelephonyProvider):
         organization_id: int,
         workflow_id: int,
         workflow_run_id: int,
-        params: Dict[str, str],
+        params: dict[str, str],
     ) -> None:
         """Agent-stream entry point.
 
@@ -566,7 +565,7 @@ class CloudonixProvider(TelephonyProvider):
                         timeout=AGENT_STREAM_HANDSHAKE_TIMEOUT_S,
                     )
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(
                     f"Cloudonix agent-stream handshake timed out for workflow_run "
                     f"{workflow_run_id}"
@@ -763,7 +762,7 @@ class CloudonixProvider(TelephonyProvider):
 
     @classmethod
     def can_handle_webhook(
-        cls, webhook_data: Dict[str, Any], headers: Dict[str, str]
+        cls, webhook_data: dict[str, Any], headers: dict[str, str]
     ) -> bool:
         """
         Determine if this provider can handle the incoming webhook.
@@ -799,7 +798,7 @@ class CloudonixProvider(TelephonyProvider):
         return False
 
     @staticmethod
-    def parse_inbound_webhook(webhook_data: Dict[str, Any]) -> NormalizedInboundData:
+    def parse_inbound_webhook(webhook_data: dict[str, Any]) -> NormalizedInboundData:
         """
         Parse Cloudonix-specific inbound webhook data into normalized format.
 
@@ -873,8 +872,8 @@ class CloudonixProvider(TelephonyProvider):
     async def verify_inbound_signature(
         self,
         url: str,
-        webhook_data: Dict[str, Any],
-        headers: Dict[str, str],
+        webhook_data: dict[str, Any],
+        headers: dict[str, str],
         body: str = "",
     ) -> bool:
         """
@@ -907,7 +906,7 @@ class CloudonixProvider(TelephonyProvider):
         return True  # TODO: update this post clarification from cloudonix
 
     async def configure_inbound(
-        self, address: str, webhook_url: Optional[str]
+        self, address: str, webhook_url: str | None
     ) -> ProviderSyncResult:
         """Update the ``url`` on the Cloudonix Voice Application.
 
@@ -950,21 +949,20 @@ class CloudonixProvider(TelephonyProvider):
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.patch(
-                    app_endpoint, json=data, headers=self._get_auth_headers()
-                ) as response:
-                    if response.status != 200:
-                        body = await response.text()
-                        logger.error(
-                            f"Cloudonix Voice Application update failed for "
-                            f"{self.application_name} on domain "
-                            f"{self.domain_id}: {response.status} {body}"
-                        )
-                        return ProviderSyncResult(
-                            ok=False,
-                            message=f"Cloudonix API {response.status}: {body}",
-                        )
+            async with aiohttp.ClientSession() as session, session.patch(
+                app_endpoint, json=data, headers=self._get_auth_headers()
+            ) as response:
+                if response.status != 200:
+                    body = await response.text()
+                    logger.error(
+                        f"Cloudonix Voice Application update failed for "
+                        f"{self.application_name} on domain "
+                        f"{self.domain_id}: {response.status} {body}"
+                    )
+                    return ProviderSyncResult(
+                        ok=False,
+                        message=f"Cloudonix API {response.status}: {body}",
+                    )
         except Exception as e:
             logger.error(
                 f"Exception updating Cloudonix Voice Application "
@@ -994,25 +992,24 @@ class CloudonixProvider(TelephonyProvider):
             f"{encoded_address}"
         )
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    endpoint, headers=self._get_auth_headers()
-                ) as response:
-                    if response.status == 404:
-                        return ProviderSyncResult(
-                            ok=False,
-                            message=(
-                                f"Address {expected} is not configured as a DNID "
-                                f"in Cloudonix domain {self.domain_id}. Add it in "
-                                "the Cloudonix Cockpit first."
-                            ),
-                        )
-                    if response.status != 200:
-                        body = await response.text()
-                        raise ProviderPhoneNumberLookupError(
-                            f"Cloudonix API {response.status}: {body}"
-                        )
-                    data = await response.json()
+            async with aiohttp.ClientSession() as session, session.get(
+                endpoint, headers=self._get_auth_headers()
+            ) as response:
+                if response.status == 404:
+                    return ProviderSyncResult(
+                        ok=False,
+                        message=(
+                            f"Address {expected} is not configured as a DNID "
+                            f"in Cloudonix domain {self.domain_id}. Add it in "
+                            "the Cloudonix Cockpit first."
+                        ),
+                    )
+                if response.status != 200:
+                    body = await response.text()
+                    raise ProviderPhoneNumberLookupError(
+                        f"Cloudonix API {response.status}: {body}"
+                    )
+                data = await response.json()
         except ProviderPhoneNumberLookupError:
             raise
         except Exception as e:
@@ -1080,9 +1077,8 @@ class CloudonixProvider(TelephonyProvider):
 
         Since Cloudonix is TwiML-compatible, we use the same XML format.
         """
-        from fastapi import Response
-
         from api.errors.telephony_errors import TELEPHONY_ERROR_MESSAGES, TelephonyError
+        from fastapi import Response
 
         message = TELEPHONY_ERROR_MESSAGES.get(
             error_type, TELEPHONY_ERROR_MESSAGES[TelephonyError.GENERAL_AUTH_FAILED]
@@ -1155,7 +1151,7 @@ class CloudonixProvider(TelephonyProvider):
         conference_name: str,
         timeout: int = 30,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Dial the transfer destination into a conference via Cloudonix.
 
         Places an outbound call whose inline CXML joins ``conference_name`` when
@@ -1183,7 +1179,7 @@ class CloudonixProvider(TelephonyProvider):
         callback_url = f"{backend_endpoint}/api/v1/telephony/cloudonix/transfer-result/{transfer_id}"
 
         endpoint = f"{self.base_url}/calls/{self.domain_id}/application"
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "destination": destination,
             "caller-id": from_number,
             "cxml": self._conference_join_cxml(conference_name, callback_url),

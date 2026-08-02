@@ -1,17 +1,17 @@
-import asyncio
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 
 from api.db import db_client
 from api.db.models import (
-    ScheduledCallbackModel,
+    CampaignModel,
     QueuedRunModel,
+    ScheduledCallbackModel,
     UserModel,
     WorkflowModel,
-    CampaignModel
 )
 from api.services.auth.depends import get_user
 
@@ -21,38 +21,38 @@ class UnifiedCallbackItem(BaseModel):
     id: int
     source: str
     status: str
-    scheduled_for: Optional[datetime]
-    fires_in_seconds: Optional[int]
-    was_late_seconds: Optional[int]
-    to_number: Optional[str]
-    from_number: Optional[str]
-    conversation_summary: Optional[str]
+    scheduled_for: datetime | None
+    fires_in_seconds: int | None
+    was_late_seconds: int | None
+    to_number: str | None
+    from_number: str | None
+    conversation_summary: str | None
     callback_chain_depth: int
-    workflow_id: Optional[int]
-    workflow_name: Optional[str]
-    campaign_id: Optional[int]
-    campaign_name: Optional[str]
-    original_run_id: Optional[int]
-    created_at: Optional[datetime]
+    workflow_id: int | None
+    workflow_name: str | None
+    campaign_id: int | None
+    campaign_name: str | None
+    original_run_id: int | None
+    created_at: datetime | None
 
 class UnifiedCallbackListResponse(BaseModel):
-    items: List[UnifiedCallbackItem]
+    items: list[UnifiedCallbackItem]
     total: int
     has_more: bool
 
 @router.get("", response_model=UnifiedCallbackListResponse)
 async def list_callbacks(
-    status: Optional[str] = Query(None, description="Filter by status (e.g. pending, completed, failed, cancelled)"),
+    status: str | None = Query(None, description="Filter by status (e.g. pending, completed, failed, cancelled)"),
     source: str = Query("all", description="Source of callback: all, standalone, campaign"),
-    campaign_id: Optional[int] = Query(None),
-    workflow_id: Optional[int] = Query(None),
+    campaign_id: int | None = Query(None),
+    workflow_id: int | None = Query(None),
     limit: int = Query(50, le=200),
     offset: int = Query(0),
     user: UserModel = Depends(get_user),
 ) -> Any:
     """Get all scheduled callbacks for the organization."""
     org_id = user.selected_organization_id
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     
     standalone_items = []
     campaign_items = []
@@ -180,7 +180,7 @@ async def list_callbacks(
             created_at=qr.created_at
         ))
         
-    merged.sort(key=lambda x: x.scheduled_for or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    merged.sort(key=lambda x: x.scheduled_for or datetime.min.replace(tzinfo=UTC), reverse=True)
     
     total = len(merged)
     paginated = merged[offset:offset+limit]
@@ -191,7 +191,7 @@ async def list_callbacks(
         has_more=len(merged) > offset + limit
     )
 
-@router.delete("/{callback_id}", response_model=Dict[str, Any])
+@router.delete("/{callback_id}", response_model=dict[str, Any])
 async def cancel_callback(
     callback_id: int,
     source: str = Query("standalone"),

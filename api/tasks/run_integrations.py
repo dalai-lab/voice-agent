@@ -2,7 +2,7 @@
 
 import random
 from datetime import UTC, datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from loguru import logger
 from pipecat.utils.enums import EndTaskReason
@@ -71,13 +71,13 @@ async def _run_qa_nodes(
     workflow_run_id: int,
     workflow_definition: dict,
     definition_id: int | None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run QA analysis for each enabled QA node and aggregate results.
 
     Returns:
         Dict keyed by node ID with QA analysis results.
     """
-    results: Dict[str, Any] = {}
+    results: dict[str, Any] = {}
 
     for node in qa_nodes:
         node_id = node.get("id", "unknown")
@@ -127,7 +127,7 @@ async def _run_qa_nodes(
 async def _update_usage_info_with_qa_tokens(
     workflow_run_id: int,
     workflow_run: WorkflowRunModel,
-    qa_results: Dict[str, Any],
+    qa_results: dict[str, Any],
 ) -> None:
     """Add QA analysis LLM token usage to the workflow run's usage_info."""
     try:
@@ -358,8 +358,8 @@ async def run_integrations_post_workflow_run(_ctx, workflow_run_id: int):
 
 
 def _build_render_context(
-    workflow_run: WorkflowRunModel, public_token: Optional[str] = None
-) -> Dict[str, Any]:
+    workflow_run: WorkflowRunModel, public_token: str | None = None
+) -> dict[str, Any]:
     """Build the context dict for template rendering.
 
     Args:
@@ -418,7 +418,7 @@ def _build_render_context(
 
 
 def _build_webhook_payload(
-    webhook_data: WebhookNodeData, render_context: Dict[str, Any]
+    webhook_data: WebhookNodeData, render_context: dict[str, Any]
 ) -> Any:
     """Render the webhook payload once, so retries are deterministic.
 
@@ -489,7 +489,7 @@ def _safe_custom_headers(
 
 async def _enqueue_webhook_delivery(
     webhook_data: WebhookNodeData,
-    render_context: Dict[str, Any],
+    render_context: dict[str, Any],
     organization_id: int,
     workflow_run_id: int,
     webhook_node_id: str,

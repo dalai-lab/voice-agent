@@ -9,18 +9,16 @@ Spec §5.2 interface: module-level functions get_or_fetch_token() and invalidate
 
 import asyncio
 import time
-from typing import Optional
 
 import cachetools
 import httpx
 import redis.asyncio as aioredis
-from loguru import logger
-
 from api.constants import REDIS_URL
 from api.utils.url_security import (
     get_pinned_httpx_transport,
     validate_user_configured_service_url,
 )
+from loguru import logger
 
 _MIN_TTL = 30  # Floor: never cache for less than 30s
 _EXPIRY_MARGIN = 60  # Pre-expire: refresh 60s before real expiry
@@ -28,7 +26,7 @@ _FETCH_TIMEOUT = 10.0  # Token endpoint timeout in seconds
 _locks: cachetools.TTLCache[str, asyncio.Lock] = cachetools.TTLCache(
     maxsize=1000, ttl=3600
 )
-_redis_client: Optional[aioredis.Redis] = None
+_redis_client: aioredis.Redis | None = None
 
 
 def _get_redis() -> aioredis.Redis:
@@ -62,8 +60,8 @@ async def get_or_fetch_token(
     client_id: str,
     client_secret: str,
     token_url: str,
-    scope: Optional[str] = None,
-    audience: Optional[str] = None,
+    scope: str | None = None,
+    audience: str | None = None,
     force_refresh: bool = False,
 ) -> str:
     """Return a valid access token, using Redis cache when possible.
@@ -201,8 +199,8 @@ class OAuth2TokenCache:
         token_url: str,
         client_id: str,
         client_secret: str,
-        scope: Optional[str] = None,
-        audience: Optional[str] = None,
+        scope: str | None = None,
+        audience: str | None = None,
     ) -> str:
         return await get_or_fetch_token(
             credential_uuid=credential_uuid,
@@ -222,8 +220,8 @@ async def _fetch_token(
     client_id: str,
     client_secret: str,
     token_url: str,
-    scope: Optional[str],
-    audience: Optional[str],
+    scope: str | None,
+    audience: str | None,
 ) -> tuple[str, int]:
     """POST to token_url and return (access_token, expires_in).
 

@@ -8,7 +8,7 @@ the root api/conftest.py. This module provides lightweight, non-DB fixtures:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -80,7 +80,7 @@ class MockWorkflowModel:
 
     workflow_id: int = 1
     organization_id: int = 1
-    workflow_configurations: Dict[str, Any] = field(default_factory=dict)
+    workflow_configurations: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -91,8 +91,8 @@ class MockWorkflowRun:
     """
 
     is_completed: bool = False
-    initial_context: Dict[str, Any] = field(default_factory=dict)
-    gathered_context: Dict[str, Any] = field(default_factory=dict)
+    initial_context: dict[str, Any] = field(default_factory=dict)
+    gathered_context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -102,10 +102,10 @@ class MockUserConfig:
     Use this when mocking db_client.get_user_configurations() responses.
     """
 
-    stt: Optional[Any] = None
-    tts: Optional[Any] = None
-    llm: Optional[Any] = None
-    embeddings: Optional[Any] = None
+    stt: Any | None = None
+    tts: Any | None = None
+    llm: Any | None = None
+    embeddings: Any | None = None
 
 
 @dataclass
@@ -115,7 +115,7 @@ class MockToolModel:
     tool_uuid: str
     name: str
     description: str
-    definition: Dict[str, Any]
+    definition: dict[str, Any]
     category: str = "http_api"
 
 

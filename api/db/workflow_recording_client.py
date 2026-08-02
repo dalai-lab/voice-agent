@@ -2,7 +2,6 @@
 
 import secrets
 import string
-from typing import List, Optional
 
 from loguru import logger
 from sqlalchemy import func, select, text
@@ -28,11 +27,11 @@ class WorkflowRecordingClient(BaseDBClient):
         storage_key: str,
         storage_backend: str,
         created_by: int,
-        workflow_id: Optional[int] = None,
-        tts_provider: Optional[str] = None,
-        tts_model: Optional[str] = None,
-        tts_voice_id: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        workflow_id: int | None = None,
+        tts_provider: str | None = None,
+        tts_model: str | None = None,
+        tts_voice_id: str | None = None,
+        metadata: dict | None = None,
     ) -> WorkflowRecordingModel:
         """Create a new workflow recording record.
 
@@ -77,11 +76,11 @@ class WorkflowRecordingClient(BaseDBClient):
     async def get_recordings(
         self,
         organization_id: int,
-        workflow_id: Optional[int] = None,
-        tts_provider: Optional[str] = None,
-        tts_model: Optional[str] = None,
-        tts_voice_id: Optional[str] = None,
-    ) -> List[WorkflowRecordingModel]:
+        workflow_id: int | None = None,
+        tts_provider: str | None = None,
+        tts_model: str | None = None,
+        tts_voice_id: str | None = None,
+    ) -> list[WorkflowRecordingModel]:
         """Get recordings for an organization, optionally filtered.
 
         Args:
@@ -118,7 +117,7 @@ class WorkflowRecordingClient(BaseDBClient):
         self,
         recording_id: str,
         organization_id: int,
-    ) -> Optional[WorkflowRecordingModel]:
+    ) -> WorkflowRecordingModel | None:
         """Get a recording by its short ID.
 
         Args:
@@ -142,7 +141,7 @@ class WorkflowRecordingClient(BaseDBClient):
         self,
         id: int,
         organization_id: int,
-    ) -> Optional[WorkflowRecordingModel]:
+    ) -> WorkflowRecordingModel | None:
         """Get a recording by its integer primary key.
 
         Args:
@@ -212,7 +211,7 @@ class WorkflowRecordingClient(BaseDBClient):
         id: int,
         new_recording_id: str,
         organization_id: int,
-    ) -> Optional[WorkflowRecordingModel]:
+    ) -> WorkflowRecordingModel | None:
         """Update the recording_id of a recording.
 
         Args:

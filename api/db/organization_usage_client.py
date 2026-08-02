@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from dateutil.relativedelta import relativedelta
@@ -125,11 +124,11 @@ class OrganizationUsageClient(BaseDBClient):
     async def get_usage_history(
         self,
         organization_id: int,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
         limit: int = 50,
         offset: int = 0,
-        filters: Optional[list[dict]] = None,
+        filters: list[dict] | None = None,
     ) -> tuple[list[dict], int, float, int]:
         """Get paginated workflow runs with usage for an organization."""
         async with self.async_session() as session:
@@ -248,9 +247,9 @@ class OrganizationUsageClient(BaseDBClient):
     async def get_usage_runs_for_report(
         self,
         organization_id: int,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        filters: Optional[list[dict]] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        filters: list[dict] | None = None,
     ) -> list:
         """Get filtered runs for an organization-scoped usage CSV report.
 
@@ -405,7 +404,7 @@ class OrganizationUsageClient(BaseDBClient):
 
     def _calculate_current_period(self) -> tuple[datetime, datetime]:
         """Calculate the current calendar-month reporting period."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         period_end = period_start + relativedelta(months=1) - relativedelta(seconds=1)

@@ -1,14 +1,13 @@
 """Service layer for credential management operations and cache invalidation."""
 
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
-
-from fastapi import HTTPException
 
 from api.db import db_client
 from api.db.models import ExternalCredentialModel
 from api.enums import WebhookCredentialType
 from api.services.oauth2_token_cache import invalidate_token
+from fastapi import HTTPException
 
 
 def validate_credential_data(
@@ -81,11 +80,11 @@ def validate_credential_data(
 async def update_credential_with_invalidation(
     credential_uuid: str,
     organization_id: int,
-    name: Optional[str] = None,
-    description: Optional[str] = None,
-    credential_type: Optional[WebhookCredentialType] = None,
-    credential_data: Optional[dict[str, Any]] = None,
-) -> Optional[ExternalCredentialModel]:
+    name: str | None = None,
+    description: str | None = None,
+    credential_type: WebhookCredentialType | None = None,
+    credential_data: dict[str, Any] | None = None,
+) -> ExternalCredentialModel | None:
     """Validate, update a credential in the DB, and invalidate its OAuth token cache if needed.
 
     Reuses one scoped DB read for existence check, effective-type validation, and cache invalidation.

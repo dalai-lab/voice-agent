@@ -1,6 +1,5 @@
 """Database client for managing agent triggers."""
 
-from typing import List, Optional
 
 from loguru import logger
 from sqlalchemy import and_, insert, select, update
@@ -17,7 +16,7 @@ class TriggerPathConflictError(Exception):
     cross-org — surfaces here.
     """
 
-    def __init__(self, trigger_paths: List[str]):
+    def __init__(self, trigger_paths: list[str]):
         self.trigger_paths = list(trigger_paths)
         joined = ", ".join(self.trigger_paths)
         super().__init__(f"Trigger path(s) already in use by another agent: {joined}")
@@ -28,7 +27,7 @@ class AgentTriggerClient(BaseDBClient):
 
     async def get_agent_trigger_by_path(
         self, trigger_path: str, active_only: bool = True
-    ) -> Optional[AgentTriggerModel]:
+    ) -> AgentTriggerModel | None:
         """Get an agent trigger by its globally unique path (UUID).
 
         Args:
@@ -53,9 +52,9 @@ class AgentTriggerClient(BaseDBClient):
 
     async def check_trigger_path_conflicts(
         self,
-        trigger_paths: List[str],
-        exclude_workflow_id: Optional[int] = None,
-    ) -> List[str]:
+        trigger_paths: list[str],
+        exclude_workflow_id: int | None = None,
+    ) -> list[str]:
         """Return any trigger paths already in use by a different workflow.
 
         Archived triggers count as conflicts — we never silently repurpose
@@ -85,8 +84,8 @@ class AgentTriggerClient(BaseDBClient):
 
     async def assert_trigger_paths_available(
         self,
-        trigger_paths: List[str],
-        exclude_workflow_id: Optional[int] = None,
+        trigger_paths: list[str],
+        exclude_workflow_id: int | None = None,
     ) -> None:
         """Raise TriggerPathConflictError if any path is already in use."""
         conflicts = await self.check_trigger_path_conflicts(
@@ -97,7 +96,7 @@ class AgentTriggerClient(BaseDBClient):
             raise TriggerPathConflictError(conflicts)
 
     async def sync_triggers_for_workflow(
-        self, workflow_id: int, organization_id: int, trigger_paths: List[str]
+        self, workflow_id: int, organization_id: int, trigger_paths: list[str]
     ) -> None:
         """Sync triggers for a workflow based on the trigger nodes in the workflow definition.
 

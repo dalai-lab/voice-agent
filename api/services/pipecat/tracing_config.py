@@ -1,15 +1,15 @@
 import base64
 
-from loguru import logger
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace import SpanProcessor
-from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
-
 from api.constants import (
     LANGFUSE_HOST,
     LANGFUSE_PUBLIC_KEY,
     LANGFUSE_SECRET_KEY,
 )
+from loguru import logger
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import SpanProcessor
+from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+
 from pipecat.utils.run_context import get_current_org_id
 from pipecat.utils.tracing.setup import setup_tracing
 

@@ -1,7 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
-
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from typing import Any, Literal, Union
 
 from api.services.integrations import (
     all_packages,
@@ -20,6 +18,7 @@ from api.services.workflow.node_specs._base import (
 )
 from api.services.workflow.node_specs.constants import DEFAULT_QA_SYSTEM_PROMPT
 from api.services.workflow.node_specs.model_spec import node_spec, spec_field
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 
 class NodeType(str, Enum):
@@ -64,7 +63,7 @@ class ExtractionVariableDTO(BaseModel):
         ],
         spec_default="string",
     )
-    prompt: Optional[str] = spec_field(
+    prompt: str | None = spec_field(
         default=None,
         ui_type=PropertyType.string,
         display_name="Extraction Hint",
@@ -101,7 +100,7 @@ class CustomHeaderDTO(BaseModel):
 
 
 class _PromptedNodeDataMixin(BaseModel):
-    prompt: Optional[str] = spec_field(
+    prompt: str | None = spec_field(
         default=None,
         ui_type=PropertyType.mention_textarea,
         display_name="Prompt",
@@ -133,7 +132,7 @@ class _ExtractionNodeDataMixin(BaseModel):
         display_name="Enable Variable Extraction",
         description="When true, runs an LLM extraction pass for this node.",
     )
-    extraction_prompt: Optional[str] = spec_field(
+    extraction_prompt: str | None = spec_field(
         default=None,
         ui_type=PropertyType.string,
         display_name="Extraction Prompt",
@@ -141,7 +140,7 @@ class _ExtractionNodeDataMixin(BaseModel):
         display_options=DisplayOptions(show={"extraction_enabled": [True]}),
         editor="textarea",
     )
-    extraction_variables: Optional[list[ExtractionVariableDTO]] = spec_field(
+    extraction_variables: list[ExtractionVariableDTO] | None = spec_field(
         default=None,
         display_name="Variables to Extract",
         description=(
@@ -153,21 +152,21 @@ class _ExtractionNodeDataMixin(BaseModel):
 
 
 class _ToolDocumentRefsMixin(BaseModel):
-    tool_uuids: Optional[List[str]] = spec_field(
+    tool_uuids: list[str] | None = spec_field(
         default=None,
         ui_type=PropertyType.tool_refs,
         display_name="Tools",
         description="Tools this node can invoke.",
         llm_hint="List of tool UUIDs from `list_tools`.",
     )
-    document_uuids: Optional[List[str]] = spec_field(
+    document_uuids: list[str] | None = spec_field(
         default=None,
         ui_type=PropertyType.document_refs,
         display_name="Knowledge Base Documents",
         description="Documents this node can reference.",
         llm_hint="List of document UUIDs from `list_documents`.",
     )
-    mcp_tool_filters: Optional[Dict[str, List[str]]] = spec_field(
+    mcp_tool_filters: dict[str, list[str]] | None = spec_field(
         default=None,
         spec_exclude=True,
     )
@@ -323,24 +322,24 @@ class StartCallNodeData(
     _ToolDocumentRefsMixin,
 ):
     is_start: bool = spec_field(default=True, spec_exclude=True)
-    greeting: Optional[str] = spec_field(default=None, ui_type=PropertyType.string)
-    greeting_type: Optional[str] = spec_field(
+    greeting: str | None = spec_field(default=None, ui_type=PropertyType.string)
+    greeting_type: str | None = spec_field(
         default=None, ui_type=PropertyType.options
     )
-    greeting_recording_id: Optional[str] = spec_field(
+    greeting_recording_id: str | None = spec_field(
         default=None, ui_type=PropertyType.recording_ref
     )
     delayed_start: bool = spec_field(default=False, ui_type=PropertyType.boolean)
-    delayed_start_duration: Optional[float] = spec_field(
+    delayed_start_duration: float | None = spec_field(
         default=None, ui_type=PropertyType.number
     )
     pre_call_fetch_enabled: bool = spec_field(
         default=False, ui_type=PropertyType.boolean
     )
-    pre_call_fetch_url: Optional[str] = spec_field(
+    pre_call_fetch_url: str | None = spec_field(
         default=None, ui_type=PropertyType.url
     )
-    pre_call_fetch_credential_uuid: Optional[str] = spec_field(
+    pre_call_fetch_credential_uuid: str | None = spec_field(
         default=None, ui_type=PropertyType.credential_ref
     )
 
@@ -633,7 +632,7 @@ class GlobalNodeData(BaseNodeData, _PromptedNodeDataMixin):
     },
 )
 class TriggerNodeData(BaseNodeData):
-    trigger_path: Optional[str] = spec_field(default=None, ui_type=PropertyType.string)
+    trigger_path: str | None = spec_field(default=None, ui_type=PropertyType.string)
     enabled: bool = spec_field(default=True, ui_type=PropertyType.boolean)
 
 
@@ -736,13 +735,13 @@ class TriggerNodeData(BaseNodeData):
 )
 class WebhookNodeData(BaseNodeData):
     enabled: bool = spec_field(default=True, ui_type=PropertyType.boolean)
-    http_method: Optional[str] = spec_field(default=None, ui_type=PropertyType.options)
-    endpoint_url: Optional[str] = spec_field(default=None, ui_type=PropertyType.url)
-    credential_uuid: Optional[str] = spec_field(
+    http_method: str | None = spec_field(default=None, ui_type=PropertyType.options)
+    endpoint_url: str | None = spec_field(default=None, ui_type=PropertyType.url)
+    credential_uuid: str | None = spec_field(
         default=None, ui_type=PropertyType.credential_ref
     )
-    custom_headers: Optional[list[CustomHeaderDTO]] = spec_field(default=None)
-    payload_template: Optional[dict] = spec_field(
+    custom_headers: list[CustomHeaderDTO] | None = spec_field(default=None)
+    payload_template: dict | None = spec_field(
         default=None, ui_type=PropertyType.json
     )
 
@@ -873,11 +872,11 @@ class WebhookNodeData(BaseNodeData):
 class QANodeData(BaseNodeData):
     qa_enabled: bool = spec_field(default=True, ui_type=PropertyType.boolean)
     qa_use_workflow_llm: bool = spec_field(default=True, ui_type=PropertyType.boolean)
-    qa_provider: Optional[str] = spec_field(default=None, ui_type=PropertyType.options)
-    qa_model: Optional[str] = spec_field(default=None, ui_type=PropertyType.string)
-    qa_api_key: Optional[str] = spec_field(default=None, ui_type=PropertyType.string)
-    qa_endpoint: Optional[str] = spec_field(default=None, ui_type=PropertyType.url)
-    qa_system_prompt: Optional[str] = spec_field(
+    qa_provider: str | None = spec_field(default=None, ui_type=PropertyType.options)
+    qa_model: str | None = spec_field(default=None, ui_type=PropertyType.string)
+    qa_api_key: str | None = spec_field(default=None, ui_type=PropertyType.string)
+    qa_endpoint: str | None = spec_field(default=None, ui_type=PropertyType.url)
+    qa_system_prompt: str | None = spec_field(
         default=None, ui_type=PropertyType.string
     )
     qa_min_call_duration: int = spec_field(default=15, ui_type=PropertyType.number)
@@ -1016,9 +1015,9 @@ class RFNodeDTO(_RFNodeBase):
 class EdgeDataDTO(BaseModel):
     label: str = Field(..., min_length=1)
     condition: str = Field(..., min_length=1)
-    transition_speech: Optional[str] = None
-    transition_speech_type: Optional[str] = None  # 'text' or 'audio'
-    transition_speech_recording_id: Optional[str] = None
+    transition_speech: str | None = None
+    transition_speech_type: str | None = None  # 'text' or 'audio'
+    transition_speech_recording_id: str | None = None
 
 
 class RFEdgeDTO(BaseModel):
@@ -1029,8 +1028,8 @@ class RFEdgeDTO(BaseModel):
 
 
 class ReactFlowDTO(BaseModel):
-    nodes: List[RFNodeDTO]
-    edges: List[RFEdgeDTO]
+    nodes: list[RFNodeDTO]
+    edges: list[RFEdgeDTO]
 
     @model_validator(mode="after")
     def _referential_integrity(self):

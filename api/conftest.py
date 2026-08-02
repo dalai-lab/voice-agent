@@ -12,10 +12,10 @@ References:
 """
 
 import os
+from collections.abc import AsyncGenerator
 
 # Load environment variables before importing anything else
 from pathlib import Path
-from typing import AsyncGenerator
 from urllib.parse import urlparse, urlunparse
 
 from dotenv import load_dotenv
@@ -35,7 +35,7 @@ SDK_PY_SRC = REPO_ROOT / "sdk" / "python" / "src"
 if str(SDK_PY_SRC) not in sys.path:
     sys.path.insert(0, str(SDK_PY_SRC))
 
-from api.constants import APP_ROOT_DIR  # noqa: E402
+from api.constants import APP_ROOT_DIR
 
 
 def setup_test_logging():
@@ -165,8 +165,9 @@ async def run_migrations(database_url: str):
     """
     Run alembic migrations programmatically on the given database.
     """
-    from alembic import command
     from alembic.config import Config
+
+    from alembic import command
 
     # Get alembic.ini path
     alembic_ini_path = APP_ROOT_DIR / "alembic.ini"
@@ -220,7 +221,7 @@ async def test_engine(setup_test_database):
 
 
 @pytest.fixture(scope="function")
-async def db_connection(test_engine) -> AsyncGenerator[AsyncConnection, None]:
+async def db_connection(test_engine) -> AsyncGenerator[AsyncConnection]:
     """
     Create a database connection for each test.
 
@@ -234,7 +235,7 @@ async def db_connection(test_engine) -> AsyncGenerator[AsyncConnection, None]:
 @pytest.fixture(scope="function")
 async def async_session(
     db_connection: AsyncConnection,
-) -> AsyncGenerator[AsyncSession, None]:
+) -> AsyncGenerator[AsyncSession]:
     """
     Create a database session with transaction isolation for each test.
 

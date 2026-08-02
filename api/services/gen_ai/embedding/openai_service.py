@@ -5,13 +5,12 @@ Document conversion and chunking now live in the Model Proxy Service (MPS);
 this file no longer pulls docling/transformers.
 """
 
-from typing import Any, Dict, List, Optional
-
-from loguru import logger
-from openai import AsyncOpenAI
+from typing import Any
 
 from api.db.db_client import DBClient
 from api.utils.url_security import validate_user_configured_service_url
+from loguru import logger
+from openai import AsyncOpenAI
 
 from .base import BaseEmbeddingService
 
@@ -35,10 +34,10 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
     def __init__(
         self,
         db_client: DBClient,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model_id: str = DEFAULT_MODEL_ID,
-        base_url: Optional[str] = None,
-        default_headers: Optional[Dict[str, str]] = None,
+        base_url: str | None = None,
+        default_headers: dict[str, str] | None = None,
     ):
         """Initialize the OpenAI embedding service.
 
@@ -85,7 +84,7 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
         if not self._api_key_configured or self.client is None:
             raise EmbeddingAPIKeyNotConfiguredError()
 
-    def _request_kwargs(self) -> Dict[str, Any]:
+    def _request_kwargs(self) -> dict[str, Any]:
         """Extra kwargs merged into every embeddings.create() call.
 
         Override hook for subclasses (e.g. DograhEmbeddingService injects the MPS
@@ -93,7 +92,7 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
         """
         return {}
 
-    async def embed_texts(self, texts: List[str]) -> List[List[float]]:
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """Embed a batch of texts using OpenAI API.
 
         Raises:
@@ -112,7 +111,7 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
             logger.error(f"Error generating OpenAI embeddings: {e}")
             raise
 
-    async def embed_query(self, query: str) -> List[float]:
+    async def embed_query(self, query: str) -> list[float]:
         """Embed a single query text using OpenAI API.
 
         Raises:
@@ -127,8 +126,8 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
         query: str,
         organization_id: int,
         limit: int = 5,
-        document_uuids: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        document_uuids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """Search for similar chunks using vector similarity.
 
         Raises:

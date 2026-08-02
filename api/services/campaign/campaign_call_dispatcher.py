@@ -1,9 +1,7 @@
 import asyncio
 import time
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Optional
-
-from loguru import logger
+from typing import TYPE_CHECKING
 
 from api.db import db_client
 from api.db.models import QueuedRunModel, WorkflowRunModel
@@ -23,6 +21,7 @@ from api.services.quota_service import authorize_workflow_run_start
 from api.services.workflow.initial_context import merge_external_initial_context
 from api.services.workflow.run_creation import prepare_workflow_run_inputs
 from api.utils.common import get_backend_endpoints
+from loguru import logger
 
 if TYPE_CHECKING:
     # Type-only — importing api.services.telephony eagerly triggers the
@@ -110,9 +109,9 @@ class CampaignCallDispatcher:
             if getattr(queued_run, "retry_reason", None) == "user_requested_callback":
                 try:
                     from api.services.workflow.tools.callback_settings import (
-                        resolve_callback_settings,
                         adjust_for_sociable_hours,
                         get_timezone_for_number,
+                        resolve_callback_settings,
                     )
                     
                     settings = await resolve_callback_settings(
@@ -275,7 +274,7 @@ class CampaignCallDispatcher:
         queued_run: QueuedRunModel,
         campaign: any,
         concurrency_slot: CallConcurrencySlot,
-    ) -> Optional[WorkflowRunModel]:
+    ) -> WorkflowRunModel | None:
         """Creates workflow run and initiates call. Requires a pre-acquired slot."""
         from_number = None
         workflow_run = None
@@ -568,7 +567,7 @@ class CampaignCallDispatcher:
         telephony_configuration_id: int | None = None,
         preferred_number: str | None = None,
         timeout: float = 600,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Acquire a from_number from the (org, telephony config) pool with retry.
         Waits up to timeout seconds, polling every 1s.

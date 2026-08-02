@@ -1,9 +1,8 @@
-from typing import Any, Optional
-
-from loguru import logger
-from posthog import Posthog
+from typing import Any
 
 from api.constants import POSTHOG_API_KEY, POSTHOG_HOST
+from loguru import logger
+from posthog import Posthog
 
 _posthog_client: Posthog | None = None
 POSTHOG_SERVER_GROUP_IDENTIFY_DISTINCT_ID = "server-group-identify"
@@ -44,7 +43,7 @@ def capture_event(
     distinct_id: str,
     event: str,
     properties: dict[str, Any] | None = None,
-    groups: Optional[dict[str, str]] = None,
+    groups: dict[str, str] | None = None,
 ) -> None:
     """Fire a PostHog event. Silently no-ops if PostHog is not configured."""
     client = get_posthog()
@@ -68,7 +67,7 @@ def group_identify(
     group_key: str,
     properties: dict[str, Any],
     *,
-    distinct_id: Optional[str] = None,
+    distinct_id: str | None = None,
 ) -> None:
     """Set PostHog group properties. Silently no-ops if PostHog is not configured."""
     client = get_posthog()

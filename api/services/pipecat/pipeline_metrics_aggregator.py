@@ -1,6 +1,5 @@
 import time
 from collections import defaultdict
-from typing import Dict, Optional
 
 from loguru import logger
 
@@ -27,11 +26,11 @@ class PipelineMetricsAggregator(FrameProcessor):
         # For TTS: aggregated_metrics is int (total characters)
         # For STT: aggregated_metrics is float (total seconds)
 
-        self._start_time: Optional[float] = None
-        self._stop_time: Optional[float] = None
-        self._llm_usage_metrics: Dict[str, LLMTokenUsage] = {}
-        self._tts_usage_metrics: Dict[str, int] = defaultdict(int)
-        self._stt_usage_metrics: Dict[str, float] = defaultdict(float)
+        self._start_time: float | None = None
+        self._stop_time: float | None = None
+        self._llm_usage_metrics: dict[str, LLMTokenUsage] = {}
+        self._tts_usage_metrics: dict[str, int] = defaultdict(int)
+        self._stt_usage_metrics: dict[str, float] = defaultdict(float)
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
@@ -101,15 +100,15 @@ class PipelineMetricsAggregator(FrameProcessor):
         self._tts_usage_metrics[key] += data.value
         # logger.debug(f"TTS usage metrics: {self._tts_usage_metrics}")
 
-    def get_llm_usage_metrics(self) -> Dict[str, LLMTokenUsage]:
+    def get_llm_usage_metrics(self) -> dict[str, LLMTokenUsage]:
         """Get the aggregated LLM usage metrics grouped by processor|||model."""
         return self._llm_usage_metrics
 
-    def get_tts_usage_metrics(self) -> Dict[str, int]:
+    def get_tts_usage_metrics(self) -> dict[str, int]:
         """Get the aggregated TTS usage metrics grouped by processor|||model."""
         return self._tts_usage_metrics
 
-    def get_stt_usage_metrics(self) -> Dict[str, float]:
+    def get_stt_usage_metrics(self) -> dict[str, float]:
         """Get the aggregated STT usage metrics grouped by processor|||model."""
         return self._stt_usage_metrics
 
@@ -126,7 +125,7 @@ class PipelineMetricsAggregator(FrameProcessor):
         # Lets return a rounded integer
         return int(round(call_duration))
 
-    def get_all_usage_metrics_serialized(self) -> Dict[str, Dict[str, any]]:
+    def get_all_usage_metrics_serialized(self) -> dict[str, dict[str, any]]:
         """Get all aggregated usage metrics in JSON-serializable format."""
         serialized_llm = {}
         for key, usage in self._llm_usage_metrics.items():

@@ -1,6 +1,7 @@
-from typing import Any, Dict
+from typing import Any
 
-def get_schedule_callback_tools() -> list[Dict[str, Any]]:
+
+def get_schedule_callback_tools() -> list[dict[str, Any]]:
     """Get schedule_callback tool definitions for LLM function calling."""
     return [
         {

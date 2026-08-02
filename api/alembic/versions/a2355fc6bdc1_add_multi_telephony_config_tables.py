@@ -8,17 +8,18 @@ Create Date: 2026-04-26 15:07:07.644855
 
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "a2355fc6bdc1"
-down_revision: Union[str, None] = "4d8e9b2a3c5f"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "4d8e9b2a3c5f"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 # Credential keys that are NOT provider credentials and must be stripped before
@@ -45,7 +46,7 @@ _SIP_URI_RE = re.compile(
 class _NormalizedAddress:
     canonical: str
     address_type: str
-    country_code: Optional[str] = None
+    country_code: str | None = None
 
 
 def normalize_telephony_address(raw: str) -> _NormalizedAddress:
@@ -79,8 +80,7 @@ def normalize_telephony_address(raw: str) -> _NormalizedAddress:
         return _NormalizedAddress(canonical=canonical, address_type="sip_uri")
 
     digits = _PSTN_STRIP_RE.sub("", raw)
-    if digits.startswith("+"):
-        digits = digits[1:]
+    digits = digits.removeprefix("+")
     if _PSTN_DIGITS_RE.fullmatch(digits):
         return _NormalizedAddress(canonical=f"+{digits}", address_type="pstn")
 
@@ -403,9 +403,8 @@ def _validate_migrated_configurations() -> None:
     """
     import importlib
 
-    from pydantic import ValidationError
-
     from api.services.telephony import registry
+    from pydantic import ValidationError
 
     # Triggers each provider package's ``register()`` side effect.
     importlib.import_module("api.services.telephony.providers")

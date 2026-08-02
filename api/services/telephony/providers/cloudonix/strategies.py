@@ -1,11 +1,10 @@
 """Cloudonix-specific call operation strategies."""
 
-from typing import Any, Dict
-
-from loguru import logger
-from pipecat.serializers.call_strategies import HangupStrategy, TransferStrategy
+from typing import Any
 
 from api.services.telephony.providers.cloudonix.provider import CLOUDONIX_API_BASE_URL
+from loguru import logger
+from pipecat.serializers.call_strategies import HangupStrategy, TransferStrategy
 
 
 class CloudonixConferenceStrategy(TransferStrategy):
@@ -22,7 +21,7 @@ class CloudonixConferenceStrategy(TransferStrategy):
     resolve the session).
     """
 
-    async def execute_transfer(self, context: Dict[str, Any]) -> bool:
+    async def execute_transfer(self, context: dict[str, Any]) -> bool:
         import aiohttp
 
         transfer_context = None
@@ -72,26 +71,25 @@ class CloudonixConferenceStrategy(TransferStrategy):
                 f"conference {conference_name}"
             )
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    endpoint, json=payload, headers=headers
-                ) as response:
-                    body = await response.text()
-                    if response.status in (200, 202):
-                        logger.info(
-                            f"[Cloudonix Transfer] Session {session_token} joined "
-                            f"conference {conference_name} (HTTP {response.status})"
-                        )
-                        await self._cleanup_transfer_context(
-                            transfer_context.transfer_id
-                        )
-                        return True
-                    logger.error(
-                        f"[Cloudonix Transfer] Switch Voice Application failed for session "
-                        f"{session_token}: HTTP {response.status}, body: {body}"
+            async with aiohttp.ClientSession() as session, session.post(
+                endpoint, json=payload, headers=headers
+            ) as response:
+                body = await response.text()
+                if response.status in (200, 202):
+                    logger.info(
+                        f"[Cloudonix Transfer] Session {session_token} joined "
+                        f"conference {conference_name} (HTTP {response.status})"
                     )
-                    await self._cleanup_transfer_context(transfer_context.transfer_id)
-                    return False
+                    await self._cleanup_transfer_context(
+                        transfer_context.transfer_id
+                    )
+                    return True
+                logger.error(
+                    f"[Cloudonix Transfer] Switch Voice Application failed for session "
+                    f"{session_token}: HTTP {response.status}, body: {body}"
+                )
+                await self._cleanup_transfer_context(transfer_context.transfer_id)
+                return False
 
         except Exception as e:
             logger.error(f"[Cloudonix Transfer] Failed to transfer call: {e}")
@@ -128,7 +126,7 @@ class CloudonixConferenceStrategy(TransferStrategy):
 class CloudonixHangupStrategy(HangupStrategy):
     """Implements hangup for Cloudonix calls."""
 
-    async def execute_hangup(self, context: Dict[str, Any]) -> bool:
+    async def execute_hangup(self, context: dict[str, Any]) -> bool:
         """Terminate a Cloudonix session via REST API.
 
         Note: CloudonixFrameSerializer inherits TwilioFrameSerializer and maps

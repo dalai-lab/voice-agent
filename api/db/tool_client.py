@@ -1,7 +1,6 @@
 """Database client for managing tools."""
 
 from datetime import UTC, datetime
-from typing import List, Optional
 
 from loguru import logger
 from sqlalchemy import select, update
@@ -22,9 +21,9 @@ class ToolClient(BaseDBClient):
         name: str,
         definition: dict,
         category: str = ToolCategory.HTTP_API.value,
-        description: Optional[str] = None,
-        icon: Optional[str] = None,
-        icon_color: Optional[str] = None,
+        description: str | None = None,
+        icon: str | None = None,
+        icon_color: str | None = None,
     ) -> ToolModel:
         """Create a new tool.
 
@@ -67,9 +66,9 @@ class ToolClient(BaseDBClient):
     async def get_tools_for_organization(
         self,
         organization_id: int,
-        status: Optional[str] = None,
-        category: Optional[str] = None,
-    ) -> List[ToolModel]:
+        status: str | None = None,
+        category: str | None = None,
+    ) -> list[ToolModel]:
         """Get all tools for an organization.
 
         Args:
@@ -109,7 +108,7 @@ class ToolClient(BaseDBClient):
         tool_uuid: str,
         organization_id: int,
         include_archived: bool = False,
-    ) -> Optional[ToolModel]:
+    ) -> ToolModel | None:
         """Get a tool by its UUID, scoped to organization.
 
         Args:
@@ -140,13 +139,13 @@ class ToolClient(BaseDBClient):
         self,
         tool_uuid: str,
         organization_id: int,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        definition: Optional[dict] = None,
-        icon: Optional[str] = None,
-        icon_color: Optional[str] = None,
-        status: Optional[str] = None,
-    ) -> Optional[ToolModel]:
+        name: str | None = None,
+        description: str | None = None,
+        definition: dict | None = None,
+        icon: str | None = None,
+        icon_color: str | None = None,
+        status: str | None = None,
+    ) -> ToolModel | None:
         """Update a tool by UUID.
 
         Args:
@@ -240,7 +239,7 @@ class ToolClient(BaseDBClient):
 
     async def unarchive_tool(
         self, tool_uuid: str, organization_id: int
-    ) -> Optional[ToolModel]:
+    ) -> ToolModel | None:
         """Restore an archived tool by setting its status to active.
 
         Args:
@@ -293,9 +292,9 @@ class ToolClient(BaseDBClient):
 
     async def get_tools_by_uuids(
         self,
-        tool_uuids: List[str],
+        tool_uuids: list[str],
         organization_id: int,
-    ) -> List[ToolModel]:
+    ) -> list[ToolModel]:
         """Get multiple tools by their UUIDs.
 
         Args:

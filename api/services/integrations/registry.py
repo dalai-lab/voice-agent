@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from loguru import logger
-
 from api.services.integrations.base import (
     IntegrationCompletionContext,
     IntegrationNodeRegistration,
@@ -11,6 +9,7 @@ from api.services.integrations.base import (
     IntegrationRuntimeContext,
 )
 from api.services.workflow.node_data import BaseNodeData
+from loguru import logger
 
 _PACKAGE_REGISTRY: dict[str, IntegrationPackageSpec] = {}
 

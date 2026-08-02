@@ -1,4 +1,3 @@
-from typing import List
 
 from sqlalchemy.future import select
 
@@ -91,7 +90,7 @@ class IntegrationClient(BaseDBClient):
 
     async def get_active_integrations_by_organization(
         self, organization_id: int
-    ) -> List[IntegrationModel]:
+    ) -> list[IntegrationModel]:
         """Get all active integrations for a specific organization."""
         async with self.async_session() as session:
             result = await session.execute(

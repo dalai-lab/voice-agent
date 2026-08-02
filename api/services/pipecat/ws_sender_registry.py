@@ -4,9 +4,9 @@ This allows the pipeline observer to send messages back through
 the signaling WebSocket without passing the WebSocket directly.
 """
 
-from typing import Awaitable, Callable, Dict, Optional
+from collections.abc import Awaitable, Callable
 
-_ws_senders: Dict[int, Callable[[dict], Awaitable[None]]] = {}
+_ws_senders: dict[int, Callable[[dict], Awaitable[None]]] = {}
 
 
 def register_ws_sender(
@@ -23,6 +23,6 @@ def unregister_ws_sender(workflow_run_id: int) -> None:
 
 def get_ws_sender(
     workflow_run_id: int,
-) -> Optional[Callable[[dict], Awaitable[None]]]:
+) -> Callable[[dict], Awaitable[None]] | None:
     """Get the WebSocket sender for a workflow run."""
     return _ws_senders.get(workflow_run_id)

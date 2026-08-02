@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 
 from api.utils.telephony_helper import get_country_code
 
@@ -38,11 +38,11 @@ _SIP_URI_RE = re.compile(
 class NormalizedAddress:
     canonical: str
     address_type: AddressType
-    country_code: Optional[str] = None  # ISO-2; only set for PSTN when known
+    country_code: str | None = None  # ISO-2; only set for PSTN when known
 
 
 def normalize_telephony_address(
-    raw: str, country_hint: Optional[str] = None
+    raw: str, country_hint: str | None = None
 ) -> NormalizedAddress:
     """Normalize a telephony address into a canonical form for storage/lookup.
 
@@ -61,8 +61,7 @@ def normalize_telephony_address(
         return _normalize_sip_uri(raw)
 
     digits = _PSTN_STRIP_RE.sub("", raw)
-    if digits.startswith("+"):
-        digits = digits[1:]
+    digits = digits.removeprefix("+")
     if _PSTN_DIGITS_RE.fullmatch(digits):
         return _normalize_pstn(digits, country_hint)
 
@@ -70,8 +69,8 @@ def normalize_telephony_address(
     return NormalizedAddress(canonical=raw.lower(), address_type="sip_extension")
 
 
-def _normalize_pstn(digits: str, country_hint: Optional[str]) -> NormalizedAddress:
-    country_code: Optional[str] = None
+def _normalize_pstn(digits: str, country_hint: str | None) -> NormalizedAddress:
+    country_code: str | None = None
 
     # If a country hint is given and the digits don't already start with that
     # country's dial code, try to apply it. Local numbers may include a leading

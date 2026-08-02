@@ -11,14 +11,13 @@ written when the breaker trips can show *which* calls pushed it over.
 
 import json
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import redis.asyncio as aioredis
-from loguru import logger
-
 from api.constants import DEFAULT_CIRCUIT_BREAKER_CONFIG, REDIS_URL
 from api.db import db_client
 from api.services.campaign.campaign_event_publisher import get_campaign_event_publisher
+from loguru import logger
 
 # Cap on the number of recent failure entries kept per campaign — large enough
 # to be useful for debugging a trip, small enough that the JSON details stay
@@ -30,7 +29,7 @@ class CircuitBreaker:
     """Sliding window circuit breaker for campaign call failures."""
 
     def __init__(self):
-        self.redis_client: Optional[aioredis.Redis] = None
+        self.redis_client: aioredis.Redis | None = None
 
     async def _get_redis(self) -> aioredis.Redis:
         """Get or create Redis connection."""
@@ -41,7 +40,7 @@ class CircuitBreaker:
         return self.redis_client
 
     @staticmethod
-    def _keys(campaign_id: int) -> Tuple[str, str]:
+    def _keys(campaign_id: int) -> tuple[str, str]:
         """Return (failures_key, successes_key) for a campaign."""
         return f"cb_failures:{campaign_id}", f"cb_successes:{campaign_id}"
 
@@ -54,7 +53,7 @@ class CircuitBreaker:
         self,
         campaign_id: int,
         workflow_run_id: int,
-        reason: Optional[str],
+        reason: str | None,
     ) -> None:
         """Push a failure entry onto the capped recent-failures list."""
         redis_client = await self._get_redis()
@@ -80,7 +79,7 @@ class CircuitBreaker:
                 f"Failed to record recent failure for campaign {campaign_id}: {e}"
             )
 
-    async def _get_recent_failures(self, campaign_id: int) -> List[Dict[str, Any]]:
+    async def _get_recent_failures(self, campaign_id: int) -> list[dict[str, Any]]:
         """Return the recent-failures list (most-recent first)."""
         redis_client = await self._get_redis()
         key = self._recent_failures_key(campaign_id)
@@ -91,7 +90,7 @@ class CircuitBreaker:
                 f"Failed to read recent failures for campaign {campaign_id}: {e}"
             )
             return []
-        decoded: List[Dict[str, Any]] = []
+        decoded: list[dict[str, Any]] = []
         for raw in entries:
             try:
                 decoded.append(json.loads(raw))
@@ -103,8 +102,8 @@ class CircuitBreaker:
         self,
         campaign_id: int,
         is_failure: bool,
-        config: Optional[dict] = None,
-    ) -> Tuple[bool, Optional[dict]]:
+        config: dict | None = None,
+    ) -> tuple[bool, dict | None]:
         """Record a call outcome and check if the circuit breaker should trip.
 
         Args:
@@ -216,8 +215,8 @@ class CircuitBreaker:
     async def is_circuit_open(
         self,
         campaign_id: int,
-        config: Optional[dict] = None,
-    ) -> Tuple[bool, Optional[dict]]:
+        config: dict | None = None,
+    ) -> tuple[bool, dict | None]:
         """Check if the circuit breaker is in open (tripped) state without recording.
 
         Used as a safety net check before scheduling batches.
@@ -296,8 +295,8 @@ class CircuitBreaker:
         campaign_id: int,
         is_failure: bool,
         *,
-        workflow_run_id: Optional[int] = None,
-        reason: Optional[str] = None,
+        workflow_run_id: int | None = None,
+        reason: str | None = None,
     ) -> None:
         """Record a call outcome, and if the breaker trips, pause the campaign.
 

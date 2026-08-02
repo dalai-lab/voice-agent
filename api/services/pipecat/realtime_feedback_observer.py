@@ -21,21 +21,21 @@ node changes.
 """
 
 import json
-from typing import TYPE_CHECKING, Awaitable, Callable, Optional, Set
-from datetime import datetime, UTC
-
-from loguru import logger
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Optional
 
 from api.services.pipecat.realtime_feedback_events import (
+    DTMFLogFrame,
     build_bot_text_event,
     build_function_call_end_event,
     build_function_call_start_event,
     build_pipeline_error_event,
     build_ttfb_metric_event,
-    build_user_transcription_event,
     build_user_dtmf_event,
-    DTMFLogFrame,
+    build_user_transcription_event,
 )
+from loguru import logger
 
 if TYPE_CHECKING:
     from api.services.pipecat.in_memory_buffers import InMemoryLogsBuffer
@@ -99,11 +99,10 @@ class RealtimeFeedbackObserver(BaseObserver):
         super().__init__()
         self._ws_sender = ws_sender
         self._logs_buffer = logs_buffer
-        self._frames_seen: Set[str] = set()
+        self._frames_seen: set[str] = set()
 
     async def cleanup(self):
         """Clean up resources. Must be called when the observer is no longer needed."""
-        pass
 
     async def on_push_frame(self, data: FramePushed):
         """Process frames and send relevant ones to the client."""

@@ -2,7 +2,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from api.services.telephony.providers.plivo.strategies import (
     PlivoConferenceStrategy,
     PlivoHangupStrategy,

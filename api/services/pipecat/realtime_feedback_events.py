@@ -1,10 +1,11 @@
 """Shared helpers for building and ordering realtime feedback events."""
 
+from dataclasses import dataclass
 from typing import Any
 
-from pipecat.utils.enums import RealtimeFeedbackType
 from pipecat.frames.frames import SystemFrame
-from dataclasses import dataclass
+from pipecat.utils.enums import RealtimeFeedbackType
+
 
 @dataclass
 class DTMFLogFrame(SystemFrame):

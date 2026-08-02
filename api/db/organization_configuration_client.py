@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy.future import select
 
@@ -10,7 +10,7 @@ from api.db.models import OrganizationConfigurationModel
 class OrganizationConfigurationClient(BaseDBClient):
     async def get_configuration(
         self, organization_id: int, key: str
-    ) -> Optional[OrganizationConfigurationModel]:
+    ) -> OrganizationConfigurationModel | None:
         """Get a specific configuration for an organization by key."""
         async with self.async_session() as session:
             result = await session.execute(
@@ -78,7 +78,7 @@ class OrganizationConfigurationClient(BaseDBClient):
 
     async def mark_configuration_validated(
         self, organization_id: int, key: str
-    ) -> Optional[OrganizationConfigurationModel]:
+    ) -> OrganizationConfigurationModel | None:
         """Update the validation timestamp for an existing organization configuration."""
         async with self.async_session() as session:
             result = await session.execute(
@@ -151,7 +151,7 @@ class OrganizationConfigurationClient(BaseDBClient):
 
     async def get_configurations_by_provider(
         self, key: str, provider: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get all organization configurations for a given key filtered by provider.
 
         Returns a list of dicts with organization_id and the config value.

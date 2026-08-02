@@ -1,13 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from enum import Enum
 from types import NoneType
-from typing import Any, Callable, Literal, get_args, get_origin
-
-from pydantic import BaseModel, Field
-from pydantic.fields import FieldInfo, PydanticUndefined
+from typing import Any, Literal, get_args, get_origin
 
 from api.services.workflow.node_specs._base import (
     DisplayOptions,
@@ -20,6 +18,8 @@ from api.services.workflow.node_specs._base import (
     PropertySpec,
     PropertyType,
 )
+from pydantic import BaseModel, Field
+from pydantic.fields import FieldInfo, PydanticUndefined
 
 _SPEC_FIELD_META_KEY = "__dograh_spec_field__"
 _UNSET = object()
@@ -115,7 +115,7 @@ def node_spec(
     )
 
     def decorator(model_cls: type[BaseModel]) -> type[BaseModel]:
-        setattr(model_cls, "__node_spec_metadata__", metadata)
+        model_cls.__node_spec_metadata__ = metadata
         return model_cls
 
     return decorator

@@ -1,7 +1,6 @@
 """Database client for managing webhook credentials."""
 
 from datetime import UTC, datetime
-from typing import List, Optional
 
 from loguru import logger
 from sqlalchemy import select, update
@@ -20,7 +19,7 @@ class WebhookCredentialClient(BaseDBClient):
         name: str,
         credential_type: str,
         credential_data: dict,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> ExternalCredentialModel:
         """Create a new webhook credential.
 
@@ -57,7 +56,7 @@ class WebhookCredentialClient(BaseDBClient):
 
     async def get_credentials_for_organization(
         self, organization_id: int, active_only: bool = True
-    ) -> List[ExternalCredentialModel]:
+    ) -> list[ExternalCredentialModel]:
         """Get all credentials for an organization.
 
         Args:
@@ -82,7 +81,7 @@ class WebhookCredentialClient(BaseDBClient):
 
     async def get_credential_by_uuid(
         self, credential_uuid: str, organization_id: int, active_only: bool = True
-    ) -> Optional[ExternalCredentialModel]:
+    ) -> ExternalCredentialModel | None:
         """Get a credential by its UUID, scoped to organization.
 
         Args:
@@ -109,11 +108,11 @@ class WebhookCredentialClient(BaseDBClient):
         self,
         credential_uuid: str,
         organization_id: int,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        credential_type: Optional[str] = None,
-        credential_data: Optional[dict] = None,
-    ) -> Optional[ExternalCredentialModel]:
+        name: str | None = None,
+        description: str | None = None,
+        credential_type: str | None = None,
+        credential_data: dict | None = None,
+    ) -> ExternalCredentialModel | None:
         """Update a credential by UUID.
 
         Args:

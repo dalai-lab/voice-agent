@@ -9,9 +9,37 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
+from api.db import db_client
+from api.db.models import QueuedRunModel, ScheduledCallbackModel
+from api.enums import ToolCategory, WorkflowRunMode
+from api.services.pipecat.audio_playback import play_audio, play_audio_loop
+from api.services.telephony.call_transfer_manager import get_call_transfer_manager
+from api.services.telephony.external_pbx import resolve_external_pbx_field_mappings
+from api.services.telephony.factory import get_telephony_provider_for_run
+from api.services.telephony.transfer_event_protocol import TransferContext
+from api.services.workflow.tools.calculator import get_calculator_tools, safe_calculator
+from api.services.workflow.tools.callback_settings import (
+    adjust_for_sociable_hours,
+    get_timezone_for_number,
+    resolve_callback_settings,
+)
+from api.services.workflow.tools.custom_tool import (
+    execute_http_tool,
+    tool_to_function_schema,
+)
+from api.services.workflow.tools.schedule_callback import get_schedule_callback_tools
+from api.services.workflow.tools.transfer_resolver import (
+    TransferResolutionError,
+    resolve_transfer_config,
+)
+from api.services.workflow.tools.wait import get_wait_tools
+from api.tasks.arq import enqueue_job
+from api.tasks.function_names import FunctionNames
+from api.utils.template_renderer import render_template
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import (
@@ -21,35 +49,6 @@ from pipecat.frames.frames import (
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.utils.enums import EndTaskReason
 
-from api.db import db_client
-from api.enums import ToolCategory, WorkflowRunMode
-from api.services.pipecat.audio_playback import play_audio, play_audio_loop
-from api.services.telephony.call_transfer_manager import get_call_transfer_manager
-from api.services.telephony.external_pbx import resolve_external_pbx_field_mappings
-from api.services.telephony.factory import get_telephony_provider_for_run
-from api.services.telephony.transfer_event_protocol import TransferContext
-from api.services.workflow.tools.calculator import get_calculator_tools, safe_calculator
-from api.services.workflow.tools.wait import get_wait_tools
-from api.services.workflow.tools.schedule_callback import get_schedule_callback_tools
-from api.tasks.arq import enqueue_job
-from api.tasks.function_names import FunctionNames
-from api.db.models import ScheduledCallbackModel, QueuedRunModel
-from datetime import datetime, timedelta, UTC
-from api.services.workflow.tools.custom_tool import (
-    execute_http_tool,
-    tool_to_function_schema,
-)
-from api.services.workflow.tools.transfer_resolver import (
-    TransferResolutionError,
-    resolve_transfer_config,
-)
-from api.services.workflow.tools.callback_settings import (
-    resolve_callback_settings,
-    adjust_for_sociable_hours,
-    get_timezone_for_number,
-)
-from api.utils.template_renderer import render_template
-
 if TYPE_CHECKING:
     from api.services.workflow.mcp_tool_session import McpToolSession
     from api.services.workflow.pipecat_engine import PipecatEngine
@@ -57,13 +56,13 @@ if TYPE_CHECKING:
 
 def _render_transfer_destination(
     destination_template: Any,
-    call_context_vars: Optional[Dict[str, Any]],
-    gathered_context_vars: Optional[Dict[str, Any]],
+    call_context_vars: dict[str, Any] | None,
+    gathered_context_vars: dict[str, Any] | None,
 ) -> str:
     """Resolve a transfer destination template into a concrete provider target."""
 
     initial_context = dict(call_context_vars or {})
-    render_context: Dict[str, Any] = {
+    render_context: dict[str, Any] = {
         **initial_context,
         "initial_context": initial_context,
         "gathered_context": dict(gathered_context_vars or {}),
@@ -78,8 +77,8 @@ def get_function_schema(
     function_name: str,
     description: str,
     *,
-    properties: Dict[str, Any] | None = None,
-    required: List[str] | None = None,
+    properties: dict[str, Any] | None = None,
+    required: list[str] | None = None,
 ) -> FunctionSchema:
     """Create a FunctionSchema definition that can later be transformed into
     the provider-specific format (OpenAI, Gemini, etc.).
@@ -107,7 +106,7 @@ class CustomToolManager:
       4. Executing tools when invoked by the LLM
     """
 
-    def __init__(self, engine: "PipecatEngine") -> None:
+    def __init__(self, engine: PipecatEngine) -> None:
         self._engine = engine
 
     async def _play_config_message(
@@ -154,14 +153,14 @@ class CustomToolManager:
 
         return False
 
-    async def get_organization_id(self) -> Optional[int]:
+    async def get_organization_id(self) -> int | None:
         """Get the organization ID from the engine (shared cache)."""
         return await self._engine._get_organization_id()
 
     async def get_tool_schemas(
         self,
         tool_uuids: list[str],
-        mcp_tool_filters: Optional[dict[str, list[str]]] = None,
+        mcp_tool_filters: dict[str, list[str]] | None = None,
     ) -> list[FunctionSchema]:
         """Fetch custom tools and convert them to function schemas.
 
@@ -271,7 +270,7 @@ class CustomToolManager:
     async def register_handlers(
         self,
         tool_uuids: list[str],
-        mcp_tool_filters: Optional[dict[str, list[str]]] = None,
+        mcp_tool_filters: dict[str, list[str]] | None = None,
     ) -> None:
         """Register custom tool execution handlers with the LLM.
 
@@ -373,7 +372,7 @@ class CustomToolManager:
         Returns:
             Async handler function for the tool
         """
-        timeout_secs: Optional[float] = None
+        timeout_secs: float | None = None
 
         if tool.category == ToolCategory.END_CALL.value:
             handler = self._create_end_call_handler(tool, function_name)
@@ -433,8 +432,17 @@ class CustomToolManager:
                 
                 message = function_call_params.arguments.get("message")
                 if message:
-                    from pipecat.frames.frames import TTSSpeakFrame, TTSStartedFrame, TTSStoppedFrame
-                    from pipecat.observers.base_observer import BaseObserver as _BaseObserver, FramePushed as _FramePushed
+                    from pipecat.frames.frames import (
+                        TTSSpeakFrame,
+                        TTSStartedFrame,
+                        TTSStoppedFrame,
+                    )
+                    from pipecat.observers.base_observer import (
+                        BaseObserver as _BaseObserver,
+                    )
+                    from pipecat.observers.base_observer import (
+                        FramePushed as _FramePushed,
+                    )
 
                     logger.info(f"Playing wait acknowledgment message: {message}")
 
@@ -472,7 +480,7 @@ class CustomToolManager:
                     # Wait for TTS to actually finish, with a generous fallback timeout.
                     try:
                         await asyncio.wait_for(tts_done_event.wait(), timeout=15.0)
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         logger.warning("Wait tool: TTS done event timed out after 15s ÔÇö proceeding anyway.")
 
                     if _task:
@@ -505,7 +513,6 @@ class CustomToolManager:
                 # in the tool result. Without this, the TranscriptionFrame is muted by
                 # FunctionCallUserMuteStrategy and the LLM never sees what the user said,
                 # forcing the user to repeat themselves.
-                import time
                 user_speech_text: list[str] = []  # mutable container for closure capture
 
                 # We use a pipeline observer (not the mute-filtered aggregator)
@@ -513,8 +520,8 @@ class CustomToolManager:
                 # TranscriptionFrames and UserStartedSpeakingFrames while a
                 # tool is executing. Pipeline observers receive frames *before*
                 # the mute strategy suppresses them.
-                from pipecat.observers.base_observer import BaseObserver, FramePushed
                 from pipecat.frames.frames import TranscriptionFrame
+                from pipecat.observers.base_observer import BaseObserver, FramePushed
 
                 class _WaitInterruptObserver(BaseObserver):
                     async def on_push_frame(self, data: FramePushed):
@@ -681,7 +688,7 @@ class CustomToolManager:
 
         return http_tool_handler
 
-    def _create_mcp_handler(self, session: "McpToolSession", function_name: str):
+    def _create_mcp_handler(self, session: McpToolSession, function_name: str):
         """Create a handler that proxies an LLM function call to a live MCP
         session. Errors are returned to the LLM as structured text so the
         agent can recover verbally; the call is never crashed."""

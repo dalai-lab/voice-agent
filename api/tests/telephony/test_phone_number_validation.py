@@ -2,8 +2,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import HTTPException
-
 from api.routes.organization import create_phone_number
 from api.schemas.telephony_phone_number import PhoneNumberCreateRequest
 from api.services.telephony.base import (
@@ -17,6 +15,7 @@ from api.services.telephony.providers.telnyx.provider import TelnyxProvider
 from api.services.telephony.providers.twilio.provider import TwilioProvider
 from api.services.telephony.providers.vobiz.provider import VobizProvider
 from api.services.telephony.providers.vonage.provider import VonageProvider
+from fastapi import HTTPException
 
 
 class _StubResponse:

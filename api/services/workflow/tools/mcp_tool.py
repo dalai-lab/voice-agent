@@ -4,9 +4,7 @@ LLM-function-name namespacing. No I/O, no MCP protocol here."""
 from __future__ import annotations
 
 import re
-from typing import Any, Dict
-
-from pydantic import ValidationError
+from typing import Any
 
 from api.schemas.tool import (
     DEFAULT_MCP_SSE_READ_TIMEOUT_SECS,
@@ -16,6 +14,7 @@ from api.schemas.tool import (
 from api.schemas.tool import (
     McpToolConfig as McpToolConfig,
 )
+from pydantic import ValidationError
 
 DEFAULT_TIMEOUT_SECS = DEFAULT_MCP_TIMEOUT_SECS
 DEFAULT_SSE_READ_TIMEOUT_SECS = DEFAULT_MCP_SSE_READ_TIMEOUT_SECS
@@ -33,7 +32,7 @@ def _format_validation_error(error: ValidationError) -> str:
     return "; ".join(parts)
 
 
-def validate_mcp_definition(definition: Dict[str, Any]) -> Dict[str, Any]:
+def validate_mcp_definition(definition: dict[str, Any]) -> dict[str, Any]:
     """Validate a ``type: "mcp"`` ToolModel definition and return a
     normalized config dict with defaults applied.
 

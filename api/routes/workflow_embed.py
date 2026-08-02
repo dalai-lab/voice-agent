@@ -1,7 +1,6 @@
 """Embed token endpoints for workflows."""
 
 from datetime import UTC, datetime, timedelta
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -40,21 +39,21 @@ def generate_embed_script(token: EmbedTokenModel) -> str:
 
 
 class EmbedTokenRequest(BaseModel):
-    allowed_domains: Optional[list[str]] = None
-    settings: Optional[dict] = None
-    usage_limit: Optional[int] = None
-    expires_in_days: Optional[int] = 30
+    allowed_domains: list[str] | None = None
+    settings: dict | None = None
+    usage_limit: int | None = None
+    expires_in_days: int | None = 30
 
 
 class EmbedTokenResponse(BaseModel):
     id: int
     token: str
-    allowed_domains: Optional[list[str]]
-    settings: Optional[dict]
+    allowed_domains: list[str] | None
+    settings: dict | None
     is_active: bool
     usage_count: int
-    usage_limit: Optional[int]
-    expires_at: Optional[datetime]
+    usage_limit: int | None
+    expires_at: datetime | None
     created_at: datetime
     embed_script: str
 
@@ -144,7 +143,7 @@ async def get_embed_token(
     workflow_id: int,
     request: Request,
     user: UserModel = Depends(get_user),
-) -> Optional[EmbedTokenResponse]:
+) -> EmbedTokenResponse | None:
     """
     Get the embed token for a workflow if it exists.
     """

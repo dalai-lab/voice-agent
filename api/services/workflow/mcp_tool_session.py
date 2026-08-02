@@ -11,15 +11,14 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any
 
+from api.services.workflow.tools.mcp_tool import namespace_function_name
+from api.utils.credential_auth import build_auth_header, invalidate_and_rebuild_auth
 from loguru import logger
 from mcp.client.session_group import StreamableHttpParameters
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.services.mcp_service import MCPClient
-
-from api.services.workflow.tools.mcp_tool import namespace_function_name
-from api.utils.credential_auth import build_auth_header, invalidate_and_rebuild_auth
 
 if TYPE_CHECKING:
     from api.db.models import ExternalCredentialModel
@@ -47,7 +46,7 @@ def _is_auth_error(exc: BaseException) -> bool:
 async def build_streamable_http_params(
     *,
     url: str,
-    credential: Optional["ExternalCredentialModel"],
+    credential: ExternalCredentialModel | None,
     timeout_secs: int,
     sse_read_timeout_secs: int,
     invalidate_first: bool = False,
@@ -59,7 +58,7 @@ async def build_streamable_http_params(
         invalidate_first: When True, invalidates any cached OAuth2 token before
             building the auth header. Use this for the retry-after-401 path.
     """
-    headers: Optional[Dict[str, str]] = None
+    headers: dict[str, str] | None = None
     if credential is not None:
         if invalidate_first:
             auth = await invalidate_and_rebuild_auth(credential)
@@ -83,8 +82,8 @@ class McpToolSession:
         tool_uuid: str,
         tool_name: str,
         url: str,
-        credential: Optional["ExternalCredentialModel"],
-        tools_filter: List[str],
+        credential: ExternalCredentialModel | None,
+        tools_filter: list[str],
         timeout_secs: int,
         sse_read_timeout_secs: int,
     ) -> None:
@@ -99,11 +98,11 @@ class McpToolSession:
         self._timeout_secs = timeout_secs
         self._sse_read_timeout_secs = sse_read_timeout_secs
 
-        self._client: Optional[MCPClient] = None
+        self._client: MCPClient | None = None
         self._session: Any = None  # mcp.ClientSession (read once after start)
-        self._schemas: List[FunctionSchema] = []
+        self._schemas: list[FunctionSchema] = []
         # namespaced LLM name -> original MCP tool name
-        self._name_map: Dict[str, str] = {}
+        self._name_map: dict[str, str] = {}
         self.available: bool = False
 
     async def _finalize_session(self) -> None:
@@ -257,8 +256,8 @@ class McpToolSession:
         return float(self._sse_read_timeout_secs) + 5.0
 
     def function_schemas(
-        self, allowed_raw_names: Optional[Set[str]] = None
-    ) -> List[FunctionSchema]:
+        self, allowed_raw_names: set[str] | None = None
+    ) -> list[FunctionSchema]:
         """Return cached FunctionSchemas, optionally filtered by raw MCP tool name.
 
         ``allowed_raw_names=None`` returns all schemas. An empty set returns none.
@@ -271,11 +270,11 @@ class McpToolSession:
             s for s in self._schemas if self._name_map.get(s.name) in allowed_raw_names
         ]
 
-    def discovered_tools(self) -> List[Dict[str, str]]:
+    def discovered_tools(self) -> list[dict[str, str]]:
         """Raw MCP tool catalog for UI/cache: ``[{name, description}]``
         using the *raw* server names (not the namespaced LLM names).
         Empty if the session is unavailable."""
-        out: List[Dict[str, str]] = []
+        out: list[dict[str, str]] = []
         for s in self._schemas:
             raw = self._name_map.get(s.name)
             if raw is None:
@@ -283,7 +282,7 @@ class McpToolSession:
             out.append({"name": raw, "description": s.description or ""})
         return out
 
-    async def call(self, namespaced_name: str, arguments: Dict[str, Any]) -> str:
+    async def call(self, namespaced_name: str, arguments: dict[str, Any]) -> str:
         """Invoke an MCP tool by its namespaced LLM name. Returns a string
         (flattened text content). Raises if the session is unavailable so
         the caller can map it to a structured error for the LLM."""
@@ -341,10 +340,10 @@ class McpToolSession:
 async def discover_mcp_tools(
     *,
     url: str,
-    credential: Optional["ExternalCredentialModel"],
+    credential: ExternalCredentialModel | None,
     timeout_secs: int,
     sse_read_timeout_secs: int,
-) -> List[Dict[str, str]]:
+) -> list[dict[str, str]]:
     """Open an ephemeral MCP session, list its tools, close it. Returns
     ``[{name, description}]`` (raw names). Never raises — on any connect
     failure returns ``[]``."""

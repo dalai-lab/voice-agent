@@ -5,12 +5,10 @@ Service keys are stored and managed entirely in MPS, not in the local database.
 """
 
 import asyncio
-from typing import List, Optional
 
 import httpx
-from loguru import logger
-
 from api.constants import DEPLOYMENT_MODE, DOGRAH_MPS_SECRET_KEY, MPS_API_URL
+from loguru import logger
 
 
 class MPSServiceKeyClient:
@@ -22,8 +20,8 @@ class MPSServiceKeyClient:
 
     def _get_headers(
         self,
-        organization_id: Optional[int] = None,
-        created_by: Optional[str] = None,
+        organization_id: int | None = None,
+        created_by: str | None = None,
     ) -> dict:
         """
         Get headers for MPS API requests.
@@ -53,10 +51,10 @@ class MPSServiceKeyClient:
     async def create_service_key(
         self,
         name: str,
-        organization_id: Optional[int] = None,
+        organization_id: int | None = None,
         created_by: str = None,
         expires_in_days: int = 90,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> dict:
         """
         Create a new service key via MPS API.
@@ -109,10 +107,10 @@ class MPSServiceKeyClient:
 
     async def get_service_keys(
         self,
-        organization_id: Optional[int] = None,
-        created_by: Optional[str] = None,
+        organization_id: int | None = None,
+        created_by: str | None = None,
         include_archived: bool = False,
-    ) -> List[dict]:
+    ) -> list[dict]:
         """
         Get service keys from MPS.
 
@@ -166,9 +164,9 @@ class MPSServiceKeyClient:
     async def get_service_key_by_id(
         self,
         key_id: int,
-        organization_id: Optional[int] = None,
-        created_by: Optional[str] = None,
-    ) -> Optional[dict]:
+        organization_id: int | None = None,
+        created_by: str | None = None,
+    ) -> dict | None:
         """Get a specific service key by ID."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(
@@ -212,8 +210,8 @@ class MPSServiceKeyClient:
     async def archive_service_key(
         self,
         key_id: int,
-        organization_id: Optional[int] = None,
-        created_by: Optional[str] = None,
+        organization_id: int | None = None,
+        created_by: str | None = None,
     ) -> bool:
         """
         Archive (soft delete) a service key.
@@ -317,9 +315,9 @@ class MPSServiceKeyClient:
     async def create_credit_purchase_url(
         self,
         organization_id: int,
-        created_by: Optional[str] = None,
-        return_url: Optional[str] = None,
-        billing_details: Optional[dict] = None,
+        created_by: str | None = None,
+        return_url: str | None = None,
+        billing_details: dict | None = None,
     ) -> dict:
         """Create a short-lived MPS checkout URL for adding organization credits."""
         payload = {
@@ -356,7 +354,7 @@ class MPSServiceKeyClient:
         organization_id: int,
         page: int = 1,
         limit: int = 50,
-        created_by: Optional[str] = None,
+        created_by: str | None = None,
     ) -> dict:
         """Get the MPS v2 billing account balance and recent credit ledger."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -409,7 +407,7 @@ class MPSServiceKeyClient:
     async def ensure_billing_account_v2(
         self,
         organization_id: int,
-        created_by: Optional[str] = None,
+        created_by: str | None = None,
     ) -> dict:
         """Create or return the MPS v2 billing account for an organization."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -439,11 +437,11 @@ class MPSServiceKeyClient:
         *,
         organization_id: int,
         workflow_run_id: int | None = None,
-        service_key: Optional[str] = None,
+        service_key: str | None = None,
         require_correlation_id: bool = False,
         minimum_credits: float | None = None,
-        metadata: Optional[dict] = None,
-        created_by: Optional[str] = None,
+        metadata: dict | None = None,
+        created_by: str | None = None,
     ) -> dict:
         """Authorize a hosted workflow run and optionally mint its MPS correlation."""
         payload = {
@@ -485,7 +483,7 @@ class MPSServiceKeyClient:
         workflow_run_id: int | None = None,
         require_correlation_id: bool = False,
         minimum_credits: float | None = None,
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> dict:
         """Authorize an OSS run using the configured service key as identity."""
         payload = {
@@ -557,10 +555,10 @@ class MPSServiceKeyClient:
         self,
         *,
         organization_id: int,
-        correlation_id: Optional[str] = None,
-        duration_seconds: Optional[float] = None,
+        correlation_id: str | None = None,
+        duration_seconds: float | None = None,
         workflow_run_id: int | None = None,
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
         max_attempts: int = 3,
     ) -> dict:
         """Report hosted Dograh platform usage for a completed workflow run."""
@@ -629,9 +627,9 @@ class MPSServiceKeyClient:
         content_type: str = "audio/wav",
         language: str = "en",
         model: str = "default",
-        correlation_id: Optional[str] = None,
-        organization_id: Optional[int] = None,
-        created_by: Optional[str] = None,
+        correlation_id: str | None = None,
+        organization_id: int | None = None,
+        created_by: str | None = None,
     ) -> dict:
         """
         Transcribe an audio file via MPS STT API.
@@ -690,8 +688,8 @@ class MPSServiceKeyClient:
     def validate_service_key(
         self,
         service_key: str,
-        organization_id: Optional[int] = None,
-        created_by: Optional[str] = None,
+        organization_id: int | None = None,
+        created_by: str | None = None,
     ) -> bool:
         """
         Synchronously validate a Dograh service key by checking usage via MPS.
@@ -715,13 +713,13 @@ class MPSServiceKeyClient:
     async def get_voices(
         self,
         provider: str,
-        model: Optional[str] = None,
-        language: Optional[str] = None,
-        q: Optional[str] = None,
-        gender: Optional[str] = None,
-        accent: Optional[str] = None,
-        organization_id: Optional[int] = None,
-        created_by: Optional[str] = None,
+        model: str | None = None,
+        language: str | None = None,
+        q: str | None = None,
+        gender: str | None = None,
+        accent: str | None = None,
+        organization_id: int | None = None,
+        created_by: str | None = None,
     ) -> dict:
         """
         Get available voices for a TTS provider from MPS.
@@ -778,10 +776,10 @@ class MPSServiceKeyClient:
         max_tokens: int = 128,
         chunk_overlap_tokens: int = 0,
         merge_peers: bool = True,
-        tokenizer_model: Optional[str] = None,
-        correlation_id: Optional[str] = None,
-        organization_id: Optional[int] = None,
-        created_by: Optional[str] = None,
+        tokenizer_model: str | None = None,
+        correlation_id: str | None = None,
+        organization_id: int | None = None,
+        created_by: str | None = None,
     ) -> dict:
         """Convert + chunk a document via MPS /document/process.
 
@@ -839,8 +837,8 @@ class MPSServiceKeyClient:
         call_type: str,
         use_case: str,
         activity_description: str,
-        organization_id: Optional[int] = None,
-        created_by: Optional[str] = None,
+        organization_id: int | None = None,
+        created_by: str | None = None,
     ) -> dict:
         """
         Call the MPS workflow creation API using secret key authentication.

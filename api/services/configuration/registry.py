@@ -1,8 +1,6 @@
 import random
 from enum import Enum, auto
-from typing import Annotated, Dict, Literal, Type, TypeVar, Union
-
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+from typing import Annotated, Literal, TypeVar
 
 from api.services.configuration.options import (
     AZURE_EMBEDDING_MODELS,
@@ -53,6 +51,7 @@ from api.services.configuration.options import (
     SPEECHMATICS_STT_LANGUAGES,
 )
 from api.services.configuration.options.google import GOOGLE_VERTEX_MODELS
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 
 class ServiceType(Enum):
@@ -179,7 +178,7 @@ class BaseEmbeddingsConfiguration(BaseServiceConfiguration):
 
 
 # Unified registry for all service types
-REGISTRY: Dict[ServiceType, Dict[str, Type[BaseServiceConfiguration]]] = {
+REGISTRY: dict[ServiceType, dict[str, type[BaseServiceConfiguration]]] = {
     ServiceType.LLM: {},
     ServiceType.TTS: {},
     ServiceType.STT: {},
@@ -193,7 +192,7 @@ T = TypeVar("T", bound=BaseServiceConfiguration)
 def register_service(service_type: ServiceType):
     """Generic decorator for registering service configurations"""
 
-    def decorator(cls: Type[T]) -> Type[T]:
+    def decorator(cls: type[T]) -> type[T]:
         # Get provider from class attributes or field defaults
         provider = getattr(cls, "provider", None)
         if provider is None:
@@ -211,19 +210,19 @@ def register_service(service_type: ServiceType):
 
 
 # Convenience decorators
-def register_llm(cls: Type[BaseLLMConfiguration]):
+def register_llm(cls: type[BaseLLMConfiguration]):
     return register_service(ServiceType.LLM)(cls)
 
 
-def register_tts(cls: Type[BaseTTSConfiguration]):
+def register_tts(cls: type[BaseTTSConfiguration]):
     return register_service(ServiceType.TTS)(cls)
 
 
-def register_stt(cls: Type[BaseSTTConfiguration]):
+def register_stt(cls: type[BaseSTTConfiguration]):
     return register_service(ServiceType.STT)(cls)
 
 
-def register_embeddings(cls: Type[BaseEmbeddingsConfiguration]):
+def register_embeddings(cls: type[BaseEmbeddingsConfiguration]):
     return register_service(ServiceType.EMBEDDINGS)(cls)
 
 
@@ -851,33 +850,12 @@ REALTIME_PROVIDERS = {
 
 
 LLMConfig = Annotated[
-    Union[
-        OpenAILLMService,
-        AtlasCloudLLMService,
-        GoogleVertexLLMConfiguration,
-        GroqLLMService,
-        OpenRouterLLMConfiguration,
-        GoogleLLMService,
-        AzureLLMService,
-        DograhLLMService,
-        AWSBedrockLLMConfiguration,
-        SpeachesLLMConfiguration,
-        HuggingFaceLLMConfiguration,
-        MiniMaxLLMConfiguration,
-        SarvamLLMConfiguration,
-    ],
+    OpenAILLMService | AtlasCloudLLMService | GoogleVertexLLMConfiguration | GroqLLMService | OpenRouterLLMConfiguration | GoogleLLMService | AzureLLMService | DograhLLMService | AWSBedrockLLMConfiguration | SpeachesLLMConfiguration | HuggingFaceLLMConfiguration | MiniMaxLLMConfiguration | SarvamLLMConfiguration,
     Field(discriminator="provider"),
 ]
 
 RealtimeConfig = Annotated[
-    Union[
-        OpenAIRealtimeLLMConfiguration,
-        GrokRealtimeLLMConfiguration,
-        UltravoxRealtimeLLMConfiguration,
-        GoogleRealtimeLLMConfiguration,
-        GoogleVertexRealtimeLLMConfiguration,
-        AzureRealtimeLLMConfiguration,
-    ],
+    OpenAIRealtimeLLMConfiguration | GrokRealtimeLLMConfiguration | UltravoxRealtimeLLMConfiguration | GoogleRealtimeLLMConfiguration | GoogleVertexRealtimeLLMConfiguration | AzureRealtimeLLMConfiguration,
     Field(discriminator="provider"),
 ]
 
@@ -1406,24 +1384,7 @@ class LmntTTSConfiguration(BaseTTSConfiguration):
 
 
 TTSConfig = Annotated[
-    Union[
-        DeepgramTTSConfiguration,
-        GoogleTTSConfiguration,
-        OpenAITTSService,
-        ElevenlabsTTSConfiguration,
-        CartesiaTTSConfiguration,
-        InworldTTSConfiguration,
-        DograhTTSService,
-        SarvamTTSConfiguration,
-        CambTTSConfiguration,
-        RimeTTSConfiguration,
-        SpeachesTTSConfiguration,
-        MiniMaxTTSConfiguration,
-        AzureSpeechTTSConfiguration,
-        SmallestAITTSConfiguration,
-        XAITTSConfiguration,
-        LmntTTSConfiguration,
-    ],
+    DeepgramTTSConfiguration | GoogleTTSConfiguration | OpenAITTSService | ElevenlabsTTSConfiguration | CartesiaTTSConfiguration | InworldTTSConfiguration | DograhTTSService | SarvamTTSConfiguration | CambTTSConfiguration | RimeTTSConfiguration | SpeachesTTSConfiguration | MiniMaxTTSConfiguration | AzureSpeechTTSConfiguration | SmallestAITTSConfiguration | XAITTSConfiguration | LmntTTSConfiguration,
     Field(discriminator="provider"),
 ]
 
@@ -1825,22 +1786,7 @@ class SmallestAISTTConfiguration(BaseSTTConfiguration):
 
 
 STTConfig = Annotated[
-    Union[
-        DeepgramSTTConfiguration,
-        CartesiaSTTConfiguration,
-        OpenAISTTConfiguration,
-        GoogleSTTConfiguration,
-        DograhSTTService,
-        SpeechmaticsSTTConfiguration,
-        SarvamSTTConfiguration,
-        SpeachesSTTConfiguration,
-        HuggingFaceSTTConfiguration,
-        AssemblyAISTTConfiguration,
-        GladiaSTTConfiguration,
-        AzureSpeechSTTConfiguration,
-        SmallestAISTTConfiguration,
-        ElevenlabsSTTConfiguration,
-    ],
+    DeepgramSTTConfiguration | CartesiaSTTConfiguration | OpenAISTTConfiguration | GoogleSTTConfiguration | DograhSTTService | SpeechmaticsSTTConfiguration | SarvamSTTConfiguration | SpeachesSTTConfiguration | HuggingFaceSTTConfiguration | AssemblyAISTTConfiguration | GladiaSTTConfiguration | AzureSpeechSTTConfiguration | SmallestAISTTConfiguration | ElevenlabsSTTConfiguration,
     Field(discriminator="provider"),
 ]
 
@@ -1918,16 +1864,11 @@ class DograhEmbeddingsConfiguration(BaseEmbeddingsConfiguration):
 
 
 EmbeddingsConfig = Annotated[
-    Union[
-        OpenAIEmbeddingsConfiguration,
-        OpenRouterEmbeddingsConfiguration,
-        AzureOpenAIEmbeddingsConfiguration,
-        DograhEmbeddingsConfiguration,
-    ],
+    OpenAIEmbeddingsConfiguration | OpenRouterEmbeddingsConfiguration | AzureOpenAIEmbeddingsConfiguration | DograhEmbeddingsConfiguration,
     Field(discriminator="provider"),
 ]
 
 ServiceConfig = Annotated[
-    Union[LLMConfig, RealtimeConfig, TTSConfig, STTConfig, EmbeddingsConfig],
+    LLMConfig | RealtimeConfig | TTSConfig | STTConfig | EmbeddingsConfig,
     Field(discriminator="provider"),
 ]

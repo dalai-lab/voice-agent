@@ -4,11 +4,11 @@ from logging.config import fileConfig
 from pathlib import Path
 
 import alembic_postgresql_enum  # noqa: F401 - registers enum handling hooks
-from alembic import context
+from api.constants import DATABASE_URL
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from api.constants import DATABASE_URL
+from alembic import context
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -18,7 +18,7 @@ config = context.config
 fileConfig(config.config_file_name)
 
 # Import your model's MetaData object for 'autogenerate' support.
-from api.db.models import Base  # noqa: E402 ensure this points to your models.py
+from api.db.models import Base
 
 target_metadata = Base.metadata
 

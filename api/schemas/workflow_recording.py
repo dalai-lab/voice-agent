@@ -1,7 +1,7 @@
 """Pydantic schemas for workflow recording operations."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -32,7 +32,7 @@ class FileDescriptor(BaseModel):
 class BatchRecordingUploadRequestSchema(BaseModel):
     """Request schema for getting presigned upload URLs for one or more files."""
 
-    files: List[FileDescriptor] = Field(
+    files: list[FileDescriptor] = Field(
         ..., min_length=1, max_length=20, description="List of files to upload"
     )
 
@@ -40,7 +40,7 @@ class BatchRecordingUploadRequestSchema(BaseModel):
 class BatchRecordingUploadResponseSchema(BaseModel):
     """Response schema with presigned upload URLs."""
 
-    items: List[RecordingUploadResponseSchema] = Field(
+    items: list[RecordingUploadResponseSchema] = Field(
         ..., description="Upload URLs for each file"
     )
 
@@ -49,18 +49,18 @@ class RecordingCreateRequestSchema(BaseModel):
     """Request schema for creating a recording record after upload."""
 
     recording_id: str = Field(..., description="Short recording ID from upload step")
-    tts_provider: Optional[str] = Field(
+    tts_provider: str | None = Field(
         default=None, description="TTS provider (e.g. elevenlabs)"
     )
-    tts_model: Optional[str] = Field(default=None, description="TTS model name")
-    tts_voice_id: Optional[str] = Field(
+    tts_model: str | None = Field(default=None, description="TTS model name")
+    tts_voice_id: str | None = Field(
         default=None, description="TTS voice identifier"
     )
     transcript: str = Field(
         ..., description="User-provided transcript of the recording"
     )
     storage_key: str = Field(..., description="Storage key from upload step")
-    metadata: Optional[Dict[str, Any]] = Field(
+    metadata: dict[str, Any] | None = Field(
         default=None, description="Optional metadata (file_size, duration, etc.)"
     )
 
@@ -70,15 +70,15 @@ class RecordingResponseSchema(BaseModel):
 
     id: int
     recording_id: str
-    workflow_id: Optional[int] = None
+    workflow_id: int | None = None
     organization_id: int
-    tts_provider: Optional[str] = None
-    tts_model: Optional[str] = None
-    tts_voice_id: Optional[str] = None
+    tts_provider: str | None = None
+    tts_model: str | None = None
+    tts_voice_id: str | None = None
     transcript: str
     storage_key: str
     storage_backend: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     created_by: int
     created_at: datetime
     is_active: bool
@@ -87,7 +87,7 @@ class RecordingResponseSchema(BaseModel):
 class BatchRecordingCreateRequestSchema(BaseModel):
     """Request schema for creating one or more recording records after upload."""
 
-    recordings: List[RecordingCreateRequestSchema] = Field(
+    recordings: list[RecordingCreateRequestSchema] = Field(
         ..., min_length=1, max_length=20, description="List of recordings to create"
     )
 
@@ -95,7 +95,7 @@ class BatchRecordingCreateRequestSchema(BaseModel):
 class BatchRecordingCreateResponseSchema(BaseModel):
     """Response schema for recording creation."""
 
-    recordings: List[RecordingResponseSchema] = Field(
+    recordings: list[RecordingResponseSchema] = Field(
         ..., description="Created recording records"
     )
 
@@ -115,5 +115,5 @@ class RecordingUpdateRequestSchema(BaseModel):
 class RecordingListResponseSchema(BaseModel):
     """Response schema for list of recordings."""
 
-    recordings: List[RecordingResponseSchema]
+    recordings: list[RecordingResponseSchema]
     total: int

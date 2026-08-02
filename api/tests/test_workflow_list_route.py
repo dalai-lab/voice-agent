@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -28,7 +28,7 @@ def test_workflow_fetch_list_includes_workflow_uuid():
         id=5,
         name="Sales Agent",
         status="active",
-        created_at=datetime(2026, 5, 22, 10, 30, tzinfo=timezone.utc),
+        created_at=datetime(2026, 5, 22, 10, 30, tzinfo=UTC),
         folder_id=3,
         workflow_uuid="workflow-uuid-123",
     )

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -12,8 +12,8 @@ class BaseDBClient:
         self.async_session = async_sessionmaker(bind=self.engine)
 
     async def execute_raw_query(
-        self, query: str, params: Dict[str, Any] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, params: dict[str, Any] = None
+    ) -> list[dict[str, Any]]:
         """
         Execute a raw SQL query and return results as a list of dictionaries.
 

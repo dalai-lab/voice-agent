@@ -15,7 +15,6 @@ acts on a delivery that is still ``pending``.
 """
 
 from datetime import UTC, datetime, timedelta
-from typing import Optional
 
 import httpx
 from loguru import logger
@@ -48,7 +47,7 @@ async def _enqueue_delivery(
     delivery_id: int,
     attempt_count: int,
     defer_by: int = 0,
-    reclaim_token: Optional[int] = None,
+    reclaim_token: int | None = None,
 ):
     """Enqueue a delivery attempt with a dedup-safe job id.
 
@@ -113,7 +112,7 @@ async def _handle_transient_failure(
     delivery: WebhookDeliveryModel,
     attempt: int,
     error: str,
-    status_code: Optional[int],
+    status_code: int | None,
 ) -> None:
     """Schedule a backed-off retry, or dead-letter once attempts are exhausted."""
     if attempt >= delivery.max_attempts:

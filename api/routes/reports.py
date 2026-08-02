@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -14,10 +14,10 @@ router = APIRouter(prefix="/organizations/reports")
 class DailyReportResponse(BaseModel):
     date: str
     timezone: str
-    workflow_id: Optional[int]
-    metrics: Dict[str, int]
-    disposition_distribution: List[Dict[str, Any]]
-    call_duration_distribution: List[Dict[str, Any]]
+    workflow_id: int | None
+    metrics: dict[str, int]
+    disposition_distribution: list[dict[str, Any]]
+    call_duration_distribution: list[dict[str, Any]]
 
 
 class WorkflowOption(BaseModel):
@@ -39,7 +39,7 @@ class WorkflowRunDetail(BaseModel):
 async def get_daily_report(
     date: str = Query(..., description="Date in YYYY-MM-DD format"),
     timezone: str = Query(..., description="IANA timezone (e.g., 'America/New_York')"),
-    workflow_id: Optional[int] = Query(
+    workflow_id: int | None = Query(
         None, description="Optional workflow ID to filter by"
     ),
     user: UserModel = Depends(get_user),
@@ -74,10 +74,10 @@ async def get_daily_report(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/workflows", response_model=List[WorkflowOption])
+@router.get("/workflows", response_model=list[WorkflowOption])
 async def get_workflow_options(
     user: UserModel = Depends(get_user),
-) -> List[WorkflowOption]:
+) -> list[WorkflowOption]:
     """
     Get all workflows for the user's organization.
     Used to populate the workflow selector dropdown in the reports page.
@@ -94,15 +94,15 @@ async def get_workflow_options(
     return [WorkflowOption(**w) for w in workflows]
 
 
-@router.get("/daily/runs", response_model=List[WorkflowRunDetail])
+@router.get("/daily/runs", response_model=list[WorkflowRunDetail])
 async def get_daily_runs_detail(
     date: str = Query(..., description="Date in YYYY-MM-DD format"),
     timezone: str = Query(..., description="IANA timezone (e.g., 'America/New_York')"),
-    workflow_id: Optional[int] = Query(
+    workflow_id: int | None = Query(
         None, description="Optional workflow ID to filter by"
     ),
     user: UserModel = Depends(get_user),
-) -> List[WorkflowRunDetail]:
+) -> list[WorkflowRunDetail]:
     """
     Get detailed workflow runs for the specified date.
     Used for CSV export functionality.

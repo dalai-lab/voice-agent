@@ -6,13 +6,10 @@ import base64
 import hashlib
 import hmac
 import json
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, quote, urlparse, urlunparse
 
 import aiohttp
-from fastapi import HTTPException
-from loguru import logger
-
 from api.db import db_client
 from api.enums import TelephonyCallStatus, WorkflowRunMode
 from api.services.telephony import ws_auth
@@ -25,6 +22,8 @@ from api.services.telephony.base import (
 )
 from api.utils.common import get_backend_endpoints
 from api.utils.telephony_address import normalize_telephony_address
+from fastapi import HTTPException
+from loguru import logger
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -38,7 +37,7 @@ class PlivoProvider(TelephonyProvider):
     PROVIDER_NAME = WorkflowRunMode.PLIVO.value
     WEBHOOK_ENDPOINT = "plivo-xml"
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.auth_id = config.get("auth_id")
         self.auth_token = config.get("auth_token")
         self.application_id = config.get("application_id")
@@ -54,8 +53,8 @@ class PlivoProvider(TelephonyProvider):
         self,
         to_number: str,
         webhook_url: str,
-        workflow_run_id: Optional[int] = None,
-        from_number: Optional[str] = None,
+        workflow_run_id: int | None = None,
+        from_number: str | None = None,
         **kwargs: Any,
     ) -> CallInitiationResult:
         if not self.validate_config():
@@ -116,7 +115,7 @@ class PlivoProvider(TelephonyProvider):
                     raw_response=response_data,
                 )
 
-    async def get_call_status(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_status(self, call_id: str) -> dict[str, Any]:
         if not self.validate_config():
             raise ValueError("Plivo provider not properly configured")
 
@@ -131,7 +130,7 @@ class PlivoProvider(TelephonyProvider):
 
                 return await response.json()
 
-    async def get_available_phone_numbers(self) -> List[str]:
+    async def get_available_phone_numbers(self) -> list[str]:
         return self.from_numbers
 
     def validate_config(self) -> bool:
@@ -148,7 +147,7 @@ class PlivoProvider(TelephonyProvider):
         return value
 
     @staticmethod
-    def _query_map(query: str) -> Dict[str, Any]:
+    def _query_map(query: str) -> dict[str, Any]:
         return {
             PlivoProvider._stringify_signature_value(
                 key
@@ -157,7 +156,7 @@ class PlivoProvider(TelephonyProvider):
         }
 
     @staticmethod
-    def _sorted_query_string(params: Dict[str, Any]) -> str:
+    def _sorted_query_string(params: dict[str, Any]) -> str:
         parts: list[str] = []
         for key in sorted(params.keys()):
             value = params[key]
@@ -171,7 +170,7 @@ class PlivoProvider(TelephonyProvider):
         return "&".join(parts)
 
     @staticmethod
-    def _sorted_params_string(params: Dict[str, Any]) -> str:
+    def _sorted_params_string(params: dict[str, Any]) -> str:
         parts: list[str] = []
         for key in sorted(params.keys()):
             value = params[key]
@@ -188,7 +187,7 @@ class PlivoProvider(TelephonyProvider):
 
     @staticmethod
     def _construct_get_url(
-        uri: str, params: Dict[str, Any], empty_post_params: bool = True
+        uri: str, params: dict[str, Any], empty_post_params: bool = True
     ) -> str:
         parsed_uri = urlparse(uri)
         base_url = urlunparse(
@@ -206,7 +205,7 @@ class PlivoProvider(TelephonyProvider):
         return base_url
 
     @staticmethod
-    def _construct_post_url(uri: str, params: Dict[str, Any]) -> str:
+    def _construct_post_url(uri: str, params: dict[str, Any]) -> str:
         base_url = PlivoProvider._construct_get_url(
             uri,
             {},
@@ -217,7 +216,7 @@ class PlivoProvider(TelephonyProvider):
     async def verify_webhook_signature(
         self,
         url: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         signature: str,
         nonce: str = "",
     ) -> bool:
@@ -251,7 +250,7 @@ class PlivoProvider(TelephonyProvider):
     <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000">{ws_url}</Stream>
 </Response>"""
 
-    async def get_call_cost(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_cost(self, call_id: str) -> dict[str, Any]:
         endpoint = f"{self.base_url}/Call/{call_id}/"
 
         try:
@@ -283,7 +282,7 @@ class PlivoProvider(TelephonyProvider):
             logger.error(f"Exception fetching Plivo call cost: {e}")
             return {"cost_usd": 0.0, "duration": 0, "status": "error", "error": str(e)}
 
-    def parse_status_callback(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_status_callback(self, data: dict[str, Any]) -> dict[str, Any]:
         status_map = {
             "in-progress": TelephonyCallStatus.ANSWERED,
             "ringing": TelephonyCallStatus.RINGING,
@@ -359,7 +358,7 @@ class PlivoProvider(TelephonyProvider):
 
     @classmethod
     def can_handle_webhook(
-        cls, webhook_data: Dict[str, Any], headers: Dict[str, str]
+        cls, webhook_data: dict[str, Any], headers: dict[str, str]
     ) -> bool:
         has_plivo_signature = (
             "x-plivo-signature-v3" in headers or "x-plivo-signature-ma-v3" in headers
@@ -367,7 +366,7 @@ class PlivoProvider(TelephonyProvider):
         return has_plivo_signature and "CallUUID" in webhook_data
 
     @staticmethod
-    def parse_inbound_webhook(webhook_data: Dict[str, Any]) -> NormalizedInboundData:
+    def parse_inbound_webhook(webhook_data: dict[str, Any]) -> NormalizedInboundData:
         from_raw = webhook_data.get("From", "")
         to_raw = webhook_data.get("To", "")
         return NormalizedInboundData(
@@ -399,8 +398,8 @@ class PlivoProvider(TelephonyProvider):
     async def verify_inbound_signature(
         self,
         url: str,
-        webhook_data: Dict[str, Any],
-        headers: Dict[str, str],
+        webhook_data: dict[str, Any],
+        headers: dict[str, str],
         body: str = "",
     ) -> bool:
         signature = headers.get("x-plivo-signature-v3") or headers.get(
@@ -415,7 +414,7 @@ class PlivoProvider(TelephonyProvider):
         return await self.verify_webhook_signature(url, webhook_data, signature, nonce)
 
     async def configure_inbound(
-        self, address: str, webhook_url: Optional[str]
+        self, address: str, webhook_url: str | None
     ) -> ProviderSyncResult:
         """Update the answer_url on the configured Plivo Application.
 
@@ -564,9 +563,8 @@ class PlivoProvider(TelephonyProvider):
 
     @staticmethod
     def generate_validation_error_response(error_type) -> tuple:
-        from fastapi import Response
-
         from api.errors.telephony_errors import TELEPHONY_ERROR_MESSAGES, TelephonyError
+        from fastapi import Response
 
         message = TELEPHONY_ERROR_MESSAGES.get(
             error_type, TELEPHONY_ERROR_MESSAGES[TelephonyError.GENERAL_AUTH_FAILED]
@@ -586,7 +584,7 @@ class PlivoProvider(TelephonyProvider):
         conference_name: str,
         timeout: int = 30,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Dial the transfer destination and point its answer URL at the conference.
 
         The destination answer callback seeds the conference. The original

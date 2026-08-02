@@ -1,11 +1,6 @@
-from typing import Optional
-
 
 import httpx
 import openai
-from deepgram import DeepgramClient
-from groq import Groq
-from typing_extensions import TypedDict
 
 # try:
 #     from pyneuphonic import Neuphonic
@@ -17,10 +12,13 @@ from api.schemas.ai_model_configuration import (
 from api.services.configuration.registry import ServiceConfig, ServiceProviders
 from api.services.mps_service_key_client import mps_service_key_client
 from api.utils.url_security import validate_user_configured_service_url
+from deepgram import DeepgramClient
+from groq import Groq
+from typing_extensions import TypedDict
 
 AuthContext = TypedDict(
     "AuthContext",
-    {"organization_id": Optional[int], "created_by": Optional[str]},
+    {"organization_id": int | None, "created_by": str | None},
     total=False,
 )
 
@@ -74,8 +72,8 @@ class UserConfigurationValidator:
     async def validate(
         self,
         configuration: EffectiveAIModelConfiguration,
-        organization_id: Optional[int] = None,
-        created_by: Optional[str] = None,
+        organization_id: int | None = None,
+        created_by: str | None = None,
     ) -> APIKeyStatusResponse:
         self._auth_context: AuthContext = {
             "organization_id": organization_id,
@@ -107,7 +105,7 @@ class UserConfigurationValidator:
 
     def _validate_service(
         self,
-        service_config: Optional[ServiceConfig],
+        service_config: ServiceConfig | None,
         service_name: str,
         required: bool = True,
     ) -> list[APIKeyStatus]:
@@ -223,7 +221,7 @@ class UserConfigurationValidator:
         self,
         provider: str,
         api_key: str,
-        service_config: Optional[ServiceConfig] = None,
+        service_config: ServiceConfig | None = None,
     ) -> bool:
         """Check if an API key for a provider is valid."""
         validator = self._validator_map.get(provider)
@@ -239,7 +237,7 @@ class UserConfigurationValidator:
         return validator(provider, api_key)
 
     def _check_openai_api_key(
-        self, model: str, api_key: str, service_config: Optional[ServiceConfig] = None
+        self, model: str, api_key: str, service_config: ServiceConfig | None = None
     ) -> bool:
         provider_name = (
             "Atlas Cloud" if model == ServiceProviders.ATLASCLOUD.value else "OpenAI"

@@ -94,7 +94,7 @@ async def test_interruption_with_blocked_end_frame():
                 asyncio.gather(*pending, return_exceptions=True),
                 timeout=2.0,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass  # Cleanup took too long, continue anyway
 
         pytest.fail("Test timed out after 2 second")

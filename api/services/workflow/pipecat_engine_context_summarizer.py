@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
+from api.services.pipecat.tracing_config import ensure_tracing
 from loguru import logger
 from opentelemetry import trace
 from pipecat.frames.frames import LLMContextSummaryRequestFrame
@@ -12,8 +13,6 @@ from pipecat.utils.context.llm_context_summarization import (
     LLMContextSummaryConfig,
 )
 from pipecat.utils.tracing.service_attributes import add_llm_span_attributes
-
-from api.services.pipecat.tracing_config import ensure_tracing
 
 if TYPE_CHECKING:
     from api.services.workflow.pipecat_engine import PipecatEngine
@@ -26,9 +25,9 @@ class ContextSummarizationManager:
     with a concise summary to keep the context window manageable.
     """
 
-    def __init__(self, engine: "PipecatEngine") -> None:
+    def __init__(self, engine: PipecatEngine) -> None:
         self._engine = engine
-        self._summarization_task: Optional[asyncio.Task] = None
+        self._summarization_task: asyncio.Task | None = None
         self._config = LLMContextSummaryConfig(
             target_context_tokens=4000,
             min_messages_after_summary=2,
@@ -165,7 +164,7 @@ class ContextSummarizationManager:
             )
         except asyncio.CancelledError:
             logger.debug("Context summarization cancelled (new transition started)")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 f"Context summarization timed out after {self._config.summarization_timeout}s"
             )

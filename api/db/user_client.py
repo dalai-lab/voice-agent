@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from loguru import logger
 from pydantic import ValidationError
@@ -32,7 +32,7 @@ class UserClient(BaseDBClient):
             # This is atomic and handles race conditions at the database level
             stmt = insert(UserModel.__table__).values(
                 provider_id=provider_id,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 selected_organization_id=None,  # Will be set later
                 is_superuser=False,  # Default value
             )
@@ -211,7 +211,7 @@ class UserClient(BaseDBClient):
         """Create a new user with email and password hash."""
         async with self.async_session() as session:
             user = UserModel(
-                provider_id=f"oss_{int(datetime.now(timezone.utc).timestamp())}_{uuid.uuid4()}",
+                provider_id=f"oss_{int(datetime.now(UTC).timestamp())}_{uuid.uuid4()}",
                 email=email.lower(),
                 password_hash=password_hash,
             )

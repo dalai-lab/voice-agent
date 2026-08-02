@@ -7,7 +7,7 @@ across multiple API server instances.
 import json
 from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class TransferEventType(str, Enum):
@@ -24,15 +24,15 @@ class TransferEvent:
     type: TransferEventType
     transfer_id: str
     original_call_sid: str
-    transfer_call_sid: Optional[str] = None
-    target_number: Optional[str] = None
-    conference_name: Optional[str] = None
-    message: Optional[str] = None
-    status: Optional[str] = None
-    action: Optional[str] = None
-    reason: Optional[str] = None
+    transfer_call_sid: str | None = None
+    target_number: str | None = None
+    conference_name: str | None = None
+    message: str | None = None
+    status: str | None = None
+    action: str | None = None
+    reason: str | None = None
     end_call: bool = False
-    timestamp: Optional[float] = None
+    timestamp: float | None = None
 
     def to_json(self) -> str:
         """Convert event to JSON string."""
@@ -43,7 +43,7 @@ class TransferEvent:
         """Create event from JSON string."""
         return cls(**json.loads(data))
 
-    def to_result_dict(self) -> Dict[str, Any]:
+    def to_result_dict(self) -> dict[str, Any]:
         """Convert to function call result format."""
         result = {
             "status": self.status or "success",
@@ -62,7 +62,7 @@ class TransferContext:
     """Transfer context data stored in Redis."""
 
     transfer_id: str
-    call_sid: Optional[str]
+    call_sid: str | None
     target_number: str
     tool_uuid: str
     original_call_sid: str
@@ -70,8 +70,8 @@ class TransferContext:
     initiated_at: float
     # workflow_run_id: lets transfer_id-keyed webhooks resolve org/credentials.
     # conference_id: set by providers that seed the conference on answer (Telnyx).
-    workflow_run_id: Optional[int] = None
-    conference_id: Optional[str] = None
+    workflow_run_id: int | None = None
+    conference_id: str | None = None
 
     def to_json(self) -> str:
         """Convert context to JSON string."""
@@ -82,7 +82,7 @@ class TransferContext:
         """Create context from JSON string."""
         return cls(**json.loads(data))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
 

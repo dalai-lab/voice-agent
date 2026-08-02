@@ -6,7 +6,6 @@ transport serializers, VAD, and audio buffers.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 from loguru import logger
 
@@ -29,7 +28,7 @@ class AudioConfig:
     transport_in_sample_rate: int
     transport_out_sample_rate: int
     vad_sample_rate: int = 16000  # VAD typically resamples internally
-    pipeline_sample_rate: Optional[int] = None  # If None, uses transport rates
+    pipeline_sample_rate: int | None = None  # If None, uses transport rates
     buffer_size_seconds: float = 5.0  # This is how frequenly we will call merge_auido
     max_recording_duration_seconds: float = 300.0  # 5 minutes max recording duration
 

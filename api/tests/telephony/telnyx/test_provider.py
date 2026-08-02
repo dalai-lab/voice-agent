@@ -6,11 +6,10 @@ from unittest.mock import AsyncMock, patch
 
 import nacl.signing
 import pytest
-from fastapi import HTTPException
-from starlette.requests import Request
-
 from api.services.telephony.providers.telnyx.provider import TelnyxProvider
 from api.services.telephony.providers.telnyx.routes import handle_telnyx_events
+from fastapi import HTTPException
+from starlette.requests import Request
 
 
 def _body() -> str:
@@ -48,7 +47,7 @@ def _signed_headers(body: str, timestamp: str | None = None):
         timestamp = str(int(time.time()))
     signing_key = nacl.signing.SigningKey.generate()
     public_key = base64.b64encode(bytes(signing_key.verify_key)).decode("ascii")
-    signed_payload = f"{timestamp}|{body}".encode("utf-8")
+    signed_payload = f"{timestamp}|{body}".encode()
     signature = base64.b64encode(signing_key.sign(signed_payload).signature).decode(
         "ascii"
     )

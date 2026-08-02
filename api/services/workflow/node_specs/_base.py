@@ -13,7 +13,7 @@ and example coverage.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -73,14 +73,14 @@ class DisplayOptions(BaseModel):
         DisplayOptions(show={"greeting_type": ["audio"]})
     """
 
-    show: Optional[dict[str, list[Any]]] = None
-    hide: Optional[dict[str, list[Any]]] = None
+    show: dict[str, list[Any]] | None = None
+    hide: dict[str, list[Any]] | None = None
 
     model_config = ConfigDict(extra="forbid")
 
 
 def evaluate_display_options(
-    rules: Optional[DisplayOptions | dict[str, Any]],
+    rules: DisplayOptions | dict[str, Any] | None,
     values: dict[str, Any],
 ) -> bool:
     """Reference implementation of the display_options visibility check.
@@ -118,7 +118,7 @@ class PropertyOption(BaseModel):
 
     value: str | int | bool | float
     label: str
-    description: Optional[str] = None
+    description: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -136,7 +136,7 @@ class PropertyOption(BaseModel):
 class PropertyLayoutOptions(BaseModel):
     """Renderer layout hints for a property in the node editor."""
 
-    column_span: Optional[int] = Field(
+    column_span: int | None = Field(
         default=None,
         ge=1,
         le=12,
@@ -163,8 +163,8 @@ class PropertyRendererOptions(BaseModel):
     Add new renderer behavior here instead of using free-form property metadata.
     """
 
-    layout: Optional[PropertyLayoutOptions] = None
-    number_input: Optional[NumberInputOptions] = None
+    layout: PropertyLayoutOptions | None = None
+    number_input: NumberInputOptions | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -190,35 +190,35 @@ class PropertySpec(BaseModel):
         min_length=1,
         description="Human-facing explanation shown in the UI.",
     )
-    llm_hint: Optional[str] = Field(
+    llm_hint: str | None = Field(
         default=None,
         description="LLM-only guidance; omitted from the UI.",
     )
     default: Any = None
     required: bool = False
-    placeholder: Optional[str] = None
+    placeholder: str | None = None
 
-    display_options: Optional[DisplayOptions] = None
+    display_options: DisplayOptions | None = None
 
     # For `options` / `multi_options`
-    options: Optional[list[PropertyOption]] = None
+    options: list[PropertyOption] | None = None
 
     # For `fixed_collection` — sub-properties of each row
-    properties: Optional[list["PropertySpec"]] = None
+    properties: list[PropertySpec] | None = None
 
     # Validation hints. Enforced by Pydantic where possible.
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    min_length: Optional[int] = None
-    max_length: Optional[int] = None
-    pattern: Optional[str] = None
+    min_value: float | None = None
+    max_value: float | None = None
+    min_length: int | None = None
+    max_length: int | None = None
+    pattern: str | None = None
 
     # Renderer hint, e.g. "textarea" vs single-line for `string`.
-    editor: Optional[str] = None
+    editor: str | None = None
 
     # Typed metadata for renderer-specific behavior. Extend
     # `PropertyRendererOptions` when the renderer needs a new hint.
-    renderer_options: Optional[PropertyRendererOptions] = None
+    renderer_options: PropertyRendererOptions | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -267,7 +267,7 @@ class NodeExample(BaseModel):
     """A worked example LLMs can pattern-match. Keep small and realistic."""
 
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     data: dict[str, Any]
 
     model_config = ConfigDict(extra="forbid")
@@ -276,12 +276,12 @@ class NodeExample(BaseModel):
 class GraphConstraints(BaseModel):
     """Per-node-type graph rules. WorkflowGraph enforces these at validation."""
 
-    min_incoming: Optional[int] = None
-    max_incoming: Optional[int] = None
-    min_outgoing: Optional[int] = None
-    max_outgoing: Optional[int] = None
-    min_instances: Optional[int] = None
-    max_instances: Optional[int] = None
+    min_incoming: int | None = None
+    max_incoming: int | None = None
+    min_outgoing: int | None = None
+    max_outgoing: int | None = None
+    min_instances: int | None = None
+    max_instances: int | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -296,11 +296,11 @@ class NodeSpec(BaseModel):
         min_length=1,
         description="Human-facing explanation shown in AddNodePanel.",
     )
-    llm_hint: Optional[str] = Field(
+    llm_hint: str | None = Field(
         default=None,
         description="LLM-only guidance; omitted from the UI.",
     )
-    docs_url: Optional[str] = Field(
+    docs_url: str | None = Field(
         default=None,
         description="Documentation URL shown in the node editor.",
     )
@@ -309,7 +309,7 @@ class NodeSpec(BaseModel):
     version: str = "1.0.0"
     properties: list[PropertySpec]
     examples: list[NodeExample] = Field(default_factory=list)
-    graph_constraints: Optional[GraphConstraints] = None
+    graph_constraints: GraphConstraints | None = None
 
     model_config = ConfigDict(extra="forbid")
 

@@ -1,13 +1,9 @@
 """Post-Call Intelligence extraction orchestrator."""
 
 import json
-from typing import Any, Dict
-
-from loguru import logger
-from pipecat.processors.aggregators.llm_context import LLMContext
+from typing import Any
 
 from api.db.models import WorkflowRunModel
-from pipecat.utils.enums import EndTaskReason
 from api.services.gen_ai.json_parser import parse_llm_json
 from api.services.managed_model_services import get_mps_correlation_id
 from api.services.pipecat.service_factory import create_llm_service_from_provider
@@ -16,12 +12,15 @@ from api.services.workflow.qa.conversation import (
     format_transcript,
 )
 from api.services.workflow.qa.llm_config import resolve_user_llm_config
+from loguru import logger
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.utils.enums import EndTaskReason
 
 
 async def run_post_call_intelligence(
     workflow_run: WorkflowRunModel,
     post_call_schema: list,
-) -> Dict[str, Any] | None:
+) -> dict[str, Any] | None:
     """Run post-call intelligence extraction on a completed workflow run.
 
     Returns the extracted data dict, or None if skipped/failed.

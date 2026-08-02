@@ -6,16 +6,17 @@ Create Date: 2025-07-08 14:38:38.542486
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "2159d4ac431a"
-down_revision: Union[str, None] = "e0d1a9b9f6c4"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "e0d1a9b9f6c4"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 DEPRECATED_QUOTA_COMMENT = "Deprecated. MPS owns quota and credit ledger state."

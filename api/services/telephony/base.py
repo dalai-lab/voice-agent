@@ -7,7 +7,7 @@ while keeping business logic decoupled from specific implementations.
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -19,11 +19,11 @@ class CallInitiationResult:
 
     call_id: str  # Provider's call identifier (SID for Twilio, UUID for Vonage)
     status: str  # Initial status (e.g., "queued", "initiated", "started")
-    caller_number: Optional[str] = None  # Caller ID used for the outbound call
-    provider_metadata: Dict[str, Any] = field(
+    caller_number: str | None = None  # Caller ID used for the outbound call
+    provider_metadata: dict[str, Any] = field(
         default_factory=dict
     )  # Data that needs to be persisted
-    raw_response: Dict[str, Any] = field(
+    raw_response: dict[str, Any] = field(
         default_factory=dict
     )  # Full provider response for debugging
 
@@ -38,7 +38,7 @@ class ProviderSyncResult:
     """
 
     ok: bool
-    message: Optional[str] = None  # human-readable detail when ok=False
+    message: str | None = None  # human-readable detail when ok=False
 
 
 class ProviderPhoneNumberLookupError(Exception):
@@ -62,10 +62,10 @@ class NormalizedInboundData:
     to_number: str  # Called phone number (E.164 format)
     direction: str  # Call direction (should be "inbound")
     call_status: str  # Call status (ringing, answered, etc.)
-    account_id: Optional[str] = None  # Provider account ID
-    from_country: Optional[str] = None  # Country code of caller
-    to_country: Optional[str] = None  # Country code of called number
-    raw_data: Dict[str, Any] = field(default_factory=dict)  # Original webhook data
+    account_id: str | None = None  # Provider account ID
+    from_country: str | None = None  # Country code of caller
+    to_country: str | None = None  # Country code of called number
+    raw_data: dict[str, Any] = field(default_factory=dict)  # Original webhook data
 
 
 @dataclass
@@ -74,7 +74,7 @@ class AnsweringMachineDetectionResult:
 
     call_id: str
     answered_by: str
-    raw_data: Dict[str, Any] = field(default_factory=dict)
+    raw_data: dict[str, Any] = field(default_factory=dict)
 
 
 class TelephonyProvider(ABC):
@@ -87,10 +87,10 @@ class TelephonyProvider(ABC):
     WEBHOOK_ENDPOINT = None
 
     # Populated by provider constructors from the factory-normalized config.
-    from_numbers: List[str] = []
-    default_from_number: Optional[str] = None
+    from_numbers: list[str] = []
+    default_from_number: str | None = None
 
-    def select_from_number(self, from_number: Optional[str] = None) -> Optional[str]:
+    def select_from_number(self, from_number: str | None = None) -> str | None:
         """Resolve the caller ID for a one-off outbound call.
 
         Preference order: explicit ``from_number`` > the configuration's
@@ -113,8 +113,8 @@ class TelephonyProvider(ABC):
         self,
         to_number: str,
         webhook_url: str,
-        workflow_run_id: Optional[int] = None,
-        from_number: Optional[str] = None,
+        workflow_run_id: int | None = None,
+        from_number: str | None = None,
         **kwargs: Any,
     ) -> CallInitiationResult:
         """
@@ -132,10 +132,9 @@ class TelephonyProvider(ABC):
         Returns:
             CallInitiationResult with standardized call details
         """
-        pass
 
     @abstractmethod
-    async def get_call_status(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_status(self, call_id: str) -> dict[str, Any]:
         """
         Get the current status of a call.
 
@@ -145,17 +144,15 @@ class TelephonyProvider(ABC):
         Returns:
             Dict containing call status information
         """
-        pass
 
     @abstractmethod
-    async def get_available_phone_numbers(self) -> List[str]:
+    async def get_available_phone_numbers(self) -> list[str]:
         """
         Get list of available phone numbers for this provider.
 
         Returns:
             List of phone numbers that can be used for outbound calls
         """
-        pass
 
     @abstractmethod
     def validate_config(self) -> bool:
@@ -165,11 +162,10 @@ class TelephonyProvider(ABC):
         Returns:
             True if configuration is valid, False otherwise
         """
-        pass
 
     @abstractmethod
     async def verify_webhook_signature(
-        self, url: str, params: Dict[str, Any], signature: str
+        self, url: str, params: dict[str, Any], signature: str
     ) -> bool:
         """
         Verify webhook signature for security.
@@ -182,7 +178,6 @@ class TelephonyProvider(ABC):
         Returns:
             True if signature is valid, False otherwise
         """
-        pass
 
     @abstractmethod
     async def get_webhook_response(
@@ -200,10 +195,9 @@ class TelephonyProvider(ABC):
         Returns:
             Provider-specific response (e.g., TwiML for Twilio)
         """
-        pass
 
     @abstractmethod
-    async def get_call_cost(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_cost(self, call_id: str) -> dict[str, Any]:
         """
         Get cost information for a completed call.
 
@@ -217,10 +211,9 @@ class TelephonyProvider(ABC):
                 - status: Call completion status
                 - raw_response: Full provider response for debugging
         """
-        pass
 
     @abstractmethod
-    def parse_status_callback(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_status_callback(self, data: dict[str, Any]) -> dict[str, Any]:
         """
         Parse provider-specific status callback data into generic format.
 
@@ -236,7 +229,6 @@ class TelephonyProvider(ABC):
                 - duration: Optional call duration
                 - extra: Provider-specific additional data
         """
-        pass
 
     def supports_answering_machine_detection(self) -> bool:
         """Return whether this provider can request answering-machine detection."""
@@ -244,14 +236,14 @@ class TelephonyProvider(ABC):
 
     def apply_answering_machine_detection_call_params(
         self,
-        data: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
         """Add provider-specific AMD parameters to an outbound call request."""
         return data
 
     def parse_answering_machine_detection_result(
-        self, data: Dict[str, Any]
-    ) -> Optional[AnsweringMachineDetectionResult]:
+        self, data: dict[str, Any]
+    ) -> AnsweringMachineDetectionResult | None:
         """Parse provider-specific callback data into a normalized AMD result."""
         return None
 
@@ -279,14 +271,13 @@ class TelephonyProvider(ABC):
             organization_id: The organization owning the workflow and run
             workflow_run_id: The workflow run ID
         """
-        pass
 
     # ======== INBOUND CALL METHODS ========
 
     @classmethod
     @abstractmethod
     def can_handle_webhook(
-        cls, webhook_data: Dict[str, Any], headers: Dict[str, str]
+        cls, webhook_data: dict[str, Any], headers: dict[str, str]
     ) -> bool:
         """
         Determine if this provider can handle the incoming webhook.
@@ -298,11 +289,10 @@ class TelephonyProvider(ABC):
         Returns:
             True if this provider should handle this webhook, False otherwise
         """
-        pass
 
     @staticmethod
     @abstractmethod
-    def parse_inbound_webhook(webhook_data: Dict[str, Any]) -> NormalizedInboundData:
+    def parse_inbound_webhook(webhook_data: dict[str, Any]) -> NormalizedInboundData:
         """
         Parse provider-specific inbound webhook data into normalized format.
 
@@ -312,7 +302,6 @@ class TelephonyProvider(ABC):
         Returns:
             NormalizedInboundData with standardized fields
         """
-        pass
 
     @staticmethod
     @abstractmethod
@@ -327,14 +316,13 @@ class TelephonyProvider(ABC):
         Returns:
             True if account_id matches, False otherwise
         """
-        pass
 
     @abstractmethod
     async def verify_inbound_signature(
         self,
         url: str,
-        webhook_data: Dict[str, Any],
-        headers: Dict[str, str],
+        webhook_data: dict[str, Any],
+        headers: dict[str, str],
         body: str = "",
     ) -> bool:
         """
@@ -356,7 +344,6 @@ class TelephonyProvider(ABC):
         Returns:
             True if signature is valid (or none required), False otherwise
         """
-        pass
 
     @abstractmethod
     async def start_inbound_stream(
@@ -388,7 +375,6 @@ class TelephonyProvider(ABC):
         Returns:
             FastAPI Response object (or dict/JSON-serializable value)
         """
-        pass
 
     async def handle_external_websocket(
         self,
@@ -397,7 +383,7 @@ class TelephonyProvider(ABC):
         organization_id: int,
         workflow_id: int,
         workflow_run_id: int,
-        params: Dict[str, str],
+        params: dict[str, str],
     ) -> None:
         """Handle the provider-specific agent-stream WebSocket.
 
@@ -415,7 +401,7 @@ class TelephonyProvider(ABC):
         )
 
     async def configure_inbound(
-        self, address: str, webhook_url: Optional[str]
+        self, address: str, webhook_url: str | None
     ) -> ProviderSyncResult:
         """Sync inbound routing for ``address`` to the provider.
 
@@ -449,7 +435,6 @@ class TelephonyProvider(ABC):
         Returns:
             Tuple of (Response, media_type) - Response object and content type
         """
-        pass
 
     # ======== CALL TRANSFER METHODS ========
 
@@ -461,7 +446,7 @@ class TelephonyProvider(ABC):
         conference_name: str,
         timeout: int = 30,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Initiate a call transfer to a destination number.
 
@@ -482,7 +467,6 @@ class TelephonyProvider(ABC):
             NotImplementedError: If provider doesn't support transfers
             ValueError: If provider configuration is invalid
         """
-        pass
 
     @abstractmethod
     def supports_transfers(self) -> bool:
@@ -492,15 +476,14 @@ class TelephonyProvider(ABC):
         Returns:
             True if provider supports call transfers, False otherwise
         """
-        pass
 
     async def transfer_external_pbx_call(
         self,
         *,
-        identity: Dict[str, Any],
+        identity: dict[str, Any],
         destination: str,
-        field_updates: Optional[Dict[str, str]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        field_updates: dict[str, str] | None = None,
+    ) -> dict[str, Any] | None:
         """Handle an external-PBX-owned customer leg when one is present.
 
         Providers without an external PBX return ``None`` so the ordinary

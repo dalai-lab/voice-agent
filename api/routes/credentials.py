@@ -1,7 +1,6 @@
 """API routes for managing webhook credentials."""
 
 from datetime import datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -22,7 +21,7 @@ class CreateCredentialRequest(BaseModel):
     """Request schema for creating a webhook credential."""
 
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     credential_type: WebhookCredentialType
     credential_data: dict  # Validated based on credential_type
 
@@ -30,10 +29,10 @@ class CreateCredentialRequest(BaseModel):
 class UpdateCredentialRequest(BaseModel):
     """Request schema for updating a webhook credential."""
 
-    name: Optional[str] = None
-    description: Optional[str] = None
-    credential_type: Optional[WebhookCredentialType] = None
-    credential_data: Optional[dict] = None
+    name: str | None = None
+    description: str | None = None
+    credential_type: WebhookCredentialType | None = None
+    credential_data: dict | None = None
 
 
 class CredentialResponse(BaseModel):
@@ -41,10 +40,10 @@ class CredentialResponse(BaseModel):
 
     uuid: str
     name: str
-    description: Optional[str]
+    description: str | None
     credential_type: WebhookCredentialType
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime | None
 
     class Config:
         from_attributes = True
@@ -71,7 +70,7 @@ def build_credential_response(credential) -> CredentialResponse:
 )
 async def list_credentials(
     user: UserModel = Depends(get_user),
-) -> List[CredentialResponse]:
+) -> list[CredentialResponse]:
     """
     List all webhook credentials for the user's organization.
 

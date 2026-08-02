@@ -15,14 +15,11 @@ import asyncio
 import json
 import signal
 import uuid
-from typing import Dict, Optional, Set
 from urllib.parse import urlparse
 
 import aiohttp
 import redis.asyncio as aioredis
 import websockets
-from loguru import logger
-
 from api.constants import REDIS_URL
 from api.db import db_client
 from api.enums import CallType, WorkflowRunMode
@@ -41,6 +38,7 @@ from api.services.telephony.transfer_event_protocol import (
 )
 from api.services.workflow.run_creation import prepare_workflow_run_inputs
 from api.services.workflow_run_failure import mark_workflow_run_failed
+from loguru import logger
 
 # Redis key pattern and TTL for channel-to-run mapping
 _CHANNEL_KEY_PREFIX = "ari:channel:"
@@ -61,7 +59,7 @@ class ARIConnection:
         app_name: str,
         app_password: str,
         ws_client_name: str = "",
-        external_pbx_config: Optional[dict] = None,
+        external_pbx_config: dict | None = None,
     ):
         self.organization_id = organization_id
         self.telephony_configuration_id = telephony_configuration_id
@@ -72,15 +70,15 @@ class ARIConnection:
         self.external_pbx_config = external_pbx_config
         self.external_pbx_adapter = create_adapter(external_pbx_config)
 
-        self._ws: Optional[websockets.ClientConnection] = None
-        self._task: Optional[asyncio.Task] = None
+        self._ws: websockets.ClientConnection | None = None
+        self._task: asyncio.Task | None = None
         self._running = False
         self._reconnect_delay = 1  # Start with 1 second
         self._max_reconnect_delay = 300  # Max 300 seconds
         self._ping_interval = 30  # Send ping every 30 seconds
 
         # Redis client for channel-to-run reverse mapping (lazy init)
-        self._redis_client: Optional[aioredis.Redis] = None
+        self._redis_client: aioredis.Redis | None = None
 
         # Transfer manager for handling call transfers
         self._call_transfer_manager = None
@@ -108,7 +106,7 @@ class ARIConnection:
             ex=_CHANNEL_KEY_TTL,
         )
 
-    async def _get_channel_run(self, channel_id: str) -> Optional[str]:
+    async def _get_channel_run(self, channel_id: str) -> str | None:
         """Look up workflow_run_id for a channel_id from Redis."""
         r = await self._get_redis()
         return await r.get(f"{_CHANNEL_KEY_PREFIX}{channel_id}")
@@ -131,14 +129,14 @@ class ARIConnection:
         r = await self._get_redis()
         return await r.exists(f"{_EXT_CHANNEL_KEY_PREFIX}{channel_id}") > 0
 
-    async def _delete_ext_channel(self, channel_id: Optional[str]):
+    async def _delete_ext_channel(self, channel_id: str | None):
         """Remove the external media channel marker."""
         if not channel_id:
             return
         r = await self._get_redis()
         await r.delete(f"{_EXT_CHANNEL_KEY_PREFIX}{channel_id}")
 
-    async def _delete_transfer_channel_mapping(self, channel_id: Optional[str]):
+    async def _delete_transfer_channel_mapping(self, channel_id: str | None):
         """Remove transfer destination channel correlation marker."""
         if not channel_id:
             return
@@ -164,7 +162,7 @@ class ARIConnection:
             ex=_PENDING_BRIDGE_TTL,
         )
 
-    async def _pop_pending_bridge(self, ext_channel_id: str) -> Optional[dict]:
+    async def _pop_pending_bridge(self, ext_channel_id: str) -> dict | None:
         """Read and delete the pending bridge context. Returns None if absent."""
         r = await self._get_redis()
         val = await r.getdel(f"{_PENDING_BRIDGE_PREFIX}{ext_channel_id}")
@@ -461,7 +459,7 @@ class ARIConnection:
 
     async def _capture_external_pbx_call(
         self, channel_id: str, channel_name: str = ""
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """Capture adapter-defined identity from inbound SIP headers."""
         if self.external_pbx_adapter is None:
             return None
@@ -491,7 +489,7 @@ class ARIConnection:
         self,
         workflow_id: str,
         workflow_run_id: str,
-        channel_id: Optional[str] = None,
+        channel_id: str | None = None,
     ) -> str:
         """Create an external media channel via chan_websocket.
 
@@ -1033,7 +1031,7 @@ class ARIConnection:
         else:
             return f"Transfer failed: {cause_txt}"
 
-    def _get_transfer_id(self, app_args: list) -> Optional[str]:
+    def _get_transfer_id(self, app_args: list) -> str | None:
         """Get transfer_id if this is a transfer channel, None otherwise.
 
         Args format: ['transfer', '{transfer_id}', '{conf_name}']
@@ -1046,7 +1044,7 @@ class ARIConnection:
             return transfer_id
         return None
 
-    async def _get_transfer_id_for_channel(self, channel_id: str) -> Optional[str]:
+    async def _get_transfer_id_for_channel(self, channel_id: str) -> str | None:
         """Get transfer_id for a channel by checking Redis mapping."""
         try:
             r = await self._get_redis()
@@ -1164,7 +1162,7 @@ class ARIManager:
     """Manages ARI WebSocket connections for all organizations."""
 
     def __init__(self):
-        self._connections: Dict[str, ARIConnection] = {}  # key -> connection
+        self._connections: dict[str, ARIConnection] = {}  # key -> connection
         self._running = False
         self._config_refresh_interval = 60  # Check for config changes every 60 seconds
 
@@ -1207,7 +1205,7 @@ class ARIManager:
             logger.error(f"Failed to load ARI configurations: {e}")
             return
 
-        active_keys: Set[str] = set()
+        active_keys: set[str] = set()
 
         for config in active_configs:
             org_id = config["organization_id"]

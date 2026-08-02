@@ -7,19 +7,18 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 import httpx
 import redis.asyncio as aioredis
-from loguru import logger
-from pydantic import BaseModel, Field
-
 from api.constants import REDIS_URL
 from api.services.gender.constants import (
     CONFIDENCE_THRESHOLD,
     REDIS_CACHE_TTL,
     REDIS_KEY_PREFIX,
 )
+from loguru import logger
+from pydantic import BaseModel, Field
 
 
 class GenderPrediction(BaseModel):
@@ -42,9 +41,9 @@ class GenderService:
 
     def __init__(
         self,
-        model_path: Optional[str] = None,
+        model_path: str | None = None,
         confidence_threshold: float = CONFIDENCE_THRESHOLD,
-        gender_api_key: Optional[str] = None,
+        gender_api_key: str | None = None,
         gender_api_url: str = "https://gender-api.com/v2/gender",
     ):
         """
@@ -68,7 +67,7 @@ class GenderService:
 
         self.model = self._load_model(model_path)
         self._http_client = None
-        self._redis_client: Optional[aioredis.Redis] = None
+        self._redis_client: aioredis.Redis | None = None
 
     def _load_model(self, model_path: Path) -> dict:
         """Load the compressed gender prediction model."""
@@ -113,7 +112,7 @@ class GenderService:
         return self._redis_client
 
     async def predict(
-        self, first_name: str, last_name: Optional[str] = None
+        self, first_name: str, last_name: str | None = None
     ) -> GenderPrediction:
         """
         Predict gender for a given name.
@@ -182,7 +181,7 @@ class GenderService:
 
                 # No need for additional debug log here as _call_gender_api logs with timing
                 return result
-            except Exception as e:
+            except Exception:
                 # Error already logged in _call_gender_api with timing
                 pass
 
@@ -267,7 +266,7 @@ class GenderService:
             else:
                 raise ValueError(f"GenderAPI HTTP error: {e.response.status_code}")
 
-        except httpx.TimeoutException as e:
+        except httpx.TimeoutException:
             elapsed_time = (
                 (time.perf_counter() - start_time) * 1000
                 if "start_time" in locals()
@@ -276,7 +275,7 @@ class GenderService:
             logger.error(
                 f"GenderAPI timeout for '{first_name}' after {elapsed_time:.2f}ms"
             )
-            raise ValueError(f"GenderAPI request timed out")
+            raise ValueError("GenderAPI request timed out")
 
         except Exception as e:
             elapsed_time = (
@@ -285,7 +284,7 @@ class GenderService:
                 else 0
             )
             logger.error(
-                f"GenderAPI unexpected error for '{first_name}': {str(e)} "
+                f"GenderAPI unexpected error for '{first_name}': {e!s} "
                 f"(took {elapsed_time:.2f}ms)"
             )
             raise
@@ -293,8 +292,8 @@ class GenderService:
     async def get_salutation(
         self,
         first_name: str,
-        last_name: Optional[str] = None,
-        confidence_threshold: Optional[float] = None,
+        last_name: str | None = None,
+        confidence_threshold: float | None = None,
     ) -> str:
         """
         Get appropriate salutation based on gender prediction.

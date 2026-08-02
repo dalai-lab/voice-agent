@@ -14,7 +14,7 @@ from .provider import VonageProvider
 from .transport import create_transport
 
 
-def _config_loader(value: Dict[str, Any]) -> Dict[str, Any]:
+def _config_loader(value: dict[str, Any]) -> dict[str, Any]:
     return {
         "provider": "vonage",
         "application_id": value.get("application_id"),

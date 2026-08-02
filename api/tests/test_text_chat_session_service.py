@@ -2,8 +2,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-import api.services.workflow.text_chat_session_service as text_chat_session_service
 from api.db.models import WorkflowRunTextSessionModel
+from api.services.workflow import text_chat_session_service
 from api.services.workflow.text_chat_session_service import (
     TextChatSessionExecutionError,
     TextChatTurnNotFoundError,

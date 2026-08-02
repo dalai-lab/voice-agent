@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from loguru import logger
 
@@ -10,7 +10,7 @@ class ValidationError:
     """Represents a validation error with details."""
 
     message: str
-    invalid_rows: Optional[List[int]] = None
+    invalid_rows: list[int] | None = None
 
 
 @dataclass
@@ -18,22 +18,22 @@ class ValidationResult:
     """Result of source validation."""
 
     is_valid: bool
-    error: Optional[ValidationError] = None
-    headers: Optional[List[str]] = field(default=None, repr=False)
-    rows: Optional[List[List[str]]] = field(default=None, repr=False)
+    error: ValidationError | None = None
+    headers: list[str] | None = field(default=None, repr=False)
+    rows: list[list[str]] | None = field(default=None, repr=False)
 
 
 class CampaignSourceSyncService(ABC):
     """Base class for campaign data source synchronization"""
 
     @staticmethod
-    def normalize_headers(headers: List[str]) -> List[str]:
+    def normalize_headers(headers: list[str]) -> list[str]:
         """Normalize headers by stripping whitespace and lowercasing."""
         return [h.strip().lower() for h in headers]
 
     @staticmethod
     def validate_source_data(
-        headers: List[str], rows: List[List[str]]
+        headers: list[str], rows: list[list[str]]
     ) -> ValidationResult:
         """
         Validate source data for campaign creation.
@@ -119,9 +119,9 @@ class CampaignSourceSyncService(ABC):
 
     @staticmethod
     def validate_template_columns(
-        headers: List[str],
-        rows: List[List[str]],
-        required_columns: Set[str],
+        headers: list[str],
+        rows: list[list[str]],
+        required_columns: set[str],
     ) -> ValidationResult:
         """Validate that template variable columns exist and are non-empty in all rows."""
         normalized_headers = CampaignSourceSyncService.normalize_headers(headers)
@@ -166,10 +166,9 @@ class CampaignSourceSyncService(ABC):
 
     @abstractmethod
     async def validate_source(
-        self, source_id: str, organization_id: Optional[int] = None
+        self, source_id: str, organization_id: int | None = None
     ) -> ValidationResult:
         """Validate source data before campaign creation."""
-        pass
 
     @abstractmethod
     async def sync_source_data(self, campaign_id: int) -> int:
@@ -178,11 +177,10 @@ class CampaignSourceSyncService(ABC):
         Each record gets a unique source_uuid based on source type
         Returns: number of records synced
         """
-        pass
 
     async def get_source_credentials(
         self, organization_id: int, source_type: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Gets source credentials when a sync service requires them."""
         logger.info(
             f"Getting credentials for org {organization_id}, source {source_type}"

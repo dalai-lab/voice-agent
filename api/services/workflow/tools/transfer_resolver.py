@@ -5,11 +5,9 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
-from loguru import logger
-
 from api.db import db_client
 from api.services.organization_preferences import external_pbx_integrations_enabled
 from api.services.workflow.tools.custom_tool import _resolve_preset_parameters
@@ -19,16 +17,17 @@ from api.utils.credential_auth import (
 )
 from api.utils.template_renderer import render_template
 from api.utils.url_security import validate_user_configured_service_url
+from loguru import logger
 
 
 @dataclass
 class ResolvedTransferConfig:
     destination: str
     timeout_seconds: int
-    message: Optional[str] = None
+    message: str | None = None
     source: str = "static"
-    resolution_id: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    resolution_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class TransferResolutionError(ValueError):
@@ -42,11 +41,11 @@ class TransferResolutionError(ValueError):
 
 def _render_value(
     value: Any,
-    call_context_vars: Optional[Dict[str, Any]],
-    gathered_context_vars: Optional[Dict[str, Any]],
+    call_context_vars: dict[str, Any] | None,
+    gathered_context_vars: dict[str, Any] | None,
 ) -> str:
     initial_context = dict(call_context_vars or {})
-    render_context: Dict[str, Any] = {
+    render_context: dict[str, Any] = {
         **initial_context,
         "initial_context": initial_context,
         "gathered_context": dict(gathered_context_vars or {}),
@@ -107,7 +106,7 @@ def _safe_log_value(key: str, value: Any) -> Any:
     return f"<{type(value).__name__}>"
 
 
-def _safe_log_dict(data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def _safe_log_dict(data: dict[str, Any] | None) -> dict[str, Any]:
     return {
         str(key): _safe_log_value(str(key), value)
         for key, value in (data or {}).items()
@@ -116,8 +115,8 @@ def _safe_log_dict(data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
 def _resolve_static_transfer(
     config: dict[str, Any],
-    call_context_vars: Optional[Dict[str, Any]],
-    gathered_context_vars: Optional[Dict[str, Any]],
+    call_context_vars: dict[str, Any] | None,
+    gathered_context_vars: dict[str, Any] | None,
 ) -> ResolvedTransferConfig:
     return ResolvedTransferConfig(
         destination=_render_value(
@@ -129,8 +128,8 @@ def _resolve_static_transfer(
 
 def _context_value(
     path: str,
-    call_context_vars: Optional[Dict[str, Any]],
-    gathered_context_vars: Optional[Dict[str, Any]],
+    call_context_vars: dict[str, Any] | None,
+    gathered_context_vars: dict[str, Any] | None,
 ) -> Any:
     initial = call_context_vars or {}
     gathered = gathered_context_vars or {}
@@ -158,8 +157,8 @@ def _context_value(
 
 def _resolve_context_mapping_transfer(
     config: dict[str, Any],
-    call_context_vars: Optional[Dict[str, Any]],
-    gathered_context_vars: Optional[Dict[str, Any]],
+    call_context_vars: dict[str, Any] | None,
+    gathered_context_vars: dict[str, Any] | None,
 ) -> ResolvedTransferConfig:
     mapping = config.get("context_mapping")
     if not isinstance(mapping, dict):
@@ -195,8 +194,8 @@ def _resolver_arguments(
     *,
     resolver: dict[str, Any],
     arguments: dict[str, Any],
-    call_context_vars: Optional[Dict[str, Any]],
-    gathered_context_vars: Optional[Dict[str, Any]],
+    call_context_vars: dict[str, Any] | None,
+    gathered_context_vars: dict[str, Any] | None,
 ) -> dict[str, Any]:
     try:
         preset_arguments = _resolve_preset_parameters(
@@ -211,7 +210,7 @@ async def _execute_http_resolver(
     *,
     resolver: dict[str, Any],
     resolved_arguments: dict[str, Any],
-    organization_id: Optional[int],
+    organization_id: int | None,
     resolution_id: str,
 ) -> dict[str, Any]:
     url = resolver.get("url", "")
@@ -376,10 +375,10 @@ async def resolve_transfer_config(
     tool: Any,
     config: dict[str, Any],
     arguments: dict[str, Any],
-    call_context_vars: Optional[Dict[str, Any]],
-    gathered_context_vars: Optional[Dict[str, Any]],
-    organization_id: Optional[int],
-    workflow_run_id: Optional[int],
+    call_context_vars: dict[str, Any] | None,
+    gathered_context_vars: dict[str, Any] | None,
+    organization_id: int | None,
+    workflow_run_id: int | None,
 ) -> ResolvedTransferConfig:
     """Resolve transfer destination and options for a transfer tool call."""
 

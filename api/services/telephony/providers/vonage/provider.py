@@ -5,13 +5,10 @@ Vonage (Nexmo) implementation of the TelephonyProvider interface.
 import hashlib
 import json
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 import jwt
-from fastapi import HTTPException, Response
-from loguru import logger
-
 from api.enums import TelephonyCallStatus, WorkflowRunMode
 from api.services.telephony import ws_auth
 from api.services.telephony.base import (
@@ -23,6 +20,8 @@ from api.services.telephony.base import (
 )
 from api.utils.common import get_backend_endpoints
 from api.utils.telephony_address import normalize_telephony_address
+from fastapi import HTTPException, Response
+from loguru import logger
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -37,7 +36,7 @@ class VonageProvider(TelephonyProvider):
     PROVIDER_NAME = WorkflowRunMode.VONAGE.value
     WEBHOOK_ENDPOINT = "ncco"
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """
         Initialize VonageProvider with configuration.
 
@@ -84,8 +83,8 @@ class VonageProvider(TelephonyProvider):
         self,
         to_number: str,
         webhook_url: str,
-        workflow_run_id: Optional[int] = None,
-        from_number: Optional[str] = None,
+        workflow_run_id: int | None = None,
+        from_number: str | None = None,
         **kwargs: Any,
     ) -> CallInitiationResult:
         """
@@ -150,7 +149,7 @@ class VonageProvider(TelephonyProvider):
                     raw_response=response_data,
                 )
 
-    async def get_call_status(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_status(self, call_id: str) -> dict[str, Any]:
         """
         Get the current status of a Vonage call.
         """
@@ -171,7 +170,7 @@ class VonageProvider(TelephonyProvider):
 
                 return await response.json()
 
-    async def get_available_phone_numbers(self) -> List[str]:
+    async def get_available_phone_numbers(self) -> list[str]:
         """
         Get list of available Vonage phone numbers.
         """
@@ -184,7 +183,7 @@ class VonageProvider(TelephonyProvider):
         return bool(self.application_id and self.private_key and self.from_numbers)
 
     async def verify_webhook_signature(
-        self, url: str, params: Dict[str, Any], signature: str
+        self, url: str, params: dict[str, Any], signature: str
     ) -> bool:
         """
         Verify Vonage webhook signature for security.
@@ -236,12 +235,12 @@ class VonageProvider(TelephonyProvider):
 
         return json.dumps(ncco)
 
-    def _get_auth_headers(self) -> Dict[str, str]:
+    def _get_auth_headers(self) -> dict[str, str]:
         """Generate authorization headers for Vonage API."""
         token = self._generate_jwt()
         return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
-    async def get_call_cost(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_cost(self, call_id: str) -> dict[str, Any]:
         """
         Get cost information for a completed Vonage call.
 
@@ -293,7 +292,7 @@ class VonageProvider(TelephonyProvider):
             logger.error(f"Exception fetching Vonage call cost: {e}")
             return {"cost_usd": 0.0, "duration": 0, "status": "error", "error": str(e)}
 
-    def parse_status_callback(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_status_callback(self, data: dict[str, Any]) -> dict[str, Any]:
         """
         Parse Vonage event callback data into generic format.
         """
@@ -412,7 +411,7 @@ class VonageProvider(TelephonyProvider):
 
     @classmethod
     def can_handle_webhook(
-        cls, webhook_data: Dict[str, Any], headers: Dict[str, str]
+        cls, webhook_data: dict[str, Any], headers: dict[str, str]
     ) -> bool:
         """
         Determine if this provider can handle the incoming webhook.
@@ -430,7 +429,7 @@ class VonageProvider(TelephonyProvider):
 
     @staticmethod
     def parse_inbound_webhook(
-        webhook_data: Dict[str, Any], headers: Optional[Dict[str, str]] = None
+        webhook_data: dict[str, Any], headers: dict[str, str] | None = None
     ) -> NormalizedInboundData:
         """
         Parse Vonage-specific inbound webhook data into normalized format.
@@ -453,14 +452,14 @@ class VonageProvider(TelephonyProvider):
         )
 
     @staticmethod
-    def _header(headers: Dict[str, str], name: str) -> Optional[str]:
+    def _header(headers: dict[str, str], name: str) -> str | None:
         for key, value in headers.items():
             if key.lower() == name.lower():
                 return value
         return None
 
     @classmethod
-    def _bearer_token(cls, headers: Dict[str, str]) -> Optional[str]:
+    def _bearer_token(cls, headers: dict[str, str]) -> str | None:
         auth_header = cls._header(headers, "authorization")
         if not auth_header:
             return None
@@ -471,8 +470,8 @@ class VonageProvider(TelephonyProvider):
 
     @classmethod
     def _decode_unverified_signed_claims(
-        cls, headers: Dict[str, str]
-    ) -> Dict[str, Any]:
+        cls, headers: dict[str, str]
+    ) -> dict[str, Any]:
         token = cls._bearer_token(headers)
         if not token:
             return {}
@@ -490,8 +489,8 @@ class VonageProvider(TelephonyProvider):
         return claims if isinstance(claims, dict) else {}
 
     def _verify_signed_claims(
-        self, headers: Dict[str, str], body: str = ""
-    ) -> Optional[Dict[str, Any]]:
+        self, headers: dict[str, str], body: str = ""
+    ) -> dict[str, Any] | None:
         token = self._bearer_token(headers)
         if not token:
             logger.warning("Missing Vonage Authorization bearer token")
@@ -549,8 +548,8 @@ class VonageProvider(TelephonyProvider):
     async def verify_inbound_signature(
         self,
         url: str,
-        webhook_data: Dict[str, Any],
-        headers: Dict[str, str],
+        webhook_data: dict[str, Any],
+        headers: dict[str, str],
         body: str = "",
     ) -> bool:
         """
@@ -560,7 +559,7 @@ class VonageProvider(TelephonyProvider):
         return claims is not None
 
     async def configure_inbound(
-        self, address: str, webhook_url: Optional[str]
+        self, address: str, webhook_url: str | None
     ) -> ProviderSyncResult:
         """Update the answer_url on Vonage's Application for ``address``.
 
@@ -659,20 +658,19 @@ class VonageProvider(TelephonyProvider):
             update_body["privacy"] = app_data["privacy"]
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.put(
-                    app_endpoint, json=update_body, auth=auth
-                ) as response:
-                    if response.status not in (200, 201):
-                        body = await response.text()
-                        logger.error(
-                            f"Vonage application update failed for "
-                            f"{self.application_id}: {response.status} {body}"
-                        )
-                        return ProviderSyncResult(
-                            ok=False,
-                            message=f"Vonage API {response.status}: {body}",
-                        )
+            async with aiohttp.ClientSession() as session, session.put(
+                app_endpoint, json=update_body, auth=auth
+            ) as response:
+                if response.status not in (200, 201):
+                    body = await response.text()
+                    logger.error(
+                        f"Vonage application update failed for "
+                        f"{self.application_id}: {response.status} {body}"
+                    )
+                    return ProviderSyncResult(
+                        ok=False,
+                        message=f"Vonage API {response.status}: {body}",
+                    )
         except Exception as e:
             logger.error(f"Exception updating Vonage application: {e}")
             return ProviderSyncResult(ok=False, message=f"Vonage update failed: {e}")
@@ -794,7 +792,7 @@ class VonageProvider(TelephonyProvider):
         conference_name: str,
         timeout: int = 30,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Vonage provider does not support call transfers.
 

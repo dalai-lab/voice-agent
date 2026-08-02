@@ -29,6 +29,7 @@ import asyncio
 
 import pytest
 from pipecat.frames.frames import TranscriptionFrame
+from pipecat.tests import MockLLMService, MockTTSService
 from pipecat.tests.mock_transport import MockTransport
 from pipecat.transports.base_transport import TransportParams
 from pipecat.utils.time import time_now_iso8601
@@ -41,7 +42,6 @@ from api.tests.integrations._run_pipeline_helpers import (
     create_workflow_run_rows,
     patch_run_pipeline_externals,
 )
-from pipecat.tests import MockLLMService, MockTTSService
 
 GREETING_TEXT = (
     "Thanks for calling Happy Feet, this is Sarah. How can I help you today?"
@@ -282,7 +282,7 @@ async def test_text_greeting_speaks_then_user_transcript_triggers_end_call(
             _run_test_body(workflow_run_setup, db_session),
             timeout=TEST_HARD_TIMEOUT_SECONDS,
         )
-    except asyncio.TimeoutError as e:
+    except TimeoutError as e:
         raise AssertionError(
             f"Test exceeded hard timeout of {TEST_HARD_TIMEOUT_SECONDS}s — "
             "pipeline likely hung. Check earlier debug logs for the last frame "

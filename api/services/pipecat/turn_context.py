@@ -6,7 +6,6 @@ propagate through asyncio.create_task() calls.
 """
 
 import asyncio
-from typing import Dict, Optional
 
 from pipecat.utils.run_context import turn_var
 
@@ -21,9 +20,9 @@ class TurnContextManager:
 
     def __init__(self):
         # Map from task to turn number
-        self._task_turns: Dict[asyncio.Task, int] = {}
+        self._task_turns: dict[asyncio.Task, int] = {}
         # Store the pipeline task reference
-        self._pipeline_task: Optional[asyncio.Task] = None
+        self._pipeline_task: asyncio.Task | None = None
         self._current_turn: int = 0
 
     def set_pipeline_task(self, task: asyncio.Task):

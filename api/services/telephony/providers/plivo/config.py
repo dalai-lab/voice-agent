@@ -1,6 +1,6 @@
 """Plivo telephony configuration schemas."""
 
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -11,7 +11,7 @@ class PlivoConfigurationRequest(BaseModel):
     provider: Literal["plivo"] = Field(default="plivo")
     auth_id: str = Field(..., description="Plivo Auth ID")
     auth_token: str = Field(..., description="Plivo Auth Token")
-    application_id: Optional[str] = Field(
+    application_id: str | None = Field(
         default=None,
         description=(
             "Plivo Application ID. The application's answer_url is updated "
@@ -20,7 +20,7 @@ class PlivoConfigurationRequest(BaseModel):
             "is stored on the configuration."
         ),
     )
-    from_numbers: List[str] = Field(
+    from_numbers: list[str] = Field(
         default_factory=list, description="List of Plivo phone numbers"
     )
 
@@ -31,5 +31,5 @@ class PlivoConfigurationResponse(BaseModel):
     provider: Literal["plivo"] = Field(default="plivo")
     auth_id: str  # Masked
     auth_token: str  # Masked
-    application_id: Optional[str] = None
-    from_numbers: List[str]
+    application_id: str | None = None
+    from_numbers: list[str]

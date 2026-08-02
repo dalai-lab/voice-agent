@@ -1,6 +1,6 @@
 """API routes for workflow recording operations."""
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from loguru import logger
@@ -173,16 +173,16 @@ async def create_recordings(
 )
 async def list_recordings(
     workflow_id: Annotated[
-        Optional[int], Query(description="Filter by workflow ID")
+        int | None, Query(description="Filter by workflow ID")
     ] = None,
     tts_provider: Annotated[
-        Optional[str], Query(description="Filter by TTS provider")
+        str | None, Query(description="Filter by TTS provider")
     ] = None,
     tts_model: Annotated[
-        Optional[str], Query(description="Filter by TTS model")
+        str | None, Query(description="Filter by TTS model")
     ] = None,
     tts_voice_id: Annotated[
-        Optional[str], Query(description="Filter by TTS voice ID")
+        str | None, Query(description="Filter by TTS voice ID")
     ] = None,
     user=Depends(get_user),
 ):

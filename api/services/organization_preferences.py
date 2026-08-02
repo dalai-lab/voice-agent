@@ -1,11 +1,10 @@
 from inspect import isawaitable
 
-from loguru import logger
-from pydantic import ValidationError
-
 from api.db import db_client
 from api.enums import OrganizationConfigurationKey
 from api.schemas.organization_preferences import OrganizationPreferences
+from loguru import logger
+from pydantic import ValidationError
 
 
 async def get_organization_preferences(

@@ -2,7 +2,7 @@
 
 import re
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -21,12 +21,12 @@ class PhoneNumberCreateRequest(BaseModel):
     """
 
     address: str = Field(..., min_length=1, max_length=255)
-    country_code: Optional[str] = Field(default=None, min_length=2, max_length=2)
-    label: Optional[str] = Field(default=None, max_length=64)
-    inbound_workflow_id: Optional[int] = None
+    country_code: str | None = Field(default=None, min_length=2, max_length=2)
+    label: str | None = Field(default=None, max_length=64)
+    inbound_workflow_id: int | None = None
     is_active: bool = True
     is_default_caller_id: bool = False
-    extra_metadata: Dict[str, Any] = Field(default_factory=dict)
+    extra_metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _validate_address_shape(self) -> "PhoneNumberCreateRequest":
@@ -65,14 +65,14 @@ class PhoneNumberUpdateRequest(BaseModel):
     """Partial update. ``address`` is intentionally immutable — to change a
     number, delete the row and create a new one."""
 
-    label: Optional[str] = Field(default=None, max_length=64)
-    inbound_workflow_id: Optional[int] = None
+    label: str | None = Field(default=None, max_length=64)
+    inbound_workflow_id: int | None = None
     # Set to true to clear inbound_workflow_id (FK is otherwise non-nullable
     # via the partial-update pattern).
     clear_inbound_workflow: bool = False
-    is_active: Optional[bool] = None
-    country_code: Optional[str] = Field(default=None, min_length=2, max_length=2)
-    extra_metadata: Optional[Dict[str, Any]] = None
+    is_active: bool | None = None
+    country_code: str | None = Field(default=None, min_length=2, max_length=2)
+    extra_metadata: dict[str, Any] | None = None
 
 
 class ProviderSyncStatus(BaseModel):
@@ -84,7 +84,7 @@ class ProviderSyncStatus(BaseModel):
     """
 
     ok: bool
-    message: Optional[str] = None
+    message: str | None = None
 
 
 class PhoneNumberResponse(BaseModel):
@@ -95,18 +95,18 @@ class PhoneNumberResponse(BaseModel):
     address: str
     address_normalized: str
     address_type: str
-    country_code: Optional[str] = None
-    label: Optional[str] = None
-    inbound_workflow_id: Optional[int] = None
-    inbound_workflow_name: Optional[str] = None
+    country_code: str | None = None
+    label: str | None = None
+    inbound_workflow_id: int | None = None
+    inbound_workflow_name: str | None = None
     is_active: bool
     is_default_caller_id: bool
-    extra_metadata: Dict[str, Any]
+    extra_metadata: dict[str, Any]
     created_at: datetime
     updated_at: datetime
     # Only set on create/update responses when the route attempted a
     # provider-side sync (e.g. setting Twilio's VoiceUrl). Omitted on reads.
-    provider_sync: Optional[ProviderSyncStatus] = None
+    provider_sync: ProviderSyncStatus | None = None
 
 
 class PhoneNumberListResponse(BaseModel):

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import String, and_, func, select
 
@@ -13,8 +13,8 @@ class ReportsClient(BaseDBClient):
         organization_id: int,
         start_utc: datetime,
         end_utc: datetime,
-        workflow_id: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        workflow_id: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Optimized method for daily reports - fetches only required JSON fields.
         Uses PostgreSQL JSON operators to extract only needed fields from JSON columns.
@@ -138,7 +138,7 @@ class ReportsClient(BaseDBClient):
 
     async def get_workflows_for_organization(
         self, organization_id: int
-    ) -> List[WorkflowModel]:
+    ) -> list[WorkflowModel]:
         """
         Get all workflows for an organization.
 

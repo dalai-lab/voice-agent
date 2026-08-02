@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -24,9 +24,9 @@ class CurrentUsageResponse(BaseModel):
     period_end: str
     used_dograh_tokens: float
     total_duration_seconds: int
-    used_amount_usd: Optional[float] = None
-    currency: Optional[str] = None
-    price_per_second_usd: Optional[float] = None
+    used_amount_usd: float | None = None
+    currency: str | None = None
+    price_per_second_usd: float | None = None
 
 
 class MPSCreditPurchaseUrlResponse(BaseModel):
@@ -44,21 +44,21 @@ class MPSBillingAccountResponse(BaseModel):
 class MPSCreditLedgerEntryResponse(BaseModel):
     id: int
     entry_type: str
-    origin: Optional[str] = None
+    origin: str | None = None
     credits_delta: float
     balance_after: float
-    amount_minor: Optional[int] = None
-    amount_currency: Optional[str] = None
-    payment_order_id: Optional[int] = None
-    metric_code: Optional[str] = None
-    correlation_id: Optional[str] = None
-    aggregation_key: Optional[str] = None
-    usage_event_id: Optional[int] = None
-    workflow_run_id: Optional[int] = None
-    workflow_id: Optional[int] = None
-    billable_quantity: Optional[float] = None
-    quantity_unit: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    amount_minor: int | None = None
+    amount_currency: str | None = None
+    payment_order_id: int | None = None
+    metric_code: str | None = None
+    correlation_id: str | None = None
+    aggregation_key: str | None = None
+    usage_event_id: int | None = None
+    workflow_run_id: int | None = None
+    workflow_id: int | None = None
+    billable_quantity: float | None = None
+    quantity_unit: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: str
 
 
@@ -66,15 +66,15 @@ class MPSBillingCreditsResponse(BaseModel):
     total_credits_used: float = 0.0
     remaining_credits: float = 0.0
     total_quota: float = 0.0
-    account: Optional[MPSBillingAccountResponse] = None
-    ledger_entries: List[MPSCreditLedgerEntryResponse] = Field(default_factory=list)
+    account: MPSBillingAccountResponse | None = None
+    ledger_entries: list[MPSCreditLedgerEntryResponse] = Field(default_factory=list)
     total_count: int = 0
     page: int = 1
     limit: int = 50
     total_pages: int = 0
 
 
-def _optional_int(value: Any) -> Optional[int]:
+def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
     try:
@@ -86,38 +86,38 @@ def _optional_int(value: Any) -> Optional[int]:
 class WorkflowRunUsageResponse(BaseModel):
     id: int
     workflow_id: int
-    workflow_name: Optional[str]
+    workflow_name: str | None
     name: str
     created_at: str
     dograh_token_usage: float
     call_duration_seconds: int
-    recording_url: Optional[str] = None
-    transcript_url: Optional[str] = None
-    user_recording_url: Optional[str] = None
-    bot_recording_url: Optional[str] = None
-    recording_public_url: Optional[str] = None
-    transcript_public_url: Optional[str] = None
-    user_recording_public_url: Optional[str] = None
-    bot_recording_public_url: Optional[str] = None
-    public_access_token: Optional[str] = None
-    phone_number: Optional[str] = Field(
+    recording_url: str | None = None
+    transcript_url: str | None = None
+    user_recording_url: str | None = None
+    bot_recording_url: str | None = None
+    recording_public_url: str | None = None
+    transcript_public_url: str | None = None
+    user_recording_public_url: str | None = None
+    bot_recording_public_url: str | None = None
+    public_access_token: str | None = None
+    phone_number: str | None = Field(
         default=None,
         deprecated=True,
         description="Deprecated. Use caller_number and called_number instead.",
     )
-    caller_number: Optional[str] = None
-    called_number: Optional[str] = None
-    call_type: Optional[str] = None
-    mode: Optional[str] = None
-    disposition: Optional[str] = None
-    initial_context: Optional[Dict[str, Any]] = None
-    gathered_context: Optional[Dict[str, Any]] = None
+    caller_number: str | None = None
+    called_number: str | None = None
+    call_type: str | None = None
+    mode: str | None = None
+    disposition: str | None = None
+    initial_context: dict[str, Any] | None = None
+    gathered_context: dict[str, Any] | None = None
     # New USD field
-    charge_usd: Optional[float] = None
+    charge_usd: float | None = None
 
 
 class UsageHistoryResponse(BaseModel):
-    runs: List[WorkflowRunUsageResponse]
+    runs: list[WorkflowRunUsageResponse]
     total_dograh_tokens: float
     total_duration_seconds: int
     total_count: int
@@ -129,17 +129,17 @@ class UsageHistoryResponse(BaseModel):
 class DailyUsageItem(BaseModel):
     date: str
     minutes: float
-    cost_usd: Optional[float] = None
+    cost_usd: float | None = None
     dograh_tokens: float
     call_count: int
 
 
 class DailyUsageBreakdownResponse(BaseModel):
-    breakdown: List[DailyUsageItem]
+    breakdown: list[DailyUsageItem]
     total_minutes: float
-    total_cost_usd: Optional[float] = None
+    total_cost_usd: float | None = None
     total_dograh_tokens: float
-    currency: Optional[str] = None
+    currency: str | None = None
 
 
 @router.get("/usage/current-period", response_model=CurrentUsageResponse)
@@ -350,19 +350,19 @@ Date filtering on this endpoint is done via the dedicated `start_date` / `end_da
 
 @router.get("/usage/runs", response_model=UsageHistoryResponse)
 async def get_usage_history(
-    start_date: Optional[str] = Query(
+    start_date: str | None = Query(
         None,
         description="ISO 8601 date-time string (UTC). Lower bound (inclusive) on `created_at`.",
         examples=["2026-04-01T00:00:00Z"],
     ),
-    end_date: Optional[str] = Query(
+    end_date: str | None = Query(
         None,
         description="ISO 8601 date-time string (UTC). Upper bound (inclusive) on `created_at`.",
         examples=["2026-05-01T00:00:00Z"],
     ),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
-    filters: Optional[str] = Query(
+    filters: str | None = Query(
         None,
         description=FILTERS_DESCRIPTION,
         examples=[
@@ -441,15 +441,15 @@ async def get_usage_history(
 
 @router.get("/usage/runs/report")
 async def download_usage_runs_report(
-    start_date: Optional[str] = Query(
+    start_date: str | None = Query(
         None,
         description="ISO 8601 date-time string (UTC). Lower bound (inclusive) on `created_at`.",
     ),
-    end_date: Optional[str] = Query(
+    end_date: str | None = Query(
         None,
         description="ISO 8601 date-time string (UTC). Upper bound (inclusive) on `created_at`.",
     ),
-    filters: Optional[str] = Query(
+    filters: str | None = Query(
         None,
         description=FILTERS_DESCRIPTION,
     ),

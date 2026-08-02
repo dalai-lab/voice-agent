@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, List
-
-from loguru import logger
-from opentelemetry import trace
-from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.utils.tracing.service_attributes import add_llm_span_attributes
+from typing import TYPE_CHECKING, Any
 
 from api.services.gen_ai.json_parser import parse_llm_json
 from api.services.pipecat.tracing_config import ensure_tracing
 from api.services.workflow.dto import ExtractionVariableDTO
+from loguru import logger
+from opentelemetry import trace
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.utils.tracing.service_attributes import add_llm_span_attributes
 
 if TYPE_CHECKING:
     from api.services.workflow.pipecat_engine import PipecatEngine
@@ -26,7 +25,7 @@ class VariableExtractionManager:
          correct bookkeeping and optional OpenTelemetry tracing.
     """
 
-    def __init__(self, engine: "PipecatEngine") -> None:  # noqa: F821
+    def __init__(self, engine: PipecatEngine) -> None:
         # We keep a reference to the engine so we can reuse its context
         # and update internal counters / extracted variable state.
         self._engine = engine
@@ -155,7 +154,7 @@ class VariableExtractionManager:
 
     async def _perform_extraction(
         self,
-        extraction_variables: List[ExtractionVariableDTO],
+        extraction_variables: list[ExtractionVariableDTO],
         parent_ctx: Any,
         extraction_prompt: str = "",
     ) -> dict:
@@ -175,7 +174,7 @@ class VariableExtractionManager:
 
         system_prompt = (
             "You are an assistant tasked with extracting structured data from the conversation. "
-            "Return ONLY a valid JSON object with the requested variables as top-level keys. Do not wrap the JSON in markdown."  # noqa: E501
+            "Return ONLY a valid JSON object with the requested variables as top-level keys. Do not wrap the JSON in markdown."
         )
         # Use provided extraction_prompt as system prompt, or default
         system_prompt = (

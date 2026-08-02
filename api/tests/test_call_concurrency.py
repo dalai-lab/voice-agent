@@ -220,10 +220,10 @@ async def test_unregister_active_call_never_raises():
 # Redis integration tests for scoped (campaign-level) slot acquisition
 # ---------------------------------------------------------------------------
 
-import os  # noqa: E402
-import uuid  # noqa: E402
+import os
+import uuid
 
-from api.services.call_concurrency.rate_limiter import RateLimiter  # noqa: E402
+from api.services.call_concurrency.rate_limiter import RateLimiter
 
 requires_redis = pytest.mark.skipif(
     "REDIS_URL" not in os.environ,

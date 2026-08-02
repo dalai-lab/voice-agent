@@ -7,7 +7,7 @@ Verifies that:
 """
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -26,6 +26,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMAssistantAggregatorParams,
     LLMContextAggregatorPair,
 )
+from pipecat.tests import MockLLMService, MockTTSService
 from pipecat.tests.mock_transport import MockTransport
 from pipecat.transports.base_transport import TransportParams
 
@@ -43,7 +44,6 @@ from api.services.workflow.dto import (
 from api.services.workflow.pipecat_engine import PipecatEngine
 from api.services.workflow.pipecat_engine_custom_tools import CustomToolManager
 from api.services.workflow.workflow_graph import WorkflowGraph
-from pipecat.tests import MockLLMService, MockTTSService
 
 # ─── Constants ──────────────────────────────────────────────────
 
@@ -166,7 +166,7 @@ def audio_workflow() -> WorkflowGraph:
 
 async def run_pipeline_and_capture_frames(
     workflow: WorkflowGraph,
-    functions: List[Dict[str, Any]],
+    functions: list[dict[str, Any]],
     fetch_recording_audio=None,
     num_text_steps: int = 1,
 ) -> tuple[MockLLMService, LLMContext, list[Frame]]:

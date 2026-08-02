@@ -5,7 +5,7 @@ Each row represents one provider account that an organization has connected
 ``OrganizationConfiguration(TELEPHONY_CONFIGURATION)`` storage.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError
@@ -22,7 +22,7 @@ class TelephonyConfigurationInUseError(Exception):
 class TelephonyConfigurationClient(BaseDBClient):
     async def list_telephony_configurations(
         self, organization_id: int
-    ) -> List[TelephonyConfigurationModel]:
+    ) -> list[TelephonyConfigurationModel]:
         async with self.async_session() as session:
             result = await session.execute(
                 select(TelephonyConfigurationModel)
@@ -33,13 +33,13 @@ class TelephonyConfigurationClient(BaseDBClient):
 
     async def get_telephony_configuration(
         self, config_id: int
-    ) -> Optional[TelephonyConfigurationModel]:
+    ) -> TelephonyConfigurationModel | None:
         async with self.async_session() as session:
             return await session.get(TelephonyConfigurationModel, config_id)
 
     async def get_telephony_configuration_for_org(
         self, config_id: int, organization_id: int
-    ) -> Optional[TelephonyConfigurationModel]:
+    ) -> TelephonyConfigurationModel | None:
         """Lookup scoped to an org — used to authorize per-org access."""
         async with self.async_session() as session:
             result = await session.execute(
@@ -52,7 +52,7 @@ class TelephonyConfigurationClient(BaseDBClient):
 
     async def get_default_telephony_configuration(
         self, organization_id: int
-    ) -> Optional[TelephonyConfigurationModel]:
+    ) -> TelephonyConfigurationModel | None:
         async with self.async_session() as session:
             result = await session.execute(
                 select(TelephonyConfigurationModel).where(
@@ -64,7 +64,7 @@ class TelephonyConfigurationClient(BaseDBClient):
 
     async def list_telephony_configurations_by_provider(
         self, organization_id: int, provider: str
-    ) -> List[TelephonyConfigurationModel]:
+    ) -> list[TelephonyConfigurationModel]:
         """Used by inbound matching to enumerate candidates of a given provider."""
         async with self.async_session() as session:
             result = await session.execute(
@@ -129,7 +129,7 @@ class TelephonyConfigurationClient(BaseDBClient):
 
     async def list_all_telephony_configurations_by_provider(
         self, provider: str
-    ) -> List[TelephonyConfigurationModel]:
+    ) -> list[TelephonyConfigurationModel]:
         """List configs of a given provider across every organization.
 
         Used by background workers like the ARI manager that maintain
@@ -148,7 +148,7 @@ class TelephonyConfigurationClient(BaseDBClient):
         organization_id: int,
         name: str,
         provider: str,
-        credentials: Dict[str, Any],
+        credentials: dict[str, Any],
         is_default_outbound: bool = False,
     ) -> TelephonyConfigurationModel:
         """Create a new config row. Duplicate-account guarding is the caller's
@@ -184,9 +184,9 @@ class TelephonyConfigurationClient(BaseDBClient):
         self,
         config_id: int,
         organization_id: int,
-        name: Optional[str] = None,
-        credentials: Optional[Dict[str, Any]] = None,
-    ) -> Optional[TelephonyConfigurationModel]:
+        name: str | None = None,
+        credentials: dict[str, Any] | None = None,
+    ) -> TelephonyConfigurationModel | None:
         async with self.async_session() as session:
             row = await session.get(TelephonyConfigurationModel, config_id)
             if not row or row.organization_id != organization_id:
@@ -207,7 +207,7 @@ class TelephonyConfigurationClient(BaseDBClient):
 
     async def set_default_telephony_configuration(
         self, config_id: int, organization_id: int
-    ) -> Optional[TelephonyConfigurationModel]:
+    ) -> TelephonyConfigurationModel | None:
         """Mark this config as the org's default outbound, clearing any other default."""
         async with self.async_session() as session:
             row = await session.get(TelephonyConfigurationModel, config_id)

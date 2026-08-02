@@ -17,7 +17,6 @@ import base64
 import hashlib
 import hmac
 import time
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
@@ -45,14 +44,14 @@ class TurnCredentialsResponse(BaseModel):
     username: str
     password: str
     ttl: int
-    uris: List[str]
+    uris: list[str]
 
 
 class TurnConfigResponse(BaseModel):
     """Response model for TURN configuration status."""
 
     enabled: bool
-    host: Optional[str] = None
+    host: str | None = None
 
 
 def generate_turn_credentials(user_id: str, ttl: int = TURN_CREDENTIAL_TTL) -> dict:

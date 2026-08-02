@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import exists
 from sqlalchemy.dialects.postgresql import insert
@@ -18,7 +17,7 @@ from api.utils.api_key import generate_api_key
 class OrganizationClient(BaseDBClient):
     async def get_organization_by_id(
         self, organization_id: int
-    ) -> Optional[OrganizationModel]:
+    ) -> OrganizationModel | None:
         """Get an organization by its ID."""
         async with self.async_session() as session:
             result = await session.execute(
@@ -65,7 +64,7 @@ class OrganizationClient(BaseDBClient):
                 # This is atomic and handles race conditions at the database level
 
                 stmt = insert(OrganizationModel.__table__).values(
-                    provider_id=org_provider_id, created_at=datetime.now(timezone.utc)
+                    provider_id=org_provider_id, created_at=datetime.now(UTC)
                 )
                 # ON CONFLICT DO NOTHING - if another request already inserted, this becomes a no-op
                 stmt = stmt.on_conflict_do_nothing(index_elements=["provider_id"])

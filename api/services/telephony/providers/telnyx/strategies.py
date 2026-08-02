@@ -13,7 +13,7 @@ API reference:
   https://developers.telnyx.com/api-reference/call-commands/hangup
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import aiohttp
 from loguru import logger
@@ -27,7 +27,7 @@ class TelnyxConferenceStrategy(TransferStrategy):
     already created (seeded with the destination on ``call.answered``).
     """
 
-    async def execute_transfer(self, context: Dict[str, Any]) -> bool:
+    async def execute_transfer(self, context: dict[str, Any]) -> bool:
         caller_call_control_id = context["call_control_id"]
         api_key = context["api_key"]
 
@@ -83,7 +83,7 @@ class TelnyxConferenceStrategy(TransferStrategy):
     async def _join_caller(
         self,
         session: aiohttp.ClientSession,
-        headers: Dict[str, str],
+        headers: dict[str, str],
         *,
         conference_id: str,
         caller_call_control_id: str,
@@ -145,7 +145,7 @@ class TelnyxHangupStrategy(HangupStrategy):
     https://developers.telnyx.com/api-reference/call-commands/hangup
     """
 
-    async def execute_hangup(self, context: Dict[str, Any]) -> bool:
+    async def execute_hangup(self, context: dict[str, Any]) -> bool:
         call_control_id = context["call_control_id"]
         api_key = context["api_key"]
 

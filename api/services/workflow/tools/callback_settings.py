@@ -1,12 +1,12 @@
-import logging
-from datetime import datetime, timedelta, date, time
-from typing import Dict, Any, Tuple
-from zoneinfo import ZoneInfo
-import phonenumbers
-from phonenumbers import timezone
 import asyncio
+import logging
+from datetime import datetime, time, timedelta
+from typing import Any
+from zoneinfo import ZoneInfo
 
+import phonenumbers
 from api.db import db_client
+from phonenumbers import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ async def resolve_callback_settings(
     organization_id: int,
     workflow_id: int,
     campaign_id: int | None = None
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Resolves callback settings from Organization, Campaign, and Workflow levels.
     Priority: Org max ceilings -> Campaign overrides -> Workflow defaults.
@@ -53,8 +53,7 @@ async def resolve_callback_settings(
     wf_include_summary = wf_cb_config.get("include_conversation_summary", True)
     
     # Cap workflow max delay to org max delay
-    if wf_max_delay > org_max_delay:
-        wf_max_delay = org_max_delay
+    wf_max_delay = min(wf_max_delay, org_max_delay)
 
     # 4. Campaign overrides
     camp_enabled = wf_enabled

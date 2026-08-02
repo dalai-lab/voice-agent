@@ -17,20 +17,19 @@ receive a normalized config dict containing credentials plus a
 joining ``telephony_phone_numbers``.
 """
 
-from typing import Any, Dict, List, Optional, Tuple, Type
-
-from loguru import logger
+from typing import Any
 
 from api.db import db_client
 from api.db.models import TelephonyConfigurationModel, WorkflowRunModel
 from api.services.telephony import registry
 from api.services.telephony.base import TelephonyProvider
+from loguru import logger
 
 
 async def load_telephony_config_by_id(
     telephony_configuration_id: int | str | None,
     organization_id: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Load and normalize the config row by primary key, scoped to the org.
 
     Returns a dict in the shape each provider class expects in its constructor
@@ -57,7 +56,7 @@ async def load_telephony_config_by_id(
     return await _normalize_with_phone_numbers(row)
 
 
-async def load_default_telephony_config(organization_id: int) -> Dict[str, Any]:
+async def load_default_telephony_config(organization_id: int) -> dict[str, Any]:
     """Load the org's default outbound config."""
     if not organization_id:
         raise ValueError("organization_id is required")
@@ -72,8 +71,8 @@ async def load_default_telephony_config(organization_id: int) -> Dict[str, Any]:
 
 
 async def find_telephony_config_for_inbound(
-    organization_id: int, provider_name: str, account_id: Optional[str]
-) -> Optional[Tuple[int, Dict[str, Any]]]:
+    organization_id: int, provider_name: str, account_id: str | None
+) -> tuple[int, dict[str, Any]] | None:
     """Match an inbound webhook to one of the org's configs of the detected
     provider. Returns ``(config_id, normalized_config)`` or None.
 
@@ -91,7 +90,7 @@ async def find_telephony_config_for_inbound(
         return None
 
     field = spec.account_id_credential_field
-    matched: Optional[TelephonyConfigurationModel] = None
+    matched: TelephonyConfigurationModel | None = None
 
     if not field:
         # Provider has no account-id concept (e.g. ARI); only one config of this
@@ -155,8 +154,8 @@ async def get_default_telephony_provider(organization_id: int) -> TelephonyProvi
 
 
 async def get_telephony_provider_for_inbound(
-    organization_id: int, provider_name: str, account_id: Optional[str]
-) -> Optional[Tuple[int, TelephonyProvider]]:
+    organization_id: int, provider_name: str, account_id: str | None
+) -> tuple[int, TelephonyProvider] | None:
     """Returns ``(config_id, provider_instance)`` or None when no config matches."""
     match = await find_telephony_config_for_inbound(
         organization_id, provider_name, account_id
@@ -169,9 +168,9 @@ async def get_telephony_provider_for_inbound(
 
 async def load_credentials_for_transport(
     organization_id: int,
-    telephony_configuration_id: Optional[int | str],
+    telephony_configuration_id: int | str | None,
     expected_provider: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Helper for per-provider transport modules.
 
     Resolves the right credentials for a websocket transport given what's
@@ -195,14 +194,14 @@ async def load_credentials_for_transport(
     return config
 
 
-async def get_all_telephony_providers() -> List[Type[TelephonyProvider]]:
+async def get_all_telephony_providers() -> list[type[TelephonyProvider]]:
     """All registered provider classes — used by inbound webhook detection."""
     return [spec.provider_cls for spec in registry.all_specs()]
 
 
 async def _normalize_with_phone_numbers(
     row: TelephonyConfigurationModel,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run the provider's config_loader over the credentials, then attach the
     active phone numbers as a ``from_numbers`` list (raw address strings) and
     the default caller ID (when one is flagged and active) as
@@ -223,7 +222,7 @@ async def _normalize_with_phone_numbers(
     return base
 
 
-def _instantiate(config: Dict[str, Any]) -> TelephonyProvider:
+def _instantiate(config: dict[str, Any]) -> TelephonyProvider:
     spec = registry.get(config["provider"])
     logger.info(f"Creating {spec.name} telephony provider")
     return spec.provider_cls(config)

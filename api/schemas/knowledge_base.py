@@ -1,7 +1,7 @@
 """Pydantic schemas for knowledge base operations."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -11,7 +11,7 @@ class DocumentUploadRequestSchema(BaseModel):
 
     filename: str = Field(..., description="Name of the file to upload")
     mime_type: str = Field(..., description="MIME type of the file")
-    custom_metadata: Optional[Dict[str, Any]] = Field(
+    custom_metadata: dict[str, Any] | None = Field(
         default=None, description="Optional custom metadata"
     )
 
@@ -45,12 +45,12 @@ class DocumentResponseSchema(BaseModel):
     file_hash: str
     mime_type: str
     processing_status: str  # pending, processing, completed, failed
-    processing_error: Optional[str] = None
+    processing_error: str | None = None
     total_chunks: int
     retrieval_mode: str = "chunked"
-    custom_metadata: Dict[str, Any]
-    docling_metadata: Dict[str, Any]
-    source_url: Optional[str] = None
+    custom_metadata: dict[str, Any]
+    docling_metadata: dict[str, Any]
+    source_url: str | None = None
     created_at: datetime
     updated_at: datetime
     organization_id: int
@@ -61,7 +61,7 @@ class DocumentResponseSchema(BaseModel):
 class DocumentListResponseSchema(BaseModel):
     """Response schema for list of documents."""
 
-    documents: List[DocumentResponseSchema]
+    documents: list[DocumentResponseSchema]
     total: int
     limit: int
     offset: int
@@ -72,10 +72,10 @@ class ChunkSearchRequestSchema(BaseModel):
 
     query: str = Field(..., description="Search query text")
     limit: int = Field(default=5, ge=1, le=50, description="Maximum number of results")
-    document_uuids: Optional[List[str]] = Field(
+    document_uuids: list[str] | None = Field(
         default=None, description="Filter by specific document UUIDs"
     )
-    min_similarity: Optional[float] = Field(
+    min_similarity: float | None = Field(
         default=None, ge=0.0, le=1.0, description="Minimum similarity threshold"
     )
 
@@ -86,9 +86,9 @@ class ChunkResponseSchema(BaseModel):
     id: int
     document_id: int
     chunk_text: str
-    contextualized_text: Optional[str]
+    contextualized_text: str | None
     chunk_index: int
-    chunk_metadata: Dict[str, Any]
+    chunk_metadata: dict[str, Any]
     filename: str
     document_uuid: str
     similarity: float
@@ -97,6 +97,6 @@ class ChunkResponseSchema(BaseModel):
 class ChunkSearchResponseSchema(BaseModel):
     """Response schema for chunk search results."""
 
-    chunks: List[ChunkResponseSchema]
+    chunks: list[ChunkResponseSchema]
     query: str
     total_results: int

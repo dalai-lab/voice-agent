@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from typing import Dict
 
 from loguru import logger
 
@@ -18,7 +17,7 @@ PHONE_NUMBER_POOL_EXHAUSTED_COUNTER_KEY = "phone_number_pool_exhausted_attempts"
 MAX_PHONE_NUMBER_POOL_EXHAUSTED_ATTEMPTS = 3
 
 
-async def sync_campaign_source(ctx: Dict, campaign_id: int) -> None:
+async def sync_campaign_source(ctx: dict, campaign_id: int) -> None:
     """
     Phase 1: Syncs data from configured source to queued_runs table
     - Campaign state should already be 'syncing'
@@ -97,7 +96,7 @@ async def sync_campaign_source(ctx: Dict, campaign_id: int) -> None:
 
 
 async def process_campaign_batch(
-    ctx: Dict, campaign_id: int, batch_size: int = 10, callbacks_only: bool = False
+    ctx: dict, campaign_id: int, batch_size: int = 10, callbacks_only: bool = False
 ) -> None:
     """
     Phase 2: Processes a batch of queued runs

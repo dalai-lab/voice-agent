@@ -10,7 +10,6 @@ These tests verify:
 import asyncio
 import uuid
 from dataclasses import dataclass
-from typing import List
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -70,7 +69,7 @@ class CampaignTestData:
     user_id: int
     workflow_id: int
     campaign_id: int
-    queued_run_ids: List[int]
+    queued_run_ids: list[int]
 
 
 @pytest.fixture

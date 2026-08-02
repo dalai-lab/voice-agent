@@ -5,11 +5,8 @@ Handles transfer event publishing, subscription, and context storage
 
 import asyncio
 import time
-from typing import Dict, Optional
 
 import redis.asyncio as aioredis
-from loguru import logger
-
 from api.constants import REDIS_URL
 from api.services.telephony.transfer_event_protocol import (
     TransferContext,
@@ -17,14 +14,15 @@ from api.services.telephony.transfer_event_protocol import (
     TransferEventType,
     TransferRedisChannels,
 )
+from loguru import logger
 
 
 class CallTransferManager:
     """Manages call transfer events and context storage using Redis."""
 
-    def __init__(self, redis_client: Optional[aioredis.Redis] = None):
+    def __init__(self, redis_client: aioredis.Redis | None = None):
         self._redis_client = redis_client
-        self._pubsub_connections: Dict[str, aioredis.client.PubSub] = {}
+        self._pubsub_connections: dict[str, aioredis.client.PubSub] = {}
 
     async def _get_redis(self) -> aioredis.Redis:
         """Get Redis client instance."""
@@ -56,7 +54,7 @@ class CallTransferManager:
         except Exception as e:
             logger.error(f"Failed to store transfer context: {e}")
 
-    async def get_transfer_context(self, transfer_id: str) -> Optional[TransferContext]:
+    async def get_transfer_context(self, transfer_id: str) -> TransferContext | None:
         """Retrieve transfer context from Redis.
 
         Args:
@@ -151,7 +149,7 @@ class CallTransferManager:
 
     async def wait_for_transfer_completion(
         self, transfer_id: str, timeout_seconds: float = 30.0
-    ) -> Optional[TransferEvent]:
+    ) -> TransferEvent | None:
         """Wait for transfer completion event using Redis pub/sub.
 
         Args:
@@ -196,7 +194,7 @@ class CallTransferManager:
             result = await asyncio.wait_for(wait_for_message(), timeout=timeout_seconds)
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.debug(f"Transfer completion wait timed out for {transfer_id}")
             return None
         except Exception as e:
@@ -254,7 +252,7 @@ class CallTransferManager:
 
 
 # Global call transfer manager instance
-_call_transfer_manager: Optional[CallTransferManager] = None
+_call_transfer_manager: CallTransferManager | None = None
 
 
 async def get_call_transfer_manager() -> CallTransferManager:

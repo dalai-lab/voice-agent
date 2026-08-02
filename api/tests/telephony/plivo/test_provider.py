@@ -2,7 +2,6 @@ import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from api.services.telephony.providers.plivo.provider import PlivoProvider
 
 

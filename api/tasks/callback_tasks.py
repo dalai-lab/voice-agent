@@ -1,10 +1,16 @@
-from loguru import logger
-from api.db import db_client
-from api.services.telephony.factory import get_default_telephony_provider, get_telephony_provider_by_id
-from api.utils.common import get_backend_endpoints
-from api.services.workflow.run_creation import prepare_workflow_run_inputs
-from arq import Retry
 from datetime import timedelta
+
+from arq import Retry
+from loguru import logger
+
+from api.db import db_client
+from api.services.telephony.factory import (
+    get_default_telephony_provider,
+    get_telephony_provider_by_id,
+)
+from api.services.workflow.run_creation import prepare_workflow_run_inputs
+from api.utils.common import get_backend_endpoints
+
 
 async def execute_callback(ctx, to_number: str, from_number: str,
                            workflow_id: int, organization_id: int,
@@ -37,6 +43,7 @@ async def execute_callback(ctx, to_number: str, from_number: str,
         # Check if cancelled for standalone callbacks
         if not campaign_id:
             from sqlalchemy import select
+
             from api.db.models import ScheduledCallbackModel
             async with db_client.async_session() as session:
                 stmt = select(ScheduledCallbackModel).where(ScheduledCallbackModel.original_run_id == original_run_id)
@@ -105,8 +112,9 @@ async def execute_callback(ctx, to_number: str, from_number: str,
         # Update ScheduledCallbackModel to "completed" if non-campaign
         if not campaign_id:
             try:
-                from api.db.models import ScheduledCallbackModel
                 from sqlalchemy import update
+
+                from api.db.models import ScheduledCallbackModel
                 async with db_client.async_session() as session:
                     stmt = (
                         update(ScheduledCallbackModel)
@@ -130,8 +138,9 @@ async def execute_callback(ctx, to_number: str, from_number: str,
         # Update status to failed only if all retries are exhausted
         if not campaign_id:
             try:
-                from api.db.models import ScheduledCallbackModel
                 from sqlalchemy import update
+
+                from api.db.models import ScheduledCallbackModel
                 async with db_client.async_session() as session:
                     stmt = (
                         update(ScheduledCallbackModel)

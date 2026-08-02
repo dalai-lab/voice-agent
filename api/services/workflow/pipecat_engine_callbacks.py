@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 class UserIdleHandler:
     """Helper class to manage user idle retry logic with state."""
 
-    def __init__(self, engine: "PipecatEngine"):
+    def __init__(self, engine: PipecatEngine):
         self._engine = engine
         self._retry_count = 0
 
@@ -62,7 +62,7 @@ class UserIdleHandler:
         )
 
 
-def create_user_idle_handler(engine: "PipecatEngine") -> UserIdleHandler:
+def create_user_idle_handler(engine: PipecatEngine) -> UserIdleHandler:
     """Return a UserIdleHandler that manages user-idle timeouts with state."""
     return UserIdleHandler(engine)
 
@@ -72,7 +72,7 @@ def create_user_idle_handler(engine: "PipecatEngine") -> UserIdleHandler:
 # ---------------------------------------------------------------------------
 
 
-def create_max_duration_callback(engine: "PipecatEngine"):
+def create_max_duration_callback(engine: PipecatEngine):
     """Return a callback that cancels the task when the hard call limit is exceeded."""
 
     async def handle_max_duration():
@@ -90,7 +90,7 @@ def create_max_duration_callback(engine: "PipecatEngine"):
 # ---------------------------------------------------------------------------
 
 
-def create_generation_started_callback(engine: "PipecatEngine"):
+def create_generation_started_callback(engine: PipecatEngine):
     """Return a callback that resets flags at the start of each LLM generation."""
 
     async def handle_generation_started():
@@ -101,7 +101,7 @@ def create_generation_started_callback(engine: "PipecatEngine"):
     return handle_generation_started
 
 
-def create_aggregation_correction_callback(engine: "PipecatEngine"):
+def create_aggregation_correction_callback(engine: PipecatEngine):
     """Create a callback that uses engine's reference text to correct corrupted aggregation."""
 
     def correct_corrupted_aggregation(ref: str, corrupted: str) -> str:

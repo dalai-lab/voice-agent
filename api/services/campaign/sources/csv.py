@@ -1,11 +1,8 @@
 import csv
 import hashlib
 from io import StringIO
-from typing import List, Optional
 
 import httpx
-from loguru import logger
-
 from api.db import db_client
 from api.services.campaign.source_sync import (
     CampaignSourceSyncService,
@@ -13,12 +10,13 @@ from api.services.campaign.source_sync import (
     ValidationResult,
 )
 from api.services.storage import storage_fs
+from loguru import logger
 
 
 class CSVSyncService(CampaignSourceSyncService):
     """Implementation for CSV file synchronization"""
 
-    async def _fetch_csv_data(self, file_key: str) -> List[List[str]]:
+    async def _fetch_csv_data(self, file_key: str) -> list[list[str]]:
         """Download and parse CSV file from storage. Returns all rows including header."""
         signed_url = await storage_fs.aget_signed_url(
             file_key, expiration=3600, use_internal_endpoint=True
@@ -34,12 +32,12 @@ class CSVSyncService(CampaignSourceSyncService):
                 csv_content = response.text
             except httpx.HTTPError as e:
                 logger.error(f"Failed to download CSV file: {e} for url: {signed_url}")
-                raise ValueError(f"Failed to download CSV file from storage: {str(e)}")
+                raise ValueError(f"Failed to download CSV file from storage: {e!s}")
 
         return self._parse_csv(csv_content)
 
     async def validate_source(
-        self, source_id: str, organization_id: Optional[int] = None
+        self, source_id: str, organization_id: int | None = None
     ) -> ValidationResult:
         """Validate a CSV source file for campaign creation."""
         try:
@@ -127,7 +125,7 @@ class CSVSyncService(CampaignSourceSyncService):
 
         return len(queued_runs)
 
-    def _parse_csv(self, csv_content: str) -> List[List[str]]:
+    def _parse_csv(self, csv_content: str) -> list[list[str]]:
         """Parse CSV content into rows"""
         try:
             csv_file = StringIO(csv_content)
@@ -135,4 +133,4 @@ class CSVSyncService(CampaignSourceSyncService):
             return list(reader)
         except Exception as e:
             logger.error(f"Failed to parse CSV: {e}")
-            raise ValueError(f"Invalid CSV format: {str(e)}")
+            raise ValueError(f"Invalid CSV format: {e!s}")

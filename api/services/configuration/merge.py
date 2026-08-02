@@ -5,7 +5,6 @@ stored, while honouring masked API keys.
 """
 
 import copy
-from typing import Dict
 
 from api.schemas.ai_model_configuration import EffectiveAIModelConfiguration
 from api.services.configuration.masking import (
@@ -66,7 +65,7 @@ def _merge_service_secret_fields(
 
 
 def merge_user_configurations(
-    existing: EffectiveAIModelConfiguration, incoming_partial: Dict[str, dict]
+    existing: EffectiveAIModelConfiguration, incoming_partial: dict[str, dict]
 ) -> EffectiveAIModelConfiguration:
     """Merge *incoming_partial* onto *existing* and return a new EffectiveAIModelConfiguration.
 

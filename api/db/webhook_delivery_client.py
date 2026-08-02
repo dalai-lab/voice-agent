@@ -7,7 +7,6 @@ pattern -- the row is the source of truth, ``scheduled_for`` gates due work.
 """
 
 from datetime import UTC, datetime, timedelta
-from typing import List, Optional, Tuple
 
 from loguru import logger
 from sqlalchemy import or_, select, update
@@ -28,12 +27,12 @@ class WebhookDeliveryClient(BaseDBClient):
         payload: dict,
         max_attempts: int,
         http_method: str = "POST",
-        webhook_name: Optional[str] = None,
-        custom_headers: Optional[list] = None,
-        credential_uuid: Optional[str] = None,
-        webhook_node_id: Optional[str] = None,
-        scheduled_for: Optional[datetime] = None,
-    ) -> Tuple[WebhookDeliveryModel, bool]:
+        webhook_name: str | None = None,
+        custom_headers: list | None = None,
+        credential_uuid: str | None = None,
+        webhook_node_id: str | None = None,
+        scheduled_for: datetime | None = None,
+    ) -> tuple[WebhookDeliveryModel, bool]:
         """Get-or-create the ``pending`` delivery for this run + webhook node.
 
         Idempotent on ``(workflow_run_id, webhook_node_id)``: a retried
@@ -98,7 +97,7 @@ class WebhookDeliveryClient(BaseDBClient):
 
     async def get_webhook_delivery(
         self, delivery_id: int
-    ) -> Optional[WebhookDeliveryModel]:
+    ) -> WebhookDeliveryModel | None:
         async with self.async_session() as session:
             result = await session.execute(
                 select(WebhookDeliveryModel).where(
@@ -109,7 +108,7 @@ class WebhookDeliveryClient(BaseDBClient):
 
     async def claim_webhook_delivery(
         self, delivery_id: int, lease_seconds: int
-    ) -> Optional[WebhookDeliveryModel]:
+    ) -> WebhookDeliveryModel | None:
         """Atomically claim a pending, due delivery for one worker to process.
 
         A conditional UPDATE pushes ``scheduled_for`` out by a short lease. Only
@@ -148,7 +147,7 @@ class WebhookDeliveryClient(BaseDBClient):
             return fetched.scalar_one_or_none()
 
     async def mark_webhook_delivery_succeeded(
-        self, delivery_id: int, attempt_count: int, status_code: Optional[int]
+        self, delivery_id: int, attempt_count: int, status_code: int | None
     ) -> None:
         async with self.async_session() as session:
             await session.execute(
@@ -171,7 +170,7 @@ class WebhookDeliveryClient(BaseDBClient):
         attempt_count: int,
         scheduled_for: datetime,
         last_error: str,
-        last_status_code: Optional[int],
+        last_status_code: int | None,
     ) -> None:
         """Record a transient failure and set when the next attempt is due."""
         async with self.async_session() as session:
@@ -194,7 +193,7 @@ class WebhookDeliveryClient(BaseDBClient):
         delivery_id: int,
         attempt_count: int,
         last_error: str,
-        last_status_code: Optional[int],
+        last_status_code: int | None,
     ) -> None:
         """Terminal failure: parked for inspection, never retried again."""
         async with self.async_session() as session:
@@ -217,8 +216,8 @@ class WebhookDeliveryClient(BaseDBClient):
             )
 
     async def get_due_webhook_deliveries(
-        self, now: Optional[datetime] = None, limit: int = 100, after_id: int = 0
-    ) -> List[WebhookDeliveryModel]:
+        self, now: datetime | None = None, limit: int = 100, after_id: int = 0
+    ) -> list[WebhookDeliveryModel]:
         """One page of pending deliveries whose next attempt is due.
 
         Used by the periodic sweeper to re-enqueue deliveries whose ARQ job was

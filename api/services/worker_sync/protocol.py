@@ -28,7 +28,7 @@ class WorkerSyncEvent:
     event_type: str  # handler key, e.g. "langfuse_credentials"
     action: str  # "update" or "delete"
     org_id: str = ""
-    timestamp: Optional[str] = None
+    timestamp: str | None = None
 
     def __post_init__(self):
         if self.timestamp is None:

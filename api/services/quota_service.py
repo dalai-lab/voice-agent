@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
-from loguru import logger
-
 from api.constants import DEPLOYMENT_MODE
 from api.db import db_client
 from api.db.models import UserModel
@@ -23,6 +21,7 @@ from api.services.managed_model_services import (
     uses_managed_model_services_v2,
 )
 from api.services.mps_service_key_client import mps_service_key_client
+from loguru import logger
 
 MINIMUM_DOGRAH_CREDITS_FOR_CALL = 0.10
 
@@ -350,7 +349,7 @@ async def _authorize_oss_dograh_keys(
         except _MPS_UNREACHABLE_ERRORS as e:
             return _mps_unreachable_result("OSS service-key quota check", e)
         except Exception as e:
-            logger.error(f"Failed to check quota for Dograh key: {str(e)}")
+            logger.error(f"Failed to check quota for Dograh key: {e!s}")
             error_str = str(e)
             if "404" in error_str or "not found" in error_str.lower():
                 return QuotaCheckResult(
@@ -729,7 +728,7 @@ async def authorize_workflow_run_start(
         )
 
     except Exception as e:
-        logger.error(f"Error during quota check: {str(e)}")
+        logger.error(f"Error during quota check: {e!s}")
         # Only an httpx transport failure raised while calling MPS is allowed to
         # fail open, and those failures are handled at the MPS call sites above.
         # Database, configuration, response-validation, and programming errors

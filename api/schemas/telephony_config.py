@@ -8,7 +8,7 @@ Adding a new provider requires adding one import here.
 """
 
 from datetime import datetime
-from typing import Annotated, List, Optional, Union
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,15 +45,7 @@ from api.services.telephony.providers.vonage.config import (
 # ``provider`` Literal field of each request class. Replaces the manual
 # if/elif chains that used to live in routes/organization.py.
 TelephonyConfigRequest = Annotated[
-    Union[
-        ARIConfigurationRequest,
-        CloudonixConfigurationRequest,
-        PlivoConfigurationRequest,
-        TelnyxConfigurationRequest,
-        TwilioConfigurationRequest,
-        VobizConfigurationRequest,
-        VonageConfigurationRequest,
-    ],
+    ARIConfigurationRequest | CloudonixConfigurationRequest | PlivoConfigurationRequest | TelnyxConfigurationRequest | TwilioConfigurationRequest | VobizConfigurationRequest | VonageConfigurationRequest,
     Field(discriminator="provider"),
 ]
 
@@ -66,13 +58,13 @@ class TelephonyConfigurationResponse(BaseModel):
     flat discriminated union.
     """
 
-    twilio: Optional[TwilioConfigurationResponse] = None
-    plivo: Optional[PlivoConfigurationResponse] = None
-    vonage: Optional[VonageConfigurationResponse] = None
-    vobiz: Optional[VobizConfigurationResponse] = None
-    cloudonix: Optional[CloudonixConfigurationResponse] = None
-    ari: Optional[ARIConfigurationResponse] = None
-    telnyx: Optional[TelnyxConfigurationResponse] = None
+    twilio: TwilioConfigurationResponse | None = None
+    plivo: PlivoConfigurationResponse | None = None
+    vonage: VonageConfigurationResponse | None = None
+    vobiz: VobizConfigurationResponse | None = None
+    cloudonix: CloudonixConfigurationResponse | None = None
+    ari: ARIConfigurationResponse | None = None
+    telnyx: TelnyxConfigurationResponse | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -97,8 +89,8 @@ class TelephonyConfigurationCreateRequest(BaseModel):
 class TelephonyConfigurationUpdateRequest(BaseModel):
     """Body for ``PUT /telephony-configs/{id}``. Partial update."""
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=64)
-    config: Optional[TelephonyConfigRequest] = None
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    config: TelephonyConfigRequest | None = None
 
 
 class TelephonyConfigurationListItem(BaseModel):
@@ -128,7 +120,7 @@ class TelephonyConfigurationDetail(BaseModel):
 
 
 class TelephonyConfigurationListResponse(BaseModel):
-    configurations: List[TelephonyConfigurationListItem]
+    configurations: list[TelephonyConfigurationListItem]
 
 
 __all__ = [

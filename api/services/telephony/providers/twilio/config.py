@@ -1,6 +1,6 @@
 """Twilio telephony configuration schemas."""
 
-from typing import List, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -13,7 +13,7 @@ class TwilioConfigurationRequest(BaseModel):
     auth_token: str = Field(..., description="Twilio Auth Token")
     # Phone numbers are managed via the dedicated phone-numbers endpoints; the
     # legacy /telephony-config POST shim still accepts them inline.
-    from_numbers: List[str] = Field(
+    from_numbers: list[str] = Field(
         default_factory=list, description="List of Twilio phone numbers"
     )
     amd_enabled: bool = Field(
@@ -31,5 +31,5 @@ class TwilioConfigurationResponse(BaseModel):
     provider: Literal["twilio"] = Field(default="twilio")
     account_sid: str  # Masked (e.g., "****************def0")
     auth_token: str  # Masked (e.g., "****************abc1")
-    from_numbers: List[str]
+    from_numbers: list[str]
     amd_enabled: bool = False

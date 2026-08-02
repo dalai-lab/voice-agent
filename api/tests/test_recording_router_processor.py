@@ -9,7 +9,6 @@ Uses pipecat's ``run_test`` helper to send frames through a real pipeline
 and inspect what arrives downstream.
 """
 
-from typing import Optional
 
 import pytest
 from pipecat.frames.frames import (
@@ -20,6 +19,7 @@ from pipecat.frames.frames import (
     TTSStoppedFrame,
     TTSTextFrame,
 )
+from pipecat.tests import run_test
 
 from api.services.pipecat.recording_audio_cache import RecordingAudio
 from api.services.pipecat.recording_router_processor import (
@@ -29,7 +29,6 @@ from api.services.workflow.pipecat_engine_context_composer import (
     RECORDING_MARKER,
     TTS_MARKER,
 )
-from pipecat.tests import run_test
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -38,7 +37,7 @@ from pipecat.tests import run_test
 FAKE_AUDIO = b"\x00\x01" * 8000  # 1 second of 16-bit mono @ 16 kHz
 
 
-async def _fake_fetch(recording_id: str) -> Optional[RecordingAudio]:
+async def _fake_fetch(recording_id: str) -> RecordingAudio | None:
     """Stub that returns fake PCM audio for any recording_id."""
     return RecordingAudio(audio=FAKE_AUDIO)
 

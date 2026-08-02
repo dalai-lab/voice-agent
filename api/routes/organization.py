@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
@@ -91,7 +91,7 @@ from api.utils.telephony_address import normalize_telephony_address
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 
-def _sensitive_fields(provider_name: str) -> List[str]:
+def _sensitive_fields(provider_name: str) -> list[str]:
     """Field names that should be masked when displaying stored config.
 
     Sourced from ProviderUIField.sensitive in the registry — the same source
@@ -131,11 +131,11 @@ class TelephonyProviderUIField(BaseModel):
     type: str
     required: bool
     sensitive: bool
-    description: Optional[str] = None
-    placeholder: Optional[str] = None
-    options: Optional[List[TelephonyProviderUIOption]] = None
-    visible_when: Optional[TelephonyProviderUICondition] = None
-    section: Optional[str] = None
+    description: str | None = None
+    placeholder: str | None = None
+    options: list[TelephonyProviderUIOption] | None = None
+    visible_when: TelephonyProviderUICondition | None = None
+    section: str | None = None
 
 
 class TelephonyProviderMetadata(BaseModel):
@@ -143,14 +143,14 @@ class TelephonyProviderMetadata(BaseModel):
 
     provider: str
     display_name: str
-    fields: List[TelephonyProviderUIField]
-    docs_url: Optional[str] = None
+    fields: list[TelephonyProviderUIField]
+    docs_url: str | None = None
 
 
 class TelephonyProvidersMetadataResponse(BaseModel):
     """List of UI form definitions used by the telephony-config screen."""
 
-    providers: List[TelephonyProviderMetadata]
+    providers: list[TelephonyProviderMetadata]
 
 
 class TelephonyConfigWarningsResponse(BaseModel):
@@ -585,7 +585,7 @@ async def _run_preprocess_hook(provider: str, credentials: dict) -> dict:
 
 
 def _phone_number_to_response(
-    row, inbound_workflow_name: Optional[str] = None
+    row, inbound_workflow_name: str | None = None
 ) -> PhoneNumberResponse:
     response = PhoneNumberResponse.model_validate(row)
     response.inbound_workflow_name = inbound_workflow_name
@@ -674,7 +674,7 @@ async def list_telephony_configurations(user: UserModel = Depends(get_user)):
         raise HTTPException(status_code=400, detail="No organization selected")
 
     rows = await db_client.list_telephony_configurations(user.selected_organization_id)
-    items: List[TelephonyConfigurationListItem] = []
+    items: list[TelephonyConfigurationListItem] = []
     for row in rows:
         numbers = await db_client.list_phone_numbers_for_config(row.id)
         items.append(
@@ -1327,7 +1327,7 @@ class TimeSlotResponse(BaseModel):
 class ScheduleConfigResponse(BaseModel):
     enabled: bool
     timezone: str
-    slots: List[TimeSlotResponse]
+    slots: list[TimeSlotResponse]
 
 
 class CircuitBreakerConfigResponse(BaseModel):
@@ -1338,17 +1338,17 @@ class CircuitBreakerConfigResponse(BaseModel):
 
 
 class LastCampaignSettingsResponse(BaseModel):
-    retry_config: Optional[RetryConfigResponse] = None
-    max_concurrency: Optional[int] = None
-    schedule_config: Optional[ScheduleConfigResponse] = None
-    circuit_breaker: Optional[CircuitBreakerConfigResponse] = None
+    retry_config: RetryConfigResponse | None = None
+    max_concurrency: int | None = None
+    schedule_config: ScheduleConfigResponse | None = None
+    circuit_breaker: CircuitBreakerConfigResponse | None = None
 
 
 class CampaignDefaultsResponse(BaseModel):
     concurrent_call_limit: int
     from_numbers_count: int
     default_retry_config: RetryConfigResponse
-    last_campaign_settings: Optional[LastCampaignSettingsResponse] = None
+    last_campaign_settings: LastCampaignSettingsResponse | None = None
 
 
 @router.get("/campaign-defaults", response_model=CampaignDefaultsResponse)

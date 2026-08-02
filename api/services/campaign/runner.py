@@ -1,7 +1,5 @@
 from datetime import UTC, datetime
-from typing import Any, Dict
-
-from loguru import logger
+from typing import Any
 
 from api.db import db_client
 from api.services.campaign.campaign_event_publisher import (
@@ -10,6 +8,7 @@ from api.services.campaign.campaign_event_publisher import (
 from api.services.campaign.circuit_breaker import circuit_breaker
 from api.tasks.arq import enqueue_job
 from api.tasks.function_names import FunctionNames
+from loguru import logger
 
 
 class CampaignRunnerService:
@@ -99,7 +98,7 @@ class CampaignRunnerService:
 
         logger.info(f"Campaign {campaign_id} resumed")
 
-    async def get_campaign_status(self, campaign_id: int) -> Dict[str, Any]:
+    async def get_campaign_status(self, campaign_id: int) -> dict[str, Any]:
         """Returns detailed campaign status"""
         campaign = await db_client.get_campaign_by_id(campaign_id)
         if not campaign:

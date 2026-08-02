@@ -8,13 +8,13 @@ so every endpoint emits the same shape.
 import csv
 import io
 from datetime import UTC, datetime
-from typing import Any, List, Optional
+from typing import Any
 
 from api.db import db_client
 from api.utils.artifacts import artifact_url
 
 
-def _collect_extracted_variable_keys(runs: List[Any]) -> list[str]:
+def _collect_extracted_variable_keys(runs: list[Any]) -> list[str]:
     """Collect all unique extracted variable keys across runs, preserving insertion order."""
     keys: dict[str, None] = {}
     for run in runs:
@@ -26,7 +26,7 @@ def _collect_extracted_variable_keys(runs: List[Any]) -> list[str]:
     return list(keys)
 
 
-def build_run_report_csv(runs: List[Any]) -> io.StringIO:
+def build_run_report_csv(runs: list[Any]) -> io.StringIO:
     """Build a CSV from completed workflow runs."""
     extracted_var_keys = _collect_extracted_variable_keys(runs)
 
@@ -89,8 +89,8 @@ def build_run_report_csv(runs: List[Any]) -> io.StringIO:
 
 async def generate_campaign_report_csv(
     campaign_id: int,
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
 ) -> tuple[io.StringIO, str]:
     """Generate a CSV report for a campaign."""
     runs = await db_client.get_completed_runs_for_report(
@@ -101,8 +101,8 @@ async def generate_campaign_report_csv(
 
 async def generate_workflow_report_csv(
     workflow_id: int,
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
 ) -> tuple[io.StringIO, str]:
     """Generate a CSV report for all completed runs of a workflow."""
     runs = await db_client.get_completed_runs_for_report(
@@ -113,9 +113,9 @@ async def generate_workflow_report_csv(
 
 async def generate_usage_runs_report_csv(
     organization_id: int,
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
-    filters: Optional[list[dict]] = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    filters: list[dict] | None = None,
 ) -> tuple[io.StringIO, str]:
     """Generate a CSV report for runs visible on the org-wide usage page.
 

@@ -13,7 +13,7 @@ The key behavior being tested:
 
 import asyncio
 from types import SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -25,6 +25,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMAssistantAggregatorParams,
     LLMContextAggregatorPair,
 )
+from pipecat.tests import MockLLMService, MockTTSService
 from pipecat.tests.mock_transport import MockTransport
 from pipecat.transports.base_transport import TransportParams
 
@@ -34,7 +35,6 @@ from api.services.workflow.pipecat_engine_variable_extractor import (
     VariableExtractionManager,
 )
 from api.services.workflow.workflow_graph import WorkflowGraph
-from pipecat.tests import MockLLMService, MockTTSService
 
 
 class TestVariableExtractionDuringTransitions:
@@ -57,7 +57,7 @@ class TestVariableExtractionDuringTransitions:
         which is the node where the conversation context that needs extraction occurred.
         """
         # Track which nodes had extraction performed
-        extraction_calls: List[Dict[str, Any]] = []
+        extraction_calls: list[dict[str, Any]] = []
 
         # Step 0 (Start node): call collect_info to transition to agent
         step_0_chunks = MockLLMService.create_function_call_chunks(

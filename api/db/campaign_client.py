@@ -1,6 +1,6 @@
 import json
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import func, text, update
 from sqlalchemy.future import select
@@ -22,12 +22,12 @@ class CampaignClient(BaseDBClient):
         source_id: str,
         user_id: int,
         organization_id: int,
-        retry_config: Optional[dict] = None,
-        max_concurrency: Optional[int] = None,
-        schedule_config: Optional[dict] = None,
-        circuit_breaker: Optional[dict] = None,
-        telephony_configuration_id: Optional[int] = None,
-        callback_config: Optional[dict] = None,
+        retry_config: dict | None = None,
+        max_concurrency: int | None = None,
+        schedule_config: dict | None = None,
+        circuit_breaker: dict | None = None,
+        telephony_configuration_id: int | None = None,
+        callback_config: dict | None = None,
     ) -> CampaignModel:
         """Create a new campaign"""
         async with self.async_session() as session:
@@ -84,7 +84,7 @@ class CampaignClient(BaseDBClient):
     async def get_latest_campaign(
         self,
         organization_id: int,
-    ) -> Optional[CampaignModel]:
+    ) -> CampaignModel | None:
         """Get the most recently created campaign for an organization"""
         async with self.async_session() as session:
             query = (
@@ -100,7 +100,7 @@ class CampaignClient(BaseDBClient):
         self,
         campaign_id: int,
         organization_id: int,
-    ) -> Optional[CampaignModel]:
+    ) -> CampaignModel | None:
         """Get single campaign by ID, ensuring organization access"""
         async with self.async_session() as session:
             query = select(CampaignModel).where(
@@ -175,9 +175,9 @@ class CampaignClient(BaseDBClient):
         organization_id: int,
         limit: int = 50,
         offset: int = 0,
-        filters: Optional[List[Dict[str, Any]]] = None,
-        sort_by: Optional[str] = None,
-        sort_order: Optional[str] = "desc",
+        filters: list[dict[str, Any]] | None = None,
+        sort_by: str | None = None,
+        sort_order: str | None = "desc",
     ) -> tuple[list[WorkflowRunResponseSchema], int]:
         """Get workflow runs for a campaign with pagination, filters and sorting"""
         async with self.async_session() as session:
@@ -245,7 +245,7 @@ class CampaignClient(BaseDBClient):
         self,
         parent_campaign: CampaignModel,
         new_name: str,
-        retry_config: Optional[dict],
+        retry_config: dict | None,
         queued_runs_data: list[dict],
     ) -> CampaignModel:
         """Atomically create a redial child campaign, seed its queued_runs, and
@@ -388,7 +388,7 @@ class CampaignClient(BaseDBClient):
                 for row in result.all()
             ]
 
-    async def get_campaign_by_id(self, campaign_id: int) -> Optional[CampaignModel]:
+    async def get_campaign_by_id(self, campaign_id: int) -> CampaignModel | None:
         """Get campaign by ID without organization check (for internal use)"""
         async with self.async_session() as session:
             query = select(CampaignModel).where(CampaignModel.id == campaign_id)
@@ -426,14 +426,14 @@ class CampaignClient(BaseDBClient):
         level: str,
         event: str,
         message: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> None:
         """Append a timestamped entry to the campaign's logs JSON array.
 
         Uses a SQL-side jsonb concat so concurrent writers do not clobber
         each other's entries.
         """
-        entry: Dict[str, Any] = {
+        entry: dict[str, Any] = {
             "ts": datetime.now(UTC).isoformat(),
             "level": level,
             "event": event,
@@ -584,7 +584,7 @@ class CampaignClient(BaseDBClient):
             return result.rowcount or 0
 
     async def count_queued_runs(
-        self, campaign_id: int, state: Optional[str] = None
+        self, campaign_id: int, state: str | None = None
     ) -> int:
         """Count queued runs, optionally filtered by state"""
         async with self.async_session() as session:
@@ -598,8 +598,8 @@ class CampaignClient(BaseDBClient):
             return result.scalar() or 0
 
     async def get_queued_runs_stats_for_campaigns(
-        self, campaign_ids: List[int]
-    ) -> Dict[int, Dict[str, int]]:
+        self, campaign_ids: list[int]
+    ) -> dict[int, dict[str, int]]:
         """Return {campaign_id: {"total": N, "executed": M}} for given campaigns.
 
         "executed" means queued runs in the "processed" state.
@@ -617,7 +617,7 @@ class CampaignClient(BaseDBClient):
                 .group_by(QueuedRunModel.campaign_id, QueuedRunModel.state)
             )
             result = await session.execute(query)
-            stats: Dict[int, Dict[str, int]] = {
+            stats: dict[int, dict[str, int]] = {
                 cid: {"total": 0, "executed": 0} for cid in campaign_ids
             }
             for campaign_id, state, count in result.all():
@@ -642,10 +642,10 @@ class CampaignClient(BaseDBClient):
     async def get_completed_runs_for_report(
         self,
         *,
-        campaign_id: Optional[int] = None,
-        workflow_id: Optional[int] = None,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        campaign_id: int | None = None,
+        workflow_id: int | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> list:
         """Get completed workflow runs for a run report CSV.
 
@@ -697,9 +697,9 @@ class CampaignClient(BaseDBClient):
         context_variables: dict,
         state: str = "queued",
         retry_count: int = 0,
-        parent_queued_run_id: Optional[int] = None,
-        scheduled_for: Optional[datetime] = None,
-        retry_reason: Optional[str] = None,
+        parent_queued_run_id: int | None = None,
+        scheduled_for: datetime | None = None,
+        retry_reason: str | None = None,
     ) -> QueuedRunModel:
         """Create a single queued run with retry support"""
         async with self.async_session() as session:
@@ -724,7 +724,7 @@ class CampaignClient(BaseDBClient):
 
     async def get_queued_run_by_id(
         self, queued_run_id: int
-    ) -> Optional[QueuedRunModel]:
+    ) -> QueuedRunModel | None:
         """Get a queued run by ID"""
         async with self.async_session() as session:
             query = select(QueuedRunModel).where(QueuedRunModel.id == queued_run_id)
@@ -782,9 +782,9 @@ class CampaignClient(BaseDBClient):
     async def get_scheduled_runs_count(
         self,
         campaign_id: int,
-        scheduled_before: Optional[datetime] = None,
-        scheduled_after: Optional[datetime] = None,
-        retry_reason: Optional[str] = None,
+        scheduled_before: datetime | None = None,
+        scheduled_after: datetime | None = None,
+        retry_reason: str | None = None,
     ) -> int:
         """Get count of scheduled runs for a campaign"""
         async with self.async_session() as session:

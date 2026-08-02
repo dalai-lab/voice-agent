@@ -1,7 +1,7 @@
 """Common filter utilities for database queries."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import Float, Text, and_, cast, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -10,7 +10,7 @@ from api.db.models import WorkflowRunModel
 
 
 def get_workflow_run_order_clause(
-    sort_by: Optional[str] = None,
+    sort_by: str | None = None,
     sort_order: str = "desc",
 ):
     """
@@ -57,7 +57,7 @@ ATTRIBUTE_FIELD_MAPPING = {
 
 def apply_workflow_run_filters(
     base_query,
-    filters: Optional[List[Dict[str, Any]]] = None,
+    filters: list[dict[str, Any]] | None = None,
 ):
     """
     Apply filters to a workflow run query.

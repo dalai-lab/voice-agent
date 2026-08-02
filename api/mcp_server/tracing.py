@@ -20,8 +20,9 @@ dispatches to the correct Langfuse project.
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import Any, Awaitable, Callable, TypeVar
+from typing import Any, TypeVar
 
 from opentelemetry import trace
 from opentelemetry.context import Context

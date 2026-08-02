@@ -13,12 +13,9 @@ setup_logging()
 import asyncio
 import signal
 from datetime import UTC, datetime, timedelta
-from typing import Dict
 from zoneinfo import ZoneInfo
 
 import redis.asyncio as aioredis
-from loguru import logger
-
 from api.constants import REDIS_URL
 from api.db import db_client
 from api.db.models import CampaignModel, QueuedRunModel
@@ -35,6 +32,7 @@ from api.services.campaign.campaign_event_publisher import CampaignEventPublishe
 from api.services.campaign.circuit_breaker import circuit_breaker
 from api.tasks.arq import enqueue_job
 from api.tasks.function_names import FunctionNames
+from loguru import logger
 
 
 class CampaignOrchestrator:
@@ -45,11 +43,11 @@ class CampaignOrchestrator:
         self.publisher = CampaignEventPublisher(redis_client)
         self.completion_check_interval = 60  # 1 minute
         self.completion_timeout = 3600  # 1 hour
-        self._processing_locks: Dict[int, datetime] = {}  # prevent duplicate scheduling
-        self._last_activity: Dict[
+        self._processing_locks: dict[int, datetime] = {}  # prevent duplicate scheduling
+        self._last_activity: dict[
             int, datetime
         ] = {}  # track last activity per campaign
-        self._batch_in_progress: Dict[
+        self._batch_in_progress: dict[
             int, datetime
         ] = {}  # track batches that have been scheduled but not completed
         self._running = False

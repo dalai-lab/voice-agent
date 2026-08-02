@@ -6,19 +6,20 @@ Create Date: 2026-04-13 16:35:00.000000
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
+
+from alembic_postgresql_enum import TableReference
 
 from alembic import op
-from alembic_postgresql_enum import TableReference
 
 # revision identifiers, used by Alembic.
 revision: str = "f2e1d0c9b8a7"
-down_revision: Union[str, Sequence[str], None] = (
+down_revision: str | Sequence[str] | None = (
     "a1b2c3d4e5f6",
     "67a5cf3e09d0",
 )
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

@@ -1,6 +1,7 @@
-from typing import Any, Dict
+from typing import Any
 
-def get_wait_tools() -> list[Dict[str, Any]]:
+
+def get_wait_tools() -> list[dict[str, Any]]:
     """Get wait tool definitions for LLM function calling."""
     return [
         {

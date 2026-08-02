@@ -19,7 +19,6 @@ import ipaddress
 import os
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, List, Optional, Set
 
 from aiortc import RTCIceServer
 from aiortc.sdp import candidate_from_sdp
@@ -161,7 +160,7 @@ def filter_outbound_sdp(sdp: str) -> str:
         return sdp
 
     lines = sdp.split("\r\n")
-    filtered: List[str] = []
+    filtered: list[str] = []
     dropped = 0
     kept_relay = 0
     for line in lines:
@@ -190,7 +189,7 @@ def filter_outbound_sdp(sdp: str) -> str:
     return "\r\n".join(filtered)
 
 
-def get_ice_servers(user_id: Optional[str] = None) -> List[RTCIceServer]:
+def get_ice_servers(user_id: str | None = None) -> list[RTCIceServer]:
     """Build ICE servers configuration including TURN if configured.
 
     Args:
@@ -200,7 +199,7 @@ def get_ice_servers(user_id: Optional[str] = None) -> List[RTCIceServer]:
     Returns:
         List of RTCIceServer configurations for WebRTC peer connection.
     """
-    servers: List[RTCIceServer] = [RTCIceServer(urls="stun:stun.l.google.com:19302")]
+    servers: list[RTCIceServer] = [RTCIceServer(urls="stun:stun.l.google.com:19302")]
 
     # Check if TURN is configured. ENABLE_COTURN is the deployment's declared
     # answer to "is there a TURN server?" — the same flag /health advertises to
@@ -243,7 +242,7 @@ def get_ice_servers(user_id: Optional[str] = None) -> List[RTCIceServer]:
             )
         )
         logger.warning(
-            f"TURN server configured with static credentials (consider using TURN_SECRET for time-limited auth)"
+            "TURN server configured with static credentials (consider using TURN_SECRET for time-limited auth)"
         )
 
     return servers
@@ -253,11 +252,11 @@ class SignalingManager:
     """Manages WebSocket connections and WebRTC peer connections."""
 
     def __init__(self):
-        self._connections: Dict[str, WebSocket] = {}
-        self._peer_connections: Dict[str, SmallWebRTCConnection] = {}
-        self._connection_peer_ids: Dict[str, Set[str]] = {}
-        self._peer_connection_owners: Dict[str, str] = {}
-        self._dtmf_queues: Dict[str, asyncio.Queue] = {}
+        self._connections: dict[str, WebSocket] = {}
+        self._peer_connections: dict[str, SmallWebRTCConnection] = {}
+        self._connection_peer_ids: dict[str, set[str]] = {}
+        self._peer_connection_owners: dict[str, str] = {}
+        self._dtmf_queues: dict[str, asyncio.Queue] = {}
 
     def _track_peer_connection(
         self, connection_id: str, pc_id: str, pc: SmallWebRTCConnection
@@ -269,7 +268,7 @@ class SignalingManager:
         self._dtmf_queues[pc_id] = dtmf_queue
         return dtmf_queue
 
-    def _forget_peer_connection(self, pc_id: str) -> Optional[str]:
+    def _forget_peer_connection(self, pc_id: str) -> str | None:
         connection_id = self._peer_connection_owners.pop(pc_id, None)
         self._peer_connections.pop(pc_id, None)
 

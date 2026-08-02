@@ -1,6 +1,6 @@
 import json
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -111,7 +111,7 @@ class TimeSlotRequest(BaseModel):
 class ScheduleConfigRequest(BaseModel):
     enabled: bool = True
     timezone: str = "UTC"
-    slots: List[TimeSlotRequest] = Field(..., min_length=1, max_length=50)
+    slots: list[TimeSlotRequest] = Field(..., min_length=1, max_length=50)
 
     @field_validator("timezone")
     @classmethod
@@ -132,7 +132,7 @@ class TimeSlotResponse(BaseModel):
 class ScheduleConfigResponse(BaseModel):
     enabled: bool
     timezone: str
-    slots: List[TimeSlotResponse]
+    slots: list[TimeSlotResponse]
 
 
 class CircuitBreakerConfigRequest(BaseModel):
@@ -184,21 +184,21 @@ class CreateCampaignRequest(BaseModel):
     # Optional during the legacy → multi-config migration window. Required in
     # a follow-up. When omitted, the dispatcher falls back to the org's
     # default config.
-    telephony_configuration_id: Optional[int] = None
-    retry_config: Optional[RetryConfigRequest] = None
-    max_concurrency: Optional[int] = Field(default=None, ge=1, le=100)
-    schedule_config: Optional[ScheduleConfigRequest] = None
-    circuit_breaker: Optional[CircuitBreakerConfigRequest] = None
-    callback_config: Optional[CallbackConfigRequest] = None
+    telephony_configuration_id: int | None = None
+    retry_config: RetryConfigRequest | None = None
+    max_concurrency: int | None = Field(default=None, ge=1, le=100)
+    schedule_config: ScheduleConfigRequest | None = None
+    circuit_breaker: CircuitBreakerConfigRequest | None = None
+    callback_config: CallbackConfigRequest | None = None
 
 
 class UpdateCampaignRequest(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    retry_config: Optional[RetryConfigRequest] = None
-    max_concurrency: Optional[int] = Field(default=None, ge=1, le=100)
-    schedule_config: Optional[ScheduleConfigRequest] = None
-    circuit_breaker: Optional[CircuitBreakerConfigRequest] = None
-    callback_config: Optional[CallbackConfigRequest] = None
+    name: str | None = Field(None, min_length=1, max_length=255)
+    retry_config: RetryConfigRequest | None = None
+    max_concurrency: int | None = Field(default=None, ge=1, le=100)
+    schedule_config: ScheduleConfigRequest | None = None
+    circuit_breaker: CircuitBreakerConfigRequest | None = None
+    callback_config: CallbackConfigRequest | None = None
 
 
 class CampaignLogEntryResponse(BaseModel):
@@ -212,7 +212,7 @@ class CampaignLogEntryResponse(BaseModel):
     level: str
     event: str
     message: str
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
 
 class CampaignResponse(BaseModel):
@@ -223,28 +223,28 @@ class CampaignResponse(BaseModel):
     state: str
     source_type: str
     source_id: str
-    total_rows: Optional[int]
+    total_rows: int | None
     processed_rows: int
     failed_rows: int
     created_at: datetime
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
+    started_at: datetime | None
+    completed_at: datetime | None
     retry_config: RetryConfigResponse
-    max_concurrency: Optional[int] = None
-    schedule_config: Optional[ScheduleConfigResponse] = None
-    circuit_breaker: Optional[CircuitBreakerConfigResponse] = None
-    callback_config: Optional[CallbackConfigResponse] = None
+    max_concurrency: int | None = None
+    schedule_config: ScheduleConfigResponse | None = None
+    circuit_breaker: CircuitBreakerConfigResponse | None = None
+    callback_config: CallbackConfigResponse | None = None
     executed_count: int = 0
     total_queued_count: int = 0
-    parent_campaign_id: Optional[int] = None
-    redialed_campaign_id: Optional[int] = None
-    telephony_configuration_id: Optional[int] = None
-    telephony_configuration_name: Optional[str] = None
-    logs: List[CampaignLogEntryResponse] = Field(default_factory=list)
+    parent_campaign_id: int | None = None
+    redialed_campaign_id: int | None = None
+    telephony_configuration_id: int | None = None
+    telephony_configuration_name: str | None = None
+    logs: list[CampaignLogEntryResponse] = Field(default_factory=list)
 
 
 class CampaignsResponse(BaseModel):
-    campaigns: List[CampaignResponse]
+    campaigns: list[CampaignResponse]
 
 
 class WorkflowRunResponse(BaseModel):
@@ -252,13 +252,13 @@ class WorkflowRunResponse(BaseModel):
     workflow_id: int
     state: str
     created_at: datetime
-    completed_at: Optional[datetime]
+    completed_at: datetime | None
 
 
 class CampaignRunsResponse(BaseModel):
     """Paginated response for campaign workflow runs"""
 
-    runs: List[dict]  # WorkflowRunResponseSchema from schemas
+    runs: list[dict]  # WorkflowRunResponseSchema from schemas
     total_count: int
     page: int
     limit: int
@@ -274,8 +274,8 @@ class CampaignProgressResponse(BaseModel):
     progress_percentage: float
     source_sync: dict
     rate_limit: int
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
+    started_at: datetime | None
+    completed_at: datetime | None
 
 
 # Default retry config for campaigns
@@ -286,7 +286,7 @@ def _build_campaign_response(
     workflow_name: str,
     executed_count: int = 0,
     total_queued_count: int = 0,
-    telephony_configuration_name: Optional[str] = None,
+    telephony_configuration_name: str | None = None,
 ) -> CampaignResponse:
     """Build a CampaignResponse from a campaign model."""
     # Get retry_config from campaign or use defaults
@@ -364,8 +364,8 @@ async def _get_campaign_stats(campaign_id: int) -> tuple[int, int]:
 
 
 async def _get_telephony_configuration_name(
-    config_id: Optional[int], organization_id: int
-) -> Optional[str]:
+    config_id: int | None, organization_id: int
+) -> str | None:
     """Resolve the display name for a campaign's telephony configuration.
 
     Org-scoped lookup so a stale FK from another org (shouldn't happen, but
@@ -743,11 +743,11 @@ async def get_campaign_runs(
     campaign_id: int,
     page: int = Query(1, ge=1, description="Page number (starts from 1)"),
     limit: int = Query(50, ge=1, le=100, description="Number of items per page"),
-    filters: Optional[str] = Query(None, description="JSON-encoded filter criteria"),
-    sort_by: Optional[str] = Query(
+    filters: str | None = Query(None, description="JSON-encoded filter criteria"),
+    sort_by: str | None = Query(
         None, description="Field to sort by (e.g., 'duration', 'created_at')"
     ),
-    sort_order: Optional[str] = Query(
+    sort_order: str | None = Query(
         "desc", description="Sort order ('asc' or 'desc')"
     ),
     user: UserModel = Depends(get_user),
@@ -803,13 +803,13 @@ async def get_campaign_runs(
 
 
 class RedialCampaignRequest(BaseModel):
-    name: Optional[str] = Field(
+    name: str | None = Field(
         None, min_length=1, max_length=255, description="Name for the redial campaign"
     )
     retry_on_voicemail: bool = True
     retry_on_no_answer: bool = True
     retry_on_busy: bool = True
-    retry_config: Optional[RetryConfigRequest] = None
+    retry_config: RetryConfigRequest | None = None
 
     @model_validator(mode="after")
     def validate_at_least_one_reason(self):
@@ -1033,7 +1033,7 @@ async def get_campaign_source_download_url(
         )
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to generate download URL: {str(e)}"
+            status_code=500, detail=f"Failed to generate download URL: {e!s}"
         )
 
 
@@ -1041,10 +1041,10 @@ async def get_campaign_source_download_url(
 async def download_campaign_report(
     campaign_id: int,
     user: UserModel = Depends(get_user),
-    start_date: Optional[datetime] = Query(
+    start_date: datetime | None = Query(
         None, description="Filter runs created on or after this datetime (ISO 8601)"
     ),
-    end_date: Optional[datetime] = Query(
+    end_date: datetime | None = Query(
         None, description="Filter runs created on or before this datetime (ISO 8601)"
     ),
 ) -> StreamingResponse:
@@ -1066,22 +1066,22 @@ async def download_campaign_report(
 class CampaignCallbackItem(BaseModel):
     queued_run_id: int
     status: str
-    scheduled_for: Optional[datetime]
-    fires_in_seconds: Optional[int]
-    to_number: Optional[str]
-    from_number: Optional[str]
-    conversation_summary: Optional[str]
+    scheduled_for: datetime | None
+    fires_in_seconds: int | None
+    to_number: str | None
+    from_number: str | None
+    conversation_summary: str | None
     callback_chain_depth: int
-    original_run_id: Optional[int]
-    outcome_run_id: Optional[int]
-    outcome_status: Optional[str]
-    outcome_disposition: Optional[str]
-    created_at: Optional[datetime]
+    original_run_id: int | None
+    outcome_run_id: int | None
+    outcome_status: str | None
+    outcome_disposition: str | None
+    created_at: datetime | None
 
-@router.get("/{campaign_id}/callbacks", response_model=List[CampaignCallbackItem])
+@router.get("/{campaign_id}/callbacks", response_model=list[CampaignCallbackItem])
 async def list_campaign_callbacks(
     campaign_id: int,
-    status: Optional[str] = Query(None),
+    status: str | None = Query(None),
     limit: int = Query(50),
     offset: int = Query(0),
     user: UserModel = Depends(get_user),
@@ -1091,9 +1091,10 @@ async def list_campaign_callbacks(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
         
-    from sqlalchemy import select, desc, text
+
+    from sqlalchemy import desc, select, text
+
     from api.db.models import QueuedRunModel
-    from datetime import timezone
     
     query = select(QueuedRunModel).where(
         QueuedRunModel.campaign_id == campaign_id,
@@ -1136,7 +1137,7 @@ async def list_campaign_callbacks(
                 outcome_map[row.orig_run_id] = (row.id, row.state, row.disposition)
         
     items = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for qr in queued_runs:
         cv = qr.context_variables or {}
         orig_run_id = cv.get("original_run_id")

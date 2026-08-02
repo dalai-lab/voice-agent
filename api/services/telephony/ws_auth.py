@@ -24,9 +24,8 @@ import hashlib
 import hmac
 import re
 
-from loguru import logger
-
 from api import constants
+from loguru import logger
 
 _WS_PATH = "/api/v1/telephony/ws"
 

@@ -1,6 +1,6 @@
 """Cloudonix telephony configuration schemas."""
 
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -22,7 +22,7 @@ class CloudonixConfigurationRequest(BaseModel):
             return v
         return f"{v}.cloudonix.net"
 
-    application_name: Optional[str] = Field(
+    application_name: str | None = Field(
         default=None,
         description=(
             "Cloudonix Voice Application name. The application's url is "
@@ -31,7 +31,7 @@ class CloudonixConfigurationRequest(BaseModel):
             "save and its name is stored on the configuration."
         ),
     )
-    from_numbers: List[str] = Field(
+    from_numbers: list[str] = Field(
         default_factory=list, description="List of Cloudonix phone numbers (optional)"
     )
 
@@ -42,5 +42,5 @@ class CloudonixConfigurationResponse(BaseModel):
     provider: Literal["cloudonix"] = Field(default="cloudonix")
     bearer_token: str  # Masked
     domain_id: str
-    application_name: Optional[str] = None
-    from_numbers: List[str]
+    application_name: str | None = None
+    from_numbers: list[str]

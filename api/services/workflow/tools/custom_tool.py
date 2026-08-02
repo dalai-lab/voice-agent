@@ -2,11 +2,9 @@
 
 import json
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import httpx
-from loguru import logger
-
 from api.db import db_client
 from api.services.configuration.masking import mask_key
 from api.utils.credential_auth import (
@@ -14,6 +12,7 @@ from api.utils.credential_auth import (
     rebuild_headers_after_401,
 )
 from api.utils.template_renderer import render_template
+from loguru import logger
 
 # Map tool parameter types to JSON schema types
 TYPE_MAP = {
@@ -580,11 +579,11 @@ async def execute_http_tool(
 
     # Add auth header if credential is configured. Keep track of which headers
     # came from the credential so only those values are masked in test previews.
-    request_headers: Dict[str, str] = {}
+    request_headers: dict[str, str] = {}
     if include_request_headers:
         request_headers = {str(name): str(value) for name, value in headers.items()}
 
-    def build_result(result: Dict[str, Any]) -> Dict[str, Any]:
+    def build_result(result: dict[str, Any]) -> dict[str, Any]:
         if include_request_headers:
             return {**result, "request_headers": request_headers}
         return result

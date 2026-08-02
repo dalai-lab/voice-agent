@@ -1,5 +1,10 @@
-from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Literal, Optional, Union
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
+from api.db import db_client
+from api.enums import ToolCategory
+from api.services.pipecat.audio_playback import play_audio
+from api.services.workflow.workflow_graph import Node, WorkflowGraph
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
@@ -8,8 +13,8 @@ from pipecat.frames.frames import (
     EndFrame,
     FunctionCallResultProperties,
     LLMContextFrame,
-    TTSSpeakFrame,
     LLMMessagesAppendFrame,
+    TTSSpeakFrame,
     UserStartedSpeakingFrame,
     UserStoppedSpeakingFrame,
 )
@@ -18,11 +23,6 @@ from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.settings import LLMSettings
 from pipecat.utils.enums import EndTaskReason
-
-from api.db import db_client
-from api.enums import ToolCategory
-from api.services.pipecat.audio_playback import play_audio
-from api.services.workflow.workflow_graph import Node, WorkflowGraph
 
 if TYPE_CHECKING:
     from pipecat.frames.frames import Frame
@@ -35,12 +35,10 @@ if TYPE_CHECKING:
 
 import asyncio
 
-from loguru import logger
-
 from api.services.managed_model_services import MPS_CORRELATION_ID_CONTEXT_KEY
+from api.services.pipecat.realtime_feedback_events import DTMFLogFrame
 from api.services.workflow import pipecat_engine_callbacks as engine_callbacks
 from api.services.workflow.mcp_tool_session import McpToolSession
-from api.services.pipecat.realtime_feedback_events import DTMFLogFrame
 from api.services.workflow.pipecat_engine_context_composer import (
     compose_functions_for_node,
     compose_system_prompt_for_node,
@@ -58,29 +56,28 @@ from api.services.workflow.tools.knowledge_base import (
     retrieve_from_knowledge_base,
 )
 from api.utils.template_renderer import render_template
+from loguru import logger
 
 
 class PipecatEngine:
     def __init__(
         self,
         *,
-        task: Optional[PipelineWorker] = None,
+        task: PipelineWorker | None = None,
         llm: Optional["LLMService"] = None,
         inference_llm: Optional["LLMService"] = None,
         variable_extraction_llm: Optional["LLMService"] = None,
-        context: Optional[LLMContext] = None,
+        context: LLMContext | None = None,
         workflow: WorkflowGraph,
         call_context_vars: dict,
-        workflow_run_id: Optional[int] = None,
-        node_transition_callback: Optional[
-            Callable[[str, str, Optional[str], Optional[str], bool], Awaitable[None]]
-        ] = None,
-        embeddings_api_key: Optional[str] = None,
-        embeddings_model: Optional[str] = None,
-        embeddings_base_url: Optional[str] = None,
-        embeddings_provider: Optional[str] = None,
-        embeddings_endpoint: Optional[str] = None,
-        embeddings_api_version: Optional[str] = None,
+        workflow_run_id: int | None = None,
+        node_transition_callback: Callable[[str, str, str | None, str | None, bool], Awaitable[None]] | None = None,
+        embeddings_api_key: str | None = None,
+        embeddings_model: str | None = None,
+        embeddings_base_url: str | None = None,
+        embeddings_provider: str | None = None,
+        embeddings_endpoint: str | None = None,
+        embeddings_api_version: str | None = None,
         has_recordings: bool = False,
         context_compaction_enabled: bool = False,
         enable_dtmf: bool = False,
@@ -104,15 +101,15 @@ class PipecatEngine:
         self._node_transition_callback = node_transition_callback
         self._initialized = False
         self._call_disposed = False
-        self._current_node: Optional[Node] = None
+        self._current_node: Node | None = None
         self._gathered_context: dict = {}
-        self._user_response_timeout_task: Optional[asyncio.Task] = None
+        self._user_response_timeout_task: asyncio.Task | None = None
         self._pending_extraction_tasks: set[asyncio.Task] = set()
-        self._dtmf_subscription_task: Optional[asyncio.Task] = None
+        self._dtmf_subscription_task: asyncio.Task | None = None
         self._enable_dtmf: bool = enable_dtmf
         self._enable_callbacks: bool = enable_callbacks
         self._dtmf_buffer: str = ""
-        self._dtmf_timer_task: Optional[asyncio.Task] = None
+        self._dtmf_timer_task: asyncio.Task | None = None
         self._dtmf_timeout_seconds: float = 3.0
         # True once a final (synchronous) extraction has run, so the end-of-call
         # and upstream-transfer paths don't redundantly re-extract the same
@@ -137,24 +134,24 @@ class PipecatEngine:
         self._bot_is_speaking: bool = False
 
         # Custom tool manager (initialized in initialize())
-        self._custom_tool_manager: Optional[CustomToolManager] = None
+        self._custom_tool_manager: CustomToolManager | None = None
 
         # User context aggregator - stored so tools can subscribe to transcript events
         self._user_aggregator = None
 
         # Cached organization ID (resolved lazily from workflow run)
-        self._organization_id: Optional[int] = None
+        self._organization_id: int | None = None
 
         # Open MCP tool sessions for this call, keyed by tool_uuid
-        self._mcp_sessions: Dict[str, McpToolSession] = {}
+        self._mcp_sessions: dict[str, McpToolSession] = {}
 
         # Embeddings configuration (passed from run_pipeline.py)
-        self._embeddings_api_key: Optional[str] = embeddings_api_key
-        self._embeddings_model: Optional[str] = embeddings_model
-        self._embeddings_base_url: Optional[str] = embeddings_base_url
-        self._embeddings_provider: Optional[str] = embeddings_provider
-        self._embeddings_endpoint: Optional[str] = embeddings_endpoint
-        self._embeddings_api_version: Optional[str] = embeddings_api_version
+        self._embeddings_api_key: str | None = embeddings_api_key
+        self._embeddings_model: str | None = embeddings_model
+        self._embeddings_base_url: str | None = embeddings_base_url
+        self._embeddings_provider: str | None = embeddings_provider
+        self._embeddings_endpoint: str | None = embeddings_endpoint
+        self._embeddings_api_version: str | None = embeddings_api_version
 
         # Audio configuration (set via set_audio_config from _run_pipeline)
         self._audio_config = None
@@ -172,11 +169,11 @@ class PipecatEngine:
 
         # Background context summarization on node transitions
         self._context_compaction_enabled: bool = context_compaction_enabled
-        self._context_summarization_manager: Optional[ContextSummarizationManager] = (
+        self._context_summarization_manager: ContextSummarizationManager | None = (
             None
         )
 
-    async def _get_organization_id(self) -> Optional[int]:
+    async def _get_organization_id(self) -> int | None:
         """Get and cache the organization ID from workflow run."""
         if self._organization_id is None:
             self._organization_id = (
@@ -324,9 +321,9 @@ class PipecatEngine:
         self,
         name: str,
         transition_to_node: str,
-        transition_speech: Optional[str] = None,
-        transition_speech_type: Optional[str] = None,
-        transition_speech_recording_id: Optional[str] = None,
+        transition_speech: str | None = None,
+        transition_speech_type: str | None = None,
+        transition_speech_recording_id: str | None = None,
     ):
         async def transition_func(function_call_params: FunctionCallParams) -> None:
             """Inner function that handles the node change tool calls"""
@@ -415,7 +412,7 @@ class PipecatEngine:
                 )
 
             except Exception as e:
-                logger.error(f"Error in transition function {name}: {str(e)}")
+                logger.error(f"Error in transition function {name}: {e!s}")
                 error_result = {"status": "error", "error": str(e)}
                 await function_call_params.result_callback(error_result)
 
@@ -425,9 +422,9 @@ class PipecatEngine:
         self,
         name: str,
         transition_to_node: str,
-        transition_speech: Optional[str] = None,
-        transition_speech_type: Optional[str] = None,
-        transition_speech_recording_id: Optional[str] = None,
+        transition_speech: str | None = None,
+        transition_speech_type: str | None = None,
+        transition_speech_recording_id: str | None = None,
     ):
         logger.debug(
             f"Registering function {name} to transition to node {transition_to_node} with LLM"
@@ -503,7 +500,7 @@ class PipecatEngine:
         self.llm.register_function("retrieve_from_knowledge_base", retrieve_kb_func)
 
     async def _perform_variable_extraction_if_needed(
-        self, node: Optional[Node], run_in_background: bool = True
+        self, node: Node | None, run_in_background: bool = True
     ) -> None:
         """Perform variable extraction if the node has extraction enabled.
 
@@ -552,7 +549,7 @@ class PipecatEngine:
                 )
             except Exception as e:
                 logger.error(
-                    f"Error during variable extraction for node {node.name}: {str(e)}"
+                    f"Error during variable extraction for node {node.name}: {e!s}"
                 )
 
         if run_in_background:
@@ -597,7 +594,7 @@ class PipecatEngine:
                         f"Pending extraction task '{task_name}' failed: {result}"
                     )
             logger.debug(f"All pending extraction tasks completed in {elapsed:.2f}s")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             incomplete = [
                 t.get_name() for t in self._pending_extraction_tasks if not t.done()
             ]
@@ -635,7 +632,7 @@ class PipecatEngine:
         try:
             self.context.set_otel_span_name(f"llm-{node.name}")
         except AttributeError:
-            logger.warning(f"context has no set_otel_span_name method")
+            logger.warning("context has no set_otel_span_name method")
 
         # Register transition functions if not an end node
         if not node.is_end:
@@ -751,7 +748,7 @@ class PipecatEngine:
         # Setup LLM context with prompts and functions.
         await self._setup_llm_context(node)
 
-    def get_node_greeting(self, node_id: str) -> Optional[tuple[str, Optional[str]]]:
+    def get_node_greeting(self, node_id: str) -> tuple[str, str | None] | None:
         """Return the greeting info for a node, or None if not configured.
 
         Returns:
@@ -782,7 +779,7 @@ class PipecatEngine:
 
         return None
 
-    def get_start_greeting(self) -> Optional[tuple[str, Optional[str]]]:
+    def get_start_greeting(self) -> tuple[str, str | None] | None:
         """Return the greeting info for the start node, or None if not configured."""
         return self.get_node_greeting(self.workflow.start_node_id)
 
@@ -790,7 +787,7 @@ class PipecatEngine:
         self,
         *,
         node_id: str,
-        previous_node_id: Optional[str] = None,
+        previous_node_id: str | None = None,
         generate_if_no_greeting: bool = False,
     ) -> Literal["none", "greeting", "llm"]:
         """Queue the opening behavior for a node.

@@ -25,9 +25,9 @@ SDK_PY_SRC = REPO_ROOT / "sdk" / "python" / "src"
 if str(SDK_PY_SRC) not in sys.path:
     sys.path.insert(0, str(SDK_PY_SRC))
 
-from dograh_sdk.codegen import generate_all  # noqa: E402
+from dograh_sdk.codegen import generate_all
 
-from api.services.workflow.node_specs import SPEC_VERSION, all_specs  # noqa: E402
+from api.services.workflow.node_specs import SPEC_VERSION, all_specs
 
 PY_OUT = REPO_ROOT / "sdk" / "python" / "src" / "dograh_sdk" / "typed"
 TS_OUT = REPO_ROOT / "sdk" / "typescript" / "src" / "typed"

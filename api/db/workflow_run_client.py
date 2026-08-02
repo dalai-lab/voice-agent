@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy import func
 from sqlalchemy.future import select
@@ -101,8 +101,8 @@ class WorkflowRunClient(BaseDBClient):
         self,
         limit: int = 50,
         offset: int = 0,
-        filters: Optional[List[Dict[str, Any]]] = None,
-        sort_by: Optional[str] = None,
+        filters: list[dict[str, Any]] | None = None,
+        sort_by: str | None = None,
         sort_order: str = "desc",
     ) -> tuple[list[dict], int]:
         """
@@ -272,9 +272,9 @@ class WorkflowRunClient(BaseDBClient):
         organization_id: int = None,
         limit: int = 50,
         offset: int = 0,
-        filters: Optional[List[Dict[str, Any]]] = None,
-        sort_by: Optional[str] = None,
-        sort_order: Optional[str] = "desc",
+        filters: list[dict[str, Any]] | None = None,
+        sort_by: str | None = None,
+        sort_order: str | None = "desc",
     ) -> tuple[list[WorkflowRunResponseSchema], int]:
         async with self.async_session() as session:
             # Build base query
@@ -477,7 +477,7 @@ class WorkflowRunClient(BaseDBClient):
 
     async def get_workflow_run_with_context(
         self, workflow_run_id: int
-    ) -> Tuple[Optional[WorkflowRunModel], Optional[int]]:
+    ) -> tuple[WorkflowRunModel | None, int | None]:
         """
         Get workflow run with all related data and return organization_id.
 
@@ -507,7 +507,7 @@ class WorkflowRunClient(BaseDBClient):
             organization_id = workflow_run.workflow.organization_id
             return workflow_run, organization_id
 
-    async def ensure_public_access_token(self, workflow_run_id: int) -> Optional[str]:
+    async def ensure_public_access_token(self, workflow_run_id: int) -> str | None:
         """Generate a public access token if not exists, return existing if present (idempotent).
 
         Args:
@@ -543,7 +543,7 @@ class WorkflowRunClient(BaseDBClient):
 
     async def get_workflow_run_by_public_token(
         self, token: str
-    ) -> Optional[WorkflowRunModel]:
+    ) -> WorkflowRunModel | None:
         """Lookup workflow run by public access token.
 
         Args:
@@ -562,7 +562,7 @@ class WorkflowRunClient(BaseDBClient):
 
     async def get_workflow_run_by_call_id(
         self, call_id: str
-    ) -> Optional[WorkflowRunModel]:
+    ) -> WorkflowRunModel | None:
         """Find workflow run by call_id stored in gathered_context.
 
         Args:

@@ -2,7 +2,6 @@
 
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import List, Optional
 
 from loguru import logger
 from sqlalchemy import and_, or_, select, update
@@ -20,10 +19,10 @@ class EmbedTokenClient(BaseDBClient):
         workflow_id: int,
         organization_id: int,
         created_by: int,
-        allowed_domains: Optional[List[str]] = None,
-        settings: Optional[dict] = None,
-        usage_limit: Optional[int] = None,
-        expires_at: Optional[datetime] = None,
+        allowed_domains: list[str] | None = None,
+        settings: dict | None = None,
+        usage_limit: int | None = None,
+        expires_at: datetime | None = None,
     ) -> EmbedTokenModel:
         """Create a new embed token for a workflow.
 
@@ -77,7 +76,7 @@ class EmbedTokenClient(BaseDBClient):
         )
         return result.scalar_one_or_none() is not None
 
-    async def get_embed_token_by_token(self, token: str) -> Optional[EmbedTokenModel]:
+    async def get_embed_token_by_token(self, token: str) -> EmbedTokenModel | None:
         """Get an embed token by its token string.
 
         Args:
@@ -94,7 +93,7 @@ class EmbedTokenClient(BaseDBClient):
 
     async def get_embed_tokens_by_workflow(
         self, workflow_id: int, organization_id: int, active_only: bool = True
-    ) -> List[EmbedTokenModel]:
+    ) -> list[EmbedTokenModel]:
         """Get all embed tokens for a workflow.
 
         Args:
@@ -123,7 +122,7 @@ class EmbedTokenClient(BaseDBClient):
 
     async def update_embed_token(
         self, token_id: int, organization_id: int, **kwargs
-    ) -> Optional[EmbedTokenModel]:
+    ) -> EmbedTokenModel | None:
         """Update an embed token.
 
         Args:
@@ -222,10 +221,10 @@ class EmbedTokenClient(BaseDBClient):
         session_token: str,
         embed_token_id: int,
         workflow_run_id: int,
-        client_ip: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        origin: Optional[str] = None,
-        expires_at: Optional[datetime] = None,
+        client_ip: str | None = None,
+        user_agent: str | None = None,
+        origin: str | None = None,
+        expires_at: datetime | None = None,
     ) -> EmbedSessionModel:
         """Create a new embed session.
 
@@ -265,7 +264,7 @@ class EmbedTokenClient(BaseDBClient):
 
     async def get_embed_session_by_token(
         self, session_token: str
-    ) -> Optional[EmbedSessionModel]:
+    ) -> EmbedSessionModel | None:
         """Get an embed session by token (alias for get_embed_session).
 
         Args:
@@ -282,7 +281,7 @@ class EmbedTokenClient(BaseDBClient):
             )
             return result.scalar_one_or_none()
 
-    async def get_embed_token_by_id(self, token_id: int) -> Optional[EmbedTokenModel]:
+    async def get_embed_token_by_id(self, token_id: int) -> EmbedTokenModel | None:
         """Get an embed token by ID.
 
         Args:

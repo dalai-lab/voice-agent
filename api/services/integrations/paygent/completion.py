@@ -18,9 +18,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from loguru import logger
-
 from api.services.integrations.base import IntegrationCompletionContext
+from loguru import logger
 
 from .client import PaygentCallSnapshot, PaygentDeliveryConfig, deliver
 from .node import PaygentNodeData

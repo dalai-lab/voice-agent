@@ -1,6 +1,6 @@
 import re
 import uuid
-from typing import Annotated, Any, Dict, Optional
+from typing import Annotated, Any
 
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -21,7 +21,7 @@ class S3SignedUrlResponse(TypedDict):
 
 class FileMetadataResponse(TypedDict):
     key: str
-    metadata: Optional[Dict[str, Any]]
+    metadata: dict[str, Any] | None
 
 
 class PresignedUploadUrlRequest(BaseModel):
@@ -44,7 +44,7 @@ router = APIRouter(prefix="/s3", tags=["s3"])
 ORG_SCOPED_STORAGE_PREFIXES = ("campaigns", "knowledge_base")
 
 
-def _extract_org_id_from_key(key: str) -> Optional[int]:
+def _extract_org_id_from_key(key: str) -> int | None:
     """Try to extract an organization ID from a storage key.
 
     Matches known org-scoped keys of the form ``{prefix}/{org_id}/...`` where
@@ -66,7 +66,7 @@ def _extract_org_id_from_key(key: str) -> Optional[int]:
     return None
 
 
-def _extract_legacy_workflow_run_id(key: str) -> Optional[int]:
+def _extract_legacy_workflow_run_id(key: str) -> int | None:
     """Extract a workflow_run_id from legacy key formats.
 
     Supports:
@@ -93,7 +93,7 @@ def _extract_legacy_workflow_run_id(key: str) -> Optional[int]:
 # Keep for backward compat with file-metadata endpoint
 async def _validate_and_extract_workflow_run_id(
     key: str, allow_special_paths: bool = False
-) -> Optional[int]:
+) -> int | None:
     """Validate the S3 key format and extract workflow_run_id if present.
 
     Args:
@@ -127,8 +127,8 @@ async def _validate_and_extract_workflow_run_id(
 
 
 async def _authorize_and_get_workflow_run(
-    run_id: Optional[int], user, require_workflow_run: bool = True
-) -> Optional[Any]:
+    run_id: int | None, user, require_workflow_run: bool = True
+) -> Any | None:
     """Authorize access to workflow run and retrieve it.
 
     Args:
@@ -172,7 +172,7 @@ async def get_signed_url(
     expires_in: int = 3600,
     inline: bool = False,
     storage_backend: Annotated[
-        Optional[str],
+        str | None,
         Query(
             description="Storage backend to use (e.g. 'minio', 's3'). "
             "When omitted the backend is inferred from the resource."

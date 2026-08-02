@@ -4,21 +4,20 @@ Handles DTMF event publishing and subscription
 """
 
 import asyncio
-from typing import AsyncGenerator, Dict, Optional
+from collections.abc import AsyncGenerator
 
 import redis.asyncio as aioredis
-from loguru import logger
-
 from api.constants import REDIS_URL
 from api.services.telephony.dtmf_event_protocol import DTMFEvent, DTMFRedisChannels
+from loguru import logger
 
 
 class DTMFManager:
     """Manages DTMF events using Redis Pub/Sub."""
 
-    def __init__(self, redis_client: Optional[aioredis.Redis] = None):
+    def __init__(self, redis_client: aioredis.Redis | None = None):
         self._redis_client = redis_client
-        self._pubsub_connections: Dict[str, aioredis.client.PubSub] = {}
+        self._pubsub_connections: dict[str, aioredis.client.PubSub] = {}
 
     async def _get_redis(self) -> aioredis.Redis:
         """Get Redis client instance."""
@@ -38,7 +37,7 @@ class DTMFManager:
         except Exception as e:
             logger.error(f"Failed to publish DTMF event for call {call_id}: {e}")
 
-    async def subscribe_dtmf_events(self, call_id: str) -> AsyncGenerator[DTMFEvent, None]:
+    async def subscribe_dtmf_events(self, call_id: str) -> AsyncGenerator[DTMFEvent]:
         """Subscribe to DTMF events for a specific call."""
         redis = await self._get_redis()
         pubsub = redis.pubsub()

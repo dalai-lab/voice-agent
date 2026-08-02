@@ -15,7 +15,7 @@ def test_aggregation_fixer():
     two-argument test cases remain unchanged.
     """
 
-    def fixer(reference: str, corrupted: str) -> str:  # noqa: D401
+    def fixer(reference: str, corrupted: str) -> str:
         mock_engine = Mock()
         mock_engine._current_llm_generation_reference_text = reference
         return create_aggregation_correction_callback(mock_engine)(corrupted)

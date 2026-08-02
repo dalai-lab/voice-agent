@@ -1,5 +1,5 @@
 from datetime import datetime, time
-from typing import Any, Dict, List, Optional
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from api.db import db_client
@@ -11,8 +11,8 @@ class DailyReportService:
         organization_id: int,
         date: str,
         timezone: str,
-        workflow_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        workflow_id: int | None = None,
+    ) -> dict[str, Any]:
         """
         Get daily report for a specific date and timezone.
 
@@ -161,7 +161,7 @@ class DailyReportService:
 
     async def get_workflows_for_organization(
         self, organization_id: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get all workflows for an organization.
         """
@@ -174,8 +174,8 @@ class DailyReportService:
         organization_id: int,
         date: str,
         timezone: str,
-        workflow_id: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        workflow_id: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Get detailed workflow runs for CSV export.
 

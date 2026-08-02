@@ -1,5 +1,5 @@
 import ast
-from typing import Any, Dict
+from typing import Any
 
 
 def safe_calculator(expr: str) -> float:
@@ -28,7 +28,7 @@ def safe_calculator(expr: str) -> float:
     return eval(compile(node, "<safe_calculator>", mode="eval"))
 
 
-def get_calculator_tools() -> list[Dict[str, Any]]:
+def get_calculator_tools() -> list[dict[str, Any]]:
     """Get calculator tool definitions for LLM function calling."""
     return [
         {

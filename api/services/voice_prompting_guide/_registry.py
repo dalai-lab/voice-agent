@@ -7,8 +7,6 @@ in lock-step with their canonical topic file.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from api.services.voice_prompting_guide._base import (
     Stage,
     VoicePromptingTopic,
@@ -93,13 +91,13 @@ def list_topic_index() -> list[dict[str, str]]:
     return [{"id": t.id, "title": t.title} for t in _TOPICS.values()]
 
 
-def get_topic(topic_id: str) -> Optional[VoicePromptingTopic]:
+def get_topic(topic_id: str) -> VoicePromptingTopic | None:
     return _TOPICS.get(topic_id)
 
 
 def build_briefing(
     stage: Stage,
-    node_type: Optional[str] = None,
+    node_type: str | None = None,
 ) -> dict:
     """Assemble the stage briefing: intro + relevant topics with lenses.
 

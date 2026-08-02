@@ -1,7 +1,7 @@
 """Base class for embedding services."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class BaseEmbeddingService(ABC):
@@ -18,7 +18,6 @@ class BaseEmbeddingService(ABC):
         Returns:
             String identifier for the model (e.g., 'sentence-transformers/all-MiniLM-L6-v2')
         """
-        pass
 
     @abstractmethod
     def get_embedding_dimension(self) -> int:
@@ -27,10 +26,9 @@ class BaseEmbeddingService(ABC):
         Returns:
             Integer dimension of the embedding vectors
         """
-        pass
 
     @abstractmethod
-    async def embed_texts(self, texts: List[str]) -> List[List[float]]:
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """Embed a batch of texts.
 
         Args:
@@ -39,10 +37,9 @@ class BaseEmbeddingService(ABC):
         Returns:
             List of embedding vectors (each vector is a list of floats)
         """
-        pass
 
     @abstractmethod
-    async def embed_query(self, query: str) -> List[float]:
+    async def embed_query(self, query: str) -> list[float]:
         """Embed a single query text.
 
         Args:
@@ -51,7 +48,6 @@ class BaseEmbeddingService(ABC):
         Returns:
             Embedding vector as list of floats
         """
-        pass
 
     @abstractmethod
     async def search_similar_chunks(
@@ -59,8 +55,8 @@ class BaseEmbeddingService(ABC):
         query: str,
         organization_id: int,
         limit: int = 5,
-        document_uuids: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        document_uuids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """Search for similar chunks using vector similarity.
 
         Args:
@@ -72,4 +68,3 @@ class BaseEmbeddingService(ABC):
         Returns:
             List of dictionaries containing chunk data and similarity scores
         """
-        pass

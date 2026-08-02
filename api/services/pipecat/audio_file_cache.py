@@ -8,11 +8,10 @@ import asyncio
 import os
 import shutil
 import tempfile
-from typing import Literal, Optional
-
-from loguru import logger
+from typing import Literal
 
 from api.constants import APP_ROOT_DIR
+from loguru import logger
 
 # ---------------------------------------------------------------------------
 # Filesystem cache directory (shared by all audio caches)
@@ -31,7 +30,7 @@ async def download_storage_file(
     storage_key: str,
     storage_backend: str,
     get_storage_fn,
-) -> Optional[str]:
+) -> str | None:
     """Download a file from object storage to a local temp file.
 
     Returns the temp file path on success, or None on failure.
@@ -64,7 +63,7 @@ async def convert_audio_file(
     file_path: str,
     target_sample_rate: int,
     output_format: Literal["pcm", "wav"] = "pcm",
-) -> Optional[bytes]:
+) -> bytes | None:
     """Convert an audio file via ffmpeg.
 
     Args:
@@ -172,7 +171,7 @@ async def get_cached_ambient_noise_path(
     storage_key: str,
     storage_backend: str,
     target_sample_rate: int,
-) -> Optional[str]:
+) -> str | None:
     """Return a local WAV file path for a custom ambient noise file.
 
     Downloads from object storage and converts to mono WAV at

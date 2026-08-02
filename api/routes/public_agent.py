@@ -5,8 +5,8 @@ external systems to programmatically trigger phone calls.
 """
 
 import random
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 from loguru import logger
@@ -35,7 +35,7 @@ class TriggerCallRequest(BaseModel):
     """Request model for triggering a call via API"""
 
     phone_number: str
-    initial_context: Optional[dict] = None
+    initial_context: dict | None = None
     telephony_configuration_id: int | None = None
 
 

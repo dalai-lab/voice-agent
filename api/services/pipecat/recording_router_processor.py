@@ -13,15 +13,15 @@ streaming LLM text tokens until the mode marker is detected, then act.
 """
 
 import uuid
-from typing import Awaitable, Callable, Optional
-
-from loguru import logger
+from collections.abc import Awaitable, Callable
 
 from api.services.pipecat.recording_audio_cache import RecordingAudio
 from api.services.workflow.pipecat_engine_context_composer import (
     RECORDING_MARKER,
     TTS_MARKER,
 )
+from loguru import logger
+
 from pipecat.frames.frames import (
     Frame,
     InterruptionFrame,
@@ -56,7 +56,7 @@ class RecordingRouterProcessor(FrameProcessor):
         self,
         *,
         audio_sample_rate: int,
-        fetch_recording_audio: Callable[..., Awaitable[Optional[RecordingAudio]]],
+        fetch_recording_audio: Callable[..., Awaitable[RecordingAudio | None]],
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -65,7 +65,7 @@ class RecordingRouterProcessor(FrameProcessor):
 
         # Per-response state
         self._frame_buffer: list[tuple[LLMTextFrame, FrameDirection]] = []
-        self._mode: Optional[str] = None  # None = detecting, "tts", "recording"
+        self._mode: str | None = None  # None = detecting, "tts", "recording"
         self._recording_id_buffer = ""
         self._recording_playback_started = False
         self._second_marker_seen = False
@@ -183,8 +183,7 @@ class RecordingRouterProcessor(FrameProcessor):
                     await self.push_frame(buf_frame, buf_dir)
 
                     tts_text = original_text[offset:]
-                    if tts_text.startswith(" "):
-                        tts_text = tts_text[1:]
+                    tts_text = tts_text.removeprefix(" ")
                     if tts_text:
                         await self.push_frame(LLMTextFrame(tts_text), buf_dir)
 

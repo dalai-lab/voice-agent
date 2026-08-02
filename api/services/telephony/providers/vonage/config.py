@@ -1,6 +1,6 @@
 """Vonage telephony configuration schemas."""
 
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -13,11 +13,11 @@ class VonageConfigurationRequest(BaseModel):
     api_secret: str = Field(..., description="Vonage API Secret")
     application_id: str = Field(..., description="Vonage Application ID")
     private_key: str = Field(..., description="Private key for JWT generation")
-    signature_secret: Optional[str] = Field(
+    signature_secret: str | None = Field(
         None,
         description="Vonage signature secret used to verify signed webhooks",
     )
-    from_numbers: List[str] = Field(
+    from_numbers: list[str] = Field(
         default_factory=list,
         description="List of Vonage phone numbers (without + prefix)",
     )
@@ -31,5 +31,5 @@ class VonageConfigurationResponse(BaseModel):
     api_key: str  # Masked
     api_secret: str  # Masked
     private_key: str  # Masked
-    signature_secret: Optional[str] = None  # Masked
-    from_numbers: List[str]
+    signature_secret: str | None = None  # Masked
+    from_numbers: list[str]

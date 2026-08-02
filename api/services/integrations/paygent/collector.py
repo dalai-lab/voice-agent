@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict
+from typing import Any
 
 from loguru import logger
 from pipecat.frames.frames import (
@@ -161,7 +161,7 @@ class _UsageAccumulator:
         self.on_user_stopped_speaking()
 
 
-def _google_live_usage_to_sts_metadata(usage: Dict[str, Any]) -> Dict[str, Any]:
+def _google_live_usage_to_sts_metadata(usage: dict[str, Any]) -> dict[str, Any]:
     """
     Pure Python translation of Google GenAI Live usage_metadata to
     Paygent's canonical speech-to-speech /api/v1/voice/speech-to-speech API schema.
@@ -336,7 +336,7 @@ def _google_live_usage_to_sts_metadata(usage: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def _openai_realtime_usage_to_sts_metadata(usage: Dict[str, Any]) -> Dict[str, Any]:
+def _openai_realtime_usage_to_sts_metadata(usage: dict[str, Any]) -> dict[str, Any]:
     """
     Pure Python translation of OpenAI Realtime usage_metadata to
     Paygent's canonical speech-to-speech /api/v1/voice/speech-to-speech API schema.

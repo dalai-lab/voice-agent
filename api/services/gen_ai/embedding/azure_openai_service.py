@@ -5,13 +5,12 @@ Uses the Azure OpenAI REST API for text embeddings, compatible with
 text-embedding-ada-002.
 """
 
-from typing import Any, Dict, List, Optional
-
-from loguru import logger
-from openai import AsyncAzureOpenAI
+from typing import Any
 
 from api.db.db_client import DBClient
 from api.utils.url_security import validate_user_configured_service_url
+from loguru import logger
+from openai import AsyncAzureOpenAI
 
 from .base import BaseEmbeddingService
 
@@ -36,8 +35,8 @@ class AzureOpenAIEmbeddingService(BaseEmbeddingService):
     def __init__(
         self,
         db_client: DBClient,
-        api_key: Optional[str] = None,
-        endpoint: Optional[str] = None,
+        api_key: str | None = None,
+        endpoint: str | None = None,
         model_id: str = DEFAULT_MODEL_ID,
         api_version: str = "2024-02-15-preview",
     ):
@@ -81,7 +80,7 @@ class AzureOpenAIEmbeddingService(BaseEmbeddingService):
         if not self._configured or self.client is None:
             raise AzureEmbeddingAPIKeyNotConfiguredError()
 
-    async def embed_texts(self, texts: List[str]) -> List[List[float]]:
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """Embed a batch of texts using Azure OpenAI API."""
         self._ensure_configured()
         try:
@@ -96,7 +95,7 @@ class AzureOpenAIEmbeddingService(BaseEmbeddingService):
             logger.error(f"Error generating Azure OpenAI embeddings: {e}")
             raise
 
-    def _validate_embedding_dimensions(self, embeddings: List[List[float]]) -> None:
+    def _validate_embedding_dimensions(self, embeddings: list[list[float]]) -> None:
         for embedding in embeddings:
             if len(embedding) != EMBEDDING_DIMENSION:
                 raise ValueError(
@@ -106,7 +105,7 @@ class AzureOpenAIEmbeddingService(BaseEmbeddingService):
                     f"{EMBEDDING_DIMENSION}-dimensional embeddings."
                 )
 
-    async def embed_query(self, query: str) -> List[float]:
+    async def embed_query(self, query: str) -> list[float]:
         """Embed a single query text using Azure OpenAI API."""
         self._ensure_configured()
         embeddings = await self.embed_texts([query])
@@ -117,8 +116,8 @@ class AzureOpenAIEmbeddingService(BaseEmbeddingService):
         query: str,
         organization_id: int,
         limit: int = 5,
-        document_uuids: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        document_uuids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """Search for similar chunks using vector similarity."""
         self._ensure_configured()
         query_embedding = await self.embed_query(query)

@@ -6,13 +6,10 @@ The ARI WebSocket event listener runs as a separate process (ari_manager.py).
 """
 
 import json
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import aiohttp
-from fastapi import HTTPException
-from loguru import logger
-
 from api.db import db_client
 from api.enums import TelephonyCallStatus, WorkflowRunMode
 from api.services.telephony.base import (
@@ -22,6 +19,8 @@ from api.services.telephony.base import (
     TelephonyProvider,
 )
 from api.services.telephony.providers.ari.external_pbx import create_adapter
+from fastapi import HTTPException
+from loguru import logger
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -38,7 +37,7 @@ class ARIProvider(TelephonyProvider):
     PROVIDER_NAME = WorkflowRunMode.ARI.value
     WEBHOOK_ENDPOINT = None  # ARI uses WebSocket events, not webhooks
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """
         Initialize ARIProvider with configuration.
 
@@ -69,8 +68,8 @@ class ARIProvider(TelephonyProvider):
         self,
         to_number: str,
         webhook_url: str,
-        workflow_run_id: Optional[int] = None,
-        from_number: Optional[str] = None,
+        workflow_run_id: int | None = None,
+        from_number: str | None = None,
         **kwargs: Any,
     ) -> CallInitiationResult:
         """
@@ -119,44 +118,43 @@ class ARIProvider(TelephonyProvider):
             f"via app={self.app_name}, workflow_run_id={workflow_run_id}"
         )
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                endpoint,
-                params=params,
-                auth=self._get_auth(),
-            ) as response:
-                response_text = await response.text()
+        async with aiohttp.ClientSession() as session, session.post(
+            endpoint,
+            params=params,
+            auth=self._get_auth(),
+        ) as response:
+            response_text = await response.text()
 
-                if response.status != 200:
-                    logger.error(
-                        f"[ARI] Channel creation failed: "
-                        f"HTTP {response.status} - {response_text}"
-                    )
-                    raise HTTPException(
-                        status_code=response.status,
-                        detail=f"Failed to create ARI channel: {response_text}",
-                    )
-
-                response_data = json.loads(response_text)
-                channel_id = response_data.get("id", "")
-
-                logger.info(
-                    f"[ARI] Channel created: {channel_id} "
-                    f"state={response_data.get('state')}"
+            if response.status != 200:
+                logger.error(
+                    f"[ARI] Channel creation failed: "
+                    f"HTTP {response.status} - {response_text}"
+                )
+                raise HTTPException(
+                    status_code=response.status,
+                    detail=f"Failed to create ARI channel: {response_text}",
                 )
 
-                return CallInitiationResult(
-                    call_id=channel_id,
-                    status=response_data.get("state", "created"),
-                    caller_number=from_number,
-                    provider_metadata={
-                        "call_id": channel_id,
-                        "channel_name": response_data.get("name", ""),
-                    },
-                    raw_response=response_data,
-                )
+            response_data = json.loads(response_text)
+            channel_id = response_data.get("id", "")
 
-    async def get_call_status(self, call_id: str) -> Dict[str, Any]:
+            logger.info(
+                f"[ARI] Channel created: {channel_id} "
+                f"state={response_data.get('state')}"
+            )
+
+            return CallInitiationResult(
+                call_id=channel_id,
+                status=response_data.get("state", "created"),
+                caller_number=from_number,
+                provider_metadata={
+                    "call_id": channel_id,
+                    "channel_name": response_data.get("name", ""),
+                },
+                raw_response=response_data,
+            )
+
+    async def get_call_status(self, call_id: str) -> dict[str, Any]:
         """Get channel status from ARI."""
         if not self.validate_config():
             raise ValueError("ARI provider not properly configured")
@@ -170,7 +168,7 @@ class ARIProvider(TelephonyProvider):
                     raise Exception(f"Failed to get channel status: {error_data}")
                 return await response.json()
 
-    async def get_available_phone_numbers(self) -> List[str]:
+    async def get_available_phone_numbers(self) -> list[str]:
         """Return configured extensions/numbers."""
         return self.from_numbers
 
@@ -188,7 +186,7 @@ class ARIProvider(TelephonyProvider):
         return ProviderSyncResult(ok=True)
 
     async def verify_webhook_signature(
-        self, url: str, params: Dict[str, Any], signature: str
+        self, url: str, params: dict[str, Any], signature: str
     ) -> bool:
         """ARI does not use webhook signatures - events come via WebSocket."""
         return True
@@ -203,7 +201,7 @@ class ARIProvider(TelephonyProvider):
         )
         return ""
 
-    async def get_call_cost(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_cost(self, call_id: str) -> dict[str, Any]:
         """ARI/Asterisk does not provide call cost information."""
         return {
             "cost_usd": 0.0,
@@ -212,7 +210,7 @@ class ARIProvider(TelephonyProvider):
             "error": "ARI does not support cost retrieval",
         }
 
-    def parse_status_callback(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_status_callback(self, data: dict[str, Any]) -> dict[str, Any]:
         """
         Parse ARI event data into generic status callback format.
 
@@ -234,9 +232,7 @@ class ARIProvider(TelephonyProvider):
         # Determine status from event type
         if event_type == "StasisStart":
             status = TelephonyCallStatus.ANSWERED
-        elif event_type == "StasisEnd":
-            status = TelephonyCallStatus.COMPLETED
-        elif event_type == "ChannelDestroyed":
+        elif event_type == "StasisEnd" or event_type == "ChannelDestroyed":
             status = TelephonyCallStatus.COMPLETED
         else:
             status = state_map.get(channel_state, channel_state.lower())
@@ -293,7 +289,7 @@ class ARIProvider(TelephonyProvider):
 
     @classmethod
     def can_handle_webhook(
-        cls, webhook_data: Dict[str, Any], headers: Dict[str, str]
+        cls, webhook_data: dict[str, Any], headers: dict[str, str]
     ) -> bool:
         """
         ARI does not use HTTP webhooks for inbound calls.
@@ -302,7 +298,7 @@ class ARIProvider(TelephonyProvider):
         return False
 
     @staticmethod
-    def parse_inbound_webhook(webhook_data: Dict[str, Any]) -> NormalizedInboundData:
+    def parse_inbound_webhook(webhook_data: dict[str, Any]) -> NormalizedInboundData:
         """Parse ARI event data into normalized inbound format."""
         channel = webhook_data.get("channel", {})
         caller = channel.get("caller", {})
@@ -327,8 +323,8 @@ class ARIProvider(TelephonyProvider):
     async def verify_inbound_signature(
         self,
         url: str,
-        webhook_data: Dict[str, Any],
-        headers: Dict[str, str],
+        webhook_data: dict[str, Any],
+        headers: dict[str, str],
         body: str = "",
     ) -> bool:
         """ARI authenticates via WebSocket connection credentials, not signatures."""
@@ -360,9 +356,8 @@ class ARIProvider(TelephonyProvider):
     @staticmethod
     def generate_validation_error_response(error_type) -> tuple:
         """Generate JSON error response for validation failures."""
-        from fastapi import Response
-
         from api.errors.telephony_errors import TELEPHONY_ERROR_MESSAGES, TelephonyError
+        from fastapi import Response
 
         message = TELEPHONY_ERROR_MESSAGES.get(
             error_type, TELEPHONY_ERROR_MESSAGES[TelephonyError.GENERAL_AUTH_FAILED]
@@ -382,10 +377,10 @@ class ARIProvider(TelephonyProvider):
     async def transfer_external_pbx_call(
         self,
         *,
-        identity: Dict[str, Any],
+        identity: dict[str, Any],
         destination: str,
-        field_updates: Optional[Dict[str, str]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        field_updates: dict[str, str] | None = None,
+    ) -> dict[str, Any] | None:
         """Delegate a PBX-owned customer leg to the configured adapter."""
 
         adapter = self.external_pbx_adapter
@@ -433,7 +428,7 @@ class ARIProvider(TelephonyProvider):
         conference_name: str,
         timeout: int = 30,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Initiate ARI call transfer by creating an outbound channel to the destination.
 
         This method creates the destination channel and returns immediately. The transfer
@@ -543,19 +538,18 @@ class ARIProvider(TelephonyProvider):
         params = {"reason_code": reason}
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.delete(
-                    endpoint, params=params, auth=self._get_auth()
-                ) as response:
-                    if response.status in (200, 204):
-                        logger.info(f"[ARI] Channel {channel_id} hung up")
-                        return True
-                    else:
-                        error = await response.text()
-                        logger.error(
-                            f"[ARI] Failed to hangup channel {channel_id}: {error}"
-                        )
-                        return False
+            async with aiohttp.ClientSession() as session, session.delete(
+                endpoint, params=params, auth=self._get_auth()
+            ) as response:
+                if response.status in (200, 204):
+                    logger.info(f"[ARI] Channel {channel_id} hung up")
+                    return True
+                else:
+                    error = await response.text()
+                    logger.error(
+                        f"[ARI] Failed to hangup channel {channel_id}: {error}"
+                    )
+                    return False
         except Exception as e:
             logger.error(f"[ARI] Exception hanging up channel {channel_id}: {e}")
             return False

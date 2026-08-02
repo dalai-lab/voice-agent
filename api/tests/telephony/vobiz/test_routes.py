@@ -6,15 +6,14 @@ from unittest.mock import AsyncMock, patch
 from urllib.parse import urlencode
 
 import pytest
-from fastapi import HTTPException
-from starlette.requests import Request
-
 from api.services.telephony.providers.vobiz.provider import VobizProvider
 from api.services.telephony.providers.vobiz.routes import (
     handle_vobiz_hangup_callback,
     handle_vobiz_hangup_callback_by_workflow,
     handle_vobiz_ring_callback,
 )
+from fastapi import HTTPException
+from starlette.requests import Request
 
 
 def _provider(application_id: str | None = None) -> VobizProvider:
@@ -69,7 +68,7 @@ def _signed_headers(provider: VobizProvider, *, url: str) -> dict[str, str]:
     signature = base64.b64encode(
         hmac.new(
             provider.auth_token.encode("utf-8"),
-            f"{url}.{nonce}".encode("utf-8"),
+            f"{url}.{nonce}".encode(),
             hashlib.sha256,
         ).digest()
     ).decode("ascii")
@@ -239,7 +238,7 @@ async def test_vobiz_verify_inbound_signature_accepts_v2():
     signature = base64.b64encode(
         hmac.new(
             provider.auth_token.encode("utf-8"),
-            f"{url}{nonce}".encode("utf-8"),
+            f"{url}{nonce}".encode(),
             hashlib.sha256,
         ).digest()
     ).decode("ascii")

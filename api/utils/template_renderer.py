@@ -3,12 +3,11 @@
 import json
 import re
 from datetime import datetime
-from typing import Any, Dict, Optional, Union
+from typing import Any
 from zoneinfo import ZoneInfo
 
-from loguru import logger
-
 from api.services.workflow.workflow_graph import TEMPLATE_VAR_PATTERN
+from loguru import logger
 
 _CURRENT_TIME_PREFIX = "current_time"
 _CURRENT_WEEKDAY_PREFIX = "current_weekday"
@@ -50,9 +49,9 @@ def get_nested_value(obj: Any, path: str) -> Any:
 
 
 def render_template(
-    template: Union[str, dict, list, None],
-    context: Dict[str, Any],
-) -> Union[str, dict, list, None]:  # noqa: C901 – complex but self-contained
+    template: str | dict | list | None,
+    context: dict[str, Any],
+) -> str | dict | list | None:
     """
     Render a template with variable substitution supporting nested paths.
 
@@ -93,7 +92,7 @@ def render_template(
     return _render_string(template, context)
 
 
-def _extract_timezone_from_template(template_str: str) -> Optional[str]:
+def _extract_timezone_from_template(template_str: str) -> str | None:
     """Extract the timezone from a ``current_time_<TZ>`` or ``current_weekday_<TZ>`` variable.
 
     Returns the first IANA timezone found, or None.
@@ -110,8 +109,8 @@ def _extract_timezone_from_template(template_str: str) -> Optional[str]:
 
 
 def _resolve_builtin_variable(
-    variable_path: str, default_tz: Optional[str] = None
-) -> Optional[str]:
+    variable_path: str, default_tz: str | None = None
+) -> str | None:
     """Resolve built-in template variables that are available in all contexts.
 
     Supported variables:
@@ -157,7 +156,7 @@ def _resolve_builtin_variable(
     return None
 
 
-def _render_string(template_str: str, context: Dict[str, Any]) -> str:
+def _render_string(template_str: str, context: dict[str, Any]) -> str:
     """
     Render a string template with variable substitution.
 

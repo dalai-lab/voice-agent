@@ -1,9 +1,8 @@
 import hashlib
 import secrets
-from typing import Tuple
 
 
-def generate_api_key() -> Tuple[str, str, str]:
+def generate_api_key() -> tuple[str, str, str]:
     """Generate a new API key with its hash and prefix.
 
     Returns:

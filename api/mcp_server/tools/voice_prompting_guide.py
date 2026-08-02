@@ -13,7 +13,7 @@ this tool is a thin MCP-facing projection.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException
 
@@ -29,9 +29,9 @@ from api.services.voice_prompting_guide import (
 
 @traced_tool
 async def get_voice_prompting_guide(
-    stage: Optional[str] = None,
-    topic: Optional[str] = None,
-    node_type: Optional[str] = None,
+    stage: str | None = None,
+    topic: str | None = None,
+    node_type: str | None = None,
 ) -> dict[str, Any]:
     """Fetch staged voice-prompting guidance for authoring Dograh workflows.
 

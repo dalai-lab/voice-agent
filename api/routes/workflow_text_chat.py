@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -33,8 +33,8 @@ router = APIRouter(prefix="/workflow", tags=["workflow-text-chat"])
 
 class CreateTextChatSessionRequest(BaseModel):
     name: str | None = None
-    initial_context: Dict[str, Any] | None = None
-    annotations: Dict[str, Any] | None = None
+    initial_context: dict[str, Any] | None = None
+    annotations: dict[str, Any] | None = None
 
 
 class AppendTextChatMessageRequest(BaseModel):
@@ -55,11 +55,11 @@ class WorkflowRunTextSessionResponse(BaseModel):
     state: str
     is_completed: bool
     revision: int
-    initial_context: Dict[str, Any] | None = None
-    gathered_context: Dict[str, Any] | None = None
-    annotations: Dict[str, Any] | None = None
-    session_data: Dict[str, Any]
-    checkpoint: Dict[str, Any]
+    initial_context: dict[str, Any] | None = None
+    gathered_context: dict[str, Any] | None = None
+    annotations: dict[str, Any] | None = None
+    session_data: dict[str, Any]
+    checkpoint: dict[str, Any]
     created_at: datetime
     updated_at: datetime | None = None
 

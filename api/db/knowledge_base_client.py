@@ -2,7 +2,6 @@
 
 import hashlib
 from pathlib import Path
-from typing import List, Optional
 
 from loguru import logger
 from sqlalchemy import delete, select
@@ -23,10 +22,10 @@ class KnowledgeBaseClient(BaseDBClient):
         file_size_bytes: int,
         file_hash: str,
         mime_type: str,
-        source_url: Optional[str] = None,
-        custom_metadata: Optional[dict] = None,
-        docling_metadata: Optional[dict] = None,
-        document_uuid: Optional[str] = None,
+        source_url: str | None = None,
+        custom_metadata: dict | None = None,
+        docling_metadata: dict | None = None,
+        document_uuid: str | None = None,
         retrieval_mode: str = "chunked",
     ) -> KnowledgeBaseDocumentModel:
         """Create a new knowledge base document record.
@@ -79,7 +78,7 @@ class KnowledgeBaseClient(BaseDBClient):
     async def get_document_by_id(
         self,
         document_id: int,
-    ) -> Optional[KnowledgeBaseDocumentModel]:
+    ) -> KnowledgeBaseDocumentModel | None:
         """Get a document by its database ID.
 
         Args:
@@ -100,7 +99,7 @@ class KnowledgeBaseClient(BaseDBClient):
         self,
         document_uuid: str,
         organization_id: int,
-    ) -> Optional[KnowledgeBaseDocumentModel]:
+    ) -> KnowledgeBaseDocumentModel | None:
         """Get a document by its UUID, scoped to organization.
 
         Args:
@@ -128,7 +127,7 @@ class KnowledgeBaseClient(BaseDBClient):
         self,
         file_hash: str,
         organization_id: int,
-    ) -> Optional[KnowledgeBaseDocumentModel]:
+    ) -> KnowledgeBaseDocumentModel | None:
         """Check if a document with the same hash already exists.
 
         Returns the first matching document if multiple exist (can happen with duplicates).
@@ -158,10 +157,10 @@ class KnowledgeBaseClient(BaseDBClient):
     async def get_documents_for_organization(
         self,
         organization_id: int,
-        processing_status: Optional[str] = None,
+        processing_status: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[KnowledgeBaseDocumentModel]:
+    ) -> list[KnowledgeBaseDocumentModel]:
         """Get all documents for an organization.
 
         Args:
@@ -196,10 +195,10 @@ class KnowledgeBaseClient(BaseDBClient):
     async def update_document_metadata(
         self,
         document_id: int,
-        file_size_bytes: Optional[int] = None,
-        file_hash: Optional[str] = None,
-        mime_type: Optional[str] = None,
-    ) -> Optional[KnowledgeBaseDocumentModel]:
+        file_size_bytes: int | None = None,
+        file_hash: str | None = None,
+        mime_type: str | None = None,
+    ) -> KnowledgeBaseDocumentModel | None:
         """Update document file metadata.
 
         Args:
@@ -238,10 +237,10 @@ class KnowledgeBaseClient(BaseDBClient):
         self,
         document_id: int,
         status: str,
-        error_message: Optional[str] = None,
-        total_chunks: Optional[int] = None,
-        docling_metadata: Optional[dict] = None,
-    ) -> Optional[KnowledgeBaseDocumentModel]:
+        error_message: str | None = None,
+        total_chunks: int | None = None,
+        docling_metadata: dict | None = None,
+    ) -> KnowledgeBaseDocumentModel | None:
         """Update document processing status.
 
         Args:
@@ -280,8 +279,8 @@ class KnowledgeBaseClient(BaseDBClient):
 
     async def create_chunks_batch(
         self,
-        chunks: List[KnowledgeBaseChunkModel],
-    ) -> List[KnowledgeBaseChunkModel]:
+        chunks: list[KnowledgeBaseChunkModel],
+    ) -> list[KnowledgeBaseChunkModel]:
         """Create multiple chunks in a batch.
 
         Args:
@@ -304,8 +303,8 @@ class KnowledgeBaseClient(BaseDBClient):
         self,
         document_id: int,
         organization_id: int,
-        chunks: List[KnowledgeBaseChunkModel],
-    ) -> List[KnowledgeBaseChunkModel]:
+        chunks: list[KnowledgeBaseChunkModel],
+    ) -> list[KnowledgeBaseChunkModel]:
         """Replace all chunks for a document with a new precomputed batch."""
         async with self.async_session() as session:
             await session.execute(
@@ -329,7 +328,7 @@ class KnowledgeBaseClient(BaseDBClient):
         self,
         document_id: int,
         organization_id: int,
-    ) -> List[KnowledgeBaseChunkModel]:
+    ) -> list[KnowledgeBaseChunkModel]:
         """Get all chunks for a document.
 
         Args:
@@ -354,13 +353,13 @@ class KnowledgeBaseClient(BaseDBClient):
 
     async def search_similar_chunks(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         organization_id: int,
         limit: int = 5,
-        document_ids: Optional[List[int]] = None,
-        document_uuids: Optional[List[str]] = None,
-        embedding_model: Optional[str] = None,
-    ) -> List[dict]:
+        document_ids: list[int] | None = None,
+        document_uuids: list[str] | None = None,
+        embedding_model: str | None = None,
+    ) -> list[dict]:
         """Search for similar chunks using vector similarity.
 
         Returns top-k most similar chunks without any similarity threshold filtering.
@@ -479,8 +478,8 @@ class KnowledgeBaseClient(BaseDBClient):
     async def get_full_text_documents(
         self,
         organization_id: int,
-        document_uuids: List[str],
-    ) -> List[KnowledgeBaseDocumentModel]:
+        document_uuids: list[str],
+    ) -> list[KnowledgeBaseDocumentModel]:
         """Get full_document mode documents by their UUIDs.
 
         Args:

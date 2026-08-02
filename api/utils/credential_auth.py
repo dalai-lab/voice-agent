@@ -6,7 +6,7 @@ and custom tool execution.
 """
 
 import base64
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from loguru import logger
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 async def build_auth_header(
     credential: "ExternalCredentialModel",
     force_refresh: bool = False,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Build authentication headers for a given ExternalCredentialModel.
 
     Args:
@@ -96,7 +96,7 @@ async def build_auth_header(
 
 async def invalidate_and_rebuild_auth(
     credential: "ExternalCredentialModel",
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Invalidate cached OAuth2 token and rebuild auth headers for retry after 401."""
     if getattr(credential, "credential_type", None) == "oauth2_client_credentials":
         from api.services.oauth2_token_cache import invalidate_token
@@ -109,8 +109,8 @@ async def invalidate_and_rebuild_auth(
 
 async def rebuild_headers_after_401(
     credential: Optional["ExternalCredentialModel"],
-    headers: Dict[str, str],
-) -> Dict[str, str]:
+    headers: dict[str, str],
+) -> dict[str, str]:
     """If credential is an OAuth2 client credential, invalidate token and rebuild headers.
 
     Purges stale headers matching fresh credential header names case-insensitively.
@@ -134,9 +134,9 @@ async def rebuild_headers_after_401(
 
 def build_auth_header_from_data(
     credential_type: str,
-    credential_data: Optional[Dict[str, Any]] = None,
-    credential_uuid: Optional[str] = None,
-) -> Dict[str, str]:
+    credential_data: dict[str, Any] | None = None,
+    credential_uuid: str | None = None,
+) -> dict[str, str]:
     """Build authentication header from raw credential data.
 
     This is a convenience function when you have credential data

@@ -7,7 +7,8 @@ subsequent plays (even from other workers) are instantaneous.
 """
 
 import os
-from typing import Awaitable, Callable, NamedTuple, Optional
+from collections.abc import Awaitable, Callable
+from typing import NamedTuple
 
 import numpy as np
 from loguru import logger
@@ -27,7 +28,7 @@ class RecordingAudio(NamedTuple):
     """Audio bytes paired with the recording's transcript (when available)."""
 
     audio: bytes
-    transcript: Optional[str] = None
+    transcript: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +51,7 @@ def _cache_path(organization_id: int, recording_id: str, sample_rate: int) -> st
 def create_recording_audio_fetcher(
     organization_id: int,
     pipeline_sample_rate: int,
-) -> Callable[..., Awaitable[Optional[bytes]]]:
+) -> Callable[..., Awaitable[bytes | None]]:
     """Create an async callback that returns raw PCM bytes for a recording.
 
     The returned callable accepts **one** of two keyword arguments:
@@ -73,7 +74,7 @@ def create_recording_audio_fetcher(
     from api.services.storage import get_storage_for_backend
 
     _storage_cache: dict[str, object] = {}
-    _transcript_cache: dict[str, Optional[str]] = {}
+    _transcript_cache: dict[str, str | None] = {}
 
     def _get_storage(backend: str):
         if backend not in _storage_cache:
@@ -82,8 +83,8 @@ def create_recording_audio_fetcher(
 
     async def _lookup_recording(
         cache_key: str,
-        recording_pk: Optional[int],
-        recording_id: Optional[str],
+        recording_pk: int | None,
+        recording_id: str | None,
     ):
         """DB lookup with transcript caching."""
         if recording_pk is not None:
@@ -100,9 +101,9 @@ def create_recording_audio_fetcher(
 
     async def fetch(
         *,
-        recording_pk: Optional[int] = None,
-        recording_id: Optional[str] = None,
-    ) -> Optional[RecordingAudio]:
+        recording_pk: int | None = None,
+        recording_id: str | None = None,
+    ) -> RecordingAudio | None:
         if recording_pk is None and recording_id is None:
             logger.warning("fetch called with neither recording_pk nor recording_id")
             return None
@@ -221,7 +222,7 @@ async def warm_recording_cache(
 
 async def _download_and_convert(
     recording, sample_rate: int, get_storage_fn
-) -> Optional[bytes]:
+) -> bytes | None:
     """Download a recording from storage, convert to PCM, trim, and cache to disk.
 
     Returns the processed PCM bytes, or None on failure.

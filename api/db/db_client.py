@@ -70,4 +70,3 @@ class DBClient(
     - FolderClient: handles folder operations for grouping workflows (agents)
     """
 
-    pass

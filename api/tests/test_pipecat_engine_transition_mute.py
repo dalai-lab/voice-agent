@@ -22,6 +22,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.tests import MockLLMService, MockTTSService
 from pipecat.tests.mock_transport import MockTransport
 from pipecat.transports.base_transport import TransportParams
 from pipecat.turns.user_mute import (
@@ -36,7 +37,6 @@ from api.services.workflow.pipecat_engine_variable_extractor import (
     VariableExtractionManager,
 )
 from api.services.workflow.workflow_graph import WorkflowGraph
-from pipecat.tests import MockLLMService, MockTTSService
 
 
 async def _build_engine_and_pipeline(
@@ -170,27 +170,26 @@ class TestTransitionFunctionMutesUser:
             "api.db:db_client.get_organization_id_by_workflow_run_id",
             new_callable=AsyncMock,
             return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={"user_intent": "end call"},
         ):
-            with patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={"user_intent": "end call"},
-            ):
 
-                async def run_pipeline():
-                    await run_pipeline_worker(task)
+            async def run_pipeline():
+                await run_pipeline_worker(task)
 
-                async def initialize_engine():
-                    await asyncio.sleep(0.01)
-                    await engine.initialize()
-                    await engine.set_node(engine.workflow.start_node_id)
-                    await engine.llm.queue_frame(LLMContextFrame(engine.context))
+            async def initialize_engine():
+                await asyncio.sleep(0.01)
+                await engine.initialize()
+                await engine.set_node(engine.workflow.start_node_id)
+                await engine.llm.queue_frame(LLMContextFrame(engine.context))
 
-                await asyncio.wait_for(
-                    asyncio.gather(run_pipeline(), initialize_engine()),
-                    timeout=10.0,
-                )
+            await asyncio.wait_for(
+                asyncio.gather(run_pipeline(), initialize_engine()),
+                timeout=10.0,
+            )
 
         assert len(captured_states) == 1, (
             f"Expected the transition function to be invoked exactly once, "
@@ -239,27 +238,26 @@ class TestTransitionFunctionMutesUser:
             "api.db:db_client.get_organization_id_by_workflow_run_id",
             new_callable=AsyncMock,
             return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={"user_intent": "end call"},
         ):
-            with patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={"user_intent": "end call"},
-            ):
 
-                async def run_pipeline():
-                    await run_pipeline_worker(task)
+            async def run_pipeline():
+                await run_pipeline_worker(task)
 
-                async def initialize_engine():
-                    await asyncio.sleep(0.01)
-                    await engine.initialize()
-                    await engine.set_node(engine.workflow.start_node_id)
-                    await engine.llm.queue_frame(LLMContextFrame(engine.context))
+            async def initialize_engine():
+                await asyncio.sleep(0.01)
+                await engine.initialize()
+                await engine.set_node(engine.workflow.start_node_id)
+                await engine.llm.queue_frame(LLMContextFrame(engine.context))
 
-                await asyncio.wait_for(
-                    asyncio.gather(run_pipeline(), initialize_engine()),
-                    timeout=10.0,
-                )
+            await asyncio.wait_for(
+                asyncio.gather(run_pipeline(), initialize_engine()),
+                timeout=10.0,
+            )
 
         assert function_call_mute_strategy._function_call_in_progress == set(), (
             "FunctionCallUserMuteStrategy should have cleared its in-progress "

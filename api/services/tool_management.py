@@ -7,9 +7,7 @@ scoping, MCP discovery, and analytics stay consistent.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Optional
-
-from loguru import logger
+from typing import Any
 
 from api.db import db_client
 from api.db.models import UserModel
@@ -27,6 +25,7 @@ from api.services.workflow.tools.mcp_tool import (
     McpDefinitionError,
     validate_mcp_definition,
 )
+from loguru import logger
 
 
 class ToolManagementError(ValueError):
@@ -64,7 +63,7 @@ def build_tool_response(tool: Any, include_created_by: bool = False) -> ToolResp
     )
 
 
-def _credential_uuid_from_definition(definition: dict[str, Any]) -> Optional[str]:
+def _credential_uuid_from_definition(definition: dict[str, Any]) -> str | None:
     config = definition.get("config")
     if not isinstance(config, dict):
         return None
@@ -89,7 +88,7 @@ def _credential_uuids_from_definition(definition: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(credential_uuids))
 
 
-async def fetch_credential(credential_uuid: Optional[str], organization_id: int):
+async def fetch_credential(credential_uuid: str | None, organization_id: int):
     """Best-effort credential lookup for MCP auth/discovery."""
     if not credential_uuid:
         return None
@@ -124,7 +123,7 @@ async def validate_external_pbx_tool_definition(
     definition: dict[str, Any],
     *,
     organization_id: int,
-    existing_definition: Optional[dict[str, Any]] = None,
+    existing_definition: dict[str, Any] | None = None,
 ) -> None:
     """Enforce the org feature gate for context-to-in-group routing."""
 

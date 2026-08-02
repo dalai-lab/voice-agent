@@ -1,6 +1,5 @@
 import json
 from datetime import datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -39,23 +38,23 @@ class SuperuserWorkflowRunResponse(BaseModel):
     id: int
     name: str
     workflow_id: int
-    workflow_name: Optional[str]
-    user_id: Optional[int]
-    organization_id: Optional[int]
-    organization_name: Optional[str]
+    workflow_name: str | None
+    user_id: int | None
+    organization_id: int | None
+    organization_name: str | None
     mode: str
     is_completed: bool
-    recording_url: Optional[str]
-    transcript_url: Optional[str]
-    usage_info: Optional[dict]
-    cost_info: Optional[dict]
-    initial_context: Optional[dict]
-    gathered_context: Optional[dict]
+    recording_url: str | None
+    transcript_url: str | None
+    usage_info: dict | None
+    cost_info: dict | None
+    initial_context: dict | None
+    gathered_context: dict | None
     created_at: datetime
 
 
 class SuperuserWorkflowRunsListResponse(BaseModel):
-    workflow_runs: List[SuperuserWorkflowRunResponse]
+    workflow_runs: list[SuperuserWorkflowRunResponse]
     total_count: int
     page: int
     limit: int
@@ -155,11 +154,11 @@ async def impersonate(
 async def get_workflow_runs(
     page: int = Query(1, ge=1, description="Page number (starts from 1)"),
     limit: int = Query(50, ge=1, le=100, description="Number of items per page"),
-    filters: Optional[str] = Query(None, description="JSON-encoded filter criteria"),
-    sort_by: Optional[str] = Query(
+    filters: str | None = Query(None, description="JSON-encoded filter criteria"),
+    sort_by: str | None = Query(
         None, description="Field to sort by (e.g., 'duration', 'created_at')"
     ),
-    sort_order: Optional[str] = Query(
+    sort_order: str | None = Query(
         "desc", description="Sort order ('asc' or 'desc')"
     ),
     user: UserModel = Depends(get_superuser),

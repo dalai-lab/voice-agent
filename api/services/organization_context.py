@@ -1,24 +1,23 @@
-from typing import Literal, Optional
-
-from pydantic import BaseModel
+from typing import Literal
 
 from api.db import db_client
 from api.db.models import UserModel
 from api.services.configuration.ai_model_configuration import (
     get_resolved_ai_model_configuration,
 )
+from pydantic import BaseModel
 
 
 class OrganizationModelServicesContext(BaseModel):
     config_source: Literal["organization_v2", "legacy_user_v1", "empty"]
     has_model_configuration_v2: bool
-    managed_service_version: Optional[int] = None
+    managed_service_version: int | None = None
     uses_managed_service_v2: bool
 
 
 class OrganizationContextResponse(BaseModel):
-    organization_id: Optional[int] = None
-    organization_provider_id: Optional[str] = None
+    organization_id: int | None = None
+    organization_provider_id: str | None = None
     model_services: OrganizationModelServicesContext
 
 

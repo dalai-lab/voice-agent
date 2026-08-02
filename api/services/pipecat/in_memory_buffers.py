@@ -3,15 +3,14 @@ import io
 import wave
 from copy import deepcopy
 from datetime import UTC, datetime
-from typing import List, Optional
-
-from loguru import logger
 
 from api.services.pipecat.realtime_feedback_events import (
     realtime_feedback_event_sort_key,
     stamp_realtime_feedback_event,
 )
 from api.utils.transcript import generate_transcript_text as _generate_transcript_text
+from loguru import logger
+
 from pipecat.utils.enums import RealtimeFeedbackType
 
 
@@ -22,7 +21,7 @@ class InMemoryAudioBuffer:
         self._workflow_run_id = workflow_run_id
         self._sample_rate = sample_rate
         self._num_channels = num_channels
-        self._chunks: List[bytes] = []
+        self._chunks: list[bytes] = []
         self._lock = asyncio.Lock()
         self._total_size = 0
         self._max_size = 100 * 1024 * 1024  # 100MB limit
@@ -104,10 +103,10 @@ class InMemoryLogsBuffer:
 
     def __init__(self, workflow_run_id: int):
         self._workflow_run_id = workflow_run_id
-        self._events: List[dict] = []
-        self._current_turn: Optional[int] = None
-        self._current_node_id: Optional[str] = None
-        self._current_node_name: Optional[str] = None
+        self._events: list[dict] = []
+        self._current_turn: int | None = None
+        self._current_node_id: str | None = None
+        self._current_node_name: str | None = None
 
     def set_current_node(self, node_id: str, node_name: str):
         """Set the current node ID and name to be injected into subsequent events."""
@@ -115,12 +114,12 @@ class InMemoryLogsBuffer:
         self._current_node_name = node_name
 
     @property
-    def current_node_id(self) -> Optional[str]:
+    def current_node_id(self) -> str | None:
         """Get the current node ID."""
         return self._current_node_id
 
     @property
-    def current_node_name(self) -> Optional[str]:
+    def current_node_name(self) -> str | None:
         """Get the current node name."""
         return self._current_node_name
 
@@ -132,10 +131,10 @@ class InMemoryLogsBuffer:
         self,
         event: dict,
         *,
-        timestamp: Optional[str] = None,
-        turn: Optional[int] = None,
-        node_id: Optional[str] = None,
-        node_name: Optional[str] = None,
+        timestamp: str | None = None,
+        turn: int | None = None,
+        node_id: str | None = None,
+        node_name: str | None = None,
         use_current_node: bool = True,
     ):
         """Append an immutable event with optional correlation metadata."""
@@ -154,13 +153,13 @@ class InMemoryLogsBuffer:
             f"Appended event {event.get('type')} to logs buffer for workflow {self._workflow_run_id}"
         )
 
-    def _sorted_events(self) -> List[dict]:
+    def _sorted_events(self) -> list[dict]:
         # Stable sort by the top-level event timestamp used by the persisted
         # realtime feedback schema. Legacy events without one fall back to their
         # payload timestamp. Events sharing a key retain insertion order.
         return sorted(self._events, key=realtime_feedback_event_sort_key)
 
-    def get_events(self) -> List[dict]:
+    def get_events(self) -> list[dict]:
         """Get all events for final storage, ordered by event timestamp."""
         return self._sorted_events()
 

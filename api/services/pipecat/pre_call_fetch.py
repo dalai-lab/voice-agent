@@ -5,19 +5,18 @@ call context with data from external systems (CRM, ERP, etc.).
 """
 
 import asyncio
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
-from loguru import logger
-
 from api.db import db_client
 from api.services.workflow.initial_context import merge_external_initial_context
 from api.utils.credential_auth import build_auth_header
+from loguru import logger
 
 PRE_CALL_FETCH_TIMEOUT_SECONDS = 10
 
 
-def _extract_initial_context(response_data: Dict[str, Any]) -> Dict[str, Any]:
+def _extract_initial_context(response_data: dict[str, Any]) -> dict[str, Any]:
     """Pull the context variables out of a pre-call fetch response.
 
     The canonical key is ``initial_context``. The legacy ``dynamic_variables``
@@ -43,11 +42,11 @@ def _extract_initial_context(response_data: Dict[str, Any]) -> Dict[str, Any]:
 async def execute_pre_call_fetch(
     *,
     url: str,
-    credential_uuid: Optional[str],
-    call_context_vars: Dict[str, Any],
+    credential_uuid: str | None,
+    call_context_vars: dict[str, Any],
     workflow_id: int,
     organization_id: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Execute a POST request to fetch data before a call starts.
 
     Sends a standardized payload with call metadata (agent_id, from/to numbers).
@@ -68,7 +67,7 @@ async def execute_pre_call_fetch(
     }
 
     # Build headers
-    headers: Dict[str, str] = {"Content-Type": "application/json"}
+    headers: dict[str, str] = {"Content-Type": "application/json"}
     credential = None
 
     if credential_uuid:

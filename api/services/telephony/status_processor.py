@@ -6,12 +6,7 @@ introducing a circular import on the routes module.
 """
 
 import time
-import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Optional
-
-from loguru import logger
-from pydantic import BaseModel
 
 from api.db import db_client
 from api.db.models import QueuedRunModel, ScheduledCallbackModel
@@ -23,6 +18,8 @@ from api.services.campaign.campaign_event_publisher import (
 from api.services.campaign.circuit_breaker import circuit_breaker
 from api.tasks.arq import enqueue_job
 from api.tasks.function_names import FunctionNames
+from loguru import logger
+from pydantic import BaseModel
 
 TERMINAL_NOT_CONNECTED_STATUSES = frozenset(
     {
@@ -105,10 +102,10 @@ class StatusCallbackRequest(BaseModel):
 
     call_id: str
     status: TelephonyCallStatus | str
-    from_number: Optional[str] = None
-    to_number: Optional[str] = None
-    direction: Optional[str] = None
-    duration: Optional[str] = None
+    from_number: str | None = None
+    to_number: str | None = None
+    direction: str | None = None
+    duration: str | None = None
 
     extra: dict = {}
 

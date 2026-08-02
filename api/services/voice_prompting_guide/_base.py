@@ -22,7 +22,7 @@ question" yields garbage tips.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -41,7 +41,7 @@ class StageLens(BaseModel):
     full content."""
 
     relevant: bool = False
-    lens: Optional[str] = None
+    lens: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -103,13 +103,13 @@ class VoicePromptingTopic(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    def lens_for(self, stage: Stage) -> Optional[str]:
+    def lens_for(self, stage: Stage) -> str | None:
         sl = self.stages.get(stage)
         if sl is None or not sl.relevant:
             return None
         return sl.lens
 
-    def is_relevant_to(self, node_type: Optional[str]) -> bool:
+    def is_relevant_to(self, node_type: str | None) -> bool:
         if node_type is None:
             return True
         # An atom with no `applies_to_node_types` is treated as

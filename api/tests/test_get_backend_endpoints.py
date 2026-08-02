@@ -136,15 +136,14 @@ class TestGetBackendEndpointsWithEnvVar:
     )
     async def test_localhost_urls_no_tunnel(self, env_url, expected_http, expected_ws):
         """Test localhost/127.0.0.1 URLs when tunnel is not available."""
-        with patch("api.utils.common.BACKEND_API_ENDPOINT", env_url):
-            with patch(
-                "api.utils.common.TunnelURLProvider.get_tunnel_urls",
-                new_callable=AsyncMock,
-            ) as mock_tunnel:
-                mock_tunnel.return_value = None
-                http_url, ws_url = await get_backend_endpoints()
-                assert http_url == expected_http
-                assert ws_url == expected_ws
+        with patch("api.utils.common.BACKEND_API_ENDPOINT", env_url), patch(
+            "api.utils.common.TunnelURLProvider.get_tunnel_urls",
+            new_callable=AsyncMock,
+        ) as mock_tunnel:
+            mock_tunnel.return_value = None
+            http_url, ws_url = await get_backend_endpoints()
+            assert http_url == expected_http
+            assert ws_url == expected_ws
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -173,15 +172,14 @@ class TestGetBackendEndpointsWithEnvVar:
         tunnel_http = "https://abc123.trycloudflare.com"
         tunnel_ws = "wss://abc123.trycloudflare.com"
 
-        with patch("api.utils.common.BACKEND_API_ENDPOINT", env_url):
-            with patch(
-                "api.utils.common.TunnelURLProvider.get_tunnel_urls",
-                new_callable=AsyncMock,
-            ) as mock_tunnel:
-                mock_tunnel.return_value = (tunnel_http, tunnel_ws)
-                http_url, ws_url = await get_backend_endpoints()
-                assert http_url == tunnel_http
-                assert ws_url == tunnel_ws
+        with patch("api.utils.common.BACKEND_API_ENDPOINT", env_url), patch(
+            "api.utils.common.TunnelURLProvider.get_tunnel_urls",
+            new_callable=AsyncMock,
+        ) as mock_tunnel:
+            mock_tunnel.return_value = (tunnel_http, tunnel_ws)
+            http_url, ws_url = await get_backend_endpoints()
+            assert http_url == tunnel_http
+            assert ws_url == tunnel_ws
 
     @pytest.mark.asyncio
     async def test_localhost_tunnel_exception_falls_back(self):
@@ -245,27 +243,25 @@ class TestGetBackendEndpointsNoEnvVar:
         tunnel_http = "https://abc123.trycloudflare.com"
         tunnel_ws = "wss://abc123.trycloudflare.com"
 
-        with patch("api.utils.common.BACKEND_API_ENDPOINT", None):
-            with patch(
-                "api.utils.common.TunnelURLProvider.get_tunnel_urls",
-                new_callable=AsyncMock,
-            ) as mock_tunnel:
-                mock_tunnel.return_value = (tunnel_http, tunnel_ws)
-                http_url, ws_url = await get_backend_endpoints()
-                assert http_url == tunnel_http
-                assert ws_url == tunnel_ws
+        with patch("api.utils.common.BACKEND_API_ENDPOINT", None), patch(
+            "api.utils.common.TunnelURLProvider.get_tunnel_urls",
+            new_callable=AsyncMock,
+        ) as mock_tunnel:
+            mock_tunnel.return_value = (tunnel_http, tunnel_ws)
+            http_url, ws_url = await get_backend_endpoints()
+            assert http_url == tunnel_http
+            assert ws_url == tunnel_ws
 
     @pytest.mark.asyncio
     async def test_raises_when_no_env_var_and_no_tunnel(self):
         """Test that ValueError is raised when no env var and no tunnel."""
-        with patch("api.utils.common.BACKEND_API_ENDPOINT", None):
-            with patch(
-                "api.utils.common.TunnelURLProvider.get_tunnel_urls",
-                new_callable=AsyncMock,
-            ) as mock_tunnel:
-                mock_tunnel.return_value = None
-                with pytest.raises(ValueError, match="No tunnel URL available"):
-                    await get_backend_endpoints()
+        with patch("api.utils.common.BACKEND_API_ENDPOINT", None), patch(
+            "api.utils.common.TunnelURLProvider.get_tunnel_urls",
+            new_callable=AsyncMock,
+        ) as mock_tunnel:
+            mock_tunnel.return_value = None
+            with pytest.raises(ValueError, match="No tunnel URL available"):
+                await get_backend_endpoints()
 
 
 class TestSchemeMapping:
@@ -320,14 +316,13 @@ class TestInvalidUrls:
     )
     async def test_malformed_scheme_single_slash(self, invalid_url):
         """Test URLs with single slash in scheme raise ValueError."""
-        with patch("api.utils.common.BACKEND_API_ENDPOINT", invalid_url):
-            with patch(
-                "api.utils.common.TunnelURLProvider.get_tunnel_urls",
-                new_callable=AsyncMock,
-            ) as mock_tunnel:
-                mock_tunnel.return_value = None
-                with pytest.raises(ValueError, match="Invalid BACKEND_API_ENDPOINT"):
-                    await get_backend_endpoints()
+        with patch("api.utils.common.BACKEND_API_ENDPOINT", invalid_url), patch(
+            "api.utils.common.TunnelURLProvider.get_tunnel_urls",
+            new_callable=AsyncMock,
+        ) as mock_tunnel:
+            mock_tunnel.return_value = None
+            with pytest.raises(ValueError, match="Invalid BACKEND_API_ENDPOINT"):
+                await get_backend_endpoints()
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

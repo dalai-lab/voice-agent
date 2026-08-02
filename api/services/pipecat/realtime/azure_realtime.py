@@ -9,9 +9,9 @@ DograhOpenAIRealtimeLLMService does for the standard OpenAI Realtime endpoint.
 import json
 from typing import Any
 
+from api.services.pipecat.realtime.static_greeting import format_static_greeting_prompt
 from loguru import logger
 
-from api.services.pipecat.realtime.static_greeting import format_static_greeting_prompt
 from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,

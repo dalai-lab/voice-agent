@@ -2,7 +2,6 @@ import copy
 import re
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 TRIGGER_PATH_MAX_LENGTH = 36
 TRIGGER_PATH_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -15,7 +14,7 @@ class TriggerPathIssue:
     message: str
 
 
-def extract_trigger_paths(workflow_definition: Optional[dict]) -> list[str]:
+def extract_trigger_paths(workflow_definition: dict | None) -> list[str]:
     """Extract trigger paths from a workflow definition."""
     if not workflow_definition:
         return []
@@ -30,7 +29,7 @@ def extract_trigger_paths(workflow_definition: Optional[dict]) -> list[str]:
     return trigger_paths
 
 
-def trigger_path_to_node_id(workflow_definition: Optional[dict]) -> dict[str, str]:
+def trigger_path_to_node_id(workflow_definition: dict | None) -> dict[str, str]:
     """Map each trigger node's trigger_path to its node id."""
     if not workflow_definition:
         return {}
@@ -45,7 +44,7 @@ def trigger_path_to_node_id(workflow_definition: Optional[dict]) -> dict[str, st
     return out
 
 
-def regenerate_trigger_uuids(workflow_definition: Optional[dict]) -> Optional[dict]:
+def regenerate_trigger_uuids(workflow_definition: dict | None) -> dict | None:
     """Regenerate UUIDs for all trigger nodes in a workflow definition."""
     if not workflow_definition:
         return workflow_definition
@@ -59,7 +58,7 @@ def regenerate_trigger_uuids(workflow_definition: Optional[dict]) -> Optional[di
     return updated_definition
 
 
-def ensure_trigger_paths(workflow_definition: Optional[dict]) -> Optional[dict]:
+def ensure_trigger_paths(workflow_definition: dict | None) -> dict | None:
     """Mint UUIDs for trigger nodes that do not already have a path."""
     if not workflow_definition:
         return workflow_definition
@@ -75,7 +74,7 @@ def ensure_trigger_paths(workflow_definition: Optional[dict]) -> Optional[dict]:
 
 
 def validate_trigger_paths(
-    workflow_definition: Optional[dict],
+    workflow_definition: dict | None,
 ) -> list[TriggerPathIssue]:
     """Validate custom trigger paths before they reach persistence/runtime."""
     if not workflow_definition:

@@ -8,13 +8,12 @@ re-reads authoritative state from the DB.
 """
 
 import asyncio
-from typing import Awaitable, Callable, Dict
+from collections.abc import Awaitable, Callable
 
 import redis.asyncio as aioredis
-from loguru import logger
-
 from api.enums import RedisChannel
 from api.services.worker_sync.protocol import WorkerSyncEvent
+from loguru import logger
 
 SyncHandler = Callable[[WorkerSyncEvent], Awaitable[None]]
 
@@ -24,7 +23,7 @@ class WorkerSyncManager:
 
     def __init__(self, redis_url: str):
         self._redis_url = redis_url
-        self._handlers: Dict[str, SyncHandler] = {}
+        self._handlers: dict[str, SyncHandler] = {}
         self._redis: aioredis.Redis | None = None
         self._pubsub: aioredis.client.PubSub | None = None
         self._listener_task: asyncio.Task | None = None

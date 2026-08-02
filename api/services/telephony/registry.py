@@ -11,17 +11,11 @@ plus a single import line in ``providers/__init__.py``.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Type,
 )
 
 from pydantic import BaseModel
@@ -60,12 +54,12 @@ class ProviderUIField:
     type: str
     required: bool = True
     sensitive: bool = False  # If true, mask when displaying stored value
-    description: Optional[str] = None
-    placeholder: Optional[str] = None
-    options: Optional[List[ProviderUIOption]] = None
-    visible_when: Optional[ProviderUICondition] = None
-    section: Optional[str] = None
-    feature_gate: Optional[str] = None
+    description: str | None = None
+    placeholder: str | None = None
+    options: list[ProviderUIOption] | None = None
+    visible_when: ProviderUICondition | None = None
+    section: str | None = None
+    feature_gate: str | None = None
 
 
 @dataclass(frozen=True)
@@ -73,8 +67,8 @@ class ProviderUIMetadata:
     """Display metadata for a provider's configuration form."""
 
     display_name: str
-    fields: List[ProviderUIField]
-    docs_url: Optional[str] = None
+    fields: list[ProviderUIField]
+    docs_url: str | None = None
 
 
 # Signature every provider's transport factory must satisfy.
@@ -83,14 +77,14 @@ TransportFactory = Callable[..., Awaitable[Any]]
 
 # Loader takes the raw config.value dict from the DB and returns a normalized
 # config dict that the provider class accepts in its constructor.
-ConfigLoader = Callable[[Dict[str, Any]], Dict[str, Any]]
+ConfigLoader = Callable[[dict[str, Any]], dict[str, Any]]
 
 # Optional async hook invoked at create/update time. Receives the credentials
 # dict the route is about to persist and returns a (possibly modified) dict.
 # Use for provider-side I/O that mutates credentials before save (e.g. an
 # external resource that must exist by the time the row lands). I/O is
 # allowed; ``config_loader`` is reserved for pure dict reshaping.
-CredentialsPreprocessor = Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]
+CredentialsPreprocessor = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
 
 
 @dataclass(frozen=True)
@@ -125,13 +119,13 @@ class ProviderSpec:
     """
 
     name: str
-    provider_cls: Type["TelephonyProvider"]
+    provider_cls: type[TelephonyProvider]
     config_loader: ConfigLoader
     transport_factory: TransportFactory
     transport_sample_rate: int
-    config_request_cls: Type[BaseModel]
-    config_response_cls: Type[BaseModel]
-    ui_metadata: Optional[ProviderUIMetadata] = None
+    config_request_cls: type[BaseModel]
+    config_response_cls: type[BaseModel]
+    ui_metadata: ProviderUIMetadata | None = None
     # Credential field that uniquely identifies the provider account. Used to
     # (a) match an inbound webhook to the right org config when multiple configs
     # exist for the same provider, and (b) reject duplicate-account saves.
@@ -140,10 +134,10 @@ class ProviderSpec:
     # Optional async hook to mutate credentials before they're persisted on
     # create/update. Called with the post-mask, post-merge credentials dict
     # and must return the dict to write. Raise HTTPException to abort save.
-    preprocess_credentials_on_save: Optional[CredentialsPreprocessor] = None
+    preprocess_credentials_on_save: CredentialsPreprocessor | None = None
 
 
-_REGISTRY: Dict[str, ProviderSpec] = {}
+_REGISTRY: dict[str, ProviderSpec] = {}
 
 
 def register(spec: ProviderSpec) -> None:
@@ -165,12 +159,12 @@ def get(name: str) -> ProviderSpec:
         raise ValueError(f"Unknown telephony provider: {name}") from None
 
 
-def get_optional(name: str) -> Optional[ProviderSpec]:
+def get_optional(name: str) -> ProviderSpec | None:
     """Look up a registered provider by name, returning None if not registered."""
     return _REGISTRY.get(name)
 
 
-def all_specs() -> List[ProviderSpec]:
+def all_specs() -> list[ProviderSpec]:
     """Return all registered providers in name-sorted order (stable iteration)."""
     return [_REGISTRY[k] for k in sorted(_REGISTRY)]
 

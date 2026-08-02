@@ -1,8 +1,6 @@
 """Utility for getting the cloudflared tunnel URL at runtime."""
 
-import asyncio
 import re
-from typing import Optional
 
 import aiohttp
 from loguru import logger
@@ -37,7 +35,7 @@ class TunnelURLProvider:
         )
 
     @classmethod
-    async def _get_cloudflared_urls(cls) -> Optional[tuple[str, str]]:
+    async def _get_cloudflared_urls(cls) -> tuple[str, str] | None:
         """
         Query cloudflared metrics endpoint to get the tunnel URLs.
 
@@ -49,42 +47,41 @@ class TunnelURLProvider:
             # The service name in docker-compose is 'cloudflared'
             metrics_url = "http://cloudflared:2000/metrics"
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    metrics_url, timeout=aiohttp.ClientTimeout(total=1)
-                ) as response:
-                    if response.status != 200:
-                        logger.warning(
-                            f"Cloudflared metrics returned status {response.status}"
-                        )
-                        return None
-
-                    text = await response.text()
-
-                    # Look for the tunnel URL in metrics
-                    # Cloudflared exposes this in the userHostname metric
-                    match = re.search(r'userHostname="([^"]+)"', text)
-                    if match:
-                        hostname = match.group(1)
-                        # Remove https:// or wss:// if present
-                        hostname = hostname.replace("https://", "").replace(
-                            "wss://", ""
-                        )
-                        return "https://" + hostname, "wss://" + hostname
-
-                    # Alternative: Look for trycloudflare.com domain
-                    match = re.search(r"([a-z0-9-]+\.trycloudflare\.com)", text)
-                    if match:
-                        hostname = match.group(1)
-                        hostname = hostname.replace("https://", "").replace(
-                            "wss://", ""
-                        )
-                        return f"https://{hostname}", f"wss://{hostname}"
-
-                    logger.warning("Could not find tunnel URL in cloudflared metrics")
+            async with aiohttp.ClientSession() as session, session.get(
+                metrics_url, timeout=aiohttp.ClientTimeout(total=1)
+            ) as response:
+                if response.status != 200:
+                    logger.warning(
+                        f"Cloudflared metrics returned status {response.status}"
+                    )
                     return None
 
-        except asyncio.TimeoutError:
+                text = await response.text()
+
+                # Look for the tunnel URL in metrics
+                # Cloudflared exposes this in the userHostname metric
+                match = re.search(r'userHostname="([^"]+)"', text)
+                if match:
+                    hostname = match.group(1)
+                    # Remove https:// or wss:// if present
+                    hostname = hostname.replace("https://", "").replace(
+                        "wss://", ""
+                    )
+                    return "https://" + hostname, "wss://" + hostname
+
+                # Alternative: Look for trycloudflare.com domain
+                match = re.search(r"([a-z0-9-]+\.trycloudflare\.com)", text)
+                if match:
+                    hostname = match.group(1)
+                    hostname = hostname.replace("https://", "").replace(
+                        "wss://", ""
+                    )
+                    return f"https://{hostname}", f"wss://{hostname}"
+
+                logger.warning("Could not find tunnel URL in cloudflared metrics")
+                return None
+
+        except TimeoutError:
             logger.warning("Timeout connecting to cloudflared metrics endpoint")
             return None
         except aiohttp.ClientError as e:

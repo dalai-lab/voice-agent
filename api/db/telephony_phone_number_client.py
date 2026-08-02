@@ -5,7 +5,7 @@ owned by a telephony configuration. They power both outbound caller-ID
 selection and inbound call routing.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
@@ -23,7 +23,7 @@ from api.utils.telephony_address import normalize_telephony_address
 class TelephonyPhoneNumberClient(BaseDBClient):
     async def list_phone_numbers_for_config(
         self, telephony_configuration_id: int
-    ) -> List[TelephonyPhoneNumberModel]:
+    ) -> list[TelephonyPhoneNumberModel]:
         async with self.async_session() as session:
             result = await session.execute(
                 select(TelephonyPhoneNumberModel)
@@ -37,7 +37,7 @@ class TelephonyPhoneNumberClient(BaseDBClient):
 
     async def list_phone_numbers_with_workflow_name_for_config(
         self, telephony_configuration_id: int
-    ) -> List[Tuple[TelephonyPhoneNumberModel, Optional[str]]]:
+    ) -> list[tuple[TelephonyPhoneNumberModel, str | None]]:
         """Same as :meth:`list_phone_numbers_for_config` but also returns the
         inbound workflow's display name (or None) for each row, fetched via a
         single LEFT JOIN so we don't load entire workflow rows."""
@@ -59,7 +59,7 @@ class TelephonyPhoneNumberClient(BaseDBClient):
 
     async def list_active_normalized_addresses_for_config(
         self, telephony_configuration_id: int
-    ) -> List[str]:
+    ) -> list[str]:
         """Active phone numbers as canonical address strings (E.164 for PSTN,
         normalized SIP otherwise) — the shape providers want in their
         ``from_numbers`` list for caller-ID and rate-limit pool keys."""
@@ -77,13 +77,13 @@ class TelephonyPhoneNumberClient(BaseDBClient):
 
     async def get_phone_number(
         self, phone_number_id: int
-    ) -> Optional[TelephonyPhoneNumberModel]:
+    ) -> TelephonyPhoneNumberModel | None:
         async with self.async_session() as session:
             return await session.get(TelephonyPhoneNumberModel, phone_number_id)
 
     async def get_phone_number_for_config(
         self, phone_number_id: int, telephony_configuration_id: int
-    ) -> Optional[TelephonyPhoneNumberModel]:
+    ) -> TelephonyPhoneNumberModel | None:
         async with self.async_session() as session:
             result = await session.execute(
                 select(TelephonyPhoneNumberModel).where(
@@ -99,8 +99,8 @@ class TelephonyPhoneNumberClient(BaseDBClient):
         organization_id: int,
         address: str,
         provider: str,
-        country_hint: Optional[str] = None,
-    ) -> Optional[TelephonyPhoneNumberModel]:
+        country_hint: str | None = None,
+    ) -> TelephonyPhoneNumberModel | None:
         """Inbound routing primary lookup: normalize the called address and find
         the matching active row whose config is for the detected provider."""
         normalized = normalize_telephony_address(address, country_hint=country_hint)
@@ -129,9 +129,9 @@ class TelephonyPhoneNumberClient(BaseDBClient):
         account_id_field: str,
         account_id: str,
         to_number: str,
-        country_hint: Optional[str] = None,
-        organization_id: Optional[int] = None,
-    ) -> Optional[Tuple[TelephonyConfigurationModel, TelephonyPhoneNumberModel]]:
+        country_hint: str | None = None,
+        organization_id: int | None = None,
+    ) -> tuple[TelephonyConfigurationModel, TelephonyPhoneNumberModel] | None:
         """Combined primary-path lookup for inbound dispatch.
 
         One SQL roundtrip that joins ``telephony_configurations`` and
@@ -184,8 +184,8 @@ class TelephonyPhoneNumberClient(BaseDBClient):
         account_id_field: str,
         account_id: str,
         address: str,
-        country_hint: Optional[str] = None,
-    ) -> Optional[Tuple[TelephonyConfigurationModel, TelephonyPhoneNumberModel]]:
+        country_hint: str | None = None,
+    ) -> tuple[TelephonyConfigurationModel, TelephonyPhoneNumberModel] | None:
         """Inbound dispatch keys on (provider, credentials[account_id_field],
         address_normalized) — see ``find_inbound_route_by_account``. That tuple
         must be globally unique or two orgs would race for the same call.
@@ -226,12 +226,12 @@ class TelephonyPhoneNumberClient(BaseDBClient):
         organization_id: int,
         telephony_configuration_id: int,
         address: str,
-        country_code: Optional[str] = None,
-        label: Optional[str] = None,
-        inbound_workflow_id: Optional[int] = None,
+        country_code: str | None = None,
+        label: str | None = None,
+        inbound_workflow_id: int | None = None,
         is_active: bool = True,
         is_default_caller_id: bool = False,
-        extra_metadata: Optional[Dict[str, Any]] = None,
+        extra_metadata: dict[str, Any] | None = None,
     ) -> TelephonyPhoneNumberModel:
         normalized = normalize_telephony_address(address, country_hint=country_code)
 
@@ -265,13 +265,13 @@ class TelephonyPhoneNumberClient(BaseDBClient):
         self,
         phone_number_id: int,
         telephony_configuration_id: int,
-        label: Optional[str] = None,
-        inbound_workflow_id: Optional[int] = None,
-        is_active: Optional[bool] = None,
-        country_code: Optional[str] = None,
-        extra_metadata: Optional[Dict[str, Any]] = None,
+        label: str | None = None,
+        inbound_workflow_id: int | None = None,
+        is_active: bool | None = None,
+        country_code: str | None = None,
+        extra_metadata: dict[str, Any] | None = None,
         clear_inbound_workflow: bool = False,
-    ) -> Optional[TelephonyPhoneNumberModel]:
+    ) -> TelephonyPhoneNumberModel | None:
         """Partial update. ``address`` is intentionally immutable — create a new
         row instead. Set ``clear_inbound_workflow=True`` to null out the FK."""
         async with self.async_session() as session:
@@ -298,7 +298,7 @@ class TelephonyPhoneNumberClient(BaseDBClient):
 
     async def set_default_caller_id(
         self, phone_number_id: int, telephony_configuration_id: int
-    ) -> Optional[TelephonyPhoneNumberModel]:
+    ) -> TelephonyPhoneNumberModel | None:
         async with self.async_session() as session:
             row = await session.get(TelephonyPhoneNumberModel, phone_number_id)
             if not row or row.telephony_configuration_id != telephony_configuration_id:
@@ -311,7 +311,7 @@ class TelephonyPhoneNumberClient(BaseDBClient):
 
     async def get_default_caller_id(
         self, telephony_configuration_id: int
-    ) -> Optional[TelephonyPhoneNumberModel]:
+    ) -> TelephonyPhoneNumberModel | None:
         async with self.async_session() as session:
             result = await session.execute(
                 select(TelephonyPhoneNumberModel).where(

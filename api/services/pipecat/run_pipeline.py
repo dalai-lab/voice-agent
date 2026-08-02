@@ -1,8 +1,4 @@
 import asyncio
-from typing import Optional
-
-from fastapi import HTTPException
-from loguru import logger
 
 from api.db import db_client
 from api.enums import WorkflowRunMode
@@ -75,6 +71,9 @@ from api.services.workflow.dto import ReactFlowDTO
 from api.services.workflow.initial_context import merge_external_initial_context
 from api.services.workflow.pipecat_engine import PipecatEngine
 from api.services.workflow.workflow_graph import WorkflowGraph
+from fastapi import HTTPException
+from loguru import logger
+
 from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -774,8 +773,8 @@ async def _run_pipeline_impl(
     async def send_node_transition(
         node_id: str,
         node_name: str,
-        previous_node_id: Optional[str],
-        previous_node_name: Optional[str],
+        previous_node_id: str | None,
+        previous_node_name: str | None,
         allow_interrupt: bool = False,
     ) -> None:
         """Send node transition event to logs buffer and optionally via WebSocket."""

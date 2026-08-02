@@ -1,4 +1,3 @@
-from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
@@ -16,7 +15,7 @@ from api.services.mps_service_key_client import mps_service_key_client
 router = APIRouter()
 
 
-@router.get("/user/service-keys", response_model=List[ServiceKeyResponse])
+@router.get("/user/service-keys", response_model=list[ServiceKeyResponse])
 async def get_service_keys(
     include_archived: bool = False,
     user: UserModel = Depends(get_user),
@@ -79,7 +78,7 @@ async def create_service_key(
         logger.error(f"Failed to create service key: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to create service key: {str(e)}",
+            detail=f"Failed to create service key: {e!s}",
         )
 
 
@@ -118,7 +117,7 @@ async def archive_service_key(
         logger.error(f"Failed to archive service key: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to archive service key: {str(e)}",
+            detail=f"Failed to archive service key: {e!s}",
         )
 
 

@@ -7,30 +7,29 @@ Implements OpenTelemetry tracing for observability in Langfuse.
 """
 
 import json
-from typing import Any, Dict, List, Optional
-
-from loguru import logger
-from opentelemetry import trace
+from typing import Any
 
 from api.db import db_client
 from api.services.gen_ai import build_embedding_service
 from api.services.pipecat.tracing_config import ensure_tracing
+from loguru import logger
+from opentelemetry import trace
 
 
 async def retrieve_from_knowledge_base(
     query: str,
     organization_id: int,
-    document_uuids: Optional[List[str]] = None,
+    document_uuids: list[str] | None = None,
     limit: int = 3,
-    embeddings_api_key: Optional[str] = None,
-    embeddings_model: Optional[str] = None,
-    embeddings_base_url: Optional[str] = None,
-    embeddings_provider: Optional[str] = None,
-    embeddings_endpoint: Optional[str] = None,
-    embeddings_api_version: Optional[str] = None,
-    correlation_id: Optional[str] = None,
+    embeddings_api_key: str | None = None,
+    embeddings_model: str | None = None,
+    embeddings_base_url: str | None = None,
+    embeddings_provider: str | None = None,
+    embeddings_endpoint: str | None = None,
+    embeddings_api_version: str | None = None,
+    correlation_id: str | None = None,
     tracing_context=None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Retrieve relevant information from the knowledge base using vector similarity search.
 
     Uses OpenAI text-embedding-3-small for embeddings by default. This provides
@@ -216,16 +215,16 @@ async def retrieve_from_knowledge_base(
 async def _perform_retrieval(
     query: str,
     organization_id: int,
-    document_uuids: Optional[List[str]],
+    document_uuids: list[str] | None,
     limit: int,
-    embeddings_api_key: Optional[str] = None,
-    embeddings_model: Optional[str] = None,
-    embeddings_base_url: Optional[str] = None,
-    embeddings_provider: Optional[str] = None,
-    embeddings_endpoint: Optional[str] = None,
-    embeddings_api_version: Optional[str] = None,
-    correlation_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    embeddings_api_key: str | None = None,
+    embeddings_model: str | None = None,
+    embeddings_base_url: str | None = None,
+    embeddings_provider: str | None = None,
+    embeddings_endpoint: str | None = None,
+    embeddings_api_version: str | None = None,
+    correlation_id: str | None = None,
+) -> dict[str, Any]:
     """Internal function to perform the actual retrieval operation.
 
     Separated from tracing logic for cleaner code organization.
@@ -318,8 +317,8 @@ async def _perform_retrieval(
 
 
 def get_knowledge_base_tool(
-    document_uuids: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    document_uuids: list[str] | None = None,
+) -> dict[str, Any]:
     """Get knowledge base retrieval tool definition for LLM function calling.
 
     Args:

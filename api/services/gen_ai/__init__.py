@@ -20,6 +20,6 @@ __all__ = [
     "EmbeddingAPIKeyNotConfiguredError",
     "OpenAIEmbeddingService",
     "build_embedding_service",
-    "resolve_embedding_correlation_id",
     "parse_llm_json",
+    "resolve_embedding_correlation_id",
 ]

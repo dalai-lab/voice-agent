@@ -6,11 +6,9 @@ and the RAG tool, and resolves the MPS correlation id the same way the voice
 path does.
 """
 
-from typing import Optional
-
-from loguru import logger
 
 from api.db.db_client import DBClient
+from loguru import logger
 
 from .azure_openai_service import AzureOpenAIEmbeddingService
 from .base import BaseEmbeddingService
@@ -23,8 +21,8 @@ DEFAULT_AZURE_API_VERSION = "2024-02-15-preview"
 
 async def resolve_embedding_correlation_id(
     *,
-    service_key: Optional[str],
-) -> Optional[str]:
+    service_key: str | None,
+) -> str | None:
     """Mint an MPS correlation id for a managed embedding call made outside a run.
 
     Matches the voice path's ``_authorize_oss_managed_v2_correlation``: the
@@ -56,13 +54,13 @@ async def resolve_embedding_correlation_id(
 async def build_embedding_service(
     *,
     db_client: DBClient,
-    provider: Optional[str],
-    api_key: Optional[str],
-    model: Optional[str],
-    base_url: Optional[str] = None,
-    endpoint: Optional[str] = None,
-    api_version: Optional[str] = None,
-    correlation_id: Optional[str] = None,
+    provider: str | None,
+    api_key: str | None,
+    model: str | None,
+    base_url: str | None = None,
+    endpoint: str | None = None,
+    api_version: str | None = None,
+    correlation_id: str | None = None,
     resolve_correlation: bool = False,
 ) -> BaseEmbeddingService:
     """Construct the right embedding service for a provider/config.

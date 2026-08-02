@@ -3,7 +3,7 @@
 This module contains the business logic for Asterisk ARI call operations.
 """
 
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 from pipecat.serializers.call_strategies import HangupStrategy, TransferStrategy
@@ -20,7 +20,7 @@ class ARIBridgeSwapStrategy(TransferStrategy):
     transfer completion events.
     """
 
-    async def execute_transfer(self, context: Dict[str, Any]) -> bool:
+    async def execute_transfer(self, context: dict[str, Any]) -> bool:
         """Execute bridge swap transfer for Asterisk ARI."""
         try:
             import aiohttp
@@ -97,7 +97,7 @@ class ARIBridgeSwapStrategy(TransferStrategy):
             destination_channel_id = transfer_context.call_sid
             if not destination_channel_id:
                 logger.error(
-                    f"[ARI Transfer] No destination channel in transfer context"
+                    "[ARI Transfer] No destination channel in transfer context"
                 )
                 return False
 
@@ -206,7 +206,7 @@ class ARIHangupStrategy(HangupStrategy):
     def __init__(self, external_pbx_adapter: "ExternalPBXAdapter | None" = None):
         self._external_pbx_adapter = external_pbx_adapter
 
-    async def execute_hangup(self, context: Dict[str, Any]) -> bool:
+    async def execute_hangup(self, context: dict[str, Any]) -> bool:
         """Hang up the Asterisk channel via ARI REST API."""
         try:
             import aiohttp
@@ -264,7 +264,6 @@ class ARIHangupStrategy(HangupStrategy):
         redis = None
         try:
             import redis.asyncio as aioredis
-
             from api.constants import REDIS_URL
             from api.db import db_client
 

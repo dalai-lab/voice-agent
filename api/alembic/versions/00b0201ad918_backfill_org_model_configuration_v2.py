@@ -7,16 +7,17 @@ Create Date: 2026-07-09 12:00:00.000000
 """
 
 import json
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "00b0201ad918"
-down_revision: Union[str, None] = "c52dc3cccfb0"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "c52dc3cccfb0"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # Organizations created before MODEL_CONFIGURATION_V2 only have per-user legacy
 # MODEL_CONFIGURATION rows, and the application no longer falls back to those.

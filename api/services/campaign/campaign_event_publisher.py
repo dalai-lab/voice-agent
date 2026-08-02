@@ -3,11 +3,8 @@
 Handles publishing of campaign events to Redis pub/sub channels.
 """
 
-from typing import Dict, Optional
 
 import redis.asyncio as aioredis
-from loguru import logger
-
 from api.constants import REDIS_URL
 from api.enums import RedisChannel
 from api.services.campaign.campaign_event_protocol import (
@@ -18,6 +15,7 @@ from api.services.campaign.campaign_event_protocol import (
     RetryNeededEvent,
     SyncCompletedEvent,
 )
+from loguru import logger
 
 
 class CampaignEventPublisher:
@@ -32,7 +30,7 @@ class CampaignEventPublisher:
         processed_count: int,
         failed_count: int = 0,
         batch_size: int = 0,
-        metadata: Optional[Dict] = None,
+        metadata: dict | None = None,
     ):
         """Publish batch completed event."""
         event = BatchCompletedEvent(
@@ -50,7 +48,7 @@ class CampaignEventPublisher:
         campaign_id: int,
         error: str,
         processed_count: int = 0,
-        metadata: Optional[Dict] = None,
+        metadata: dict | None = None,
     ):
         """Publish batch failed event."""
         event = BatchFailedEvent(
@@ -68,7 +66,7 @@ class CampaignEventPublisher:
         total_rows: int,
         source_type: str = "",
         source_id: str = "",
-        metadata: Optional[Dict] = None,
+        metadata: dict | None = None,
     ):
         """Publish sync completed event."""
         event = SyncCompletedEvent(
@@ -85,9 +83,9 @@ class CampaignEventPublisher:
         self,
         workflow_run_id: int,
         reason: str,
-        campaign_id: Optional[int] = None,
-        queued_run_id: Optional[int] = None,
-        metadata: Optional[Dict] = None,
+        campaign_id: int | None = None,
+        queued_run_id: int | None = None,
+        metadata: dict | None = None,
     ):
         """Publish retry needed event."""
         event = RetryNeededEvent(
@@ -111,7 +109,7 @@ class CampaignEventPublisher:
         total_rows: int,
         processed_rows: int,
         failed_rows: int,
-        duration_seconds: Optional[float] = None,
+        duration_seconds: float | None = None,
     ):
         """Publish campaign completed event."""
         event = CampaignCompletedEvent(

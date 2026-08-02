@@ -7,7 +7,6 @@ These tests verify (regression for issue #328):
 3. Removing a transfer context also clears its call-sid index entry.
 """
 
-from typing import Dict, List
 
 import pytest
 
@@ -20,7 +19,7 @@ class _FakeRedis:
     """
 
     def __init__(self) -> None:
-        self._store: Dict[str, str] = {}
+        self._store: dict[str, str] = {}
         self.keys_call_count = 0
 
     async def setex(self, key: str, ttl: int, value: str) -> None:
@@ -41,7 +40,7 @@ class _FakeRedis:
         for key in keys:
             self._store.pop(key, None)
 
-    async def keys(self, pattern: str) -> List[str]:
+    async def keys(self, pattern: str) -> list[str]:
         self.keys_call_count += 1
         if pattern.endswith("*"):
             prefix = pattern[:-1]

@@ -61,8 +61,8 @@ def all_specs() -> list[NodeSpec]:
 
 
 __all__ = [
-    "SPEC_VERSION",
     "REGISTRY",
+    "SPEC_VERSION",
     "DisplayOptions",
     "GraphConstraints",
     "NodeCategory",

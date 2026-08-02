@@ -6,7 +6,7 @@ Defines message formats and helpers for campaign event publishing and handling.
 import json
 from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class CampaignEventType(str, Enum):
@@ -53,7 +53,7 @@ class BaseCampaignEvent:
 
     type: str
     campaign_id: int = 0
-    timestamp: Optional[str] = None
+    timestamp: str | None = None
 
     def __post_init__(self):
         if self.timestamp is None:
@@ -77,7 +77,7 @@ class BatchCompletedEvent(BaseCampaignEvent):
     processed_count: int = 0
     failed_count: int = 0
     batch_size: int = 0
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -92,7 +92,7 @@ class BatchFailedEvent(BaseCampaignEvent):
     type: str = CampaignEventType.BATCH_FAILED
     error: str = ""
     processed_count: int = 0
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -117,7 +117,7 @@ class SyncCompletedEvent(BaseCampaignEvent):
     total_rows: int = 0
     source_type: str = ""
     source_id: str = ""
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -141,7 +141,7 @@ class CampaignStartedEvent(BaseCampaignEvent):
 
     type: str = CampaignEventType.CAMPAIGN_STARTED
     workflow_id: int = 0
-    total_rows: Optional[int] = None
+    total_rows: int | None = None
 
 
 @dataclass
@@ -170,7 +170,7 @@ class CampaignCompletedEvent(BaseCampaignEvent):
     total_rows: int = 0
     processed_rows: int = 0
     failed_rows: int = 0
-    duration_seconds: Optional[float] = None
+    duration_seconds: float | None = None
 
 
 @dataclass
@@ -191,7 +191,7 @@ class RetryNeededEvent(BaseCampaignEvent):
     workflow_run_id: int = 0
     queued_run_id: int = 0
     reason: str = ""  # RetryReason value
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self):
         super().__post_init__()

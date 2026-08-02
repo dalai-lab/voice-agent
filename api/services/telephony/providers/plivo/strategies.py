@@ -1,13 +1,12 @@
 """Plivo call operations invoked when the media pipeline shuts down."""
 
-from typing import Any, Dict
+from typing import Any
 
 import aiohttp
-from loguru import logger
-from pipecat.serializers.call_strategies import HangupStrategy, TransferStrategy
-
 from api.services.telephony.call_transfer_manager import get_call_transfer_manager
 from api.utils.common import get_backend_endpoints
+from loguru import logger
+from pipecat.serializers.call_strategies import HangupStrategy, TransferStrategy
 
 
 class PlivoConferenceStrategy(TransferStrategy):
@@ -16,7 +15,7 @@ class PlivoConferenceStrategy(TransferStrategy):
     https://docs.plivo.com/docs/voice/api/calls#transfer-a-call
     """
 
-    async def execute_transfer(self, context: Dict[str, Any]) -> bool:
+    async def execute_transfer(self, context: dict[str, Any]) -> bool:
         original_call_uuid = context["call_id"]
         auth_id = context["auth_id"]
         auth_token = context["auth_token"]
@@ -49,20 +48,19 @@ class PlivoConferenceStrategy(TransferStrategy):
         auth = aiohttp.BasicAuth(auth_id, auth_token)
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    call_endpoint, json=payload, auth=auth
-                ) as response:
-                    body = await response.text()
-                    if response.status not in (200, 201, 202):
-                        logger.error(
-                            f"[Plivo Transfer] Failed to redirect caller "
-                            f"{original_call_uuid}: status={response.status} body={body}"
-                        )
-                        await manager.remove_transfer_context(
-                            transfer_context.transfer_id
-                        )
-                        return False
+            async with aiohttp.ClientSession() as session, session.post(
+                call_endpoint, json=payload, auth=auth
+            ) as response:
+                body = await response.text()
+                if response.status not in (200, 201, 202):
+                    logger.error(
+                        f"[Plivo Transfer] Failed to redirect caller "
+                        f"{original_call_uuid}: status={response.status} body={body}"
+                    )
+                    await manager.remove_transfer_context(
+                        transfer_context.transfer_id
+                    )
+                    return False
 
             logger.info(
                 f"[Plivo Transfer] Redirected caller {original_call_uuid} "
@@ -81,7 +79,7 @@ class PlivoHangupStrategy(HangupStrategy):
     https://docs.plivo.com/docs/voice/api/calls#hang-up-a-call
     """
 
-    async def execute_hangup(self, context: Dict[str, Any]) -> bool:
+    async def execute_hangup(self, context: dict[str, Any]) -> bool:
         call_uuid = context["call_id"]
         auth_id = context["auth_id"]
         auth_token = context["auth_token"]

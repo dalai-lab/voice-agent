@@ -1,7 +1,7 @@
 """Time tools for LLM function calling - timezone and time conversion utilities."""
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
@@ -23,7 +23,7 @@ class TimeConversionResult(BaseModel):
     time_difference: str
 
 
-def get_local_timezone(local_tz_override: Optional[str] = None) -> str:
+def get_local_timezone(local_tz_override: str | None = None) -> str:
     """
     Get the local timezone name using system timezone.
     Falls back to UTC if cannot determine.
@@ -48,7 +48,7 @@ def get_local_timezone(local_tz_override: Optional[str] = None) -> str:
         return "UTC"
 
 
-def get_current_time(timezone: str) -> Dict[str, Any]:
+def get_current_time(timezone: str) -> dict[str, Any]:
     """
     Get current time in specified timezone.
 
@@ -69,12 +69,12 @@ def get_current_time(timezone: str) -> Dict[str, Any]:
         )
         return result.model_dump()
     except Exception as e:
-        raise ValueError(f"Invalid timezone '{timezone}': {str(e)}")
+        raise ValueError(f"Invalid timezone '{timezone}': {e!s}")
 
 
 def convert_time(
     source_timezone: str, time: str, target_timezone: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Convert time between timezones.
 
@@ -90,7 +90,7 @@ def convert_time(
         source_tz = ZoneInfo(source_timezone)
         target_tz = ZoneInfo(target_timezone)
     except Exception as e:
-        raise ValueError(f"Invalid timezone: {str(e)}")
+        raise ValueError(f"Invalid timezone: {e!s}")
 
     # Parse time
     try:
@@ -146,7 +146,7 @@ def convert_time(
 
 
 # Tool definitions for LLM function calling
-def get_time_tools(local_tz_override: Optional[str] = None) -> list[Dict[str, Any]]:
+def get_time_tools(local_tz_override: str | None = None) -> list[dict[str, Any]]:
     """Get tool definitions with dynamic local timezone."""
     local_tz = local_tz_override or get_local_timezone()
 

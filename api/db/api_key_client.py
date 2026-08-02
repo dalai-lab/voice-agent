@@ -1,4 +1,4 @@
-from typing import List, Optional
+from datetime import UTC
 
 from sqlalchemy import and_
 from sqlalchemy.future import select
@@ -10,7 +10,7 @@ from api.utils.api_key import generate_api_key, hash_api_key
 
 class APIKeyClient(BaseDBClient):
     async def create_api_key(
-        self, organization_id: int, name: str, created_by: Optional[int] = None
+        self, organization_id: int, name: str, created_by: int | None = None
     ) -> tuple[APIKeyModel, str]:
         """Create a new API key for an organization.
 
@@ -37,7 +37,7 @@ class APIKeyClient(BaseDBClient):
 
     async def get_api_keys_by_organization(
         self, organization_id: int, include_archived: bool = False
-    ) -> List[APIKeyModel]:
+    ) -> list[APIKeyModel]:
         """Get all API keys for an organization."""
         async with self.async_session() as session:
             query = select(APIKeyModel).where(
@@ -50,7 +50,7 @@ class APIKeyClient(BaseDBClient):
             result = await session.execute(query)
             return result.scalars().all()
 
-    async def get_api_key_by_hash(self, key_hash: str) -> Optional[APIKeyModel]:
+    async def get_api_key_by_hash(self, key_hash: str) -> APIKeyModel | None:
         """Get an API key by its hash."""
         async with self.async_session() as session:
             result = await session.execute(
@@ -64,20 +64,20 @@ class APIKeyClient(BaseDBClient):
             )
             return result.scalars().first()
 
-    async def validate_api_key(self, raw_api_key: str) -> Optional[APIKeyModel]:
+    async def validate_api_key(self, raw_api_key: str) -> APIKeyModel | None:
         """Validate an API key and return the associated model if valid."""
         key_hash = hash_api_key(raw_api_key)
         api_key = await self.get_api_key_by_hash(key_hash)
 
         if api_key:
             # Update last_used_at
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             async with self.async_session() as session:
                 await session.execute(
                     APIKeyModel.__table__.update()
                     .where(APIKeyModel.id == api_key.id)
-                    .values(last_used_at=datetime.now(timezone.utc))
+                    .values(last_used_at=datetime.now(UTC))
                 )
                 await session.commit()
 
@@ -85,13 +85,13 @@ class APIKeyClient(BaseDBClient):
 
     async def archive_api_key(self, api_key_id: int) -> bool:
         """Archive an API key (soft delete)."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         async with self.async_session() as session:
             result = await session.execute(
                 APIKeyModel.__table__.update()
                 .where(APIKeyModel.id == api_key_id)
-                .values(is_active=False, archived_at=datetime.now(timezone.utc))
+                .values(is_active=False, archived_at=datetime.now(UTC))
             )
             await session.commit()
             return result.rowcount > 0

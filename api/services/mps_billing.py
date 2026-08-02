@@ -1,4 +1,3 @@
-from typing import Optional
 
 from api.constants import DEPLOYMENT_MODE
 from api.services.mps_service_key_client import mps_service_key_client
@@ -7,8 +6,8 @@ from api.services.mps_service_key_client import mps_service_key_client
 async def ensure_hosted_mps_billing_account_v2(
     organization_id: int,
     *,
-    created_by: Optional[str] = None,
-) -> Optional[dict]:
+    created_by: str | None = None,
+) -> dict | None:
     """Ensure hosted orgs have an MPS billing v2 account.
 
     OSS deployments use legacy per-key quota accounting and do not create MPS

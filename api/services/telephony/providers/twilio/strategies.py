@@ -4,7 +4,7 @@ This module contains the business logic for Twilio call operations,
 maintaining proper separation of concerns between protocol handling and business logic.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import aiohttp
 from loguru import logger
@@ -18,7 +18,7 @@ class TwilioConferenceStrategy(TransferStrategy):
     with cleanup of transfer contexts upon successful completion.
     """
 
-    async def execute_transfer(self, context: Dict[str, Any]) -> bool:
+    async def execute_transfer(self, context: dict[str, Any]) -> bool:
         """Execute conference transfer for Twilio call."""
         try:
             account_sid = context["account_sid"]
@@ -133,7 +133,7 @@ class TwilioConferenceStrategy(TransferStrategy):
 class TwilioHangupStrategy(HangupStrategy):
     """Implements hangup for Twilio calls."""
 
-    async def execute_hangup(self, context: Dict[str, Any]) -> bool:
+    async def execute_hangup(self, context: dict[str, Any]) -> bool:
         """Hang up the Twilio call via REST API."""
         try:
             account_sid = context["account_sid"]
@@ -154,23 +154,22 @@ class TwilioHangupStrategy(HangupStrategy):
             endpoint = f"https://api.{edge_prefix}{region_prefix}twilio.com/2010-04-01/Accounts/{account_sid}/Calls/{call_sid}.json"
             auth = aiohttp.BasicAuth(account_sid, auth_token)
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    endpoint, auth=auth, data={"Status": "completed"}
-                ) as response:
-                    if response.status == 200:
-                        logger.info(f"Successfully terminated Twilio call {call_sid}")
-                        return True
-                    elif response.status == 404:
-                        logger.debug(f"Twilio call {call_sid} was already terminated")
-                        return True
-                    else:
-                        response_text = await response.text()
-                        logger.error(
-                            f"Failed to terminate Twilio call {call_sid}: "
-                            f"Status {response.status}, Response: {response_text}"
-                        )
-                        return False
+            async with aiohttp.ClientSession() as session, session.post(
+                endpoint, auth=auth, data={"Status": "completed"}
+            ) as response:
+                if response.status == 200:
+                    logger.info(f"Successfully terminated Twilio call {call_sid}")
+                    return True
+                elif response.status == 404:
+                    logger.debug(f"Twilio call {call_sid} was already terminated")
+                    return True
+                else:
+                    response_text = await response.text()
+                    logger.error(
+                        f"Failed to terminate Twilio call {call_sid}: "
+                        f"Status {response.status}, Response: {response_text}"
+                    )
+                    return False
 
         except Exception as e:
             logger.exception(f"Failed to hang up Twilio call: {e}")

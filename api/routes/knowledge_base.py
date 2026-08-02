@@ -1,7 +1,7 @@
 """API routes for knowledge base operations."""
 
 import uuid
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
@@ -199,7 +199,7 @@ async def process_document(
 )
 async def list_documents(
     status: Annotated[
-        Optional[str],
+        str | None,
         Query(description="Filter by processing status"),
     ] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 100,

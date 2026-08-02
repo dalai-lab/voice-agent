@@ -70,7 +70,7 @@ def _count_transcript_tts_characters(
 
 
 def compute_call_cost_cents(
-    tuner_data: "TunerNodeData",
+    tuner_data: TunerNodeData,
     usage_info: dict[str, Any] | None,
     transcript_segments: list[dict[str, Any]] | None = None,
 ) -> float | None:

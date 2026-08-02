@@ -1,4 +1,3 @@
-from typing import List
 
 from pipecat.utils.enums import RealtimeFeedbackType
 
@@ -21,7 +20,7 @@ def _format_timestamp_range(
 
 
 def generate_transcript_text(
-    events: List[dict], *, include_end_timestamps: bool = False
+    events: list[dict], *, include_end_timestamps: bool = False
 ) -> str:
     """Generate transcript text from realtime feedback events.
 
@@ -30,7 +29,7 @@ def generate_transcript_text(
     include_end_timestamps is True, formats as
     '[start_timestamp -> end_timestamp] user/assistant: text\\n'.
     """
-    lines: List[str] = []
+    lines: list[str] = []
     for event in events:
         event_type = event.get("type")
         payload = event.get("payload", {})

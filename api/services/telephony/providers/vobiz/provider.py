@@ -6,13 +6,10 @@ import base64
 import hashlib
 import hmac
 import json
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlparse, urlunparse
 
 import aiohttp
-from fastapi import HTTPException
-from loguru import logger
-
 from api.enums import TelephonyCallStatus, WorkflowRunMode
 from api.services.telephony import ws_auth
 from api.services.telephony.base import (
@@ -24,6 +21,8 @@ from api.services.telephony.base import (
 )
 from api.utils.common import get_backend_endpoints
 from api.utils.telephony_address import normalize_telephony_address
+from fastapi import HTTPException
+from loguru import logger
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -38,7 +37,7 @@ class VobizProvider(TelephonyProvider):
     PROVIDER_NAME = WorkflowRunMode.VOBIZ.value
     WEBHOOK_ENDPOINT = "vobiz-xml"
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """
         Initialize VobizProvider with configuration.
 
@@ -66,8 +65,8 @@ class VobizProvider(TelephonyProvider):
         self,
         to_number: str,
         webhook_url: str,
-        workflow_run_id: Optional[int] = None,
-        from_number: Optional[str] = None,
+        workflow_run_id: int | None = None,
+        from_number: str | None = None,
         **kwargs: Any,
     ) -> CallInitiationResult:
         """
@@ -164,7 +163,7 @@ class VobizProvider(TelephonyProvider):
                     raw_response=response_data,
                 )
 
-    async def get_call_status(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_status(self, call_id: str) -> dict[str, Any]:
         """
         Get the current status of a Vobiz call (CDR).
 
@@ -188,7 +187,7 @@ class VobizProvider(TelephonyProvider):
 
                 return await response.json()
 
-    async def get_available_phone_numbers(self) -> List[str]:
+    async def get_available_phone_numbers(self) -> list[str]:
         """
         Get list of available Vobiz phone numbers.
         """
@@ -203,7 +202,7 @@ class VobizProvider(TelephonyProvider):
     async def verify_webhook_signature(
         self,
         url: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         signature: str,
         nonce: str = None,
         body: str = "",
@@ -276,7 +275,7 @@ class VobizProvider(TelephonyProvider):
 </Response>"""
         return vobiz_xml
 
-    async def get_call_cost(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_cost(self, call_id: str) -> dict[str, Any]:
         """
         Get cost information for a completed Vobiz call.
 
@@ -330,7 +329,7 @@ class VobizProvider(TelephonyProvider):
             logger.error(f"Exception fetching Vobiz call cost: {e}")
             return {"cost_usd": 0.0, "duration": 0, "status": "error", "error": str(e)}
 
-    def parse_status_callback(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_status_callback(self, data: dict[str, Any]) -> dict[str, Any]:
         """
         Parse Vobiz status callback data into generic format.
 
@@ -414,7 +413,7 @@ class VobizProvider(TelephonyProvider):
 
     @classmethod
     def can_handle_webhook(
-        cls, webhook_data: Dict[str, Any], headers: Dict[str, str]
+        cls, webhook_data: dict[str, Any], headers: dict[str, str]
     ) -> bool:
         """
         Determine if this provider can handle the incoming webhook.
@@ -423,7 +422,7 @@ class VobizProvider(TelephonyProvider):
         return "vobiz" in headers.get("user-agent", "").lower()
 
     @staticmethod
-    def parse_inbound_webhook(webhook_data: Dict[str, Any]) -> NormalizedInboundData:
+    def parse_inbound_webhook(webhook_data: dict[str, Any]) -> NormalizedInboundData:
         """
         Parse Vobiz-specific inbound webhook data into normalized format.
         """
@@ -467,8 +466,8 @@ class VobizProvider(TelephonyProvider):
     async def verify_inbound_signature(
         self,
         url: str,
-        webhook_data: Dict[str, Any],
-        headers: Dict[str, str],
+        webhook_data: dict[str, Any],
+        headers: dict[str, str],
         body: str = "",
     ) -> bool:
         """
@@ -504,7 +503,7 @@ class VobizProvider(TelephonyProvider):
         )
 
     async def configure_inbound(
-        self, address: str, webhook_url: Optional[str]
+        self, address: str, webhook_url: str | None
     ) -> ProviderSyncResult:
         """Attach or detach a Vobiz number from the configured Application.
 
@@ -773,9 +772,8 @@ class VobizProvider(TelephonyProvider):
         """
         Generate Vobiz-specific error response for validation failures with organizational debugging info.
         """
-        from fastapi import Response
-
         from api.errors.telephony_errors import TELEPHONY_ERROR_MESSAGES, TelephonyError
+        from fastapi import Response
 
         message = TELEPHONY_ERROR_MESSAGES.get(
             error_type, TELEPHONY_ERROR_MESSAGES[TelephonyError.GENERAL_AUTH_FAILED]
@@ -798,7 +796,7 @@ class VobizProvider(TelephonyProvider):
         conference_name: str,
         timeout: int = 30,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Vobiz provider does not support call transfers.
 

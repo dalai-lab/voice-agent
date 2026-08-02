@@ -4,7 +4,8 @@ Extracts prompt and function composition logic from PipecatEngine into
 reusable functions. Defines recording response mode markers and instructions.
 """
 
-from typing import TYPE_CHECKING, Callable, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from api.services.workflow.pipecat_engine_custom_tools import CustomToolManager

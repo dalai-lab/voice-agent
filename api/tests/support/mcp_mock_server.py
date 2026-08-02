@@ -9,7 +9,7 @@ import asyncio
 import contextlib
 import socket
 import threading
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import httpx
 import uvicorn

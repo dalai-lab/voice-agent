@@ -11,18 +11,18 @@ Revises: cdcf9f65913b, f2e1d0c9b8a7
 Create Date: 2026-04-25 21:30:00.000000
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "4d8e9b2a3c5f"
-down_revision: Union[str, Sequence[str], None] = (
+down_revision: str | Sequence[str] | None = (
     "cdcf9f65913b",
     "f2e1d0c9b8a7",
 )
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 # Mode values that existed when the enum was dropped, used to recreate the

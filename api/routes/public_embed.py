@@ -6,7 +6,6 @@ They handle CORS, domain validation, and session management for embedded workflo
 
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Optional
 
 from fastapi import (
     APIRouter,
@@ -65,7 +64,7 @@ class InitEmbedRequest(BaseModel):
     """Request model for initializing an embed session"""
 
     token: str
-    context_variables: Optional[dict] = None
+    context_variables: dict | None = None
 
 
 class InitEmbedResponse(BaseModel):

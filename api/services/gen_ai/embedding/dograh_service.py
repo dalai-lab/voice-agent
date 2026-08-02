@@ -12,7 +12,7 @@ OpenAI-compatible client; only the managed path carries MPS-specific metadata,
 so BYOK OpenAI/Azure requests never ship MPS fields to the real provider.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from api.db.db_client import DBClient
 
@@ -31,10 +31,10 @@ class DograhEmbeddingService(OpenAIEmbeddingService):
     def __init__(
         self,
         db_client: DBClient,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model_id: str = DEFAULT_MODEL_ID,
-        base_url: Optional[str] = None,
-        correlation_id: Optional[str] = None,
+        base_url: str | None = None,
+        correlation_id: str | None = None,
     ):
         """Initialize the managed embedding service.
 
@@ -55,7 +55,7 @@ class DograhEmbeddingService(OpenAIEmbeddingService):
         )
         self._correlation_id = correlation_id
 
-    def _request_kwargs(self) -> Dict[str, Any]:
+    def _request_kwargs(self) -> dict[str, Any]:
         """Forward the MPS billing v2 protocol when a correlation id is present."""
         if not self._correlation_id:
             return {}

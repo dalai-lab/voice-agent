@@ -4,9 +4,6 @@ import uuid
 from typing import Any, Dict
 
 import aiohttp
-from fastapi import HTTPException
-from loguru import logger
-
 from api.services.telephony.registry import (
     ProviderSpec,
     ProviderUIField,
@@ -14,6 +11,8 @@ from api.services.telephony.registry import (
     register,
 )
 from api.utils.common import get_backend_endpoints
+from fastapi import HTTPException
+from loguru import logger
 
 from .config import TelnyxConfigurationRequest, TelnyxConfigurationResponse
 from .provider import TelnyxProvider
@@ -22,7 +21,7 @@ from .transport import create_transport
 TELNYX_API_BASE_URL = "https://api.telnyx.com/v2"
 
 
-def _config_loader(value: Dict[str, Any]) -> Dict[str, Any]:
+def _config_loader(value: dict[str, Any]) -> dict[str, Any]:
     return {
         "provider": "telnyx",
         "api_key": value.get("api_key"),
@@ -32,7 +31,7 @@ def _config_loader(value: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-async def _ensure_connection_id(credentials: Dict[str, Any]) -> Dict[str, Any]:
+async def _ensure_connection_id(credentials: dict[str, Any]) -> dict[str, Any]:
     """Auto-create a Telnyx Call Control Application if one wasn't supplied.
 
     The application is created with our inbound dispatcher URL pre-set on

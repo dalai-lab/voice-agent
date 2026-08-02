@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -23,12 +23,12 @@ class WorkflowRunResponseSchema(BaseModel):
     user_recording_public_url: str | None = None
     bot_recording_public_url: str | None = None
     public_access_token: str | None = None
-    cost_info: Dict[str, Any] | None
-    usage_info: Dict[str, Any] | None = None
+    cost_info: dict[str, Any] | None
+    usage_info: dict[str, Any] | None = None
     definition_id: int | None  # This is for backward compatibility
     initial_context: dict | None = None
     gathered_context: dict | None = None
     call_type: CallType
-    logs: Dict[str, Any] | None = None
-    annotations: Dict[str, Any] | None = None
-    extracted_data: Dict[str, Any] | None = None
+    logs: dict[str, Any] | None = None
+    annotations: dict[str, Any] | None = None
+    extracted_data: dict[str, Any] | None = None

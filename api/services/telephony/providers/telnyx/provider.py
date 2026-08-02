@@ -8,7 +8,7 @@ import base64
 import binascii
 import json
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 import nacl.exceptions
@@ -48,7 +48,7 @@ def normalize_event_type(event_type: str) -> str:
     return (event_type or "").replace("_", ".")
 
 
-def _get_header(headers: Dict[str, str], name: str) -> str:
+def _get_header(headers: dict[str, str], name: str) -> str:
     for key, value in headers.items():
         if key.lower() == name:
             return value
@@ -66,7 +66,7 @@ class TelnyxProvider(TelephonyProvider):
 
     TELNYX_API_BASE = "https://api.telnyx.com/v2"
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.api_key = config.get("api_key")
         self.connection_id = config.get("connection_id")
         self.webhook_public_key = config.get("webhook_public_key")
@@ -76,7 +76,7 @@ class TelnyxProvider(TelephonyProvider):
         if isinstance(self.from_numbers, str):
             self.from_numbers = [self.from_numbers]
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         return {
             "Content-Type": "application/json",
             "Accept": "application/json",
@@ -87,8 +87,8 @@ class TelnyxProvider(TelephonyProvider):
         self,
         to_number: str,
         webhook_url: str,
-        workflow_run_id: Optional[int] = None,
-        from_number: Optional[str] = None,
+        workflow_run_id: int | None = None,
+        from_number: str | None = None,
         **kwargs: Any,
     ) -> CallInitiationResult:
         """Initiate an outbound call via Telnyx Call Control API."""
@@ -137,42 +137,41 @@ class TelnyxProvider(TelephonyProvider):
 
         endpoint = f"{self.TELNYX_API_BASE}/calls"
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                endpoint, json=payload, headers=self._headers()
-            ) as response:
-                if response.status != 200:
-                    error_data = await response.json()
-                    logger.error(f"Telnyx API error: {error_data}")
-                    raise HTTPException(
-                        status_code=response.status, detail=json.dumps(error_data)
-                    )
-
-                response_data = await response.json()
-                data = response_data.get("data", {})
-                call_control_id = data.get("call_control_id", "")
-                call_leg_id = data.get("call_leg_id", "")
-                call_session_id = data.get("call_session_id", "")
-
-                logger.info(
-                    f"Telnyx call initiated: call_control_id={call_control_id}, "
-                    f"call_leg_id={call_leg_id}, call_session_id={call_session_id}"
+        async with aiohttp.ClientSession() as session, session.post(
+            endpoint, json=payload, headers=self._headers()
+        ) as response:
+            if response.status != 200:
+                error_data = await response.json()
+                logger.error(f"Telnyx API error: {error_data}")
+                raise HTTPException(
+                    status_code=response.status, detail=json.dumps(error_data)
                 )
 
-                return CallInitiationResult(
-                    call_id=call_control_id,
-                    status="initiated",
-                    caller_number=from_number,
-                    provider_metadata={
-                        "call_id": call_control_id,
-                        "call_control_id": call_control_id,
-                        "call_leg_id": call_leg_id,
-                        "call_session_id": call_session_id,
-                    },
-                    raw_response=response_data,
-                )
+            response_data = await response.json()
+            data = response_data.get("data", {})
+            call_control_id = data.get("call_control_id", "")
+            call_leg_id = data.get("call_leg_id", "")
+            call_session_id = data.get("call_session_id", "")
 
-    async def get_call_status(self, call_id: str) -> Dict[str, Any]:
+            logger.info(
+                f"Telnyx call initiated: call_control_id={call_control_id}, "
+                f"call_leg_id={call_leg_id}, call_session_id={call_session_id}"
+            )
+
+            return CallInitiationResult(
+                call_id=call_control_id,
+                status="initiated",
+                caller_number=from_number,
+                provider_metadata={
+                    "call_id": call_control_id,
+                    "call_control_id": call_control_id,
+                    "call_leg_id": call_leg_id,
+                    "call_session_id": call_session_id,
+                },
+                raw_response=response_data,
+            )
+
+    async def get_call_status(self, call_id: str) -> dict[str, Any]:
         """Get the current status of a Telnyx call."""
         endpoint = f"{self.TELNYX_API_BASE}/calls/{call_id}"
 
@@ -183,14 +182,14 @@ class TelnyxProvider(TelephonyProvider):
                     raise Exception(f"Failed to get call status: {error_data}")
                 return await response.json()
 
-    async def get_available_phone_numbers(self) -> List[str]:
+    async def get_available_phone_numbers(self) -> list[str]:
         return self.from_numbers
 
     def validate_config(self) -> bool:
         return bool(self.api_key and self.connection_id and self.from_numbers)
 
     async def verify_webhook_signature(
-        self, url: str, params: Dict[str, Any], signature: str
+        self, url: str, params: dict[str, Any], signature: str
     ) -> bool:
         """Verify a Telnyx Ed25519 webhook signature.
 
@@ -264,7 +263,7 @@ class TelnyxProvider(TelephonyProvider):
 
         try:
             verify_key = nacl.signing.VerifyKey(public_key_bytes)
-            signed_payload = f"{timestamp}|{raw_body}".encode("utf-8")
+            signed_payload = f"{timestamp}|{raw_body}".encode()
             verify_key.verify(signed_payload, signature_bytes)
             return True
         except nacl.exceptions.BadSignatureError:
@@ -276,7 +275,7 @@ class TelnyxProvider(TelephonyProvider):
         """Not used for Telnyx — streaming is inline with the dial request."""
         return ""
 
-    async def get_call_cost(self, call_id: str) -> Dict[str, Any]:
+    async def get_call_cost(self, call_id: str) -> dict[str, Any]:
         """Get cost information for a Telnyx call.
 
         Telnyx doesn't provide per-call cost via the Call Control API.
@@ -289,7 +288,7 @@ class TelnyxProvider(TelephonyProvider):
             "raw_response": {},
         }
 
-    def parse_status_callback(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_status_callback(self, data: dict[str, Any]) -> dict[str, Any]:
         """Parse Telnyx webhook event data into generic format."""
         event_data = data.get("data", data)
         event_type = normalize_event_type(event_data.get("event_type", ""))
@@ -310,7 +309,7 @@ class TelnyxProvider(TelephonyProvider):
 
     @staticmethod
     def _resolve_status(
-        event_type: str, payload: Dict[str, Any]
+        event_type: str, payload: dict[str, Any]
     ) -> TelephonyCallStatus | str:
         """Map a Telnyx event type (and hangup cause) to a normalized status."""
         EVENT_STATUS = {
@@ -461,27 +460,26 @@ class TelnyxProvider(TelephonyProvider):
             f"Answering Telnyx inbound call {call_control_id} with stream_url={stream_url}"
         )
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                endpoint, json=payload, headers=self._headers()
-            ) as response:
-                if response.status != 200:
-                    error_data = await response.text()
-                    logger.error(
-                        f"Failed to answer Telnyx call {call_control_id}: "
-                        f"status={response.status}, response={error_data}"
-                    )
-                    raise Exception(
-                        f"Failed to answer Telnyx call: {response.status} {error_data}"
-                    )
+        async with aiohttp.ClientSession() as session, session.post(
+            endpoint, json=payload, headers=self._headers()
+        ) as response:
+            if response.status != 200:
+                error_data = await response.text()
+                logger.error(
+                    f"Failed to answer Telnyx call {call_control_id}: "
+                    f"status={response.status}, response={error_data}"
+                )
+                raise Exception(
+                    f"Failed to answer Telnyx call: {response.status} {error_data}"
+                )
 
-                logger.info(f"Successfully answered Telnyx call {call_control_id}")
+            logger.info(f"Successfully answered Telnyx call {call_control_id}")
 
     # ======== INBOUND CALL METHODS ========
 
     @classmethod
     def can_handle_webhook(
-        cls, webhook_data: Dict[str, Any], headers: Dict[str, str]
+        cls, webhook_data: dict[str, Any], headers: dict[str, str]
     ) -> bool:
         """Detect if a webhook is from Telnyx.
 
@@ -501,7 +499,7 @@ class TelnyxProvider(TelephonyProvider):
         return False
 
     @staticmethod
-    def parse_inbound_webhook(webhook_data: Dict[str, Any]) -> NormalizedInboundData:
+    def parse_inbound_webhook(webhook_data: dict[str, Any]) -> NormalizedInboundData:
         """Parse Telnyx inbound webhook into normalized format."""
         data = webhook_data.get("data", webhook_data)
         payload = data.get("payload", {})
@@ -536,8 +534,8 @@ class TelnyxProvider(TelephonyProvider):
     async def verify_inbound_signature(
         self,
         url: str,
-        webhook_data: Dict[str, Any],
-        headers: Dict[str, str],
+        webhook_data: dict[str, Any],
+        headers: dict[str, str],
         body: str = "",
     ) -> bool:
         """Verify the signature of an inbound Telnyx webhook."""
@@ -550,7 +548,7 @@ class TelnyxProvider(TelephonyProvider):
         )
 
     async def configure_inbound(
-        self, address: str, webhook_url: Optional[str]
+        self, address: str, webhook_url: str | None
     ) -> ProviderSyncResult:
         """Update webhook_event_url on the Telnyx Call Control Application.
 
@@ -588,21 +586,20 @@ class TelnyxProvider(TelephonyProvider):
         )
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    app_endpoint, headers=self._headers()
-                ) as response:
-                    if response.status != 200:
-                        body = await response.text()
-                        logger.error(
-                            f"Failed to fetch Telnyx Call Control Application "
-                            f"{self.connection_id}: {response.status} {body}"
-                        )
-                        return ProviderSyncResult(
-                            ok=False,
-                            message=f"Telnyx API {response.status}: {body}",
-                        )
-                    app_data = await response.json()
+            async with aiohttp.ClientSession() as session, session.get(
+                app_endpoint, headers=self._headers()
+            ) as response:
+                if response.status != 200:
+                    body = await response.text()
+                    logger.error(
+                        f"Failed to fetch Telnyx Call Control Application "
+                        f"{self.connection_id}: {response.status} {body}"
+                    )
+                    return ProviderSyncResult(
+                        ok=False,
+                        message=f"Telnyx API {response.status}: {body}",
+                    )
+                app_data = await response.json()
         except Exception as e:
             logger.error(
                 f"Exception fetching Telnyx Call Control Application "
@@ -627,21 +624,20 @@ class TelnyxProvider(TelephonyProvider):
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.patch(
-                    app_endpoint, json=update_body, headers=self._headers()
-                ) as response:
-                    if response.status != 200:
-                        body = await response.text()
-                        logger.error(
-                            f"Telnyx Call Control Application update failed "
-                            f"for {self.connection_id}: {response.status} "
-                            f"{body}"
-                        )
-                        return ProviderSyncResult(
-                            ok=False,
-                            message=f"Telnyx API {response.status}: {body}",
-                        )
+            async with aiohttp.ClientSession() as session, session.patch(
+                app_endpoint, json=update_body, headers=self._headers()
+            ) as response:
+                if response.status != 200:
+                    body = await response.text()
+                    logger.error(
+                        f"Telnyx Call Control Application update failed "
+                        f"for {self.connection_id}: {response.status} "
+                        f"{body}"
+                    )
+                    return ProviderSyncResult(
+                        ok=False,
+                        message=f"Telnyx API {response.status}: {body}",
+                    )
         except Exception as e:
             logger.error(
                 f"Exception updating Telnyx Call Control Application "
@@ -671,16 +667,15 @@ class TelnyxProvider(TelephonyProvider):
             "page[size]": 100,
         }
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    endpoint, params=params, headers=self._headers()
-                ) as response:
-                    if response.status != 200:
-                        body = await response.text()
-                        raise ProviderPhoneNumberLookupError(
-                            f"Telnyx API {response.status}: {body}"
-                        )
-                    data = await response.json()
+            async with aiohttp.ClientSession() as session, session.get(
+                endpoint, params=params, headers=self._headers()
+            ) as response:
+                if response.status != 200:
+                    body = await response.text()
+                    raise ProviderPhoneNumberLookupError(
+                        f"Telnyx API {response.status}: {body}"
+                    )
+                data = await response.json()
         except ProviderPhoneNumberLookupError:
             raise
         except Exception as e:
@@ -746,9 +741,8 @@ class TelnyxProvider(TelephonyProvider):
 
     @staticmethod
     def generate_validation_error_response(error_type) -> tuple:
-        from fastapi import Response
-
         from api.errors.telephony_errors import TELEPHONY_ERROR_MESSAGES, TelephonyError
+        from fastapi import Response
 
         message = TELEPHONY_ERROR_MESSAGES.get(
             error_type, TELEPHONY_ERROR_MESSAGES[TelephonyError.GENERAL_AUTH_FAILED]
@@ -767,7 +761,7 @@ class TelnyxProvider(TelephonyProvider):
         conference_name: str,
         timeout: int = 30,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Dial the destination as a plain call; conference is seeded later.
 
         Webhook (``call.answered``) seeds the conference with this leg;
@@ -803,39 +797,38 @@ class TelnyxProvider(TelephonyProvider):
         )
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    endpoint, json=payload, headers=self._headers()
-                ) as response:
-                    response_text = await response.text()
-                    if response.status != 200:
-                        logger.error(
-                            f"Telnyx transfer dial failed: "
-                            f"status={response.status} body={response_text}"
-                        )
-                        raise Exception(
-                            f"Telnyx transfer dial failed: "
-                            f"status={response.status} body={response_text}"
-                        )
-
-                    response_data = json.loads(response_text)
-                    data = response_data.get("data", {})
-                    call_control_id = data.get("call_control_id", "")
-
-                    logger.info(
-                        f"Telnyx transfer dial initiated: "
-                        f"call_control_id={call_control_id}, "
-                        f"to={destination}, conference_name={conference_name}"
+            async with aiohttp.ClientSession() as session, session.post(
+                endpoint, json=payload, headers=self._headers()
+            ) as response:
+                response_text = await response.text()
+                if response.status != 200:
+                    logger.error(
+                        f"Telnyx transfer dial failed: "
+                        f"status={response.status} body={response_text}"
+                    )
+                    raise Exception(
+                        f"Telnyx transfer dial failed: "
+                        f"status={response.status} body={response_text}"
                     )
 
-                    return {
-                        "call_sid": call_control_id,
-                        "status": "initiated",
-                        "provider": self.PROVIDER_NAME,
-                        "from_number": from_number,
-                        "to_number": destination,
-                        "raw_response": response_data,
-                    }
+                response_data = json.loads(response_text)
+                data = response_data.get("data", {})
+                call_control_id = data.get("call_control_id", "")
+
+                logger.info(
+                    f"Telnyx transfer dial initiated: "
+                    f"call_control_id={call_control_id}, "
+                    f"to={destination}, conference_name={conference_name}"
+                )
+
+                return {
+                    "call_sid": call_control_id,
+                    "status": "initiated",
+                    "provider": self.PROVIDER_NAME,
+                    "from_number": from_number,
+                    "to_number": destination,
+                    "raw_response": response_data,
+                }
         except Exception as e:
             logger.error(f"Exception during Telnyx transfer dial: {e}")
             raise
@@ -845,7 +838,7 @@ class TelnyxProvider(TelephonyProvider):
 
     async def create_conference(
         self, seed_call_control_id: str, name: str
-    ) -> Optional[str]:
+    ) -> str | None:
         """Seed a Telnyx conference with an existing call leg.
 
         Used by the transfer flow on ``call.answered`` to put the destination
@@ -866,29 +859,28 @@ class TelnyxProvider(TelephonyProvider):
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    endpoint, json=payload, headers=self._headers()
-                ) as response:
-                    body = await response.text()
-                    if response.status != 200:
-                        logger.error(
-                            f"Telnyx create_conference failed: "
-                            f"status={response.status} body={body}"
-                        )
-                        return None
-                    data = json.loads(body).get("data", {})
-                    conference_id = data.get("id")
-                    if not conference_id:
-                        logger.error(
-                            f"Telnyx create_conference response missing id: {body}"
-                        )
-                        return None
-                    logger.info(
-                        f"Telnyx conference {conference_id} created (name={name}, "
-                        f"seeded with {seed_call_control_id})"
+            async with aiohttp.ClientSession() as session, session.post(
+                endpoint, json=payload, headers=self._headers()
+            ) as response:
+                body = await response.text()
+                if response.status != 200:
+                    logger.error(
+                        f"Telnyx create_conference failed: "
+                        f"status={response.status} body={body}"
                     )
-                    return conference_id
+                    return None
+                data = json.loads(body).get("data", {})
+                conference_id = data.get("id")
+                if not conference_id:
+                    logger.error(
+                        f"Telnyx create_conference response missing id: {body}"
+                    )
+                    return None
+                logger.info(
+                    f"Telnyx conference {conference_id} created (name={name}, "
+                    f"seeded with {seed_call_control_id})"
+                )
+                return conference_id
         except Exception as e:
             logger.error(f"Exception during Telnyx create_conference: {e}")
             return None

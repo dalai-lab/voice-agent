@@ -775,7 +775,7 @@ async def execute_http_tool(
                 credential_uuid, organization_id
             )
             if credential:
-                credential_headers = build_auth_header(credential)
+                credential_headers = await build_auth_header(credential)
                 headers.update(credential_headers)
                 logger.debug(f"Applied credential '{credential.name}' to tool request")
             else:

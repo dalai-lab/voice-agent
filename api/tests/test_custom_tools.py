@@ -1670,7 +1670,8 @@ class TestTransferResolver:
 class TestAuthHeaders:
     """Tests for auth header building utilities."""
 
-    def test_bearer_token_auth(self):
+    @pytest.mark.asyncio
+    async def test_bearer_token_auth(self):
         """Test building bearer token auth header."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1678,11 +1679,12 @@ class TestAuthHeaders:
         mock_credential.credential_type = "bearer_token"
         mock_credential.credential_data = {"token": "abc123"}
 
-        header = build_auth_header(mock_credential)
+        header = await build_auth_header(mock_credential)
 
         assert header == {"Authorization": "Bearer abc123"}
 
-    def test_api_key_auth(self):
+    @pytest.mark.asyncio
+    async def test_api_key_auth(self):
         """Test building API key auth header."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1693,11 +1695,12 @@ class TestAuthHeaders:
             "api_key": "secret-key-123",
         }
 
-        header = build_auth_header(mock_credential)
+        header = await build_auth_header(mock_credential)
 
         assert header == {"X-API-Key": "secret-key-123"}
 
-    def test_basic_auth(self):
+    @pytest.mark.asyncio
+    async def test_basic_auth(self):
         """Test building basic auth header."""
         import base64
 
@@ -1710,12 +1713,13 @@ class TestAuthHeaders:
             "password": "pass123",
         }
 
-        header = build_auth_header(mock_credential)
+        header = await build_auth_header(mock_credential)
 
         expected_encoded = base64.b64encode(b"user:pass123").decode()
         assert header == {"Authorization": f"Basic {expected_encoded}"}
 
-    def test_custom_header_auth(self):
+    @pytest.mark.asyncio
+    async def test_custom_header_auth(self):
         """Test building custom header auth."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1726,11 +1730,12 @@ class TestAuthHeaders:
             "header_value": "custom-value-123",
         }
 
-        header = build_auth_header(mock_credential)
+        header = await build_auth_header(mock_credential)
 
         assert header == {"X-Custom-Auth": "custom-value-123"}
 
-    def test_unknown_auth_type_returns_empty(self):
+    @pytest.mark.asyncio
+    async def test_unknown_auth_type_returns_empty(self):
         """Test that unknown auth types return empty dict."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1738,11 +1743,12 @@ class TestAuthHeaders:
         mock_credential.credential_type = "unknown_type"
         mock_credential.credential_data = {}
 
-        header = build_auth_header(mock_credential)
+        header = await build_auth_header(mock_credential)
 
         assert header == {}
 
-    def test_none_credential_type_returns_empty(self):
+    @pytest.mark.asyncio
+    async def test_none_credential_type_returns_empty(self):
         """Test that 'none' credential type returns empty dict."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1750,7 +1756,7 @@ class TestAuthHeaders:
         mock_credential.credential_type = "none"
         mock_credential.credential_data = {}
 
-        header = build_auth_header(mock_credential)
+        header = await build_auth_header(mock_credential)
 
         assert header == {}
 
@@ -1765,7 +1771,8 @@ class TestAuthHeaders:
 
         assert header == {"Authorization": "Bearer my-token"}
 
-    def test_api_key_default_header_name(self):
+    @pytest.mark.asyncio
+    async def test_api_key_default_header_name(self):
         """Test that API key uses default header name if not specified."""
         from api.utils.credential_auth import build_auth_header
 
@@ -1773,7 +1780,7 @@ class TestAuthHeaders:
         mock_credential.credential_type = "api_key"
         mock_credential.credential_data = {"api_key": "key123"}
 
-        header = build_auth_header(mock_credential)
+        header = await build_auth_header(mock_credential)
 
         assert header == {"X-API-Key": "key123"}
 

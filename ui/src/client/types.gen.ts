@@ -297,34 +297,6 @@ export type AssemblyAisttConfiguration = {
 };
 
 /**
- * Atlas Cloud
- *
- * Atlas Cloud OpenAI-compatible LLM API.
- */
-export type AtlasCloudLlmService = {
-    /**
-     * Provider
-     */
-    provider?: 'atlascloud';
-    /**
-     * Api Key
-     */
-    api_key: string | Array<string>;
-    /**
-     * Model
-     *
-     * Atlas Cloud OpenAI-compatible chat model identifier.
-     */
-    model?: string;
-    /**
-     * Base Url
-     *
-     * Atlas Cloud OpenAI-compatible API endpoint.
-     */
-    base_url?: string;
-};
-
-/**
  * AuthResponse
  */
 export type AuthResponse = {
@@ -559,8 +531,6 @@ export type ByokPipelineAiModelConfiguration = {
     llm: ({
         provider: 'openai';
     } & OpenAillmService) | ({
-        provider: 'atlascloud';
-    } & AtlasCloudLlmService) | ({
         provider: 'google_vertex';
     } & GoogleVertexLlmConfiguration) | ({
         provider: 'groq';
@@ -691,8 +661,6 @@ export type ByokRealtimeAiModelConfiguration = {
     llm: ({
         provider: 'openai';
     } & OpenAillmService) | ({
-        provider: 'atlascloud';
-    } & AtlasCloudLlmService) | ({
         provider: 'google_vertex';
     } & GoogleVertexLlmConfiguration) | ({
         provider: 'groq';

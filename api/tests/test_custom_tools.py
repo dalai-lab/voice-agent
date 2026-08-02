@@ -1135,6 +1135,11 @@ class TestRenderBodyTemplate:
         res = render_body_template(tpl, {}, [])
         assert res == {"a": 1, "b": "two"}
 
+    def test_static_template_with_literal_closing_braces(self):
+        tpl = {"syntax": "See placeholder syntax: }}"}
+        res = render_body_template(tpl, {}, [])
+        assert res == {"syntax": "See placeholder syntax: }}"}
+
     def test_null_literal_in_template(self):
         tpl = {"key": None}
         res = render_body_template(tpl, {}, [])

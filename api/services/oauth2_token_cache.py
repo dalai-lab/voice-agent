@@ -13,13 +13,12 @@ import time
 import cachetools
 import httpx
 import redis.asyncio as aioredis
-from loguru import logger
-
 from api.constants import REDIS_URL
 from api.utils.url_security import (
     get_pinned_httpx_transport,
     validate_user_configured_service_url,
 )
+from loguru import logger
 
 _MIN_TTL = 30  # Floor: never cache for less than 30s
 _EXPIRY_MARGIN = 60  # Pre-expire: refresh 60s before real expiry

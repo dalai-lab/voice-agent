@@ -19,12 +19,11 @@ joining ``telephony_phone_numbers``.
 
 from typing import Any
 
-from loguru import logger
-
 from api.db import db_client
 from api.db.models import TelephonyConfigurationModel, WorkflowRunModel
 from api.services.telephony import registry
 from api.services.telephony.base import TelephonyProvider
+from loguru import logger
 
 
 async def load_telephony_config_by_id(

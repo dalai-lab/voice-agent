@@ -231,7 +231,7 @@ async def test_tool(
     tool_config = (
         tool.definition.get("config", {}) if isinstance(tool.definition, dict) else {}
     )
-    configured_method = tool_config.get("method", "?").upper()
+    configured_method = tool_config.get("method", "?")
     configured_url = tool_config.get("url", "?")
 
     started_at = time.perf_counter()
@@ -278,7 +278,7 @@ async def test_tool(
         duration_ms=duration_ms,
         hint=hint,
         request_method=configured_method,
-        request_url=result.get("rendered_url") or configured_url,
+        request_url=result.get("rendered_url", configured_url),
         request_headers=result.get("request_headers", {}),
         request_body=request_body,
         request_params=request_params,

@@ -158,7 +158,9 @@ async def get_workflow_runs(
     sort_by: str | None = Query(
         None, description="Field to sort by (e.g., 'duration', 'created_at')"
     ),
-    sort_order: str | None = Query("desc", description="Sort order ('asc' or 'desc')"),
+    sort_order: str | None = Query(
+        "desc", description="Sort order ('asc' or 'desc')"
+    ),
     user: UserModel = Depends(get_superuser),
 ) -> SuperuserWorkflowRunsListResponse:
     """

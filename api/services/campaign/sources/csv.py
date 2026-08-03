@@ -3,8 +3,6 @@ import hashlib
 from io import StringIO
 
 import httpx
-from loguru import logger
-
 from api.db import db_client
 from api.services.campaign.source_sync import (
     CampaignSourceSyncService,
@@ -12,6 +10,7 @@ from api.services.campaign.source_sync import (
     ValidationResult,
 )
 from api.services.storage import storage_fs
+from loguru import logger
 
 
 class CSVSyncService(CampaignSourceSyncService):

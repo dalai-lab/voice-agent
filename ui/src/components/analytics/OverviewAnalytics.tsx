@@ -1,7 +1,5 @@
 "use client";
 
-import { ArrowRight, Bot, Calendar, CheckCircle2, Clock, Megaphone, Phone, PhoneForwarded, TrendingUp } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
     Area,
@@ -16,6 +14,8 @@ import {
     XAxis,
     YAxis
 } from "recharts";
+import { Phone, Clock, Bot, ArrowRight, Megaphone, Calendar, PhoneForwarded, CheckCircle2, TrendingUp } from "lucide-react";
+import Link from "next/link";
 
 import {
     getCampaignsApiV1CampaignGet,
@@ -27,7 +27,7 @@ import {
 } from "@/client/sdk.gen";
 import { useUserConfig } from "@/context/UserConfigContext";
 import { useAuth } from "@/lib/auth";
-import { formatContactOrigin,formatDispositionLabel, getDispositionBadge } from "@/lib/dispositionLabels";
+import { formatDispositionLabel, getDispositionBadge, formatContactOrigin } from "@/lib/dispositionLabels";
 
 const CHART_COLORS = [
     '#3b82f6', // blue

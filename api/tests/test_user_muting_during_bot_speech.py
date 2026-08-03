@@ -33,6 +33,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+from pipecat.tests import MockLLMService, MockTTSService
 from pipecat.tests.mock_transport import MockTransport
 from pipecat.transports.base_transport import TransportParams
 from pipecat.turns.user_mute import (
@@ -48,7 +49,6 @@ from api.services.workflow.pipecat_engine_variable_extractor import (
     VariableExtractionManager,
 )
 from api.services.workflow.workflow_graph import WorkflowGraph
-from pipecat.tests import MockLLMService, MockTTSService
 
 
 class BotSpeakingObserverProcessor(FrameProcessor):
@@ -241,18 +241,15 @@ class TestUserMutingDuringBotSpeech:
             observer,
         ) = await create_engine_for_mute_test(simple_workflow, llm, tts_duration_ms=50)
 
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={},
         ):
 
             async def run_pipeline():
@@ -267,13 +264,17 @@ class TestUserMutingDuringBotSpeech:
                 await engine.llm.queue_frame(LLMContextFrame(engine.context))
 
                 # Wait for first bot started
-                await asyncio.wait_for(observer.first_bot_started.wait(), timeout=5.0)
+                await asyncio.wait_for(
+                    observer.first_bot_started.wait(), timeout=5.0
+                )
 
                 # Queue user speaking frames so that second generation starts
                 await queue_user_speaking_and_transcript_frames(task)
 
                 # Wait for first bot stopped
-                await asyncio.wait_for(observer.first_bot_stopped.wait(), timeout=5.0)
+                await asyncio.wait_for(
+                    observer.first_bot_stopped.wait(), timeout=5.0
+                )
 
                 await task.cancel()
 
@@ -324,18 +325,15 @@ class TestUserMutingDuringBotSpeech:
             observer,
         ) = await create_engine_for_mute_test(simple_workflow, llm, tts_duration_ms=50)
 
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={},
         ):
 
             async def run_pipeline():
@@ -350,16 +348,22 @@ class TestUserMutingDuringBotSpeech:
                 await engine.llm.queue_frame(LLMContextFrame(engine.context))
 
                 # Wait for first bot stopped (first response complete)
-                await asyncio.wait_for(observer.first_bot_stopped.wait(), timeout=5.0)
+                await asyncio.wait_for(
+                    observer.first_bot_stopped.wait(), timeout=5.0
+                )
 
                 # Queue user speaking frames for second generation
                 await queue_user_speaking_and_transcript_frames(task)
 
                 # Wait for second bot started
-                await asyncio.wait_for(observer.second_bot_started.wait(), timeout=5.0)
+                await asyncio.wait_for(
+                    observer.second_bot_started.wait(), timeout=5.0
+                )
 
                 # Wait for second bot stopped
-                await asyncio.wait_for(observer.second_bot_stopped.wait(), timeout=5.0)
+                await asyncio.wait_for(
+                    observer.second_bot_stopped.wait(), timeout=5.0
+                )
 
                 await task.cancel()
 
@@ -410,18 +414,15 @@ class TestUserMutingDuringBotSpeech:
             observer,
         ) = await create_engine_for_mute_test(simple_workflow, llm, tts_duration_ms=50)
 
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={},
         ):
 
             async def run_pipeline():
@@ -436,16 +437,22 @@ class TestUserMutingDuringBotSpeech:
                 await engine.llm.queue_frame(LLMContextFrame(engine.context))
 
                 # Wait for first bot stopped (first response complete)
-                await asyncio.wait_for(observer.first_bot_stopped.wait(), timeout=5.0)
+                await asyncio.wait_for(
+                    observer.first_bot_stopped.wait(), timeout=5.0
+                )
 
                 # Queue user speaking frames for second llm generation
                 await queue_user_speaking_and_transcript_frames(task)
 
                 # Wait for second bot started
-                await asyncio.wait_for(observer.second_bot_started.wait(), timeout=5.0)
+                await asyncio.wait_for(
+                    observer.second_bot_started.wait(), timeout=5.0
+                )
 
                 # Wait for second bot stopped
-                await asyncio.wait_for(observer.second_bot_stopped.wait(), timeout=5.0)
+                await asyncio.wait_for(
+                    observer.second_bot_stopped.wait(), timeout=5.0
+                )
 
                 await task.cancel()
 

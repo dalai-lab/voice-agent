@@ -6,10 +6,9 @@ Shared functions used across the application.
 import ipaddress
 import re
 
-from loguru import logger
-
 from api.constants import BACKEND_API_ENDPOINT
 from api.utils.tunnel import TunnelURLProvider
+from loguru import logger
 
 
 def get_scheme(url: str) -> str | None:

@@ -4,11 +4,11 @@ from logging.config import fileConfig
 from pathlib import Path
 
 import alembic_postgresql_enum  # noqa: F401 - registers enum handling hooks
-from alembic import context
+from api.constants import DATABASE_URL
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from api.constants import DATABASE_URL
+from alembic import context
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

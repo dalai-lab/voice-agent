@@ -2,8 +2,6 @@ import random
 from enum import Enum, auto
 from typing import Annotated, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
-
 from api.services.configuration.options import (
     AZURE_EMBEDDING_MODELS,
     AZURE_MODELS,
@@ -53,6 +51,7 @@ from api.services.configuration.options import (
     SPEECHMATICS_STT_LANGUAGES,
 )
 from api.services.configuration.options.google import GOOGLE_VERTEX_MODELS
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 
 class ServiceType(Enum):
@@ -851,29 +850,12 @@ REALTIME_PROVIDERS = {
 
 
 LLMConfig = Annotated[
-    OpenAILLMService
-    | AtlasCloudLLMService
-    | GoogleVertexLLMConfiguration
-    | GroqLLMService
-    | OpenRouterLLMConfiguration
-    | GoogleLLMService
-    | AzureLLMService
-    | DograhLLMService
-    | AWSBedrockLLMConfiguration
-    | SpeachesLLMConfiguration
-    | HuggingFaceLLMConfiguration
-    | MiniMaxLLMConfiguration
-    | SarvamLLMConfiguration,
+    OpenAILLMService | AtlasCloudLLMService | GoogleVertexLLMConfiguration | GroqLLMService | OpenRouterLLMConfiguration | GoogleLLMService | AzureLLMService | DograhLLMService | AWSBedrockLLMConfiguration | SpeachesLLMConfiguration | HuggingFaceLLMConfiguration | MiniMaxLLMConfiguration | SarvamLLMConfiguration,
     Field(discriminator="provider"),
 ]
 
 RealtimeConfig = Annotated[
-    OpenAIRealtimeLLMConfiguration
-    | GrokRealtimeLLMConfiguration
-    | UltravoxRealtimeLLMConfiguration
-    | GoogleRealtimeLLMConfiguration
-    | GoogleVertexRealtimeLLMConfiguration
-    | AzureRealtimeLLMConfiguration,
+    OpenAIRealtimeLLMConfiguration | GrokRealtimeLLMConfiguration | UltravoxRealtimeLLMConfiguration | GoogleRealtimeLLMConfiguration | GoogleVertexRealtimeLLMConfiguration | AzureRealtimeLLMConfiguration,
     Field(discriminator="provider"),
 ]
 
@@ -1402,22 +1384,7 @@ class LmntTTSConfiguration(BaseTTSConfiguration):
 
 
 TTSConfig = Annotated[
-    DeepgramTTSConfiguration
-    | GoogleTTSConfiguration
-    | OpenAITTSService
-    | ElevenlabsTTSConfiguration
-    | CartesiaTTSConfiguration
-    | InworldTTSConfiguration
-    | DograhTTSService
-    | SarvamTTSConfiguration
-    | CambTTSConfiguration
-    | RimeTTSConfiguration
-    | SpeachesTTSConfiguration
-    | MiniMaxTTSConfiguration
-    | AzureSpeechTTSConfiguration
-    | SmallestAITTSConfiguration
-    | XAITTSConfiguration
-    | LmntTTSConfiguration,
+    DeepgramTTSConfiguration | GoogleTTSConfiguration | OpenAITTSService | ElevenlabsTTSConfiguration | CartesiaTTSConfiguration | InworldTTSConfiguration | DograhTTSService | SarvamTTSConfiguration | CambTTSConfiguration | RimeTTSConfiguration | SpeachesTTSConfiguration | MiniMaxTTSConfiguration | AzureSpeechTTSConfiguration | SmallestAITTSConfiguration | XAITTSConfiguration | LmntTTSConfiguration,
     Field(discriminator="provider"),
 ]
 
@@ -1819,20 +1786,7 @@ class SmallestAISTTConfiguration(BaseSTTConfiguration):
 
 
 STTConfig = Annotated[
-    DeepgramSTTConfiguration
-    | CartesiaSTTConfiguration
-    | OpenAISTTConfiguration
-    | GoogleSTTConfiguration
-    | DograhSTTService
-    | SpeechmaticsSTTConfiguration
-    | SarvamSTTConfiguration
-    | SpeachesSTTConfiguration
-    | HuggingFaceSTTConfiguration
-    | AssemblyAISTTConfiguration
-    | GladiaSTTConfiguration
-    | AzureSpeechSTTConfiguration
-    | SmallestAISTTConfiguration
-    | ElevenlabsSTTConfiguration,
+    DeepgramSTTConfiguration | CartesiaSTTConfiguration | OpenAISTTConfiguration | GoogleSTTConfiguration | DograhSTTService | SpeechmaticsSTTConfiguration | SarvamSTTConfiguration | SpeachesSTTConfiguration | HuggingFaceSTTConfiguration | AssemblyAISTTConfiguration | GladiaSTTConfiguration | AzureSpeechSTTConfiguration | SmallestAISTTConfiguration | ElevenlabsSTTConfiguration,
     Field(discriminator="provider"),
 ]
 
@@ -1910,10 +1864,7 @@ class DograhEmbeddingsConfiguration(BaseEmbeddingsConfiguration):
 
 
 EmbeddingsConfig = Annotated[
-    OpenAIEmbeddingsConfiguration
-    | OpenRouterEmbeddingsConfiguration
-    | AzureOpenAIEmbeddingsConfiguration
-    | DograhEmbeddingsConfiguration,
+    OpenAIEmbeddingsConfiguration | OpenRouterEmbeddingsConfiguration | AzureOpenAIEmbeddingsConfiguration | DograhEmbeddingsConfiguration,
     Field(discriminator="provider"),
 ]
 

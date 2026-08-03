@@ -2,7 +2,7 @@
 
 import { ChevronLeft, ChevronRight, Download, Globe } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Fragment,useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, Fragment } from 'react';
 import TimezoneSelect, { type ITimezoneOption } from 'react-timezone-select';
 import { toast } from 'sonner';
 
@@ -553,10 +553,10 @@ export default function UsagePage() {
                                 {dispositionCounts.map(([name, count], idx) => {
                                     const percentage = (count / usageHistory.runs.length) * 100;
                                     return (
-                                        <div
-                                            key={name}
-                                            className="h-full rounded-full transition-all"
-                                            style={{ width: `${percentage}%`, backgroundColor: COLORS[idx % COLORS.length] }}
+                                        <div 
+                                            key={name} 
+                                            className="h-full rounded-full transition-all" 
+                                            style={{ width: `${percentage}%`, backgroundColor: COLORS[idx % COLORS.length] }} 
                                             title={`${name}: ${count} (${percentage.toFixed(1)}%)`}
                                         />
                                     );

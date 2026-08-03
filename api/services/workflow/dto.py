@@ -1,8 +1,6 @@
 from enum import Enum
 from typing import Any, Literal, Union
 
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
-
 from api.services.integrations import (
     all_packages,
 )
@@ -20,6 +18,7 @@ from api.services.workflow.node_specs._base import (
 )
 from api.services.workflow.node_specs.constants import DEFAULT_QA_SYSTEM_PROMPT
 from api.services.workflow.node_specs.model_spec import node_spec, spec_field
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 
 class NodeType(str, Enum):
@@ -324,7 +323,9 @@ class StartCallNodeData(
 ):
     is_start: bool = spec_field(default=True, spec_exclude=True)
     greeting: str | None = spec_field(default=None, ui_type=PropertyType.string)
-    greeting_type: str | None = spec_field(default=None, ui_type=PropertyType.options)
+    greeting_type: str | None = spec_field(
+        default=None, ui_type=PropertyType.options
+    )
     greeting_recording_id: str | None = spec_field(
         default=None, ui_type=PropertyType.recording_ref
     )
@@ -335,7 +336,9 @@ class StartCallNodeData(
     pre_call_fetch_enabled: bool = spec_field(
         default=False, ui_type=PropertyType.boolean
     )
-    pre_call_fetch_url: str | None = spec_field(default=None, ui_type=PropertyType.url)
+    pre_call_fetch_url: str | None = spec_field(
+        default=None, ui_type=PropertyType.url
+    )
     pre_call_fetch_credential_uuid: str | None = spec_field(
         default=None, ui_type=PropertyType.credential_ref
     )
@@ -738,7 +741,9 @@ class WebhookNodeData(BaseNodeData):
         default=None, ui_type=PropertyType.credential_ref
     )
     custom_headers: list[CustomHeaderDTO] | None = spec_field(default=None)
-    payload_template: dict | None = spec_field(default=None, ui_type=PropertyType.json)
+    payload_template: dict | None = spec_field(
+        default=None, ui_type=PropertyType.json
+    )
 
 
 @node_spec(
@@ -871,7 +876,9 @@ class QANodeData(BaseNodeData):
     qa_model: str | None = spec_field(default=None, ui_type=PropertyType.string)
     qa_api_key: str | None = spec_field(default=None, ui_type=PropertyType.string)
     qa_endpoint: str | None = spec_field(default=None, ui_type=PropertyType.url)
-    qa_system_prompt: str | None = spec_field(default=None, ui_type=PropertyType.string)
+    qa_system_prompt: str | None = spec_field(
+        default=None, ui_type=PropertyType.string
+    )
     qa_min_call_duration: int = spec_field(default=15, ui_type=PropertyType.number)
     qa_voicemail_calls: bool = spec_field(default=False, ui_type=PropertyType.boolean)
     qa_sample_rate: int = spec_field(default=100, ui_type=PropertyType.number)

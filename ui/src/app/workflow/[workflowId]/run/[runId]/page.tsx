@@ -424,7 +424,7 @@ function SplitTracksSection({
 
         const playbackAudios = getPlaybackAudios(playbackMode);
         const { duration } = getAudioTimelineState(playbackAudios);
-
+        
         if (duration > 0) {
             const newTime = percentage * duration;
             if (userAudioRef.current) userAudioRef.current.currentTime = newTime;
@@ -534,7 +534,7 @@ function SplitTracksSection({
                 >
                     {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
                 </button>
-                <div
+                <div 
                     ref={timelineRef}
                     className={cn(
                         "relative h-24 min-w-0 flex-1 overflow-hidden rounded-lg border border-border/75 bg-secondary/15 transition-colors",

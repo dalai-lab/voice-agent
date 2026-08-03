@@ -11,10 +11,9 @@ import asyncio
 from collections.abc import Awaitable, Callable
 
 import redis.asyncio as aioredis
-from loguru import logger
-
 from api.enums import RedisChannel
 from api.services.worker_sync.protocol import WorkerSyncEvent
+from loguru import logger
 
 SyncHandler = Callable[[WorkerSyncEvent], Awaitable[None]]
 

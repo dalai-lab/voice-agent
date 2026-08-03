@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -402,9 +403,8 @@ def _validate_migrated_configurations() -> None:
     """
     import importlib
 
-    from pydantic import ValidationError
-
     from api.services.telephony import registry
+    from pydantic import ValidationError
 
     # Triggers each provider package's ``register()`` side effect.
     importlib.import_module("api.services.telephony.providers")

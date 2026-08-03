@@ -1,9 +1,9 @@
 'use client';
 
 import { addDays, format, subDays } from 'date-fns';
-import { ArrowUpRight,Calendar, ChevronLeft, ChevronRight, Download, Filter, PhoneCall } from 'lucide-react';
-import Link from 'next/link';
+import { Calendar, ChevronLeft, ChevronRight, Download, Filter, PhoneCall, ArrowUpRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 import {
   getDailyReportApiV1OrganizationsReportsDailyGet,

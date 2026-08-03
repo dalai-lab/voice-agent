@@ -1,6 +1,5 @@
 'use client';
 
-import { Clock } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -11,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { Clock } from 'lucide-react';
 
 interface DurationData {
   bucket: string;

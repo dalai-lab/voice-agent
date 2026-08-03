@@ -20,8 +20,6 @@ from urllib.parse import urlparse
 import aiohttp
 import redis.asyncio as aioredis
 import websockets
-from loguru import logger
-
 from api.constants import REDIS_URL
 from api.db import db_client
 from api.enums import CallType, WorkflowRunMode
@@ -40,6 +38,7 @@ from api.services.telephony.transfer_event_protocol import (
 )
 from api.services.workflow.run_creation import prepare_workflow_run_inputs
 from api.services.workflow_run_failure import mark_workflow_run_failed
+from loguru import logger
 
 # Redis key pattern and TTL for channel-to-run mapping
 _CHANNEL_KEY_PREFIX = "ari:channel:"

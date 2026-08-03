@@ -807,14 +807,7 @@ class QueuedRunModel(Base):
     source_uuid = Column(String, nullable=False)
     context_variables = Column(JSON, nullable=False, default=dict)
     state = Column(
-        Enum(
-            "queued",
-            "processed",
-            "processing",
-            "failed",
-            "cancelled",
-            name="queued_run_state",
-        ),
+        Enum("queued", "processed", "processing", "failed", "cancelled", name="queued_run_state"),
         nullable=False,
         default="queued",
     )
@@ -858,9 +851,7 @@ class QueuedRunModel(Base):
             "idx_queued_runs_callback",
             "campaign_id",
             "scheduled_for",
-            postgresql_where=text(
-                "state = 'queued' AND retry_reason = 'user_requested_callback'"
-            ),
+            postgresql_where=text("state = 'queued' AND retry_reason = 'user_requested_callback'"),
         ),
         UniqueConstraint(
             "campaign_id",
@@ -1498,13 +1489,7 @@ class ScheduledCallbackModel(Base):
     original_run_id = Column(Integer, nullable=False, index=True)
 
     status = Column(
-        Enum(
-            "pending",
-            "completed",
-            "failed",
-            "cancelled",
-            name="scheduled_callback_status",
-        ),
+        Enum("pending", "completed", "failed", "cancelled", name="scheduled_callback_status"),
         nullable=False,
         default="pending",
     )

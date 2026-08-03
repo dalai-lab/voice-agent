@@ -47,12 +47,9 @@ class TunnelURLProvider:
             # The service name in docker-compose is 'cloudflared'
             metrics_url = "http://cloudflared:2000/metrics"
 
-            async with (
-                aiohttp.ClientSession() as session,
-                session.get(
-                    metrics_url, timeout=aiohttp.ClientTimeout(total=1)
-                ) as response,
-            ):
+            async with aiohttp.ClientSession() as session, session.get(
+                metrics_url, timeout=aiohttp.ClientTimeout(total=1)
+            ) as response:
                 if response.status != 200:
                     logger.warning(
                         f"Cloudflared metrics returned status {response.status}"
@@ -67,14 +64,18 @@ class TunnelURLProvider:
                 if match:
                     hostname = match.group(1)
                     # Remove https:// or wss:// if present
-                    hostname = hostname.replace("https://", "").replace("wss://", "")
+                    hostname = hostname.replace("https://", "").replace(
+                        "wss://", ""
+                    )
                     return "https://" + hostname, "wss://" + hostname
 
                 # Alternative: Look for trycloudflare.com domain
                 match = re.search(r"([a-z0-9-]+\.trycloudflare\.com)", text)
                 if match:
                     hostname = match.group(1)
-                    hostname = hostname.replace("https://", "").replace("wss://", "")
+                    hostname = hostname.replace("https://", "").replace(
+                        "wss://", ""
+                    )
                     return f"https://{hostname}", f"wss://{hostname}"
 
                 logger.warning("Could not find tunnel URL in cloudflared metrics")

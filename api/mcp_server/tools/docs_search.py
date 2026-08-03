@@ -443,9 +443,7 @@ def _score_page(page: DocPage, terms: list[str]) -> tuple[int, DocSection | None
     if phrase:
         if phrase in _normalized_phrase(page.title):
             score += 12
-        elif phrase in _normalized_phrase(
-            page.routing_hint()
-        ) or phrase in _normalized_phrase(page.path):
+        elif phrase in _normalized_phrase(page.routing_hint()) or phrase in _normalized_phrase(page.path):
             score += 8
         elif best_section is not None and phrase in _normalized_phrase(
             best_section.content

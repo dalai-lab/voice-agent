@@ -6,10 +6,6 @@ provider registry — see ProviderSpec.router.
 
 import json
 
-from fastapi import APIRouter, HTTPException, Request
-from loguru import logger
-from pipecat.utils.run_context import set_current_run_id
-
 from api.db import db_client
 from api.services.telephony.call_transfer_manager import get_call_transfer_manager
 from api.services.telephony.factory import get_telephony_provider_for_run
@@ -27,6 +23,9 @@ from api.services.telephony.transfer_event_protocol import (
     TransferEvent,
     TransferEventType,
 )
+from fastapi import APIRouter, HTTPException, Request
+from loguru import logger
+from pipecat.utils.run_context import set_current_run_id
 
 router = APIRouter()
 

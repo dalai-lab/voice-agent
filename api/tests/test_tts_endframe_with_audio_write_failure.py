@@ -41,6 +41,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.tests import MockLLMService, MockTTSService
 from pipecat.tests.mock_transport import MockTransport
 from pipecat.transports.base_transport import TransportParams
 from pipecat.turns.user_mute import (
@@ -55,7 +56,6 @@ from api.services.workflow.pipecat_engine_variable_extractor import (
     VariableExtractionManager,
 )
 from api.services.workflow.workflow_graph import WorkflowGraph
-from pipecat.tests import MockLLMService, MockTTSService
 
 
 async def create_test_pipeline_with_failing_transport(
@@ -203,18 +203,15 @@ class TestTTSPauseWithAudioWriteFailure:
         )
 
         # Patch DB calls
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={},
         ):
 
             async def run_pipeline():
@@ -319,18 +316,15 @@ class TestTTSPauseWithAudioWriteFailure:
             fail_after_n_frames=3,  # Bot starts speaking, then fails
         )
 
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={},
         ):
 
             async def run_pipeline():

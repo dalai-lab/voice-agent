@@ -589,7 +589,7 @@ class WorkflowClient(BaseDBClient):
 
             if enable_callbacks is not None:
                 workflow.enable_callbacks = enable_callbacks
-
+                
             if callback_resume_mode is not None:
                 workflow.callback_resume_mode = callback_resume_mode
 

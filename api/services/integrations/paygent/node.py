@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pydantic import model_validator
-
 from api.services.integrations.base import IntegrationNodeRegistration
 from api.services.workflow.node_data import BaseNodeData
 from api.services.workflow.node_specs._base import (
@@ -15,6 +13,7 @@ from api.services.workflow.node_specs.model_spec import (
     node_spec,
     spec_field,
 )
+from pydantic import model_validator
 
 
 @node_spec(

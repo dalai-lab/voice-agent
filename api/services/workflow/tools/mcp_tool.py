@@ -6,8 +6,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from pydantic import ValidationError
-
 from api.schemas.tool import (
     DEFAULT_MCP_SSE_READ_TIMEOUT_SECS,
     DEFAULT_MCP_TIMEOUT_SECS,
@@ -16,6 +14,7 @@ from api.schemas.tool import (
 from api.schemas.tool import (
     McpToolConfig as McpToolConfig,
 )
+from pydantic import ValidationError
 
 DEFAULT_TIMEOUT_SECS = DEFAULT_MCP_TIMEOUT_SECS
 DEFAULT_SSE_READ_TIMEOUT_SECS = DEFAULT_MCP_SSE_READ_TIMEOUT_SECS

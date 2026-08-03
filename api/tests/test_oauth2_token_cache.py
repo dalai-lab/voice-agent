@@ -14,10 +14,9 @@ def mock_ssrf_guard():
 
 @pytest.fixture
 def mock_redis():
-    with (
-        patch("api.services.oauth2_token_cache._redis_client", None),
-        patch("api.services.oauth2_token_cache.aioredis.from_url") as mock_from_url,
-    ):
+    with patch("api.services.oauth2_token_cache._redis_client", None), patch(
+        "api.services.oauth2_token_cache.aioredis.from_url"
+    ) as mock_from_url:
         mock_client = AsyncMock()
         mock_client.eval.return_value = 1
         mock_from_url.return_value = mock_client

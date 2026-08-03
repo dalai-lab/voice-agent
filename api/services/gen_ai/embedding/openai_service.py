@@ -7,11 +7,10 @@ this file no longer pulls docling/transformers.
 
 from typing import Any
 
-from loguru import logger
-from openai import AsyncOpenAI
-
 from api.db.db_client import DBClient
 from api.utils.url_security import validate_user_configured_service_url
+from loguru import logger
+from openai import AsyncOpenAI
 
 from .base import BaseEmbeddingService
 

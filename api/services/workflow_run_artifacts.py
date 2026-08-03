@@ -7,10 +7,9 @@ workflow-completion job is enqueued so QA and webhooks see the artifacts
 in storage.
 """
 
-from loguru import logger
-
 from api.db import db_client
 from api.services.storage import get_current_storage_backend, storage_fs
+from loguru import logger
 
 
 def _recording_metadata(storage_key: str, storage_backend: str, track: str) -> dict:

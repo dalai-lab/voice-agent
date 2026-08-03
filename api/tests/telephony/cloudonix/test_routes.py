@@ -11,11 +11,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from starlette.requests import Request
-
 from api.enums import TelephonyCallStatus
 from api.services.telephony.providers.cloudonix.provider import CloudonixProvider
 from api.services.telephony.providers.cloudonix.routes import handle_cloudonix_cdr
+from starlette.requests import Request
 
 
 def _json_request(body: bytes) -> Request:

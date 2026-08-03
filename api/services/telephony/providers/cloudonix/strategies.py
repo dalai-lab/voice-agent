@@ -2,10 +2,9 @@
 
 from typing import Any
 
+from api.services.telephony.providers.cloudonix.provider import CLOUDONIX_API_BASE_URL
 from loguru import logger
 from pipecat.serializers.call_strategies import HangupStrategy, TransferStrategy
-
-from api.services.telephony.providers.cloudonix.provider import CLOUDONIX_API_BASE_URL
 
 
 class CloudonixConferenceStrategy(TransferStrategy):
@@ -72,17 +71,18 @@ class CloudonixConferenceStrategy(TransferStrategy):
                 f"conference {conference_name}"
             )
 
-            async with (
-                aiohttp.ClientSession() as session,
-                session.post(endpoint, json=payload, headers=headers) as response,
-            ):
+            async with aiohttp.ClientSession() as session, session.post(
+                endpoint, json=payload, headers=headers
+            ) as response:
                 body = await response.text()
                 if response.status in (200, 202):
                     logger.info(
                         f"[Cloudonix Transfer] Session {session_token} joined "
                         f"conference {conference_name} (HTTP {response.status})"
                     )
-                    await self._cleanup_transfer_context(transfer_context.transfer_id)
+                    await self._cleanup_transfer_context(
+                        transfer_context.transfer_id
+                    )
                     return True
                 logger.error(
                     f"[Cloudonix Transfer] Switch Voice Application failed for session "

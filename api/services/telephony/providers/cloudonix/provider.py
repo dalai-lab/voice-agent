@@ -8,9 +8,6 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 import aiohttp
-from fastapi import HTTPException
-from loguru import logger
-
 from api.db import db_client
 from api.enums import TelephonyCallStatus, WorkflowRunMode
 from api.services.telephony import ws_auth
@@ -24,6 +21,8 @@ from api.services.telephony.base import (
 from api.services.workflow.initial_context import merge_external_initial_context
 from api.utils.common import get_backend_endpoints
 from api.utils.telephony_address import normalize_telephony_address
+from fastapi import HTTPException
+from loguru import logger
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -950,12 +949,9 @@ class CloudonixProvider(TelephonyProvider):
         }
 
         try:
-            async with (
-                aiohttp.ClientSession() as session,
-                session.patch(
-                    app_endpoint, json=data, headers=self._get_auth_headers()
-                ) as response,
-            ):
+            async with aiohttp.ClientSession() as session, session.patch(
+                app_endpoint, json=data, headers=self._get_auth_headers()
+            ) as response:
                 if response.status != 200:
                     body = await response.text()
                     logger.error(
@@ -996,10 +992,9 @@ class CloudonixProvider(TelephonyProvider):
             f"{encoded_address}"
         )
         try:
-            async with (
-                aiohttp.ClientSession() as session,
-                session.get(endpoint, headers=self._get_auth_headers()) as response,
-            ):
+            async with aiohttp.ClientSession() as session, session.get(
+                endpoint, headers=self._get_auth_headers()
+            ) as response:
                 if response.status == 404:
                     return ProviderSyncResult(
                         ok=False,
@@ -1082,9 +1077,8 @@ class CloudonixProvider(TelephonyProvider):
 
         Since Cloudonix is TwiML-compatible, we use the same XML format.
         """
-        from fastapi import Response
-
         from api.errors.telephony_errors import TELEPHONY_ERROR_MESSAGES, TelephonyError
+        from fastapi import Response
 
         message = TELEPHONY_ERROR_MESSAGES.get(
             error_type, TELEPHONY_ERROR_MESSAGES[TelephonyError.GENERAL_AUTH_FAILED]

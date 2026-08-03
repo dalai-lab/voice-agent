@@ -6,9 +6,9 @@ and the RAG tool, and resolves the MPS correlation id the same way the voice
 path does.
 """
 
-from loguru import logger
 
 from api.db.db_client import DBClient
+from loguru import logger
 
 from .azure_openai_service import AzureOpenAIEmbeddingService
 from .base import BaseEmbeddingService

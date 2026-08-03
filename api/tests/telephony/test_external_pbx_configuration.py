@@ -1,7 +1,6 @@
 from unittest.mock import AsyncMock
 
 import pytest
-
 from api.routes import organization
 from api.services import tool_management
 

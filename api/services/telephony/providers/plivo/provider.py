@@ -10,9 +10,6 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, quote, urlparse, urlunparse
 
 import aiohttp
-from fastapi import HTTPException
-from loguru import logger
-
 from api.db import db_client
 from api.enums import TelephonyCallStatus, WorkflowRunMode
 from api.services.telephony import ws_auth
@@ -25,6 +22,8 @@ from api.services.telephony.base import (
 )
 from api.utils.common import get_backend_endpoints
 from api.utils.telephony_address import normalize_telephony_address
+from fastapi import HTTPException
+from loguru import logger
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -564,9 +563,8 @@ class PlivoProvider(TelephonyProvider):
 
     @staticmethod
     def generate_validation_error_response(error_type) -> tuple:
-        from fastapi import Response
-
         from api.errors.telephony_errors import TELEPHONY_ERROR_MESSAGES, TelephonyError
+        from fastapi import Response
 
         message = TELEPHONY_ERROR_MESSAGES.get(
             error_type, TELEPHONY_ERROR_MESSAGES[TelephonyError.GENERAL_AUTH_FAILED]

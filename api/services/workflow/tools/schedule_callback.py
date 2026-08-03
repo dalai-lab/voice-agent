@@ -31,7 +31,7 @@ def get_schedule_callback_tools() -> list[dict[str, Any]]:
                             "type": "integer",
                             "description": "Number of minutes before calling back. Min: 1, Max: 480.",
                             "minimum": 1,
-                            "maximum": 480,
+                            "maximum": 480
                         },
                         "farewell_message": {
                             "type": "string",
@@ -40,7 +40,7 @@ def get_schedule_callback_tools() -> list[dict[str, Any]]:
                         "conversation_summary": {
                             "type": "string",
                             "description": "A 1-2 sentence summary of the conversation so far, to be injected as context on the callback call.",
-                        },
+                        }
                     },
                     "required": ["minutes", "farewell_message", "conversation_summary"],
                 },

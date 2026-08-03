@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
-
 from api.services.workflow.node_specs._base import PropertyType
 from api.services.workflow.node_specs.model_spec import spec_field
+from pydantic import BaseModel
 
 
 class BaseNodeData(BaseModel):

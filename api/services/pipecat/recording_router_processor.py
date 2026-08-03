@@ -15,13 +15,13 @@ streaming LLM text tokens until the mode marker is detected, then act.
 import uuid
 from collections.abc import Awaitable, Callable
 
-from loguru import logger
-
 from api.services.pipecat.recording_audio_cache import RecordingAudio
 from api.services.workflow.pipecat_engine_context_composer import (
     RECORDING_MARKER,
     TTS_MARKER,
 )
+from loguru import logger
+
 from pipecat.frames.frames import (
     Frame,
     InterruptionFrame,

@@ -1,9 +1,9 @@
 import time
 from collections.abc import Awaitable, Callable
 
+from api.schemas.workflow_configurations import DEFAULT_MAX_CALL_DURATION_SECONDS
 from loguru import logger
 
-from api.schemas.workflow_configurations import DEFAULT_MAX_CALL_DURATION_SECONDS
 from pipecat.frames.frames import (
     Frame,
     HeartbeatFrame,

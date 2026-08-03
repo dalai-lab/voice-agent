@@ -32,6 +32,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.tests import MockLLMService, MockTTSService
 from pipecat.tests.mock_transport import MockTransport
 from pipecat.transports.base_transport import TransportParams
 from pipecat.turns.user_mute import (
@@ -58,7 +59,6 @@ from api.services.workflow.pipecat_engine_variable_extractor import (
 )
 from api.services.workflow.workflow_graph import WorkflowGraph
 from api.tests.conftest import END_CALL_SYSTEM_PROMPT, START_CALL_SYSTEM_PROMPT
-from pipecat.tests import MockLLMService, MockTTSService
 
 
 class EndCallTestHelper:
@@ -263,18 +263,15 @@ class TestEndCallViaNodeTransition:
         )
 
         # Patch DB calls and extraction manager
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={"user_intent": "end call"},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={"user_intent": "end call"},
         ):
 
             async def run_pipeline():
@@ -363,18 +360,15 @@ class TestEndCallViaNodeTransition:
         )
 
         # Patch DB calls and extraction manager
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={"greeting_type": "formal", "user_name": "John"},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={"greeting_type": "formal", "user_name": "John"},
         ):
 
             async def run_pipeline():
@@ -458,18 +452,15 @@ class TestEndCallViaCustomTool:
         llm.register_function("end_call_tool", handler)
 
         # Patch DB calls and extraction manager
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={"user_intent": "end"},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={"user_intent": "end"},
         ):
 
             async def run_pipeline():
@@ -546,18 +537,15 @@ class TestEndCallViaCustomTool:
         llm.register_function("end_call_with_message", handler)
 
         # Patch DB calls and extraction manager
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={"user_intent": "end"},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={"user_intent": "end"},
         ):
 
             async def run_pipeline():
@@ -620,18 +608,15 @@ class TestEndCallViaClientDisconnect:
         )
 
         # Patch DB calls and extraction manager
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={"user_intent": "disconnected"},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={"user_intent": "disconnected"},
         ):
 
             async def run_pipeline():
@@ -707,18 +692,15 @@ class TestEndCallRaceConditions:
         )
 
         # Patch DB calls and extraction manager
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={"user_intent": "end"},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={"user_intent": "end"},
         ):
 
             async def run_pipeline():
@@ -815,18 +797,15 @@ class TestEndCallRaceConditions:
         disconnect_called = False
 
         # Patch DB calls and extraction manager
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                new_callable=AsyncMock,
-                return_value={"user_intent": "end"},
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            new_callable=AsyncMock,
+            return_value={"user_intent": "end"},
         ):
 
             async def run_pipeline():
@@ -905,17 +884,14 @@ class TestEndCallExtractionBehavior:
             return {"user_intent": "extracted"}
 
         # Patch DB calls and extraction manager
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                side_effect=mock_extraction,
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            side_effect=mock_extraction,
         ):
 
             async def run_pipeline():
@@ -1027,17 +1003,14 @@ class TestEndCallExtractionBehavior:
         extraction_mock = AsyncMock(return_value={})
 
         # Patch DB calls and extraction manager
-        with (
-            patch(
-                "api.db:db_client.get_organization_id_by_workflow_run_id",
-                new_callable=AsyncMock,
-                return_value=1,
-            ),
-            patch.object(
-                VariableExtractionManager,
-                "_perform_extraction",
-                extraction_mock,
-            ),
+        with patch(
+            "api.db:db_client.get_organization_id_by_workflow_run_id",
+            new_callable=AsyncMock,
+            return_value=1,
+        ), patch.object(
+            VariableExtractionManager,
+            "_perform_extraction",
+            extraction_mock,
         ):
 
             async def run_pipeline():

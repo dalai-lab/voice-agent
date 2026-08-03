@@ -8,11 +8,10 @@ import asyncio
 from typing import Any
 
 import httpx
-from loguru import logger
-
 from api.db import db_client
 from api.services.workflow.initial_context import merge_external_initial_context
 from api.utils.credential_auth import build_auth_header
+from loguru import logger
 
 PRE_CALL_FETCH_TIMEOUT_SECONDS = 10
 

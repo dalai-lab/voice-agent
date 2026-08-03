@@ -9,6 +9,7 @@ Create Date: 2026-07-20 12:26:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -21,9 +22,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "workflows",
-        sa.Column(
-            "enable_dtmf", sa.Boolean(), nullable=False, server_default=sa.text("false")
-        ),
+        sa.Column("enable_dtmf", sa.Boolean(), nullable=False, server_default=sa.text("false")),
     )
 
 

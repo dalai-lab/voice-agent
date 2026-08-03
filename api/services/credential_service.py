@@ -3,12 +3,11 @@
 from typing import Any
 from urllib.parse import urlparse
 
-from fastapi import HTTPException
-
 from api.db import db_client
 from api.db.models import ExternalCredentialModel
 from api.enums import WebhookCredentialType
 from api.services.oauth2_token_cache import invalidate_token
+from fastapi import HTTPException
 
 
 def validate_credential_data(

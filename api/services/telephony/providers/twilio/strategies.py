@@ -154,12 +154,9 @@ class TwilioHangupStrategy(HangupStrategy):
             endpoint = f"https://api.{edge_prefix}{region_prefix}twilio.com/2010-04-01/Accounts/{account_sid}/Calls/{call_sid}.json"
             auth = aiohttp.BasicAuth(account_sid, auth_token)
 
-            async with (
-                aiohttp.ClientSession() as session,
-                session.post(
-                    endpoint, auth=auth, data={"Status": "completed"}
-                ) as response,
-            ):
+            async with aiohttp.ClientSession() as session, session.post(
+                endpoint, auth=auth, data={"Status": "completed"}
+            ) as response:
                 if response.status == 200:
                     logger.info(f"Successfully terminated Twilio call {call_sid}")
                     return True

@@ -41,15 +41,12 @@ async def test_get_telephony_provider_for_run_rejects_non_numeric_string_config_
         initial_context={"telephony_configuration_id": "twilio-main"}
     )
 
-    with (
-        patch(
-            "api.services.telephony.factory.get_default_telephony_provider",
-            new_callable=AsyncMock,
-        ) as get_default,
-        pytest.raises(
-            ValueError,
-            match="telephony_configuration_id must be an integer",
-        ),
+    with patch(
+        "api.services.telephony.factory.get_default_telephony_provider",
+        new_callable=AsyncMock,
+    ) as get_default, pytest.raises(
+        ValueError,
+        match="telephony_configuration_id must be an integer",
     ):
         await get_telephony_provider_for_run(workflow_run, 2617)
 

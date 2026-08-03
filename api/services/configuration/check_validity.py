@@ -1,8 +1,6 @@
+
 import httpx
 import openai
-from deepgram import DeepgramClient
-from groq import Groq
-from typing_extensions import TypedDict
 
 # try:
 #     from pyneuphonic import Neuphonic
@@ -14,6 +12,9 @@ from api.schemas.ai_model_configuration import (
 from api.services.configuration.registry import ServiceConfig, ServiceProviders
 from api.services.mps_service_key_client import mps_service_key_client
 from api.utils.url_security import validate_user_configured_service_url
+from deepgram import DeepgramClient
+from groq import Groq
+from typing_extensions import TypedDict
 
 AuthContext = TypedDict(
     "AuthContext",

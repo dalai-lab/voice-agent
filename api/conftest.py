@@ -165,8 +165,9 @@ async def run_migrations(database_url: str):
     """
     Run alembic migrations programmatically on the given database.
     """
-    from alembic import command
     from alembic.config import Config
+
+    from alembic import command
 
     # Get alembic.ini path
     alembic_ini_path = APP_ROOT_DIR / "alembic.ini"

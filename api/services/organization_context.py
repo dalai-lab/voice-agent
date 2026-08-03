@@ -1,12 +1,11 @@
 from typing import Literal
 
-from pydantic import BaseModel
-
 from api.db import db_client
 from api.db.models import UserModel
 from api.services.configuration.ai_model_configuration import (
     get_resolved_ai_model_configuration,
 )
+from pydantic import BaseModel
 
 
 class OrganizationModelServicesContext(BaseModel):

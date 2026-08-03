@@ -1,10 +1,6 @@
 from typing import Annotated
 
 import httpx
-from fastapi import Depends, Header, HTTPException, Query, WebSocket
-from loguru import logger
-from pydantic import ValidationError
-
 from api.constants import AUTH_PROVIDER, DOGRAH_MPS_SECRET_KEY, MPS_API_URL
 from api.db import db_client
 from api.db.models import UserModel
@@ -20,6 +16,9 @@ from api.services.posthog_client import (
     set_person_properties,
 )
 from api.utils.auth import decode_jwt_token
+from fastapi import Depends, Header, HTTPException, Query, WebSocket
+from loguru import logger
+from pydantic import ValidationError
 
 
 async def require_local_auth() -> None:

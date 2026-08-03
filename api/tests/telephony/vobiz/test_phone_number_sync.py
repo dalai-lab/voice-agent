@@ -2,8 +2,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import HTTPException
-
 from api.routes.organization import (
     _sync_inbound_for_phone_number,
     delete_phone_number,
@@ -14,6 +12,7 @@ from api.schemas.telephony_phone_number import (
     ProviderSyncStatus,
 )
 from api.services.telephony.base import ProviderSyncResult
+from fastapi import HTTPException
 
 
 @pytest.mark.asyncio
@@ -153,8 +152,7 @@ async def test_failed_detach_preserves_local_phone_number():
             return_value=ProviderSyncStatus(
                 ok=False, message="Vobiz API 409: number is still assigned"
             ),
-        ),
-        pytest.raises(HTTPException) as exc_info,
+        ),pytest.raises(HTTPException) as exc_info
     ):
         await delete_phone_number(
             config_id=7,

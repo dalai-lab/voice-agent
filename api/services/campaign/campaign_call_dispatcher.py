@@ -3,8 +3,6 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from loguru import logger
-
 from api.db import db_client
 from api.db.models import QueuedRunModel, WorkflowRunModel
 from api.enums import WorkflowRunState
@@ -23,6 +21,7 @@ from api.services.quota_service import authorize_workflow_run_start
 from api.services.workflow.initial_context import merge_external_initial_context
 from api.services.workflow.run_creation import prepare_workflow_run_inputs
 from api.utils.common import get_backend_endpoints
+from loguru import logger
 
 if TYPE_CHECKING:
     # Type-only — importing api.services.telephony eagerly triggers the
@@ -58,9 +57,7 @@ class CampaignCallDispatcher:
         """Get the concurrent call limit for an organization."""
         return await call_concurrency.get_org_concurrent_limit(organization_id)
 
-    async def process_batch(
-        self, campaign_id: int, batch_size: int = 10, callbacks_only: bool = False
-    ) -> int:
+    async def process_batch(self, campaign_id: int, batch_size: int = 10, callbacks_only: bool = False) -> int:
         """
         Processes a batch of queued runs with priority for scheduled retries.
         Thread-safe: uses SELECT FOR UPDATE SKIP LOCKED to prevent concurrent processing.
@@ -116,26 +113,22 @@ class CampaignCallDispatcher:
                         get_timezone_for_number,
                         resolve_callback_settings,
                     )
-
+                    
                     settings = await resolve_callback_settings(
                         organization_id=campaign.organization_id,
                         workflow_id=campaign.workflow_id,
-                        campaign_id=campaign.id,
+                        campaign_id=campaign.id
                     )
-
-                    to_number = queued_run.context_variables.get(
-                        "called_number"
-                    ) or queued_run.context_variables.get("phone_number")
+                    
+                    to_number = queued_run.context_variables.get("called_number") or queued_run.context_variables.get("phone_number")
                     start_str = settings.get("sociable_hours_start", "08:00")
                     end_str = settings.get("sociable_hours_end", "21:00")
                     default_tz_str = settings.get("sociable_timezone", "UTC")
                     tz_str = get_timezone_for_number(to_number, default_tz_str)
-
+                    
                     now_utc = datetime.now(UTC)
-                    adjusted_time = adjust_for_sociable_hours(
-                        now_utc, start_str, end_str, tz_str
-                    )
-
+                    adjusted_time = adjust_for_sociable_hours(now_utc, start_str, end_str, tz_str)
+                    
                     if adjusted_time > now_utc:
                         logger.info(
                             f"Callback queued_run {queued_run.id} is outside sociable hours at dispatch time. "
@@ -144,14 +137,12 @@ class CampaignCallDispatcher:
                         await db_client.update_queued_run(
                             queued_run_id=queued_run.id,
                             state="queued",
-                            scheduled_for=adjusted_time,
+                            scheduled_for=adjusted_time
                         )
                         processed_run_ids.add(queued_run.id)
                         continue
                 except Exception as e:
-                    logger.error(
-                        f"Error re-validating sociable hours for callback {queued_run.id}: {e}"
-                    )
+                    logger.error(f"Error re-validating sociable hours for callback {queued_run.id}: {e}")
                     # On error, we'll continue and dispatch it rather than dropping it forever
 
             try:
@@ -183,13 +174,9 @@ class CampaignCallDispatcher:
                 processed_run_ids.add(queued_run.id)
 
                 # Update campaign processed count
-                if (
-                    getattr(queued_run, "retry_reason", None)
-                    != "user_requested_callback"
-                ):
+                if getattr(queued_run, "retry_reason", None) != "user_requested_callback":
                     await db_client.update_campaign(
-                        campaign_id=campaign_id,
-                        processed_rows=campaign.processed_rows + 1,
+                        campaign_id=campaign_id, processed_rows=campaign.processed_rows + 1
                     )
 
             except asyncio.CancelledError:
@@ -393,7 +380,9 @@ class CampaignCallDispatcher:
         elif getattr(queued_run, "retry_reason", None) == "user_requested_callback":
             await db_client.update_workflow_run(
                 run_id=workflow_run.id,
-                gathered_context={"call_tags": ["callback"]},
+                gathered_context={
+                    "call_tags": ["callback"]
+                },
             )
 
         quota_result = await authorize_workflow_run_start(

@@ -7,8 +7,6 @@ import asyncio
 import time
 
 import redis.asyncio as aioredis
-from loguru import logger
-
 from api.constants import REDIS_URL
 from api.services.telephony.transfer_event_protocol import (
     TransferContext,
@@ -16,6 +14,7 @@ from api.services.telephony.transfer_event_protocol import (
     TransferEventType,
     TransferRedisChannels,
 )
+from loguru import logger
 
 
 class CallTransferManager:

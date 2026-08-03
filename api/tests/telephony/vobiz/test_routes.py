@@ -6,15 +6,14 @@ from unittest.mock import AsyncMock, patch
 from urllib.parse import urlencode
 
 import pytest
-from fastapi import HTTPException
-from starlette.requests import Request
-
 from api.services.telephony.providers.vobiz.provider import VobizProvider
 from api.services.telephony.providers.vobiz.routes import (
     handle_vobiz_hangup_callback,
     handle_vobiz_hangup_callback_by_workflow,
     handle_vobiz_ring_callback,
 )
+from fastapi import HTTPException
+from starlette.requests import Request
 
 
 def _provider(application_id: str | None = None) -> VobizProvider:

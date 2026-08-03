@@ -1,23 +1,24 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Clock, Phone, CheckCircle2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
-    Bar,
     BarChart,
-    CartesianGrid,
-    Cell,
-    Line,
-    LineChart,
-    ResponsiveContainer,
-    Tooltip,
+    Bar,
     XAxis,
-    YAxis} from "recharts";
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+    Cell,
+    LineChart,
+    Line
+} from "recharts";
 
 import { getWorkflowRunsApiV1WorkflowWorkflowIdRunsGet } from "@/client/sdk.gen";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
@@ -40,7 +41,7 @@ export default function AgentAnalyticsPage() {
                     path: { workflow_id: workflowId },
                     query: { limit: 100 }
                 });
-
+                
                 if (res.data?.runs) {
                     setRuns(res.data.runs);
                 }
@@ -54,7 +55,7 @@ export default function AgentAnalyticsPage() {
     }, [isAuthenticated, workflowId]);
 
     const { kpis, dispositionData, timelineData } = useMemo(() => {
-        const totalCalls = runs.length;
+        let totalCalls = runs.length;
         let totalDuration = 0;
         let completedCalls = 0;
         const dispMap: Record<string, number> = {};
@@ -62,16 +63,16 @@ export default function AgentAnalyticsPage() {
 
         runs.forEach(run => {
             totalDuration += run.call_duration_seconds || 0;
-
+            
             // Map disposition from gathered_context or fallback to disposition
             let disp = (run.gathered_context as any)?.mapped_call_disposition;
             if (!disp && run.disposition) {
                 disp = run.disposition;
             }
             if (!disp) disp = "Unknown";
-
+            
             dispMap[disp] = (dispMap[disp] || 0) + 1;
-
+            
             if (run.state === 'completed' || run.is_completed) {
                 completedCalls++;
             }
@@ -174,13 +175,13 @@ export default function AgentAnalyticsPage() {
                                             >
                                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#333" />
                                                 <XAxis type="number" tick={{ fontSize: 10, fill: '#888' }} />
-                                                <YAxis
-                                                    dataKey="name"
-                                                    type="category"
-                                                    tick={{ fontSize: 11, fill: '#ccc' }}
+                                                <YAxis 
+                                                    dataKey="name" 
+                                                    type="category" 
+                                                    tick={{ fontSize: 11, fill: '#ccc' }} 
                                                     width={100}
                                                 />
-                                                <Tooltip
+                                                <Tooltip 
                                                     contentStyle={{ backgroundColor: '#1f1f1f', borderColor: '#333', fontSize: '12px', borderRadius: '8px' }}
                                                     cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                                 />
@@ -204,20 +205,20 @@ export default function AgentAnalyticsPage() {
                                                 margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
                                             >
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" />
-                                                <XAxis
-                                                    dataKey="date"
-                                                    tick={{ fontSize: 10, fill: '#888' }}
+                                                <XAxis 
+                                                    dataKey="date" 
+                                                    tick={{ fontSize: 10, fill: '#888' }} 
                                                     tickMargin={10}
                                                 />
                                                 <YAxis tick={{ fontSize: 10, fill: '#888' }} />
-                                                <Tooltip
+                                                <Tooltip 
                                                     contentStyle={{ backgroundColor: '#1f1f1f', borderColor: '#333', fontSize: '12px', borderRadius: '8px' }}
                                                 />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="count"
+                                                <Line 
+                                                    type="monotone" 
+                                                    dataKey="count" 
                                                     name="Calls"
-                                                    stroke="#0088FE"
+                                                    stroke="#0088FE" 
                                                     strokeWidth={3}
                                                     dot={{ r: 4, fill: '#0088FE', strokeWidth: 0 }}
                                                     activeDot={{ r: 6 }}

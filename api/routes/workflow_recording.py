@@ -178,7 +178,9 @@ async def list_recordings(
     tts_provider: Annotated[
         str | None, Query(description="Filter by TTS provider")
     ] = None,
-    tts_model: Annotated[str | None, Query(description="Filter by TTS model")] = None,
+    tts_model: Annotated[
+        str | None, Query(description="Filter by TTS model")
+    ] = None,
     tts_voice_id: Annotated[
         str | None, Query(description="Filter by TTS voice ID")
     ] = None,

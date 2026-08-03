@@ -264,7 +264,6 @@ class ARIHangupStrategy(HangupStrategy):
         redis = None
         try:
             import redis.asyncio as aioredis
-
             from api.constants import REDIS_URL
             from api.db import db_client
 

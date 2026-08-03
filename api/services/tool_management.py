@@ -9,8 +9,6 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from loguru import logger
-
 from api.db import db_client
 from api.db.models import UserModel
 from api.enums import PostHogEvent, ToolCategory
@@ -27,6 +25,7 @@ from api.services.workflow.tools.mcp_tool import (
     McpDefinitionError,
     validate_mcp_definition,
 )
+from loguru import logger
 
 
 class ToolManagementError(ValueError):

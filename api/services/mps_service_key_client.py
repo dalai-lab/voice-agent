@@ -7,9 +7,8 @@ Service keys are stored and managed entirely in MPS, not in the local database.
 import asyncio
 
 import httpx
-from loguru import logger
-
 from api.constants import DEPLOYMENT_MODE, DOGRAH_MPS_SECRET_KEY, MPS_API_URL
+from loguru import logger
 
 
 class MPSServiceKeyClient:

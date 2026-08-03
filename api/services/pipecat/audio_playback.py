@@ -174,7 +174,7 @@ async def play_audio_loop(
     duration = num_samples / sample_rate
 
     logger.debug(f"Audio loop: playing at {sample_rate}Hz")
-
+    
     # 500ms chunks to allow near-instant cancellation without music bleeding
     chunk_duration_sec = 0.5
     chunk_size = int(sample_rate * chunk_duration_sec * 2)  # 2 bytes per sample
@@ -184,17 +184,17 @@ async def play_audio_loop(
             for i in range(0, len(audio_data), chunk_size):
                 if stop_event.is_set():
                     break
-
-                chunk = audio_data[i : i + chunk_size]
+                
+                chunk = audio_data[i:i + chunk_size]
                 frame = OutputAudioRawFrame(
                     audio=chunk,
                     sample_rate=sample_rate,
                     num_channels=1,
                 )
                 await queue_frame(frame)
-
+                
                 chunk_play_time = (len(chunk) // 2) / sample_rate
-
+                
                 try:
                     await asyncio.wait_for(stop_event.wait(), timeout=chunk_play_time)
                     break

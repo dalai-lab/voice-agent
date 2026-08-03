@@ -450,11 +450,9 @@ export function HttpToolTestDialog({
                                                 Path params:{" "}
                                                 {result.consumed_path_params
                                                     .map((key) => {
-                                                        const llmVal = llmParamValues[key];
-                                                        const preVal = presetParamValues[key];
-                                                        const val = preVal !== undefined ? preVal : llmVal;
-                                                        const displayVal = typeof val === 'object' && val !== null ? JSON.stringify(val) : val;
-                                                        return `${key}=${displayVal}`;
+                                                        const baseKey = key.split('.')[0];
+                                                        const val = llmParamValues[baseKey] !== undefined ? llmParamValues[baseKey] : presetParamValues[baseKey];
+                                                        return `${key}=${val !== undefined ? val : ''}`;
                                                     })
                                                     .join("  ")}
                                             </pre>

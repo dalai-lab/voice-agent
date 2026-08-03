@@ -1,4 +1,4 @@
-import {Percent, Phone, PhoneForwarded } from 'lucide-react';
+import { Phone, PhoneForwarded, Percent, Clock } from 'lucide-react';
 
 interface MetricsCardsProps {
   metrics: {

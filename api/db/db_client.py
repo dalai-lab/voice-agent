@@ -69,3 +69,4 @@ class DBClient(
     - KnowledgeBaseClient: handles knowledge base document and vector search operations
     - FolderClient: handles folder operations for grouping workflows (agents)
     """
+

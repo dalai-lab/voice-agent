@@ -1,7 +1,5 @@
 import asyncio
 
-from loguru import logger
-
 from api.db import db_client
 from api.enums import PostHogEvent, WorkflowRunState
 from api.services.campaign.circuit_breaker import circuit_breaker
@@ -21,6 +19,8 @@ from api.services.workflow.pipecat_engine import PipecatEngine
 from api.services.workflow_run_artifacts import upload_workflow_run_artifacts
 from api.tasks.arq import enqueue_job
 from api.tasks.function_names import FunctionNames
+from loguru import logger
+
 from pipecat.frames.frames import (
     Frame,
 )
@@ -162,9 +162,7 @@ def register_event_handlers(
             # Determine which node to start at based on callback_resume_mode
             resume_mode = engine._call_context_vars.get("callback_resume_mode", "fresh")
             is_callback = engine._call_context_vars.get("is_callback", False)
-            nodes_visited = engine._call_context_vars.get("gathered_context", {}).get(
-                "nodes_visited", []
-            )
+            nodes_visited = engine._call_context_vars.get("gathered_context", {}).get("nodes_visited", [])
 
             if is_callback and resume_mode == "last_node" and nodes_visited:
                 # nodes_visited stores node NAMES (labels), but workflow.nodes is keyed by ID
@@ -180,14 +178,10 @@ def register_event_handlers(
                     node_id = name_to_id.get(node_name)
                     if node_id and node_id in engine.workflow.nodes:
                         start_node_id = node_id
-                        logger.info(
-                            f"[CALLBACK DEBUG] Resuming from last visited node: '{node_name}' (id={node_id!r})"
-                        )
+                        logger.info(f"[CALLBACK DEBUG] Resuming from last visited node: '{node_name}' (id={node_id!r})")
                         break
                 else:
-                    logger.info(
-                        f"[CALLBACK DEBUG] No matching node found in nodes_visited={nodes_visited}, starting fresh"
-                    )
+                    logger.info(f"[CALLBACK DEBUG] No matching node found in nodes_visited={nodes_visited}, starting fresh")
             else:
                 start_node_id = engine.workflow.start_node_id
 

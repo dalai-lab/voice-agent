@@ -369,7 +369,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   },
 
   setTemplateContextVariables: (variables) => set({ templateContextVariables: variables }),
-
+  
   setWorkflowConfigurations: (configurations) => set({ workflowConfigurations: configurations }),
 
   setPostCallSchema: (schema) => set({ postCallSchema: schema }),

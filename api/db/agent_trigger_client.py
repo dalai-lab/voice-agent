@@ -1,5 +1,6 @@
 """Database client for managing agent triggers."""
 
+
 from loguru import logger
 from sqlalchemy import and_, insert, select, update
 

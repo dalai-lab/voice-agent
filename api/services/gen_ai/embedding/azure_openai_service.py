@@ -7,11 +7,10 @@ text-embedding-ada-002.
 
 from typing import Any
 
-from loguru import logger
-from openai import AsyncAzureOpenAI
-
 from api.db.db_client import DBClient
 from api.utils.url_security import validate_user_configured_service_url
+from loguru import logger
+from openai import AsyncAzureOpenAI
 
 from .base import BaseEmbeddingService
 

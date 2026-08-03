@@ -137,10 +137,9 @@ class TelnyxProvider(TelephonyProvider):
 
         endpoint = f"{self.TELNYX_API_BASE}/calls"
 
-        async with (
-            aiohttp.ClientSession() as session,
-            session.post(endpoint, json=payload, headers=self._headers()) as response,
-        ):
+        async with aiohttp.ClientSession() as session, session.post(
+            endpoint, json=payload, headers=self._headers()
+        ) as response:
             if response.status != 200:
                 error_data = await response.json()
                 logger.error(f"Telnyx API error: {error_data}")
@@ -461,10 +460,9 @@ class TelnyxProvider(TelephonyProvider):
             f"Answering Telnyx inbound call {call_control_id} with stream_url={stream_url}"
         )
 
-        async with (
-            aiohttp.ClientSession() as session,
-            session.post(endpoint, json=payload, headers=self._headers()) as response,
-        ):
+        async with aiohttp.ClientSession() as session, session.post(
+            endpoint, json=payload, headers=self._headers()
+        ) as response:
             if response.status != 200:
                 error_data = await response.text()
                 logger.error(
@@ -588,10 +586,9 @@ class TelnyxProvider(TelephonyProvider):
         )
 
         try:
-            async with (
-                aiohttp.ClientSession() as session,
-                session.get(app_endpoint, headers=self._headers()) as response,
-            ):
+            async with aiohttp.ClientSession() as session, session.get(
+                app_endpoint, headers=self._headers()
+            ) as response:
                 if response.status != 200:
                     body = await response.text()
                     logger.error(
@@ -627,12 +624,9 @@ class TelnyxProvider(TelephonyProvider):
         }
 
         try:
-            async with (
-                aiohttp.ClientSession() as session,
-                session.patch(
-                    app_endpoint, json=update_body, headers=self._headers()
-                ) as response,
-            ):
+            async with aiohttp.ClientSession() as session, session.patch(
+                app_endpoint, json=update_body, headers=self._headers()
+            ) as response:
                 if response.status != 200:
                     body = await response.text()
                     logger.error(
@@ -673,12 +667,9 @@ class TelnyxProvider(TelephonyProvider):
             "page[size]": 100,
         }
         try:
-            async with (
-                aiohttp.ClientSession() as session,
-                session.get(
-                    endpoint, params=params, headers=self._headers()
-                ) as response,
-            ):
+            async with aiohttp.ClientSession() as session, session.get(
+                endpoint, params=params, headers=self._headers()
+            ) as response:
                 if response.status != 200:
                     body = await response.text()
                     raise ProviderPhoneNumberLookupError(
@@ -750,9 +741,8 @@ class TelnyxProvider(TelephonyProvider):
 
     @staticmethod
     def generate_validation_error_response(error_type) -> tuple:
-        from fastapi import Response
-
         from api.errors.telephony_errors import TELEPHONY_ERROR_MESSAGES, TelephonyError
+        from fastapi import Response
 
         message = TELEPHONY_ERROR_MESSAGES.get(
             error_type, TELEPHONY_ERROR_MESSAGES[TelephonyError.GENERAL_AUTH_FAILED]
@@ -807,12 +797,9 @@ class TelnyxProvider(TelephonyProvider):
         )
 
         try:
-            async with (
-                aiohttp.ClientSession() as session,
-                session.post(
-                    endpoint, json=payload, headers=self._headers()
-                ) as response,
-            ):
+            async with aiohttp.ClientSession() as session, session.post(
+                endpoint, json=payload, headers=self._headers()
+            ) as response:
                 response_text = await response.text()
                 if response.status != 200:
                     logger.error(
@@ -872,12 +859,9 @@ class TelnyxProvider(TelephonyProvider):
         }
 
         try:
-            async with (
-                aiohttp.ClientSession() as session,
-                session.post(
-                    endpoint, json=payload, headers=self._headers()
-                ) as response,
-            ):
+            async with aiohttp.ClientSession() as session, session.post(
+                endpoint, json=payload, headers=self._headers()
+            ) as response:
                 body = await response.text()
                 if response.status != 200:
                     logger.error(

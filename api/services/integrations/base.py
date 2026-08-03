@@ -4,10 +4,9 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from fastapi import APIRouter
-
 from api.services.workflow.node_data import BaseNodeData
 from api.services.workflow.node_specs._base import NodeSpec
+from fastapi import APIRouter
 
 
 class IntegrationRuntimeSession(Protocol):

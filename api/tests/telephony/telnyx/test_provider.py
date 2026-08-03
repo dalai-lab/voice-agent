@@ -6,11 +6,10 @@ from unittest.mock import AsyncMock, patch
 
 import nacl.signing
 import pytest
-from fastapi import HTTPException
-from starlette.requests import Request
-
 from api.services.telephony.providers.telnyx.provider import TelnyxProvider
 from api.services.telephony.providers.telnyx.routes import handle_telnyx_events
+from fastapi import HTTPException
+from starlette.requests import Request
 
 
 def _body() -> str:

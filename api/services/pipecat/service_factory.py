@@ -2,9 +2,6 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlencode, urlparse, urlunparse
 
 import aiohttp
-from fastapi import HTTPException
-from loguru import logger
-
 from api.constants import MPS_API_URL
 from api.services.configuration.options import (
     DEEPGRAM_FLUX_MODELS,
@@ -16,6 +13,9 @@ from api.services.pipecat.gemini_json_schema_adapter import (
 )
 from api.services.pipecat.minimax_tts import MiniMaxOwnedSessionTTSService
 from api.utils.url_security import validate_user_configured_service_url
+from fastapi import HTTPException
+from loguru import logger
+
 from pipecat.services.assemblyai.stt import AssemblyAISTTService, AssemblyAISTTSettings
 from pipecat.services.aws.llm import AWSBedrockLLMService, AWSBedrockLLMSettings
 from pipecat.services.azure.llm import AzureLLMService, AzureLLMSettings
@@ -1033,6 +1033,7 @@ def create_realtime_llm_service(user_config, audio_config: "AudioConfig"):
         from api.services.pipecat.realtime.openai_realtime import (
             DograhOpenAIRealtimeLLMService,
         )
+
         from pipecat.services.openai.realtime.events import (
             AudioConfiguration,
             AudioInput,
@@ -1070,6 +1071,7 @@ def create_realtime_llm_service(user_config, audio_config: "AudioConfig"):
         from api.services.pipecat.realtime.grok_realtime import (
             DograhGrokRealtimeLLMService,
         )
+
         from pipecat.services.xai.realtime.events import (
             AudioConfiguration,
             AudioInput,
@@ -1155,6 +1157,7 @@ def create_realtime_llm_service(user_config, audio_config: "AudioConfig"):
         from api.services.pipecat.realtime.azure_realtime import (
             DograhAzureRealtimeLLMService,
         )
+
         from pipecat.services.openai.realtime.events import (
             AudioConfiguration,
             AudioInput,
@@ -1226,14 +1229,10 @@ def create_llm_service(
     api_key = user_config.llm.api_key
 
     kwargs = {}
-    if (
-        provider
-        in (
-            ServiceProviders.OPENAI.value,
-            ServiceProviders.ATLASCLOUD.value,
-        )
-        or provider == ServiceProviders.OPENROUTER.value
-    ):
+    if provider in (
+        ServiceProviders.OPENAI.value,
+        ServiceProviders.ATLASCLOUD.value,
+    ) or provider == ServiceProviders.OPENROUTER.value:
         kwargs["base_url"] = user_config.llm.base_url
     elif provider == ServiceProviders.AZURE.value:
         kwargs["endpoint"] = user_config.llm.endpoint

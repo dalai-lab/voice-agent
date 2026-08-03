@@ -14,9 +14,8 @@ import json
 import re
 from typing import Any
 
-from loguru import logger
-
 from api.services.workflow.initial_context import RESERVED_INITIAL_CONTEXT_KEYS
+from loguru import logger
 
 MAX_CONTEXT_VARIABLES = 50
 MAX_KEY_LENGTH = 64

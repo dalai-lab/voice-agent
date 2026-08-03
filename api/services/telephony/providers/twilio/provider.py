@@ -6,10 +6,6 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
-from fastapi import HTTPException
-from loguru import logger
-from twilio.request_validator import RequestValidator
-
 from api.enums import TelephonyCallStatus, WorkflowRunMode
 from api.services.telephony import ws_auth
 from api.services.telephony.base import (
@@ -22,6 +18,9 @@ from api.services.telephony.base import (
 )
 from api.utils.common import get_backend_endpoints
 from api.utils.telephony_address import normalize_telephony_address
+from fastapi import HTTPException
+from loguru import logger
+from twilio.request_validator import RequestValidator
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -606,9 +605,8 @@ class TwilioProvider(TelephonyProvider):
         """
         Generate Twilio-specific error response for validation failures with organizational debugging info.
         """
-        from fastapi import Response
-
         from api.errors.telephony_errors import TELEPHONY_ERROR_MESSAGES, TelephonyError
+        from fastapi import Response
 
         message = TELEPHONY_ERROR_MESSAGES.get(
             error_type, TELEPHONY_ERROR_MESSAGES[TelephonyError.GENERAL_AUTH_FAILED]

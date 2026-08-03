@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Cpu, Shield, Terminal, PhoneCall, Megaphone, CheckCircle2, Mic, Volume2, Sparkles, Layers, Activity, Bot, Zap, Lock, RefreshCw } from "lucide-react";
+import { Activity, ArrowRight, Bot, CheckCircle2, Cpu, Layers, Mic, PhoneCall,Shield, Terminal, Volume2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 

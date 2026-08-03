@@ -9,6 +9,9 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 import jwt
+from fastapi import HTTPException, Response
+from loguru import logger
+
 from api.enums import TelephonyCallStatus, WorkflowRunMode
 from api.services.telephony import ws_auth
 from api.services.telephony.base import (
@@ -20,8 +23,6 @@ from api.services.telephony.base import (
 )
 from api.utils.common import get_backend_endpoints
 from api.utils.telephony_address import normalize_telephony_address
-from fastapi import HTTPException, Response
-from loguru import logger
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -658,9 +659,10 @@ class VonageProvider(TelephonyProvider):
             update_body["privacy"] = app_data["privacy"]
 
         try:
-            async with aiohttp.ClientSession() as session, session.put(
-                app_endpoint, json=update_body, auth=auth
-            ) as response:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.put(app_endpoint, json=update_body, auth=auth) as response,
+            ):
                 if response.status not in (200, 201):
                     body = await response.text()
                     logger.error(

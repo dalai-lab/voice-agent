@@ -16,6 +16,7 @@ import {
     startCampaignApiV1CampaignCampaignIdStartPost,
 } from '@/client/sdk.gen';
 import type { CampaignResponse } from '@/client/types.gen';
+import { CampaignAnalytics } from '@/components/analytics/CampaignAnalytics';
 import { CampaignCallbacks } from '@/components/campaign-callbacks';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,6 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CampaignAnalytics } from '@/components/analytics/CampaignAnalytics';
 import { CampaignRuns } from '@/components/workflow-runs';
 import { useOrganizationTimezone } from '@/hooks/useOrganizationTimezone';
 import { useAuth } from '@/lib/auth';

@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import redis.asyncio as aioredis
-from api.constants import REDIS_URL
 from loguru import logger
+
+from api.constants import REDIS_URL
 
 # Fleet-wide mirror of every live slot ("<org_id>:<slot_id>", scored by acquire
 # time), maintained by the acquire/release paths alongside the per-org sets so
@@ -540,9 +541,13 @@ class RateLimiter:
         """
 
         try:
-            result = await redis_client.eval(lua_script, 1, key, now, stale_cutoff, preferred_number)
+            result = await redis_client.eval(
+                lua_script, 1, key, now, stale_cutoff, preferred_number
+            )
             if result:
-                logger.debug(f"Acquired specific from_number {preferred_number} for org {organization_id}")
+                logger.debug(
+                    f"Acquired specific from_number {preferred_number} for org {organization_id}"
+                )
             return bool(result)
         except Exception as e:
             logger.error(f"Error acquiring specific from_number: {e}")

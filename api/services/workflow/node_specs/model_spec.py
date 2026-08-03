@@ -7,6 +7,9 @@ from enum import Enum
 from types import NoneType
 from typing import Any, Literal, get_args, get_origin
 
+from pydantic import BaseModel, Field
+from pydantic.fields import FieldInfo, PydanticUndefined
+
 from api.services.workflow.node_specs._base import (
     DisplayOptions,
     GraphConstraints,
@@ -18,8 +21,6 @@ from api.services.workflow.node_specs._base import (
     PropertySpec,
     PropertyType,
 )
-from pydantic import BaseModel, Field
-from pydantic.fields import FieldInfo, PydanticUndefined
 
 _SPEC_FIELD_META_KEY = "__dograh_spec_field__"
 _UNSET = object()

@@ -2,12 +2,13 @@ import asyncio
 import time
 from dataclasses import dataclass
 
+from loguru import logger
+
 from api.constants import DEFAULT_ORG_CONCURRENCY_LIMIT
 from api.db import db_client
 from api.enums import OrganizationConfigurationKey, PostHogEvent
 from api.services.call_concurrency.rate_limiter import rate_limiter
 from api.services.posthog_client import capture_event
-from loguru import logger
 
 
 @dataclass(frozen=True)

@@ -4,9 +4,10 @@ import copy
 from datetime import UTC, datetime
 from typing import Any
 
+from loguru import logger
+
 from api.constants import BACKEND_API_ENDPOINT, TUNER_BASE_URL
 from api.services.integrations.base import IntegrationCompletionContext
-from loguru import logger
 
 from .client import TunerDeliveryConfig, post_call
 from .collector import TUNER_RECORDING_PLACEHOLDER

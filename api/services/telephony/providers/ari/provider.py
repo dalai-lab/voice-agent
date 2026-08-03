@@ -10,6 +10,9 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import aiohttp
+from fastapi import HTTPException
+from loguru import logger
+
 from api.db import db_client
 from api.enums import TelephonyCallStatus, WorkflowRunMode
 from api.services.telephony.base import (
@@ -19,8 +22,6 @@ from api.services.telephony.base import (
     TelephonyProvider,
 )
 from api.services.telephony.providers.ari.external_pbx import create_adapter
-from fastapi import HTTPException
-from loguru import logger
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -118,11 +119,14 @@ class ARIProvider(TelephonyProvider):
             f"via app={self.app_name}, workflow_run_id={workflow_run_id}"
         )
 
-        async with aiohttp.ClientSession() as session, session.post(
-            endpoint,
-            params=params,
-            auth=self._get_auth(),
-        ) as response:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                endpoint,
+                params=params,
+                auth=self._get_auth(),
+            ) as response,
+        ):
             response_text = await response.text()
 
             if response.status != 200:
@@ -356,8 +360,9 @@ class ARIProvider(TelephonyProvider):
     @staticmethod
     def generate_validation_error_response(error_type) -> tuple:
         """Generate JSON error response for validation failures."""
-        from api.errors.telephony_errors import TELEPHONY_ERROR_MESSAGES, TelephonyError
         from fastapi import Response
+
+        from api.errors.telephony_errors import TELEPHONY_ERROR_MESSAGES, TelephonyError
 
         message = TELEPHONY_ERROR_MESSAGES.get(
             error_type, TELEPHONY_ERROR_MESSAGES[TelephonyError.GENERAL_AUTH_FAILED]
@@ -538,9 +543,12 @@ class ARIProvider(TelephonyProvider):
         params = {"reason_code": reason}
 
         try:
-            async with aiohttp.ClientSession() as session, session.delete(
-                endpoint, params=params, auth=self._get_auth()
-            ) as response:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.delete(
+                    endpoint, params=params, auth=self._get_auth()
+                ) as response,
+            ):
                 if response.status in (200, 204):
                     logger.info(f"[ARI] Channel {channel_id} hung up")
                     return True

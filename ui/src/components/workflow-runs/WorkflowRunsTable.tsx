@@ -18,9 +18,9 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { getDispositionBadge, formatContactOrigin } from "@/lib/dispositionLabels";
 import { useOrganizationTimezone } from "@/hooks/useOrganizationTimezone";
 import { formatDateTime } from "@/lib/dateTime";
+import {getDispositionBadge } from "@/lib/dispositionLabels";
 import { ActiveFilter, FilterAttribute } from "@/types/filters";
 
 export interface WorkflowRunsTableProps {

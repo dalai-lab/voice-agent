@@ -11,6 +11,8 @@ the post-run integration job delivers configured webhooks.
 
 from datetime import UTC, datetime
 
+from loguru import logger
+
 from api.db import db_client
 from api.enums import TelephonyCallStatus, WorkflowRunState
 from api.services.pipecat.realtime_feedback_events import (
@@ -18,7 +20,6 @@ from api.services.pipecat.realtime_feedback_events import (
     stamp_realtime_feedback_event,
 )
 from api.tasks.function_names import FunctionNames
-from loguru import logger
 
 
 async def mark_workflow_run_failed(workflow_run_id: int, error_message: str) -> None:

@@ -5,15 +5,15 @@ Revises: gg11dd223344
 Create Date: 2026-07-22 12:42:18.521312
 
 """
+
 from collections.abc import Sequence
 
+from alembic import op
 from alembic_postgresql_enum import TableReference
 
-from alembic import op
-
 # revision identifiers, used by Alembic.
-revision: str = 'ceeaf3c37b2f'
-down_revision: str | None = 'gg11dd223344'
+revision: str = "ceeaf3c37b2f"
+down_revision: str | None = "gg11dd223344"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -39,6 +39,7 @@ def upgrade() -> None:
         ],
         enum_values_to_rename=[],
     )
+
 
 def downgrade() -> None:
     op.sync_enum_values(

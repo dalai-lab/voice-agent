@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class DTMFEvent(BaseModel):
     """Event triggered when a user presses a keypad digit."""
+
     call_id: str = Field(description="The call ID associated with the DTMF event.")
     digit: str = Field(description="The single digit pressed (0-9, *, #).")
     timestamp: datetime = Field(description="When the digit was pressed.")

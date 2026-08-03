@@ -19,7 +19,6 @@ from api.services.pipecat.realtime_feedback_events import (
 
 if TYPE_CHECKING:
     from api.services.pipecat.in_memory_buffers import InMemoryLogsBuffer
-
     from pipecat.observers.turn_tracking_observer import TurnTrackingObserver
 
 

@@ -8,9 +8,8 @@ Create Date: 2026-01-14 15:04:48.899778
 
 from collections.abc import Sequence
 
-from alembic_postgresql_enum import TableReference
-
 from alembic import op
+from alembic_postgresql_enum import TableReference
 
 # revision identifiers, used by Alembic.
 revision: str = "493ca2bb001f"

@@ -2,6 +2,9 @@
 
 from typing import Any
 
+from loguru import logger
+from pipecat.processors.aggregators.llm_context import LLMContext
+
 from api.db import db_client
 from api.db.models import WorkflowRunModel
 from api.services.managed_model_services import get_mps_correlation_id
@@ -9,8 +12,6 @@ from api.services.pipecat.service_factory import create_llm_service_from_provide
 from api.services.workflow.dto import NodeType, QANodeData
 from api.services.workflow.qa.llm_config import QA_USAGE_CONTEXT, resolve_llm_config
 from api.services.workflow.qa.tracing import create_node_summary_trace
-from loguru import logger
-from pipecat.processors.aggregators.llm_context import LLMContext
 
 NODE_SUMMARY_SYSTEM_PROMPT = (
     "You are analyzing a voice AI agent script. This is only a part of a larger script. "

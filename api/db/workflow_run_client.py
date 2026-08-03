@@ -337,7 +337,6 @@ class WorkflowRunClient(BaseDBClient):
             ]
             return runs, total_count
 
-
     async def get_workflow_runs_by_organization_id(
         self,
         organization_id: int,
@@ -368,7 +367,7 @@ class WorkflowRunClient(BaseDBClient):
             result = await session.execute(
                 base_query.order_by(order_clause).limit(limit).offset(offset)
             )
-            
+
             runs = []
             for row in result.all():
                 run = row[0]

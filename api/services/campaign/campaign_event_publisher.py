@@ -3,8 +3,9 @@
 Handles publishing of campaign events to Redis pub/sub channels.
 """
 
-
 import redis.asyncio as aioredis
+from loguru import logger
+
 from api.constants import REDIS_URL
 from api.enums import RedisChannel
 from api.services.campaign.campaign_event_protocol import (
@@ -15,7 +16,6 @@ from api.services.campaign.campaign_event_protocol import (
     RetryNeededEvent,
     SyncCompletedEvent,
 )
-from loguru import logger
 
 
 class CampaignEventPublisher:

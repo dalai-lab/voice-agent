@@ -3,6 +3,10 @@
 import json
 from typing import Any
 
+from loguru import logger
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.utils.enums import EndTaskReason
+
 from api.db.models import WorkflowRunModel
 from api.services.gen_ai.json_parser import parse_llm_json
 from api.services.managed_model_services import get_mps_correlation_id
@@ -12,9 +16,6 @@ from api.services.workflow.qa.conversation import (
     format_transcript,
 )
 from api.services.workflow.qa.llm_config import resolve_user_llm_config
-from loguru import logger
-from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.utils.enums import EndTaskReason
 
 
 async def run_post_call_intelligence(
@@ -32,7 +33,9 @@ async def run_post_call_intelligence(
     usage_info = workflow_run.usage_info or {}
     call_duration = usage_info.get("call_duration_seconds", 0)
     if call_duration < 10:
-        logger.info(f"Skipping PCI for run {workflow_run.id}: call_too_short ({call_duration}s)")
+        logger.info(
+            f"Skipping PCI for run {workflow_run.id}: call_too_short ({call_duration}s)"
+        )
         return {"_error": "skipped", "reason": "call_too_short"}
 
     gathered_context = workflow_run.gathered_context or {}
@@ -45,7 +48,9 @@ async def run_post_call_intelligence(
     logs = workflow_run.logs or {}
     rtf_events = logs.get("realtime_feedback_events", [])
     if not rtf_events:
-        logger.info(f"Skipping PCI for run {workflow_run.id}: no_transcript (no events)")
+        logger.info(
+            f"Skipping PCI for run {workflow_run.id}: no_transcript (no events)"
+        )
         return {"_error": "skipped", "reason": "no_transcript"}
 
     conversation = build_conversation_structure(rtf_events)
@@ -86,7 +91,9 @@ async def run_post_call_intelligence(
     context.set_messages(messages)
 
     try:
-        raw_response = await llm.run_inference(context, system_instruction=system_prompt)
+        raw_response = await llm.run_inference(
+            context, system_instruction=system_prompt
+        )
     except Exception as e:
         logger.error(f"PCI LLM call failed for run {workflow_run.id}: {e}")
         return {"_error": "error", "reason": str(e)}

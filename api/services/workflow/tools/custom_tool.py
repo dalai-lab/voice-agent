@@ -2,8 +2,9 @@
 
 import json
 import re
-from typing import Any
 import urllib.parse
+from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from loguru import logger
@@ -706,6 +707,20 @@ def render_url_template(
         return urllib.parse.quote(val, safe="")
 
     rendered_url = re.sub(TEMPLATE_VAR_PATTERN, _replace, url)
+
+    if "{{" in rendered_url or "}}" in rendered_url:
+        raise ValueError("Malformed URL template: invalid placeholder syntax.")
+
+    original_parsed = urlparse(url)
+    rendered_parsed = urlparse(rendered_url)
+    if (
+        original_parsed.scheme != rendered_parsed.scheme
+        or original_parsed.netloc != rendered_parsed.netloc
+    ):
+        raise ValueError(
+            "URL placeholders cannot alter the scheme or host of the configured endpoint."
+        )
+
     return rendered_url, consumed_params
 
 

@@ -1,3 +1,5 @@
+from loguru import logger
+
 from api.constants import (
     ENABLE_AWS_S3,
     ENVIRONMENT,
@@ -14,7 +16,6 @@ from api.constants import (
     S3_SIGNATURE_VERSION,
 )
 from api.enums import Environment, StorageBackend
-from loguru import logger
 
 from .filesystem import BaseFileSystem, MinioFileSystem, NullFileSystem, S3FileSystem
 

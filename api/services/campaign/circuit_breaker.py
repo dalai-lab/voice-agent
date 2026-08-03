@@ -14,10 +14,11 @@ import time
 from typing import Any
 
 import redis.asyncio as aioredis
+from loguru import logger
+
 from api.constants import DEFAULT_CIRCUIT_BREAKER_CONFIG, REDIS_URL
 from api.db import db_client
 from api.services.campaign.campaign_event_publisher import get_campaign_event_publisher
-from loguru import logger
 
 # Cap on the number of recent failure entries kept per campaign — large enough
 # to be useful for debugging a trip, small enough that the JSON details stay

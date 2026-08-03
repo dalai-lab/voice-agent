@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from api.enums import TelephonyCallStatus, WorkflowRunState
 from api.services.telephony.status_processor import (
     StatusCallbackRequest,

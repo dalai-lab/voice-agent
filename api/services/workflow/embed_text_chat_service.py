@@ -7,6 +7,9 @@ turn execution, and allowlist projection.
 
 from typing import Any
 
+from loguru import logger
+from pipecat.utils.run_context import set_current_run_id
+
 from api.db import db_client
 from api.db.models import EmbedTokenModel, WorkflowRunTextSessionModel
 from api.enums import WorkflowRunMode
@@ -30,8 +33,6 @@ from api.services.workflow.text_chat_session_service import (
     initialize_text_chat_session,
     normalize_text_chat_session_data,
 )
-from loguru import logger
-from pipecat.utils.run_context import set_current_run_id
 
 EMBED_CHAT_MAX_TURNS = 50
 

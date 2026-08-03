@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+
 from api.services.telephony import ari_manager
 from api.services.telephony.ari_manager import ARIConnection
 

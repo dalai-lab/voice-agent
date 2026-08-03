@@ -9,11 +9,12 @@ Implements OpenTelemetry tracing for observability in Langfuse.
 import json
 from typing import Any
 
+from loguru import logger
+from opentelemetry import trace
+
 from api.db import db_client
 from api.services.gen_ai import build_embedding_service
 from api.services.pipecat.tracing_config import ensure_tracing
-from loguru import logger
-from opentelemetry import trace
 
 
 async def retrieve_from_knowledge_base(

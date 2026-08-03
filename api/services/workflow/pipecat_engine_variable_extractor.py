@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from api.services.gen_ai.json_parser import parse_llm_json
-from api.services.pipecat.tracing_config import ensure_tracing
-from api.services.workflow.dto import ExtractionVariableDTO
 from loguru import logger
 from opentelemetry import trace
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.utils.tracing.service_attributes import add_llm_span_attributes
+
+from api.services.gen_ai.json_parser import parse_llm_json
+from api.services.pipecat.tracing_config import ensure_tracing
+from api.services.workflow.dto import ExtractionVariableDTO
 
 if TYPE_CHECKING:
     from api.services.workflow.pipecat_engine import PipecatEngine

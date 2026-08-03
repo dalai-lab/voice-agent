@@ -21,13 +21,13 @@ Layers Dograh engine integration quirks onto upstream-pristine
 import asyncio
 from typing import Any
 
+from google.genai.types import Content, Part
+from loguru import logger
+
 from api.services.pipecat.gemini_json_schema_adapter import (
     DograhGeminiJSONSchemaAdapter,
 )
 from api.services.pipecat.realtime.static_greeting import format_static_greeting_prompt
-from google.genai.types import Content, Part
-from loguru import logger
-
 from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     Frame,

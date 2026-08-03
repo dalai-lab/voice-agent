@@ -1,8 +1,9 @@
+from loguru import logger
+from pydantic import ValidationError
+
 from api.db import db_client
 from api.enums import UserConfigurationKey
 from api.schemas.onboarding_state import OnboardingState, OnboardingStateUpdate
-from loguru import logger
-from pydantic import ValidationError
 
 
 async def get_onboarding_state(user_id: int) -> OnboardingState:

@@ -4,6 +4,9 @@ import uuid
 from typing import Any, Dict
 
 import aiohttp
+from fastapi import HTTPException
+from loguru import logger
+
 from api.services.telephony.registry import (
     ProviderSpec,
     ProviderUIField,
@@ -11,8 +14,6 @@ from api.services.telephony.registry import (
     register,
 )
 from api.utils.common import get_backend_endpoints
-from fastapi import HTTPException
-from loguru import logger
 
 from .config import VobizConfigurationRequest, VobizConfigurationResponse
 from .provider import VobizProvider

@@ -7,10 +7,11 @@ from unittest.mock import AsyncMock, patch
 
 import jwt
 import pytest
-from api.services.telephony.providers.vonage.provider import VonageProvider
-from api.services.telephony.providers.vonage.routes import handle_vonage_events
 from fastapi import HTTPException
 from starlette.requests import Request
+
+from api.services.telephony.providers.vonage.provider import VonageProvider
+from api.services.telephony.providers.vonage.routes import handle_vonage_events
 
 SIGNATURE_SECRET = "vonage-signature-secret"
 

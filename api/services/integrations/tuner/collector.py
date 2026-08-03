@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from api.enums import WorkflowRunMode
 from tuner_pipecat_sdk import Observer
+
+from api.enums import WorkflowRunMode
 
 TUNER_RECORDING_PLACEHOLDER = "pipecat://no-recording"
 

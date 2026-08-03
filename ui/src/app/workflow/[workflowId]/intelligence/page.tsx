@@ -5,12 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { getWorkflowApiV1WorkflowFetchWorkflowIdGet, getWorkflowRunsApiV1WorkflowWorkflowIdRunsGet } from "@/client/sdk.gen";
-import { useAuth } from "@/lib/auth";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { formatDateTime } from "@/lib/dateTime";
 import { useOrganizationTimezone } from "@/hooks/useOrganizationTimezone";
+import { useAuth } from "@/lib/auth";
+import { formatDateTime } from "@/lib/dateTime";
 
 export default function IntelligenceDashboardPage() {
     const params = useParams();
@@ -32,7 +32,7 @@ export default function IntelligenceDashboardPage() {
                 const workflowRes = await getWorkflowApiV1WorkflowFetchWorkflowIdGet({
                     path: { workflow_id: workflowId }
                 });
-                
+
                 if (workflowRes.data?.post_call_schema) {
                     setSchema(workflowRes.data.post_call_schema as any[]);
                 }
@@ -41,7 +41,7 @@ export default function IntelligenceDashboardPage() {
                     path: { workflow_id: workflowId },
                     query: { limit: 100 }
                 });
-                
+
                 if (runsRes.data?.runs) {
                     setRuns(runsRes.data.runs);
                 }
@@ -55,12 +55,12 @@ export default function IntelligenceDashboardPage() {
     }, [isAuthenticated, workflowId]);
 
     const extractedKeys = schema ? schema.map(s => s.name) : [];
-    
+
     // Fallback dynamic columns if no schema
     const dynamicExtractedColumns = runs.length > 0 && runs[0].extracted_data && !schema
         ? Object.keys(runs[0].extracted_data)
         : [];
-        
+
     const columnsToRender = extractedKeys.length > 0 ? extractedKeys : dynamicExtractedColumns;
 
     return (
@@ -110,7 +110,7 @@ export default function IntelligenceDashboardPage() {
                             </TableHeader>
                             <TableBody>
                                 {runs.map(run => (
-                                    <TableRow 
+                                    <TableRow
                                         key={run.id}
                                         className="cursor-pointer hover:bg-muted/40 transition-colors"
                                         onClick={() => router.push(`/workflow/${workflowId}/run/${run.id}`)}

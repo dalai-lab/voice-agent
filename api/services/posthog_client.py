@@ -1,8 +1,9 @@
 from typing import Any
 
-from api.constants import POSTHOG_API_KEY, POSTHOG_HOST
 from loguru import logger
 from posthog import Posthog
+
+from api.constants import POSTHOG_API_KEY, POSTHOG_HOST
 
 _posthog_client: Posthog | None = None
 POSTHOG_SERVER_GROUP_IDENTIFY_DISTINCT_ID = "server-group-identify"

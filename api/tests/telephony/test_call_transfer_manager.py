@@ -7,7 +7,6 @@ These tests verify (regression for issue #328):
 3. Removing a transfer context also clears its call-sid index entry.
 """
 
-
 import pytest
 
 

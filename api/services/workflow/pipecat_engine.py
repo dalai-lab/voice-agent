@@ -1,10 +1,6 @@
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
-from api.db import db_client
-from api.enums import ToolCategory
-from api.services.pipecat.audio_playback import play_audio
-from api.services.workflow.workflow_graph import Node, WorkflowGraph
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
@@ -24,6 +20,11 @@ from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.settings import LLMSettings
 from pipecat.utils.enums import EndTaskReason
 
+from api.db import db_client
+from api.enums import ToolCategory
+from api.services.pipecat.audio_playback import play_audio
+from api.services.workflow.workflow_graph import Node, WorkflowGraph
+
 if TYPE_CHECKING:
     from pipecat.frames.frames import Frame
     from pipecat.services.anthropic.llm import AnthropicLLMService
@@ -34,6 +35,8 @@ if TYPE_CHECKING:
     LLMService = Union[OpenAILLMService, AnthropicLLMService, GoogleLLMService]
 
 import asyncio
+
+from loguru import logger
 
 from api.services.managed_model_services import MPS_CORRELATION_ID_CONTEXT_KEY
 from api.services.pipecat.realtime_feedback_events import DTMFLogFrame
@@ -56,7 +59,6 @@ from api.services.workflow.tools.knowledge_base import (
     retrieve_from_knowledge_base,
 )
 from api.utils.template_renderer import render_template
-from loguru import logger
 
 
 class PipecatEngine:
@@ -71,7 +73,10 @@ class PipecatEngine:
         workflow: WorkflowGraph,
         call_context_vars: dict,
         workflow_run_id: int | None = None,
-        node_transition_callback: Callable[[str, str, str | None, str | None, bool], Awaitable[None]] | None = None,
+        node_transition_callback: Callable[
+            [str, str, str | None, str | None, bool], Awaitable[None]
+        ]
+        | None = None,
         embeddings_api_key: str | None = None,
         embeddings_model: str | None = None,
         embeddings_base_url: str | None = None,
@@ -169,9 +174,7 @@ class PipecatEngine:
 
         # Background context summarization on node transitions
         self._context_compaction_enabled: bool = context_compaction_enabled
-        self._context_summarization_manager: ContextSummarizationManager | None = (
-            None
-        )
+        self._context_summarization_manager: ContextSummarizationManager | None = None
 
     async def _get_organization_id(self) -> int | None:
         """Get and cache the organization ID from workflow run."""
@@ -232,9 +235,11 @@ class PipecatEngine:
         """Listen for DTMF events and inject them into the LLM context."""
         try:
             from api.services.telephony.dtmf_manager import dtmf_manager
-            
+
             async for event in dtmf_manager.subscribe_dtmf_events(call_id):
-                logger.info(f"Pipeline received DTMF digit {event.digit} for call {call_id}")
+                logger.info(
+                    f"Pipeline received DTMF digit {event.digit} for call {call_id}"
+                )
                 if self.task and self.context:
                     await self.handle_dtmf_event(event.digit)
         except asyncio.CancelledError:
@@ -249,14 +254,16 @@ class PipecatEngine:
             return
 
         logger.info(f"Pipeline received DTMF digit {digit} directly from frame")
-        
+
         if not self._dtmf_buffer and self.task:
-            logger.debug("First DTMF digit received, pushing UserStartedSpeakingFrame to interrupt TTS.")
+            logger.debug(
+                "First DTMF digit received, pushing UserStartedSpeakingFrame to interrupt TTS."
+            )
             await self.task.queue_frame(UserStartedSpeakingFrame())
-            
+
         if self._dtmf_timer_task:
             self._dtmf_timer_task.cancel()
-            
+
         if digit == "#":
             logger.info("DTMF terminator '#' received, flushing buffer immediately.")
             await self._flush_dtmf_buffer()
@@ -267,7 +274,9 @@ class PipecatEngine:
     async def _dtmf_timer(self):
         try:
             await asyncio.sleep(self._dtmf_timeout_seconds)
-            logger.info(f"DTMF timer expired after {self._dtmf_timeout_seconds}s, flushing buffer.")
+            logger.info(
+                f"DTMF timer expired after {self._dtmf_timeout_seconds}s, flushing buffer."
+            )
             await self._flush_dtmf_buffer()
         except asyncio.CancelledError:
             pass
@@ -277,25 +286,22 @@ class PipecatEngine:
             if self.task:
                 await self.task.queue_frame(UserStoppedSpeakingFrame())
             return
-            
+
         digits = self._dtmf_buffer
         self._dtmf_buffer = ""
         self._dtmf_timer_task = None
-        
+
         logger.info(f"Flushing DTMF buffer to LLM: {digits}")
-        
+
         if self.task and self.context:
             await self.task.queue_frame(DTMFLogFrame(digits=digits))
             await self.task.queue_frame(UserStoppedSpeakingFrame())
             dtmf_message = {
                 "role": "system",
-                "content": f"The caller pressed the keypad digits: {digits}"
+                "content": f"The caller pressed the keypad digits: {digits}",
             }
             self.context.add_message(dtmf_message)
-            frame = LLMMessagesAppendFrame(
-                messages=[dtmf_message],
-                run_llm=True
-            )
+            frame = LLMMessagesAppendFrame(messages=[dtmf_message], run_llm=True)
             await self.task.queue_frame(frame)
 
     async def _update_llm_context(self, system_prompt: str, functions: list[dict]):
@@ -666,9 +672,13 @@ class PipecatEngine:
 
         # Callback context note — appended last so it's the final instruction the LLM reads
         is_callback = self._call_context_vars.get("is_callback", False)
-        logger.info(f"[CALLBACK DEBUG] is_callback={is_callback!r}, node_id={node.id!r}")
+        logger.info(
+            f"[CALLBACK DEBUG] is_callback={is_callback!r}, node_id={node.id!r}"
+        )
         if is_callback and "is_callback" not in node.prompt:
-            summary = self._call_context_vars.get("conversation_summary", "our previous conversation")
+            summary = self._call_context_vars.get(
+                "conversation_summary", "our previous conversation"
+            )
             callback_injection = (
                 f"\n\n[SYSTEM NOTE: This is an outbound callback you are making to the user. "
                 f"Summary of the previous call: '{summary}'. "
@@ -676,7 +686,9 @@ class PipecatEngine:
                 f"Do not ask for information already covered in the summary.]\n"
             )
             system_prompt += callback_injection
-            logger.info(f"[CALLBACK DEBUG] Injected (appended). Prompt last 150 chars: {system_prompt[-150:]!r}")
+            logger.info(
+                f"[CALLBACK DEBUG] Injected (appended). Prompt last 150 chars: {system_prompt[-150:]!r}"
+            )
         functions = await compose_functions_for_node(
             node=node,
             custom_tool_manager=self._custom_tool_manager,
@@ -768,13 +780,13 @@ class PipecatEngine:
 
         if node.greeting:
             greeting_text = node.greeting
-            
+
             # Smart Fallback for Callbacks
             is_callback = self._call_context_vars.get("is_callback", False)
             if is_callback and "is_callback" not in greeting_text:
                 # Return None to skip the static TTS greeting and let the LLM generate the first turn
                 return None
-                
+
             return ("text", self._format_prompt(greeting_text))
 
         return None
@@ -1152,7 +1164,7 @@ class PipecatEngine:
 
         if self._dtmf_subscription_task:
             self._dtmf_subscription_task.cancel()
-            
+
         if self._dtmf_timer_task:
             self._dtmf_timer_task.cancel()
 

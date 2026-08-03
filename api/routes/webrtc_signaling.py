@@ -435,9 +435,14 @@ class SignalingManager:
     def _handle_dtmf(self, payload: dict, connection_key: str):
         """Handle incoming DTMF digits."""
         digit = payload.get("digit")
-        if not digit or not isinstance(digit, str) or len(digit) != 1 or digit not in "0123456789*#ABCDabcd":
+        if (
+            not digit
+            or not isinstance(digit, str)
+            or len(digit) != 1
+            or digit not in "0123456789*#ABCDabcd"
+        ):
             return
-        
+
         digit = digit.upper()
 
         peer_ids = self._connection_peer_ids.get(connection_key, set())

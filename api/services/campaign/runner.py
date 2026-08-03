@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from loguru import logger
+
 from api.db import db_client
 from api.services.campaign.campaign_event_publisher import (
     get_campaign_event_publisher,
@@ -8,7 +10,6 @@ from api.services.campaign.campaign_event_publisher import (
 from api.services.campaign.circuit_breaker import circuit_breaker
 from api.tasks.arq import enqueue_job
 from api.tasks.function_names import FunctionNames
-from loguru import logger
 
 
 class CampaignRunnerService:

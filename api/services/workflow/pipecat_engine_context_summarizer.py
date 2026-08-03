@@ -4,7 +4,6 @@ import asyncio
 import json
 from typing import TYPE_CHECKING
 
-from api.services.pipecat.tracing_config import ensure_tracing
 from loguru import logger
 from opentelemetry import trace
 from pipecat.frames.frames import LLMContextSummaryRequestFrame
@@ -13,6 +12,8 @@ from pipecat.utils.context.llm_context_summarization import (
     LLMContextSummaryConfig,
 )
 from pipecat.utils.tracing.service_attributes import add_llm_span_attributes
+
+from api.services.pipecat.tracing_config import ensure_tracing
 
 if TYPE_CHECKING:
     from api.services.workflow.pipecat_engine import PipecatEngine

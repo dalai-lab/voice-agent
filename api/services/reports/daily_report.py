@@ -48,9 +48,7 @@ class DailyReportService:
             1
             for run in runs
             if run["gathered_context"]
-            and str(
-                run["gathered_context"].get("mapped_call_disposition", "")
-            ).lower()
+            and str(run["gathered_context"].get("mapped_call_disposition", "")).lower()
             in ("xfer", "transfer_call")
         )
 

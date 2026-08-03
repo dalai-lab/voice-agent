@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from loguru import logger
+
 from api.constants import DEPLOYMENT_MODE
 from api.db import db_client
 from api.db.models import UserModel
@@ -21,7 +23,6 @@ from api.services.managed_model_services import (
     uses_managed_model_services_v2,
 )
 from api.services.mps_service_key_client import mps_service_key_client
-from loguru import logger
 
 MINIMUM_DOGRAH_CREDITS_FOR_CALL = 0.10
 

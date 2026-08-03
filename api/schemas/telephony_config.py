@@ -45,7 +45,13 @@ from api.services.telephony.providers.vonage.config import (
 # ``provider`` Literal field of each request class. Replaces the manual
 # if/elif chains that used to live in routes/organization.py.
 TelephonyConfigRequest = Annotated[
-    ARIConfigurationRequest | CloudonixConfigurationRequest | PlivoConfigurationRequest | TelnyxConfigurationRequest | TwilioConfigurationRequest | VobizConfigurationRequest | VonageConfigurationRequest,
+    ARIConfigurationRequest
+    | CloudonixConfigurationRequest
+    | PlivoConfigurationRequest
+    | TelnyxConfigurationRequest
+    | TwilioConfigurationRequest
+    | VobizConfigurationRequest
+    | VonageConfigurationRequest,
     Field(discriminator="provider"),
 ]
 

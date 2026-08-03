@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import httpcore
 import httpx
+
 from api.constants import DEPLOYMENT_MODE
 
 _CGNAT_NETWORK = ipaddress.ip_network("100.64.0.0/10")

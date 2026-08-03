@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
+from loguru import logger
+
 from api.db import db_client
 from api.services.organization_preferences import external_pbx_integrations_enabled
 from api.services.workflow.tools.custom_tool import _resolve_preset_parameters
@@ -17,7 +19,6 @@ from api.utils.credential_auth import (
 )
 from api.utils.template_renderer import render_template
 from api.utils.url_security import validate_user_configured_service_url
-from loguru import logger
 
 
 @dataclass

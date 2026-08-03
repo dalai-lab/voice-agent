@@ -5,15 +5,15 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import phonenumbers
-from api.db import db_client
 from phonenumbers import timezone
+
+from api.db import db_client
 
 logger = logging.getLogger(__name__)
 
+
 async def resolve_callback_settings(
-    organization_id: int,
-    workflow_id: int,
-    campaign_id: int | None = None
+    organization_id: int, workflow_id: int, campaign_id: int | None = None
 ) -> dict[str, Any]:
     """
     Resolves callback settings from Organization, Campaign, and Workflow levels.
@@ -22,13 +22,13 @@ async def resolve_callback_settings(
     # 1. Fetch all required DB records concurrently
     tasks = [
         db_client.get_configuration(organization_id, "ORGANIZATION_PREFERENCES"),
-        db_client.get_workflow(workflow_id, organization_id)
+        db_client.get_workflow(workflow_id, organization_id),
     ]
     if campaign_id:
         tasks.append(db_client.get_campaign_by_id(campaign_id))
-        
+
     results = await asyncio.gather(*tasks)
-    
+
     org_config = results[0]
     workflow = results[1]
     campaign = results[2] if campaign_id else None
@@ -36,7 +36,7 @@ async def resolve_callback_settings(
     # 2. Organization defaults/ceilings
     org_prefs = org_config.value if org_config else {}
     callback_defaults = org_prefs.get("callback_defaults", {})
-    
+
     org_sociable_start = callback_defaults.get("sociable_hours_start", "00:00")
     org_sociable_end = callback_defaults.get("sociable_hours_end", "23:59")
     org_max_delay = callback_defaults.get("max_delay_minutes", 480)
@@ -44,14 +44,18 @@ async def resolve_callback_settings(
     org_timezone = org_prefs.get("timezone", "UTC")
 
     # 3. Workflow (Agent) defaults
-    wf_config = workflow.workflow_configurations if workflow and workflow.workflow_configurations else {}
+    wf_config = (
+        workflow.workflow_configurations
+        if workflow and workflow.workflow_configurations
+        else {}
+    )
     wf_cb_config = wf_config.get("callback", {})
-    
+
     wf_enabled = wf_cb_config.get("enabled", True)
     wf_min_delay = wf_cb_config.get("min_delay_minutes", 1)
     wf_max_delay = wf_cb_config.get("max_delay_minutes", org_max_delay)
     wf_include_summary = wf_cb_config.get("include_conversation_summary", True)
-    
+
     # Cap workflow max delay to org max delay
     wf_max_delay = min(wf_max_delay, org_max_delay)
 
@@ -64,14 +68,18 @@ async def resolve_callback_settings(
     camp_long_thresh = 120
 
     if campaign and campaign.orchestrator_metadata:
-            camp_cb_config = campaign.orchestrator_metadata.get("callback_config", {})
-            camp_enabled = camp_cb_config.get("enabled", wf_enabled)
-            camp_sociable_start = camp_cb_config.get("sociable_hours_start", org_sociable_start)
-            camp_sociable_end = camp_cb_config.get("sociable_hours_end", org_sociable_end)
-            camp_sociable_tz = camp_cb_config.get("sociable_hours_timezone", org_timezone)
-            camp_honor_window = camp_cb_config.get("honor_campaign_window_for_long_callbacks", True)
-            camp_long_thresh = camp_cb_config.get("long_callback_threshold_minutes", 120)
-    
+        camp_cb_config = campaign.orchestrator_metadata.get("callback_config", {})
+        camp_enabled = camp_cb_config.get("enabled", wf_enabled)
+        camp_sociable_start = camp_cb_config.get(
+            "sociable_hours_start", org_sociable_start
+        )
+        camp_sociable_end = camp_cb_config.get("sociable_hours_end", org_sociable_end)
+        camp_sociable_tz = camp_cb_config.get("sociable_hours_timezone", org_timezone)
+        camp_honor_window = camp_cb_config.get(
+            "honor_campaign_window_for_long_callbacks", True
+        )
+        camp_long_thresh = camp_cb_config.get("long_callback_threshold_minutes", 120)
+
     return {
         "enabled": camp_enabled,
         "min_delay_minutes": wf_min_delay,
@@ -83,14 +91,12 @@ async def resolve_callback_settings(
         "sociable_timezone": camp_sociable_tz,
         "honor_campaign_window": camp_honor_window,
         "long_callback_threshold": camp_long_thresh,
-        "callback_resume_mode": workflow.callback_resume_mode if workflow else "fresh"
+        "callback_resume_mode": workflow.callback_resume_mode if workflow else "fresh",
     }
 
+
 def adjust_for_sociable_hours(
-    scheduled_utc: datetime,
-    start_str: str,
-    end_str: str,
-    tz_str: str
+    scheduled_utc: datetime, start_str: str, end_str: str, tz_str: str
 ) -> datetime:
     """
     Adjusts the scheduled time to fall within sociable hours (start_str to end_str HH:MM).
@@ -100,33 +106,36 @@ def adjust_for_sociable_hours(
         tz = ZoneInfo(tz_str)
     except Exception:
         tz = ZoneInfo("UTC")
-        
+
     local_dt = scheduled_utc.astimezone(tz)
-    
+
     try:
-        start_h, start_m = map(int, start_str.split(':'))
-        end_h, end_m = map(int, end_str.split(':'))
+        start_h, start_m = map(int, start_str.split(":"))
+        end_h, end_m = map(int, end_str.split(":"))
     except Exception:
         start_h, start_m = 8, 0
         end_h, end_m = 21, 0
-        
+
     start_time = time(start_h, start_m)
     end_time = time(end_h, end_m)
-    
+
     local_time = local_dt.time()
-    
+
     # If within window, return original
     if start_time <= local_time < end_time:
         return scheduled_utc
-        
+
     # If before window start, move to start of today's window
     if local_time < start_time:
         target_dt = datetime.combine(local_dt.date(), start_time, tzinfo=tz)
         return target_dt.astimezone(ZoneInfo("UTC"))
-        
+
     # If after window end, move to start of tomorrow's window
-    target_dt = datetime.combine(local_dt.date() + timedelta(days=1), start_time, tzinfo=tz)
+    target_dt = datetime.combine(
+        local_dt.date() + timedelta(days=1), start_time, tzinfo=tz
+    )
     return target_dt.astimezone(ZoneInfo("UTC"))
+
 
 def get_timezone_for_number(phone_number: str, default_tz: str = "UTC") -> str:
     """
@@ -135,7 +144,7 @@ def get_timezone_for_number(phone_number: str, default_tz: str = "UTC") -> str:
     """
     if not phone_number:
         return default_tz
-        
+
     # Mapping for old tzdata aliases occasionally returned by phonenumbers
     TZ_ALIASES = {
         "Asia/Calcutta": "Asia/Kolkata",
@@ -146,22 +155,23 @@ def get_timezone_for_number(phone_number: str, default_tz: str = "UTC") -> str:
         "Asia/Ulan_Bator": "Asia/Ulaanbaatar",
         "Asia/Rangoon": "Asia/Yangon",
     }
-        
+
     try:
         # Assuming E.164 format, if no +, we try to prepend it just in case
         if not phone_number.startswith("+"):
             phone_number = "+" + phone_number
-            
+
         parsed = phonenumbers.parse(phone_number)
         timezones = timezone.time_zones_for_number(parsed)
         if timezones:
             now = datetime.now(ZoneInfo("UTC"))
+
             def get_offset(tz_name):
                 try:
                     return ZoneInfo(tz_name).utcoffset(now).total_seconds()
                 except Exception:
                     return -9999999
-                    
+
             valid_tzs = []
             for tz in timezones:
                 if tz == "Etc/Unknown":
@@ -172,11 +182,11 @@ def get_timezone_for_number(phone_number: str, default_tz: str = "UTC") -> str:
                     valid_tzs.append(tz)
                 except Exception:
                     pass
-                    
+
             if valid_tzs:
                 best_tz = max(valid_tzs, key=get_offset)
                 return best_tz
     except Exception as e:
         logger.warning(f"Failed to derive timezone for {phone_number}: {e}")
-        
+
     return default_tz

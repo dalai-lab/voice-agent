@@ -8,11 +8,12 @@ as the canonical duration. Otherwise Dograh reports the completed run duration.
 
 from typing import Any
 
+from loguru import logger
+
 from api.constants import DEPLOYMENT_MODE
 from api.db import db_client
 from api.services.managed_model_services import get_mps_correlation_id
 from api.services.mps_service_key_client import mps_service_key_client
-from loguru import logger
 
 
 def _workflow_run_organization_id(workflow_run) -> int | None:

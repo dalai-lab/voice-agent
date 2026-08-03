@@ -4,10 +4,11 @@ import copy
 import posixpath
 import uuid
 
+from loguru import logger
+
 from api.db import db_client
 from api.enums import StorageBackend
 from api.services.storage import get_storage_for_backend, storage_fs
-from loguru import logger
 
 
 def _extract_trigger_paths(workflow_definition: dict) -> list[str]:

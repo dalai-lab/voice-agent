@@ -25,6 +25,8 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
+from loguru import logger
+
 from api.services.pipecat.realtime_feedback_events import (
     DTMFLogFrame,
     build_bot_text_event,
@@ -35,7 +37,6 @@ from api.services.pipecat.realtime_feedback_events import (
     build_user_dtmf_event,
     build_user_transcription_event,
 )
-from loguru import logger
 
 if TYPE_CHECKING:
     from api.services.pipecat.in_memory_buffers import InMemoryLogsBuffer

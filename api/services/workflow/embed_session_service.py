@@ -3,10 +3,11 @@
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
+from loguru import logger
+
 from api.db import db_client
 from api.db.models import EmbedSessionModel, EmbedTokenModel
 from api.services.quota_service import QuotaCheckResult, authorize_workflow_run_start
-from loguru import logger
 
 
 class EmbedSessionValidationError(Exception):

@@ -722,9 +722,7 @@ class CampaignClient(BaseDBClient):
             await session.refresh(queued_run)
             return queued_run
 
-    async def get_queued_run_by_id(
-        self, queued_run_id: int
-    ) -> QueuedRunModel | None:
+    async def get_queued_run_by_id(self, queued_run_id: int) -> QueuedRunModel | None:
         """Get a queued run by ID"""
         async with self.async_session() as session:
             query = select(QueuedRunModel).where(QueuedRunModel.id == queued_run_id)
@@ -742,7 +740,9 @@ class CampaignClient(BaseDBClient):
             result = await session.execute(query)
             return list(result.scalars().all())
 
-    async def get_queued_runs_count(self, campaign_id: int, states: list[str], non_scheduled_only: bool = False) -> int:
+    async def get_queued_runs_count(
+        self, campaign_id: int, states: list[str], non_scheduled_only: bool = False
+    ) -> int:
         """Get count of queued runs for a campaign in specified states"""
         async with self.async_session() as session:
             query = select(func.count(QueuedRunModel.id)).where(
@@ -764,11 +764,11 @@ class CampaignClient(BaseDBClient):
                 .where(
                     QueuedRunModel.retry_reason == "user_requested_callback",
                     QueuedRunModel.state == "queued",
-                    QueuedRunModel.scheduled_for <= now
+                    QueuedRunModel.scheduled_for <= now,
                 )
             )
             result = await session.execute(query)
-            
+
             campaigns = list(result.scalars().all())
             seen = set()
             unique_campaigns = []
@@ -776,7 +776,7 @@ class CampaignClient(BaseDBClient):
                 if c.id not in seen:
                     seen.add(c.id)
                     unique_campaigns.append(c)
-                    
+
             return unique_campaigns
 
     async def get_scheduled_runs_count(
@@ -827,21 +827,19 @@ class CampaignClient(BaseDBClient):
             claimed_runs = []
 
             # First, get scheduled retries that are due (with lock)
-            scheduled_query = (
-                select(QueuedRunModel)
-                .where(
-                    QueuedRunModel.campaign_id == campaign_id,
-                    QueuedRunModel.state == "queued",
-                    QueuedRunModel.scheduled_for.isnot(None),
-                    QueuedRunModel.scheduled_for <= scheduled_before,
-                )
+            scheduled_query = select(QueuedRunModel).where(
+                QueuedRunModel.campaign_id == campaign_id,
+                QueuedRunModel.state == "queued",
+                QueuedRunModel.scheduled_for.isnot(None),
+                QueuedRunModel.scheduled_for <= scheduled_before,
             )
             if callbacks_only:
-                scheduled_query = scheduled_query.where(QueuedRunModel.retry_reason == "user_requested_callback")
+                scheduled_query = scheduled_query.where(
+                    QueuedRunModel.retry_reason == "user_requested_callback"
+                )
 
             scheduled_query = (
-                scheduled_query
-                .order_by(QueuedRunModel.scheduled_for)
+                scheduled_query.order_by(QueuedRunModel.scheduled_for)
                 .limit(limit)
                 .with_for_update(skip_locked=True)
             )

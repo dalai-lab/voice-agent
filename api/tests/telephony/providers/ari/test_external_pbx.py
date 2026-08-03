@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 import redis.asyncio as aioredis
+
 from api.db import db_client
 from api.services.telephony.external_pbx import resolve_external_pbx_field_mappings
 from api.services.telephony.providers.ari.external_pbx import (

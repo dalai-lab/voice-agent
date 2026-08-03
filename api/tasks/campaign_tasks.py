@@ -117,7 +117,9 @@ async def process_campaign_batch(
     try:
         # Process the batch
         processed_count = await campaign_call_dispatcher.process_batch(
-            campaign_id=campaign_id, batch_size=batch_size, callbacks_only=callbacks_only
+            campaign_id=campaign_id,
+            batch_size=batch_size,
+            callbacks_only=callbacks_only,
         )
 
         if processed_count > 0:

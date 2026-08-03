@@ -4,13 +4,13 @@ import wave
 from copy import deepcopy
 from datetime import UTC, datetime
 
+from loguru import logger
+
 from api.services.pipecat.realtime_feedback_events import (
     realtime_feedback_event_sort_key,
     stamp_realtime_feedback_event,
 )
 from api.utils.transcript import generate_transcript_text as _generate_transcript_text
-from loguru import logger
-
 from pipecat.utils.enums import RealtimeFeedbackType
 
 

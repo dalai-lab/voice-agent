@@ -3,6 +3,9 @@
 import json
 from typing import Any
 
+from loguru import logger
+from pipecat.processors.aggregators.llm_context import LLMContext
+
 from api.db.models import WorkflowRunModel
 from api.services.gen_ai.json_parser import parse_llm_json
 from api.services.managed_model_services import get_mps_correlation_id
@@ -25,8 +28,6 @@ from api.services.workflow.qa.tracing import (
     setup_langfuse_parent_context,
 )
 from api.utils.template_renderer import render_template
-from loguru import logger
-from pipecat.processors.aggregators.llm_context import LLMContext
 
 
 async def _run_llm_inference(

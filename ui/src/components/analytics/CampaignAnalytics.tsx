@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo,useState } from "react";
 import {
-    BarChart,
     Bar,
-    XAxis,
-    YAxis,
+    BarChart,
     CartesianGrid,
-    Tooltip,
+    Cell,
     ResponsiveContainer,
-    Cell
-} from "recharts";
+    Tooltip,
+    XAxis,
+    YAxis} from "recharts";
+
 import { getCampaignRunsApiV1CampaignCampaignIdRunsGet } from "@/client/sdk.gen";
 import { useAuth } from "@/lib/auth";
 
@@ -31,7 +31,7 @@ export function CampaignAnalytics({ campaignId }: { campaignId: number }) {
                     path: { campaign_id: campaignId },
                     query: { limit: 100 }
                 });
-                
+
                 if (res.data?.runs) {
                     setRuns(res.data.runs);
                 }
@@ -45,23 +45,23 @@ export function CampaignAnalytics({ campaignId }: { campaignId: number }) {
     }, [isAuthenticated, campaignId]);
 
     const { kpis, dispositionData } = useMemo(() => {
-        let totalCalls = runs.length;
+        const totalCalls = runs.length;
         let totalDuration = 0;
         let completedCalls = 0;
         const dispMap: Record<string, number> = {};
 
         runs.forEach(run => {
             totalDuration += run.call_duration_seconds || 0;
-            
+
             // Map disposition from gathered_context or fallback to disposition
             let disp = (run.gathered_context as any)?.mapped_call_disposition;
             if (!disp && run.disposition) {
                 disp = run.disposition;
             }
             if (!disp) disp = "Unknown";
-            
+
             dispMap[disp] = (dispMap[disp] || 0) + 1;
-            
+
             if (run.state === 'completed' || run.is_completed) {
                 completedCalls++;
             }
@@ -95,7 +95,7 @@ export function CampaignAnalytics({ campaignId }: { campaignId: number }) {
                 <h2 className="text-sm font-bold text-foreground">Campaign Analytics</h2>
                 <p className="text-[10px] text-muted-foreground/60 mt-0.5">Disposition breakdown and performance metrics</p>
             </div>
-            
+
                     <div className="grid grid-cols-3 gap-4 pt-2 border-t border-border/40">
                 <div className="p-4 rounded-xl border border-border bg-card/30 shadow-xs space-y-1">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Calls</p>
@@ -123,13 +123,13 @@ export function CampaignAnalytics({ campaignId }: { campaignId: number }) {
                         >
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#333" />
                             <XAxis type="number" tick={{ fontSize: 10, fill: '#888' }} />
-                            <YAxis 
-                                dataKey="name" 
-                                type="category" 
-                                tick={{ fontSize: 11, fill: '#ccc' }} 
+                            <YAxis
+                                dataKey="name"
+                                type="category"
+                                tick={{ fontSize: 11, fill: '#ccc' }}
                                 width={100}
                             />
-                            <Tooltip 
+                            <Tooltip
                                 contentStyle={{ backgroundColor: '#1f1f1f', borderColor: '#333', fontSize: '12px', borderRadius: '8px' }}
                                 cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                             />

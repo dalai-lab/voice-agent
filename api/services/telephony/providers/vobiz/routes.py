@@ -7,6 +7,11 @@ provider registry — see ProviderSpec.router.
 import json
 from datetime import UTC, datetime
 
+from fastapi import APIRouter, HTTPException, Request
+from loguru import logger
+from pipecat.utils.run_context import set_current_run_id
+from starlette.responses import HTMLResponse
+
 from api.db import db_client
 from api.services.telephony.factory import (
     get_telephony_provider_for_run,
@@ -19,10 +24,6 @@ from api.utils.common import get_backend_endpoints
 from api.utils.telephony_helper import (
     parse_webhook_request,
 )
-from fastapi import APIRouter, HTTPException, Request
-from loguru import logger
-from pipecat.utils.run_context import set_current_run_id
-from starlette.responses import HTMLResponse
 
 router = APIRouter()
 

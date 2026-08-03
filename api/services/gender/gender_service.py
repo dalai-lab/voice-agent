@@ -11,14 +11,15 @@ from typing import Literal
 
 import httpx
 import redis.asyncio as aioredis
+from loguru import logger
+from pydantic import BaseModel, Field
+
 from api.constants import REDIS_URL
 from api.services.gender.constants import (
     CONFIDENCE_THRESHOLD,
     REDIS_CACHE_TTL,
     REDIS_KEY_PREFIX,
 )
-from loguru import logger
-from pydantic import BaseModel, Field
 
 
 class GenderPrediction(BaseModel):

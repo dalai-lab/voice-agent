@@ -3,12 +3,13 @@
 import json
 import re
 
+from loguru import logger
+
 from api.db.models import WorkflowRunModel
 from api.services.pipecat.tracing_config import (
     build_remote_parent_context,
     get_trace_url,
 )
-from loguru import logger
 
 
 def extract_trace_id(gathered_context: dict) -> str | None:
@@ -97,10 +98,11 @@ def create_node_summary_trace(
     Returns the trace URL, or None if tracing is unavailable.
     """
     try:
-        from api.services.pipecat.tracing_config import ensure_tracing
         from opentelemetry import trace as otel_trace
         from opentelemetry.context import Context
         from pipecat.utils.tracing.service_attributes import add_llm_span_attributes
+
+        from api.services.pipecat.tracing_config import ensure_tracing
 
         if not ensure_tracing():
             return None

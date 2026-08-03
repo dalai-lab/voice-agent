@@ -3,14 +3,15 @@ from unittest.mock import AsyncMock, patch
 from urllib.parse import urlencode
 
 import pytest
+from fastapi import HTTPException
+from starlette.requests import Request
+from twilio.request_validator import RequestValidator
+
 from api.services.telephony.providers.twilio.provider import TwilioProvider
 from api.services.telephony.providers.twilio.routes import (
     handle_twilio_status_callback,
     handle_twiml_webhook,
 )
-from fastapi import HTTPException
-from starlette.requests import Request
-from twilio.request_validator import RequestValidator
 
 
 def _provider() -> TwilioProvider:

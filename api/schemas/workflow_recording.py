@@ -53,9 +53,7 @@ class RecordingCreateRequestSchema(BaseModel):
         default=None, description="TTS provider (e.g. elevenlabs)"
     )
     tts_model: str | None = Field(default=None, description="TTS model name")
-    tts_voice_id: str | None = Field(
-        default=None, description="TTS voice identifier"
-    )
+    tts_voice_id: str | None = Field(default=None, description="TTS voice identifier")
     transcript: str = Field(
         ..., description="User-provided transcript of the recording"
     )

@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, patch
 from urllib.parse import urlencode
 
 import pytest
+from starlette.requests import Request
+
 from api.services.telephony.providers.plivo.provider import PlivoProvider
 from api.services.telephony.providers.plivo.routes import (
     handle_plivo_hangup_callback,
@@ -14,7 +16,6 @@ from api.services.telephony.providers.plivo.routes import (
     handle_plivo_xml_webhook,
 )
 from api.services.telephony.transfer_event_protocol import TransferContext
-from starlette.requests import Request
 
 
 def _provider() -> PlivoProvider:

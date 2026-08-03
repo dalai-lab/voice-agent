@@ -7,9 +7,10 @@ import asyncio
 from collections.abc import AsyncGenerator
 
 import redis.asyncio as aioredis
+from loguru import logger
+
 from api.constants import REDIS_URL
 from api.services.telephony.dtmf_event_protocol import DTMFEvent, DTMFRedisChannels
-from loguru import logger
 
 
 class DTMFManager:
@@ -42,12 +43,12 @@ class DTMFManager:
         redis = await self._get_redis()
         pubsub = redis.pubsub()
         channel = DTMFRedisChannels.dtmf_channel(call_id)
-        
+
         try:
             await pubsub.subscribe(channel)
             self._pubsub_connections[call_id] = pubsub
             logger.debug(f"Subscribed to DTMF events for call {call_id}")
-            
+
             async for message in pubsub.listen():
                 if message["type"] == "message":
                     try:
@@ -71,7 +72,10 @@ class DTMFManager:
                 await pubsub.close()
                 logger.debug(f"Unsubscribed from DTMF events for call {call_id}")
             except Exception as e:
-                logger.error(f"Failed to unsubscribe from DTMF events for call {call_id}: {e}")
+                logger.error(
+                    f"Failed to unsubscribe from DTMF events for call {call_id}: {e}"
+                )
+
 
 # Global instance for easy import
 dtmf_manager = DTMFManager()

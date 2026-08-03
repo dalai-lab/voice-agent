@@ -14,6 +14,7 @@ import pathlib
 from unittest.mock import AsyncMock
 
 import pytest
+
 from api import constants
 from api.services.telephony import ws_auth
 
@@ -382,9 +383,10 @@ def test_redact_token_is_a_noop_without_a_token(no_secret):
 
 @pytest.fixture
 def ws_client(enforced, monkeypatch):
-    from api.routes import telephony as telephony_routes
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
+
+    from api.routes import telephony as telephony_routes
 
     # Past the gate, the run lookup finds nothing -> a deterministic 4404 that
     # distinguishes "authenticated" from "rejected" without touching a DB.

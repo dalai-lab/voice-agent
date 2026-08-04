@@ -24,6 +24,11 @@ from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.settings import LLMSettings
 from pipecat.utils.enums import EndTaskReason
 
+from api.errors.failure import (
+    classify_exception,
+    failure_metadata_for_processor,
+    log_failure,
+)
 if TYPE_CHECKING:
     from pipecat.frames.frames import Frame
     from pipecat.services.anthropic.llm import AnthropicLLMService
@@ -548,8 +553,17 @@ class PipecatEngine:
                     f"Variable extraction completed for node: {node.name}. Extracted: {extracted_data}"
                 )
             except Exception as e:
-                logger.error(
-                    f"Error during variable extraction for node {node.name}: {e!s}"
+                metadata = failure_metadata_for_processor(self.variable_extraction_llm)
+                log_failure(
+                    classify_exception(
+                        e,
+                        source=metadata.source,
+                        provider=metadata.provider,
+                        error_owner=metadata.error_owner,
+                    ),
+                    organization_id=self._organization_id,
+                    workflow_run_id=self._workflow_run_id,
+                    node_name=node.name,
                 )
 
         if run_in_background:

@@ -18,11 +18,18 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 from loguru import logger
-from pipecat.utils.run_context import set_current_run_id
+from pipecat.utils.run_context import set_current_org_id, set_current_run_id
 
 from api.constants import DEFAULT_WEBHOOK_DELIVERY_CONFIG
 from api.db import db_client
 from api.db.models import WebhookDeliveryModel
+from api.errors.failure import (
+    DograhFailure,
+    ErrorSource,
+    classify_exception,
+    classify_http_response,
+    log_failure,
+)
 from api.tasks.function_names import FunctionNames
 from api.utils.credential_auth import build_auth_header, invalidate_and_rebuild_auth
 
@@ -113,13 +120,13 @@ async def _handle_transient_failure(
     attempt: int,
     error: str,
     status_code: int | None,
-) -> None:
+) -> bool:
     """Schedule a backed-off retry, or dead-letter once attempts are exhausted."""
     if attempt >= delivery.max_attempts:
         await db_client.mark_webhook_delivery_dead_letter(
             delivery.id, attempt, error, status_code
         )
-        return
+        return True
 
     delay = _backoff_seconds(attempt)
     scheduled_for = datetime.now(UTC) + timedelta(seconds=delay)
@@ -135,6 +142,18 @@ async def _handle_transient_failure(
         f"Webhook '{delivery.webhook_name}' delivery {delivery.id} attempt {attempt} "
         f"failed ({error}); retrying in {delay}s "
         f"(attempt {attempt + 1}/{delivery.max_attempts})"
+    )
+    return False
+
+
+def _log_dead_letter_failure(
+    delivery: WebhookDeliveryModel, failure: DograhFailure
+) -> None:
+    log_failure(
+        failure,
+        organization_id=delivery.organization_id,
+        workflow_run_id=delivery.workflow_run_id,
+        delivery_id=delivery.id,
     )
 
 
@@ -159,6 +178,7 @@ async def deliver_webhook(_ctx, delivery_id: int) -> None:
         return
 
     set_current_run_id(str(delivery.workflow_run_id))
+    set_current_org_id(delivery.organization_id)
     attempt = delivery.attempt_count + 1
     method = (delivery.http_method or "POST").upper()
     timeout = DEFAULT_WEBHOOK_DELIVERY_CONFIG["timeout_seconds"]
@@ -187,8 +207,19 @@ async def deliver_webhook(_ctx, delivery_id: int) -> None:
     except httpx.HTTPStatusError as e:
         status_code = e.response.status_code
         error = f"HTTP {status_code}: {e.response.text[:200]}"
+        failure = classify_http_response(
+            status_code,
+            error,
+            source=ErrorSource.WEBHOOK,
+            provider="webhook",
+            error_owner="user",
+        )
         if status_code in _RETRYABLE_STATUS_CODES:
-            await _handle_transient_failure(delivery, attempt, error, status_code)
+            dead_lettered = await _handle_transient_failure(
+                delivery, attempt, error, status_code
+            )
+            if dead_lettered:
+                _log_dead_letter_failure(delivery, failure)
         else:
             # 401 on an OAuth2 credential: invalidate the cached token so the
             # next attempt fetches a fresh one, then schedule a single retry
@@ -285,20 +316,38 @@ async def deliver_webhook(_ctx, delivery_id: int) -> None:
             await db_client.mark_webhook_delivery_dead_letter(
                 delivery.id, attempt, error, status_code
             )
+            _log_dead_letter_failure(delivery, failure)
         return
     except httpx.RequestError as e:
         # Connect/read timeouts, DNS, connection resets -- the transient class that
         # previously lost the webhook entirely. str(e) is often empty, so use repr.
-        await _handle_transient_failure(delivery, attempt, repr(e), None)
+        dead_lettered = await _handle_transient_failure(
+            delivery, attempt, repr(e), None
+        )
+        if dead_lettered:
+            _log_dead_letter_failure(
+                delivery,
+                classify_exception(
+                    e,
+                    source=ErrorSource.WEBHOOK,
+                    provider="webhook",
+                    error_owner="user",
+                ),
+            )
         return
     except Exception as e:
         # Unexpected (e.g. a bug): don't loop on it, surface as dead-letter.
-        logger.error(
-            f"Webhook '{delivery.webhook_name}' delivery {delivery.id} "
-            f"unexpected error: {e!r}"
-        )
         await db_client.mark_webhook_delivery_dead_letter(
             delivery.id, attempt, repr(e), None
+        )
+        _log_dead_letter_failure(
+            delivery,
+            classify_exception(
+                e,
+                source=ErrorSource.WEBHOOK,
+                provider="webhook",
+                error_owner="user",
+            ),
         )
         return
 

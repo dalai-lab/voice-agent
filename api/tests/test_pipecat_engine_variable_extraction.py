@@ -11,13 +11,11 @@ The key behavior being tested:
 5. Variable extraction should NOT be triggered for AGENT node
 """
 
-import asyncio
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Dict, List
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from pipecat.frames.frames import LLMContextFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -25,16 +23,16 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMAssistantAggregatorParams,
     LLMContextAggregatorPair,
 )
-from pipecat.tests import MockLLMService, MockTTSService
 from pipecat.tests.mock_transport import MockTransport
 from pipecat.transports.base_transport import TransportParams
 
-from api.services.pipecat.worker_runner import run_pipeline_worker
 from api.services.workflow.pipecat_engine import PipecatEngine
 from api.services.workflow.pipecat_engine_variable_extractor import (
     VariableExtractionManager,
 )
 from api.services.workflow.workflow_graph import WorkflowGraph
+from api.tests.pipecat_test_utils import run_engine_test_pipeline
+from pipecat.tests import MockLLMService, MockTTSService
 
 
 class TestVariableExtractionDuringTransitions:
@@ -57,7 +55,7 @@ class TestVariableExtractionDuringTransitions:
         which is the node where the conversation context that needs extraction occurred.
         """
         # Track which nodes had extraction performed
-        extraction_calls: list[dict[str, Any]] = []
+        extraction_calls: List[Dict[str, Any]] = []
 
         # Step 0 (Start node): call collect_info to transition to agent
         step_0_chunks = MockLLMService.create_function_call_chunks(
@@ -91,6 +89,7 @@ class TestVariableExtractionDuringTransitions:
                 audio_out_enabled=True,
                 audio_in_sample_rate=16000,
                 audio_out_sample_rate=16000,
+                audio_out_end_silence_secs=0,
             ),
         )
 
@@ -135,6 +134,7 @@ class TestVariableExtractionDuringTransitions:
         # Create the pipeline
         pipeline = Pipeline(
             [
+                mock_transport.input(),
                 llm,
                 tts,
                 mock_transport.output(),
@@ -164,17 +164,7 @@ class TestVariableExtractionDuringTransitions:
                 new_callable=AsyncMock,
                 return_value={"user_name": "John Doe"},
             ):
-
-                async def run_pipeline():
-                    await run_pipeline_worker(task)
-
-                async def initialize_engine():
-                    await asyncio.sleep(0.01)
-                    await engine.initialize()
-                    await engine.set_node(engine.workflow.start_node_id)
-                    await engine.llm.queue_frame(LLMContextFrame(engine.context))
-
-                await asyncio.gather(run_pipeline(), initialize_engine())
+                await run_engine_test_pipeline(task, engine, mock_transport)
 
         # Should have 3 LLM generations
         assert llm.get_current_step() == 3

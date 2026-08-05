@@ -5,13 +5,12 @@ from typing import Any
 
 from api.db.models import WorkflowRunModel
 from api.services.gen_ai.json_parser import parse_llm_json
-from api.services.managed_model_services import get_mps_correlation_id
-from api.services.pipecat.service_factory import create_llm_service_from_provider
+from api.services.workflow.dto import QANodeData
 from api.services.workflow.qa.conversation import (
     build_conversation_structure,
     format_transcript,
 )
-from api.services.workflow.qa.llm_config import resolve_user_llm_config
+from api.services.workflow.qa.llm_config import create_qa_llm_service
 from loguru import logger
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.utils.enums import EndTaskReason
@@ -54,20 +53,14 @@ async def run_post_call_intelligence(
         logger.info(f"Skipping PCI for run {workflow_run.id}: no_transcript (empty)")
         return {"_error": "skipped", "reason": "no_transcript"}
 
-    # Resolve workflow/org LLM config directly (no QA node needed)
-    provider, model, api_key, service_kwargs = await resolve_user_llm_config(
-        workflow_run
-    )
-    if not api_key:
+    # Resolve workflow/org LLM config directly using central factory
+    qa_data = QANodeData(qa_use_workflow_llm=True)
+    resolved_llm = await create_qa_llm_service(qa_data, workflow_run)
+    if not resolved_llm:
         logger.warning(f"Skipping PCI for run {workflow_run.id}: no_api_key")
         return {"_error": "error", "reason": "no_api_key"}
-
-    mps_correlation_id = get_mps_correlation_id(
-        getattr(workflow_run, "initial_context", None)
-    )
-    llm = create_llm_service_from_provider(
-        provider, model, api_key, correlation_id=mps_correlation_id, **service_kwargs
-    )
+    
+    llm, _ = resolved_llm
 
     # Build system prompt with schema
     schema_json = json.dumps(post_call_schema, indent=2)

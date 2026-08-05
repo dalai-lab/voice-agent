@@ -27,22 +27,6 @@ if SENTRY_DSN and (
 
 from contextlib import asynccontextmanager
 
-# --- Python 3.13 aioice WebRTC fix ---
-try:
-    import aioice.ice
-    _original_send_stun = aioice.ice.StunProtocol.send_stun
-    def _safe_send_stun(self, message, addr):
-        if getattr(self, "transport", None) is None or self.transport.is_closing():
-            return
-        try:
-            return _original_send_stun(self, message, addr)
-        except Exception:
-            pass
-    aioice.ice.StunProtocol.send_stun = _safe_send_stun
-except ImportError:
-    pass
-# -------------------------------------
-
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger

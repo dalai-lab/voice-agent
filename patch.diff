@@ -1,0 +1,1362 @@
+From 80238d6f006078ececb954c6525dffd89e4e55fc Mon Sep 17 00:00:00 2001
+From: Arnav <123669753+arnofrxdd@users.noreply.github.com>
+Date: Tue, 4 Aug 2026 20:54:01 +0530
+Subject: [PATCH] feat(tools): support inline URL path parameters for custom
+ HTTP tools (#617)
+
+* feat: extract URL path parameter substitution
+
+* style: apply ruff format and lint to changed files
+
+* fix: address audit feedback for url path params
+
+* fix(tools): address bot review comments regarding security and ui
+
+* fix(tools): test ui lowercase method preview and format code
+
+* fix(ui): add empty line after import to satisfy linter
+
+* fix: simplify HTTP URL template rendering
+
+---------
+
+Co-authored-by: Abhishek Kumar <abhishek@a6k.me>
+---
+ api/routes/tool.py                            |  21 +-
+ api/schemas/tool.py                           | 116 +++--
+ api/services/workflow/tools/custom_tool.py    |  91 ++--
+ api/tests/test_custom_tools.py                | 437 +++++++++++++++++-
+ api/tests/test_mcp_tool_route.py              |   6 +-
+ api/utils/template_renderer.py                | 142 ++++--
+ .../components/HttpApiToolConfig.tsx          |  23 +
+ .../http-tool-test/HttpToolTestDialog.tsx     |   2 +-
+ 8 files changed, 701 insertions(+), 137 deletions(-)
+
+diff --git a/api/routes/tool.py b/api/routes/tool.py
+index 8ec436712..ca16ab52d 100644
+--- a/api/routes/tool.py
++++ b/api/routes/tool.py
+@@ -1,7 +1,6 @@
+ """API routes for managing tools."""
+ 
+ import time
+-from typing import List, Optional
+ 
+ from fastapi import APIRouter, Depends, HTTPException
+ 
+@@ -103,10 +102,10 @@ def validate_status(status: str) -> None:
+     ),
+ )
+ async def list_tools(
+-    status: Optional[str] = None,
+-    category: Optional[str] = None,
++    status: str | None = None,
++    category: str | None = None,
+     user: UserModel = Depends(get_user),
+-) -> List[ToolResponse]:
++) -> list[ToolResponse]:
+     """
+     List all tools for the user's organization.
+ 
+@@ -230,7 +229,7 @@ async def test_tool(
+     tool_config = (
+         tool.definition.get("config", {}) if isinstance(tool.definition, dict) else {}
+     )
+-    configured_method = tool_config.get("method", "?")
++    configured_method = tool_config.get("method", "?").upper()
+     configured_url = tool_config.get("url", "?")
+ 
+     started_at = time.perf_counter()
+@@ -250,9 +249,9 @@ async def test_tool(
+ 
+     hint = _hint_for_status_code(status_code, configured_method)
+ 
+-    # Preset values take precedence over model-supplied values, matching live
+-    # execution after configured preset templates have been resolved.
+-    resolved_arguments = {**request.llm_params, **request.preset_params}
++    # Model-supplied values take precedence over context-derived presets,
++    # matching live execution. URL variables remain in the body/query.
++    resolved_arguments = {**request.preset_params, **request.llm_params}
+ 
+     # Mirror execute_http_tool's own branch: POST/PUT/PATCH send the
+     # resolved arguments as a JSON body; GET/DELETE send them as query
+@@ -272,7 +271,7 @@ async def test_tool(
+         duration_ms=duration_ms,
+         hint=hint,
+         request_method=configured_method,
+-        request_url=configured_url,
++        request_url=result.get("rendered_url") or configured_url,
+         request_headers=result.get("request_headers", {}),
+         request_body=request_body,
+         request_params=request_params,
+@@ -280,8 +279,8 @@ async def test_tool(
+ 
+ 
+ def _hint_for_status_code(
+-    status_code: Optional[int], configured_method: str
+-) -> Optional[str]:
++    status_code: int | None, configured_method: str
++) -> str | None:
+     """Human-readable explanation for a status code a misconfigured tool
+     is likely to hit. Returns None for 2xx and any code not covered."""
+     if status_code == 400:
+diff --git a/api/schemas/tool.py b/api/schemas/tool.py
+index 87937b276..a383c51f6 100644
+--- a/api/schemas/tool.py
++++ b/api/schemas/tool.py
+@@ -9,7 +9,7 @@
+ from __future__ import annotations
+ 
+ from datetime import datetime
+-from typing import Annotated, Any, Dict, List, Literal, Optional, Union
++from typing import Annotated, Any, Literal
+ 
+ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+ 
+@@ -99,7 +99,7 @@ class HttpApiConfig(BaseModel):
+             "not embedded in the URL."
+         ),
+     )
+-    headers: Optional[Dict[str, str]] = Field(
++    headers: dict[str, str] | None = Field(
+         default=None,
+         description="Static headers to include with every request.",
+         json_schema_extra=_llm_hint(
+@@ -107,7 +107,7 @@ class HttpApiConfig(BaseModel):
+             "and reference them with credential_uuid."
+         ),
+     )
+-    credential_uuid: Optional[str] = Field(
++    credential_uuid: str | None = Field(
+         default=None,
+         description="Reference to an external credential for request authentication.",
+         json_schema_extra=_llm_hint(
+@@ -115,29 +115,29 @@ class HttpApiConfig(BaseModel):
+             "not create credential secrets."
+         ),
+     )
+-    parameters: Optional[List[ToolParameter]] = Field(
++    parameters: list[ToolParameter] | None = Field(
+         default=None,
+         description="Parameters the model must provide when calling this tool.",
+     )
+-    preset_parameters: Optional[List[PresetToolParameter]] = Field(
++    preset_parameters: list[PresetToolParameter] | None = Field(
+         default=None,
+         description=(
+             "Parameters injected by Dograh from fixed values or workflow context "
+             "templates."
+         ),
+     )
+-    timeout_ms: Optional[int] = Field(
++    timeout_ms: int | None = Field(
+         default=5000,
+         ge=1,
+         description="Request timeout in milliseconds.",
+     )
+-    customMessage: Optional[str] = Field(
++    customMessage: str | None = Field(
+         default=None, description="Custom message to play after tool execution."
+     )
+-    customMessageType: Optional[Literal["text", "audio"]] = Field(
++    customMessageType: Literal["text", "audio"] | None = Field(
+         default=None, description="Type of custom message."
+     )
+-    customMessageRecordingId: Optional[str] = Field(
++    customMessageRecordingId: str | None = Field(
+         default=None, description="Recording ID for an audio custom message."
+     )
+ 
+@@ -158,10 +158,10 @@ class EndCallConfig(BaseModel):
+     messageType: Literal["none", "custom", "audio"] = Field(
+         default="none", description="Type of goodbye message."
+     )
+-    customMessage: Optional[str] = Field(
++    customMessage: str | None = Field(
+         default=None, description="Custom message to play before ending the call."
+     )
+-    audioRecordingId: Optional[str] = Field(
++    audioRecordingId: str | None = Field(
+         default=None, description="Recording ID for audio goodbye message."
+     )
+     endCallReason: bool = Field(
+@@ -171,7 +171,7 @@ class EndCallConfig(BaseModel):
+             "The reason is set as call disposition and added to call tags."
+         ),
+     )
+-    endCallReasonDescription: Optional[str] = Field(
++    endCallReasonDescription: str | None = Field(
+         default=None,
+         description=(
+             "Description shown to the model for the reason parameter. Used only "
+@@ -185,11 +185,11 @@ class HttpTransferResolverConfig(BaseModel):
+ 
+     type: Literal["http"] = Field(default="http", description="Resolver type.")
+     url: str = Field(description="HTTP or HTTPS endpoint for transfer resolution.")
+-    headers: Optional[Dict[str, str]] = Field(
++    headers: dict[str, str] | None = Field(
+         default=None,
+         description="Static headers to include with every resolver request.",
+     )
+-    credential_uuid: Optional[str] = Field(
++    credential_uuid: str | None = Field(
+         default=None,
+         description="Reference to an external credential for resolver authentication.",
+     )
+@@ -199,15 +199,15 @@ class HttpTransferResolverConfig(BaseModel):
+         le=5000,
+         description="Resolver request timeout in milliseconds.",
+     )
+-    wait_message: Optional[str] = Field(
++    wait_message: str | None = Field(
+         default=None,
+         description="Optional short message played while Dograh resolves routing.",
+     )
+-    parameters: Optional[List[ToolParameter]] = Field(
++    parameters: list[ToolParameter] | None = Field(
+         default=None,
+         description="Parameters the model may provide when calling this transfer tool.",
+     )
+-    preset_parameters: Optional[List[PresetToolParameter]] = Field(
++    preset_parameters: list[PresetToolParameter] | None = Field(
+         default=None,
+         description=(
+             "Parameters injected by Dograh from fixed values or workflow context "
+@@ -248,8 +248,8 @@ class ContextDestinationMappingConfig(BaseModel):
+             "Gathered-context path or extracted-variable name used for routing."
+         ),
+     )
+-    routes: List[ContextDestinationRoute] = Field(min_length=1, max_length=100)
+-    fallback_destination: Optional[str] = Field(
++    routes: list[ContextDestinationRoute] = Field(min_length=1, max_length=100)
++    fallback_destination: str | None = Field(
+         default=None,
+         max_length=255,
+         description="Optional provider-native fallback destination.",
+@@ -265,7 +265,7 @@ def strip_context_path(cls, value: str) -> str:
+ 
+     @field_validator("fallback_destination")
+     @classmethod
+-    def normalize_fallback(cls, value: Optional[str]) -> Optional[str]:
++    def normalize_fallback(cls, value: str | None) -> str | None:
+         if value is None:
+             return None
+         return value.strip() or None
+@@ -298,10 +298,10 @@ class TransferCallConfig(BaseModel):
+     messageType: Literal["none", "custom", "audio"] = Field(
+         default="none", description="Type of message to play before transfer."
+     )
+-    customMessage: Optional[str] = Field(
++    customMessage: str | None = Field(
+         default=None, description="Custom message to play before transferring."
+     )
+-    audioRecordingId: Optional[str] = Field(
++    audioRecordingId: str | None = Field(
+         default=None, description="Recording ID for audio message before transfer."
+     )
+     timeout: int = Field(
+@@ -310,18 +310,18 @@ class TransferCallConfig(BaseModel):
+         le=120,
+         description="Maximum seconds to wait for the destination to answer.",
+     )
+-    parameters: Optional[List[ToolParameter]] = Field(
++    parameters: list[ToolParameter] | None = Field(
+         default=None,
+         description=(
+             "Parameters the model may provide when calling this transfer tool, "
+             "for example state, department, or transfer reason."
+         ),
+     )
+-    resolver: Optional[HttpTransferResolverConfig] = Field(
++    resolver: HttpTransferResolverConfig | None = Field(
+         default=None,
+         description="Optional resolver that determines transfer routing at call time.",
+     )
+-    context_mapping: Optional[ContextDestinationMappingConfig] = Field(
++    context_mapping: ContextDestinationMappingConfig | None = Field(
+         default=None,
+         description="Optional gathered-context to external-PBX destination mapping.",
+     )
+@@ -354,7 +354,7 @@ class McpToolConfig(BaseModel):
+         description="MCP server URL. Must use http:// or https://.",
+         json_schema_extra=_llm_hint("Use the server's streamable HTTP MCP endpoint."),
+     )
+-    credential_uuid: Optional[str] = Field(
++    credential_uuid: str | None = Field(
+         default=None,
+         description="Reference to an external credential for MCP server auth.",
+         json_schema_extra=_llm_hint(
+@@ -444,13 +444,11 @@ class McpToolDefinition(BaseModel):
+ 
+ 
+ ToolDefinition = Annotated[
+-    Union[
+-        HttpApiToolDefinition,
+-        EndCallToolDefinition,
+-        TransferCallToolDefinition,
+-        CalculatorToolDefinition,
+-        McpToolDefinition,
+-    ],
++    HttpApiToolDefinition
++    | EndCallToolDefinition
++    | TransferCallToolDefinition
++    | CalculatorToolDefinition
++    | McpToolDefinition,
+     Field(discriminator="type"),
+ ]
+ 
+@@ -466,7 +464,7 @@ class CreateToolRequest(BaseModel):
+             "name shown to the agent."
+         ),
+     )
+-    description: Optional[str] = Field(
++    description: str | None = Field(
+         default=None,
+         description="Description shown to the agent when deciding whether to call it.",
+         json_schema_extra=_llm_hint(
+@@ -477,10 +475,10 @@ class CreateToolRequest(BaseModel):
+         default=ToolCategory.HTTP_API.value,
+         description="Tool category. Must match definition.type.",
+     )
+-    icon: Optional[str] = Field(
++    icon: str | None = Field(
+         default="globe", max_length=50, description="Lucide icon identifier."
+     )
+-    icon_color: Optional[str] = Field(
++    icon_color: str | None = Field(
+         default="#3B82F6", max_length=7, description="Hex color for the tool icon."
+     )
+     definition: ToolDefinition = Field(description="Typed tool definition.")
+@@ -508,7 +506,7 @@ def validate_category(cls, v: str) -> str:
+         return v
+ 
+     @model_validator(mode="after")
+-    def validate_category_matches_definition(self) -> "CreateToolRequest":
++    def validate_category_matches_definition(self) -> CreateToolRequest:
+         definition_type = self.definition.type
+         if self.category != definition_type:
+             raise ValueError(
+@@ -521,12 +519,12 @@ def validate_category_matches_definition(self) -> "CreateToolRequest":
+ class UpdateToolRequest(BaseModel):
+     """Request schema for updating a reusable tool."""
+ 
+-    name: Optional[str] = Field(default=None, max_length=255)
+-    description: Optional[str] = None
+-    icon: Optional[str] = Field(default=None, max_length=50)
+-    icon_color: Optional[str] = Field(default=None, max_length=7)
+-    definition: Optional[ToolDefinition] = None
+-    status: Optional[str] = None
++    name: str | None = Field(default=None, max_length=255)
++    description: str | None = None
++    icon: str | None = Field(default=None, max_length=50)
++    icon_color: str | None = Field(default=None, max_length=7)
++    definition: ToolDefinition | None = None
++    status: str | None = None
+ 
+ 
+ class CreatedByResponse(BaseModel):
+@@ -542,15 +540,15 @@ class ToolResponse(BaseModel):
+     id: int
+     tool_uuid: str
+     name: str
+-    description: Optional[str]
++    description: str | None
+     category: str
+-    icon: Optional[str]
+-    icon_color: Optional[str]
++    icon: str | None
++    icon_color: str | None
+     status: str
+-    definition: Dict[str, Any]
++    definition: dict[str, Any]
+     created_at: datetime
+-    updated_at: Optional[datetime]
+-    created_by: Optional[CreatedByResponse] = None
++    updated_at: datetime | None
++    created_by: CreatedByResponse | None = None
+ 
+     model_config = ConfigDict(from_attributes=True)
+ 
+@@ -560,17 +558,17 @@ class McpRefreshResponse(BaseModel):
+ 
+     tool_uuid: str
+     discovered_tools: list = Field(default_factory=list)
+-    error: Optional[str] = None
++    error: str | None = None
+ 
+ 
+ class ToolTestRequest(BaseModel):
+     """Request body for testing an HTTP API tool outside a live call."""
+ 
+-    llm_params: Dict[str, Any] = Field(
++    llm_params: dict[str, Any] = Field(
+         default_factory=dict,
+         description="Values for parameters normally supplied by the model.",
+     )
+-    preset_params: Dict[str, Any] = Field(
++    preset_params: dict[str, Any] = Field(
+         default_factory=dict,
+         description="Resolved values for parameters normally supplied from presets.",
+     )
+@@ -580,13 +578,13 @@ class ToolTestResponse(BaseModel):
+     """Result of testing an HTTP API tool."""
+ 
+     status: str
+-    status_code: Optional[int] = None
+-    data: Optional[Any] = None
+-    error: Optional[str] = None
+-    hint: Optional[str] = None
++    status_code: int | None = None
++    data: Any | None = None
++    error: str | None = None
++    hint: str | None = None
+     request_method: str
+     request_url: str
+-    request_headers: Dict[str, str] = Field(default_factory=dict)
+-    request_body: Optional[Dict[str, Any]] = None
+-    request_params: Optional[Dict[str, Any]] = None
++    request_headers: dict[str, str] = Field(default_factory=dict)
++    request_body: dict[str, Any] | None = None
++    request_params: dict[str, Any] | None = None
+     duration_ms: int
+diff --git a/api/services/workflow/tools/custom_tool.py b/api/services/workflow/tools/custom_tool.py
+index 5d012dd44..2ccc0a8ef 100644
+--- a/api/services/workflow/tools/custom_tool.py
++++ b/api/services/workflow/tools/custom_tool.py
+@@ -2,7 +2,7 @@
+ 
+ import json
+ import re
+-from typing import Any, Dict, Optional
++from typing import Any
+ 
+ import httpx
+ from loguru import logger
+@@ -19,7 +19,7 @@
+ )
+ from api.services.configuration.masking import mask_key
+ from api.utils.credential_auth import build_auth_header
+-from api.utils.template_renderer import render_template
++from api.utils.template_renderer import render_template, render_url_template
+ 
+ # Map tool parameter types to JSON schema types
+ TYPE_MAP = {
+@@ -37,7 +37,7 @@ def custom_tool_function_name(name: str) -> str:
+     return re.sub(r"_+", "_", function_name).strip("_")
+ 
+ 
+-def serialize_query_params(arguments: Dict[str, Any]) -> Dict[str, Any]:
++def serialize_query_params(arguments: dict[str, Any]) -> dict[str, Any]:
+     """JSON-stringify dict/list values so they're safe to pass as query params.
+ 
+     httpx (and query strings in general) only support primitive param values.
+@@ -50,7 +50,7 @@ def serialize_query_params(arguments: Dict[str, Any]) -> Dict[str, Any]:
+     }
+ 
+ 
+-def tool_to_function_schema(tool: Any) -> Dict[str, Any]:
++def tool_to_function_schema(tool: Any) -> dict[str, Any]:
+     """Convert a ToolModel to an LLM function schema.
+ 
+     Args:
+@@ -207,10 +207,10 @@ def _coerce_parameter_value(value: Any, param_type: str) -> Any:
+ 
+ 
+ def _resolve_preset_parameters(
+-    config: Dict[str, Any],
+-    call_context_vars: Optional[Dict[str, Any]],
+-    gathered_context_vars: Optional[Dict[str, Any]],
+-) -> Dict[str, Any]:
++    config: dict[str, Any],
++    call_context_vars: dict[str, Any] | None,
++    gathered_context_vars: dict[str, Any] | None,
++) -> dict[str, Any]:
+     """Resolve fixed/template-backed parameters before executing the HTTP request."""
+ 
+     preset_parameters = config.get("preset_parameters", []) or []
+@@ -218,13 +218,15 @@ def _resolve_preset_parameters(
+         return {}
+ 
+     initial_context = dict(call_context_vars or {})
+-    render_context: Dict[str, Any] = {
++    gathered_context = dict(gathered_context_vars or {})
++    render_context: dict[str, Any] = {
+         **initial_context,
++        **gathered_context,
+         "initial_context": initial_context,
+-        "gathered_context": dict(gathered_context_vars or {}),
++        "gathered_context": gathered_context,
+     }
+ 
+-    resolved: Dict[str, Any] = {}
++    resolved: dict[str, Any] = {}
+     for param in preset_parameters:
+         param_name = (param.get("name") or "").strip()
+         if not param_name:
+@@ -247,13 +249,13 @@ def _resolve_preset_parameters(
+ 
+ async def execute_http_tool(
+     tool: Any,
+-    arguments: Dict[str, Any],
+-    call_context_vars: Optional[Dict[str, Any]] = None,
+-    gathered_context_vars: Optional[Dict[str, Any]] = None,
+-    preset_params: Optional[Dict[str, Any]] = None,
+-    organization_id: Optional[int] = None,
++    arguments: dict[str, Any],
++    call_context_vars: dict[str, Any] | None = None,
++    gathered_context_vars: dict[str, Any] | None = None,
++    preset_params: dict[str, Any] | None = None,
++    organization_id: int | None = None,
+     include_request_headers: bool = False,
+-) -> Dict[str, Any]:
++) -> dict[str, Any]:
+     """Execute an HTTP API tool.
+ 
+     Args:
+@@ -282,7 +284,7 @@ async def execute_http_tool(
+ 
+     # Add auth header if credential is configured. Keep track of which headers
+     # came from the credential so only those values are masked in test previews.
+-    credential_headers: Dict[str, str] = {}
++    credential_headers: dict[str, str] = {}
+     credential_uuid = config.get("credential_uuid")
+     if credential_uuid and organization_id:
+         try:
+@@ -320,15 +322,21 @@ async def execute_http_tool(
+                 tool_name=tool.name,
+             )
+ 
+-    request_headers: Dict[str, str] = {}
++    request_headers: dict[str, str] = {}
+     if include_request_headers:
+         request_headers = {str(name): str(value) for name, value in headers.items()}
+         for header_name, header_value in credential_headers.items():
+             request_headers[header_name] = mask_key(str(header_value))
+ 
+-    def build_result(result: Dict[str, Any]) -> Dict[str, Any]:
++    _rendered_url: str | None = None
++
++    def build_result(result: dict[str, Any]) -> dict[str, Any]:
+         if include_request_headers:
+-            return {**result, "request_headers": request_headers}
++            return {
++                **result,
++                "request_headers": request_headers,
++                "rendered_url": _rendered_url,
++            }
+         return result
+ 
+     # Get timeout
+@@ -359,15 +367,44 @@ def build_result(result: Dict[str, Any]) -> Dict[str, Any]:
+     else:
+         preset_arguments = dict(preset_params)
+ 
+-    resolved_arguments = {**(arguments or {}), **preset_arguments}
++    llm_arguments = dict(arguments or {})
++    resolved_arguments = {**preset_arguments, **llm_arguments}
++
++    initial_context = dict(call_context_vars or {})
++    gathered_context = dict(gathered_context_vars or {})
++    # Unprefixed URL variables follow LLM > gathered > initial precedence.
++    # Preset aliases are context-derived fallbacks; explicit namespaces keep
++    # the original context maps available regardless of name collisions.
++    url_render_context: dict[str, Any] = {
++        **preset_arguments,
++        **initial_context,
++        **gathered_context,
++        **llm_arguments,
++        "initial_context": initial_context,
++        "gathered_context": gathered_context,
++    }
++
++    try:
++        url = render_url_template(
++            url=url,
++            context=url_render_context,
++        )
++        _rendered_url = url
++
++        request_arguments = resolved_arguments
++    except ValueError as e:
++        logger.error(f"Custom tool '{tool.name}' URL template render failed: {e}")
++        return build_result(
++            {"status": "error", "error": f"URL template rendering failed: {e!s}"}
++        )
+ 
+     # Build request: JSON body for POST/PUT/PATCH, query params for GET/DELETE
+     body = None
+     params = None
+     if method in ("POST", "PUT", "PATCH"):
+-        body = resolved_arguments
+-    elif method in ("GET", "DELETE") and resolved_arguments:
+-        params = serialize_query_params(resolved_arguments)
++        body = request_arguments
++    elif method in ("GET", "DELETE") and request_arguments:
++        params = serialize_query_params(request_arguments)
+ 
+     logger.info(
+         f"Executing custom tool '{tool.name}' ({tool.tool_uuid}): "
+@@ -450,7 +487,7 @@ def build_result(result: Dict[str, Any]) -> Dict[str, Any]:
+         return build_result(
+             {
+                 "status": "error",
+-                "error": f"Request failed: {str(e)}",
++                "error": f"Request failed: {e!s}",
+             }
+         )
+     except Exception as e:
+@@ -467,6 +504,6 @@ def build_result(result: Dict[str, Any]) -> Dict[str, Any]:
+         return build_result(
+             {
+                 "status": "error",
+-                "error": f"Tool execution failed: {str(e)}",
++                "error": f"Tool execution failed: {e!s}",
+             }
+         )
+diff --git a/api/tests/test_custom_tools.py b/api/tests/test_custom_tools.py
+index 6dceb2b10..7c05cee49 100644
+--- a/api/tests/test_custom_tools.py
++++ b/api/tests/test_custom_tools.py
+@@ -9,7 +9,7 @@
+ 
+ from dataclasses import dataclass
+ from types import SimpleNamespace
+-from typing import Any, Dict
++from typing import Any
+ from unittest.mock import AsyncMock, Mock, patch
+ 
+ import pytest
+@@ -37,6 +37,7 @@
+     execute_http_tool,
+     tool_to_function_schema,
+ )
++from api.utils.template_renderer import render_url_template
+ from pipecat.tests import MockLLMService, run_test
+ 
+ 
+@@ -48,7 +49,7 @@ class MockToolModel:
+     name: str
+     description: str
+     category: str
+-    definition: Dict[str, Any]
++    definition: dict[str, Any]
+ 
+ 
+ def test_empty_resolver_credential_uuid_is_ignored():
+@@ -549,8 +550,8 @@ async def test_post_request_injects_preset_parameters(self):
+             assert result["status"] == "success"
+ 
+     @pytest.mark.asyncio
+-    async def test_post_request_accepts_pre_resolved_preset_params(self):
+-        """The test endpoint can supply preset values without call context."""
++    async def test_llm_arguments_override_pre_resolved_preset_params(self):
++        """Context-derived presets remain fallbacks for LLM arguments."""
+         tool = MockToolModel(
+             tool_uuid="test-uuid-preset-override",
+             name="Create Lead",
+@@ -587,13 +588,17 @@ async def test_post_request_accepts_pre_resolved_preset_params(self):
+ 
+             result = await execute_http_tool(
+                 tool,
+-                {"name": "John"},
+-                preset_params={"phone_number": "+14155550123"},
++                {"name": "John", "phone_number": "+14155550999"},
++                preset_params={
++                    "phone_number": "+14155550123",
++                    "source": "initial-context",
++                },
+             )
+ 
+             assert mock_client.request.call_args.kwargs["json"] == {
+                 "name": "John",
+-                "phone_number": "+14155550123",
++                "phone_number": "+14155550999",
++                "source": "initial-context",
+             }
+             assert result["status"] == "success"
+ 
+@@ -2133,3 +2138,421 @@ def test_function_schema_with_no_parameters(self):
+         assert schema.description == "Check if service is alive"
+         assert schema.properties == {}
+         assert schema.required == []
++
++
++class TestUrlPathParameters:
++    def test_single_path_param_substituted(self):
++        url = render_url_template(
++            "https://api.com/users/{{userId}}",
++            {"userId": "123"},
++        )
++        assert url == "https://api.com/users/123"
++
++    def test_multiple_path_params_substituted(self):
++        url = render_url_template(
++            "https://api.com/orgs/{{orgId}}/users/{{userId}}",
++            {"orgId": "abc", "userId": "123"},
++        )
++        assert url == "https://api.com/orgs/abc/users/123"
++
++    def test_preset_param_in_url(self):
++        url = render_url_template(
++            "https://api.com/props/{{propertyId}}",
++            {"propertyId": "prop-1"},
++        )
++        assert url == "https://api.com/props/prop-1"
++
++    def test_static_url_unchanged(self):
++        url = render_url_template(
++            "https://api.com/static",
++            {"userId": "123"},
++        )
++        assert url == "https://api.com/static"
++
++    def test_fallback_filter_in_url_uses_fallback_when_empty(self):
++        url = render_url_template(
++            "https://api.com/users/{{userId | default}}",
++            {"userId": ""},
++        )
++        assert url == "https://api.com/users/default"
++
++        url2 = render_url_template(
++            "https://api.com/users/{{userId | fallback:me}}",
++            {"userId": None},
++        )
++        assert url2 == "https://api.com/users/me"
++
++    def test_dot_notation_path_param_in_url(self):
++        url = render_url_template(
++            "https://api.com/users/{{user.id}}",
++            {"user": {"id": "456"}},
++        )
++        assert url == "https://api.com/users/456"
++
++    def test_number_param_in_url_stringified(self):
++        url = render_url_template(
++            "https://api.com/users/{{userId}}",
++            {"userId": 123},
++        )
++        assert url == "https://api.com/users/123"
++
++    def test_boolean_param_in_url_stringified(self):
++        url = render_url_template(
++            "https://api.com/users/{{active}}",
++            {"active": True},
++        )
++        assert url == "https://api.com/users/true"
++
++    def test_existing_query_string_preserved(self):
++        url = render_url_template(
++            "https://api.com/users/{{userId}}?limit=10&sort=desc",
++            {"userId": "123"},
++        )
++        assert url == "https://api.com/users/123?limit=10&sort=desc"
++
++    def test_unresolved_required_placeholder_raises(self):
++        import pytest
++
++        with pytest.raises(ValueError, match="has no value"):
++            render_url_template("https://api.com/users/{{userId}}", {})
++
++    def test_empty_value_raises(self):
++        import pytest
++
++        with pytest.raises(ValueError, match="resolved to an empty string"):
++            render_url_template(
++                "https://api.com/users/{{userId}}",
++                {"userId": ""},
++            )
++
++    def test_context_variable_does_not_require_parameter_declaration(self):
++        url = render_url_template(
++            "https://api.com/users/{{path}}",
++            {"path": "123"},
++        )
++        assert url == "https://api.com/users/123"
++
++    def test_malformed_open_brace_raises(self):
++        import pytest
++
++        with pytest.raises(ValueError, match="unmatched '{{'"):
++            render_url_template("https://api.com/users/{{userId", {})
++
++    def test_malformed_close_brace_raises(self):
++        import pytest
++
++        with pytest.raises(ValueError, match="unmatched '}}'"):
++            render_url_template("https://api.com/users/userId}}", {})
++
++    def test_nested_brace_raises(self):
++        import pytest
++
++        with pytest.raises(ValueError, match="nested '{{'"):
++            render_url_template("https://api.com/users/{{{{userId}}}}", {})
++
++    def test_array_param_in_url_raises(self):
++        import pytest
++
++        with pytest.raises(ValueError, match="Arrays cannot be rendered"):
++            render_url_template(
++                "https://api.com/users/{{ids}}",
++                {"ids": [1, 2, 3]},
++            )
++
++    def test_object_param_in_url_raises(self):
++        import pytest
++
++        with pytest.raises(ValueError, match="Objects cannot be rendered"):
++            render_url_template(
++                "https://api.com/users/{{user}}",
++                {"user": {"id": "123"}},
++            )
++
++    def test_host_injection_raises(self):
++        import pytest
++
++        with pytest.raises(
++            ValueError, match="URL placeholders cannot alter the scheme or host"
++        ):
++            render_url_template(
++                "https://{{host}}/v1/data",
++                {"host": "evil.com"},
++            )
++
++    def test_malformed_placeholder_syntax_raises(self):
++        import pytest
++
++        with pytest.raises(ValueError, match="invalid placeholder syntax"):
++            render_url_template(
++                "https://api.com/users/{{userId|}}",
++                {"userId": "123"},
++            )
++
++    def test_path_traversal_slash_is_encoded(self):
++        url = render_url_template(
++            "https://api.com/users/{{userId}}",
++            {"userId": "../admin"},
++        )
++        assert url == "https://api.com/users/..%2Fadmin"
++
++    def test_query_injection_ampersand_is_encoded(self):
++        url = render_url_template(
++            "https://api.com/users/{{userId}}",
++            {"userId": "123&evil=true"},
++        )
++        assert url == "https://api.com/users/123%26evil%3Dtrue"
++
++    def test_query_injection_question_mark_is_encoded(self):
++        url = render_url_template(
++            "https://api.com/users/{{userId}}",
++            {"userId": "123?evil=true"},
++        )
++        assert url == "https://api.com/users/123%3Fevil%3Dtrue"
++
++    def test_space_in_value_is_encoded(self):
++        url = render_url_template(
++            "https://api.com/users/{{userId}}",
++            {"userId": "john doe"},
++        )
++        assert url == "https://api.com/users/john%20doe"
++
++    def test_null_byte_is_encoded(self):
++        url = render_url_template(
++            "https://api.com/users/{{userId}}",
++            {"userId": "123\x00"},
++        )
++        assert url == "https://api.com/users/123%00"
++
++    def test_initial_context_in_url(self):
++        url = render_url_template(
++            "https://api.com/users/{{initial_context.phone}}",
++            {"initial_context": {"phone": "+1234567890"}},
++        )
++        assert url == "https://api.com/users/%2B1234567890"
++
++    def test_gathered_context_in_url(self):
++        url = render_url_template(
++            "https://api.com/users/{{gathered_context.email}}",
++            {"gathered_context": {"email": "test@example.com"}},
++        )
++        assert url == "https://api.com/users/test%40example.com"
++
++    @pytest.mark.parametrize(
++        ("arguments", "gathered_context", "initial_context", "expected_path"),
++        [
++            (
++                {"path": "from-llm"},
++                {"path": "from-gathered"},
++                {"path": "from-initial"},
++                "from-llm",
++            ),
++            ({}, {"path": "from-gathered"}, {"path": "from-initial"}, "from-gathered"),
++            ({}, {}, {"path": "from-initial"}, "from-initial"),
++        ],
++    )
++    @pytest.mark.asyncio
++    async def test_url_render_context_precedence(
++        self,
++        arguments,
++        gathered_context,
++        initial_context,
++        expected_path,
++    ):
++        tool = MockToolModel(
++            tool_uuid="uuid",
++            name="Context URL",
++            description="Render a URL from runtime context",
++            category="http_api",
++            definition={
++                "config": {
++                    "method": "GET",
++                    "url": "https://api.com/{{path}}",
++                }
++            },
++        )
++
++        with patch(
++            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
++        ) as mock_client_class:
++            mock_client = AsyncMock()
++            mock_response = Mock()
++            mock_response.status_code = 200
++            mock_response.json.return_value = {}
++            mock_client.request.return_value = mock_response
++            mock_client_class.return_value.__aenter__.return_value = mock_client
++
++            await execute_http_tool(
++                tool,
++                arguments,
++                call_context_vars=initial_context,
++                gathered_context_vars=gathered_context,
++            )
++
++            assert mock_client.request.call_args.kwargs["url"] == (
++                f"https://api.com/{expected_path}"
++            )
++
++    import pytest
++
++    @pytest.mark.asyncio
++    async def test_get_with_path_param_is_also_sent_as_query_param(self):
++        from unittest.mock import patch
++
++        tool = MockToolModel(
++            tool_uuid="uuid",
++            name="Get User",
++            description="Get User",
++            category="http_api",
++            definition={
++                "config": {
++                    "method": "GET",
++                    "url": "https://api.com/users/{{userId}}",
++                    "parameters": [{"name": "userId", "type": "string"}],
++                }
++            },
++        )
++        with patch(
++            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
++        ) as mock_client:
++            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 200
++            mock_client.return_value.__aenter__.return_value.request.return_value.json.return_value = {}
++
++            await execute_http_tool(tool, {"userId": "123"})
++
++            mock_client.return_value.__aenter__.return_value.request.assert_called_once_with(
++                method="GET",
++                url="https://api.com/users/123",
++                headers={},
++                json=None,
++                params={"userId": "123"},
++            )
++
++    @pytest.mark.asyncio
++    async def test_put_path_param_is_also_sent_in_body(self):
++        from unittest.mock import patch
++
++        tool = MockToolModel(
++            tool_uuid="uuid",
++            name="Cancel",
++            description="Cancel",
++            category="http_api",
++            definition={
++                "config": {
++                    "method": "PUT",
++                    "url": "https://api.apaleo.com/booking/v1/reservations/{{reservationId}}/actions/cancel",
++                    "parameters": [{"name": "reservationId", "type": "string"}],
++                }
++            },
++        )
++        with patch(
++            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
++        ) as mock_client:
++            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 204
++
++            await execute_http_tool(tool, {"reservationId": "AWAEYPKI-1"})
++
++            mock_client.return_value.__aenter__.return_value.request.assert_called_once_with(
++                method="PUT",
++                url="https://api.apaleo.com/booking/v1/reservations/AWAEYPKI-1/actions/cancel",
++                headers={},
++                json={"reservationId": "AWAEYPKI-1"},
++                params=None,
++            )
++
++    @pytest.mark.asyncio
++    async def test_rendered_url_in_test_mode_result(self):
++        from unittest.mock import patch
++
++        tool = MockToolModel(
++            tool_uuid="uuid",
++            name="Cancel",
++            description="Cancel",
++            category="http_api",
++            definition={
++                "config": {
++                    "method": "PUT",
++                    "url": "https://api.apaleo.com/booking/v1/reservations/{{reservationId}}/actions/cancel",
++                    "parameters": [{"name": "reservationId", "type": "string"}],
++                }
++            },
++        )
++        with patch(
++            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
++        ) as mock_client:
++            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 204
++
++            result = await execute_http_tool(
++                tool, {"reservationId": "123"}, include_request_headers=True
++            )
++            assert (
++                result.get("rendered_url")
++                == "https://api.apaleo.com/booking/v1/reservations/123/actions/cancel"
++            )
++
++    @pytest.mark.asyncio
++    async def test_rendered_url_absent_in_live_mode(self):
++        from unittest.mock import patch
++
++        tool = MockToolModel(
++            tool_uuid="uuid",
++            name="Cancel",
++            description="Cancel",
++            category="http_api",
++            definition={
++                "config": {
++                    "method": "PUT",
++                    "url": "https://api.apaleo.com/booking/v1/reservations/{{reservationId}}/actions/cancel",
++                    "parameters": [{"name": "reservationId", "type": "string"}],
++                }
++            },
++        )
++        with patch(
++            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
++        ) as mock_client:
++            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 204
++
++            result = await execute_http_tool(
++                tool, {"reservationId": "123"}, include_request_headers=False
++            )
++            assert "rendered_url" not in result
++
++    def test_current_time_timezone_in_url(self):
++        url = render_url_template(
++            "https://api.com/users/{{current_time_Europe/Berlin}}",
++            {},
++        )
++        assert "https://api.com/users/" in url
++        # Output should be quoted datetime string. It'll have characters like %3A (encoded colon)
++        assert "%3A" in url or ":" in url
++
++    @pytest.mark.asyncio
++    async def test_delete_with_path_param(self):
++        from unittest.mock import patch
++
++        tool = MockToolModel(
++            tool_uuid="uuid",
++            name="Delete User",
++            description="Delete User",
++            category="http_api",
++            definition={
++                "config": {
++                    "method": "DELETE",
++                    "url": "https://api.com/users/{{userId}}",
++                    "parameters": [{"name": "userId", "type": "string"}],
++                }
++            },
++        )
++        with patch(
++            "api.services.workflow.tools.custom_tool.httpx.AsyncClient"
++        ) as mock_client:
++            mock_client.return_value.__aenter__.return_value.request.return_value.status_code = 204
++
++            await execute_http_tool(tool, {"userId": "123"})
++
++            mock_client.return_value.__aenter__.return_value.request.assert_called_once_with(
++                method="DELETE",
++                url="https://api.com/users/123",
++                headers={},
++                json=None,
++                params={"userId": "123"},
++            )
+diff --git a/api/tests/test_mcp_tool_route.py b/api/tests/test_mcp_tool_route.py
+index d312ee11f..8497a8d3f 100644
+--- a/api/tests/test_mcp_tool_route.py
++++ b/api/tests/test_mcp_tool_route.py
+@@ -559,7 +559,7 @@ async def test_tool_test_returns_masked_effective_request_headers(monkeypatch):
+ async def test_tool_test_request_body_includes_resolved_preset_parameters(
+     monkeypatch,
+ ):
+-    """The Request preview includes direct preset values alongside LLM values."""
++    """The request preview gives LLM values precedence over preset values."""
+     import api.routes.tool as tool_route
+ 
+     tool = _http_tool_model(method="POST")
+@@ -585,13 +585,13 @@ async def test_tool_test_request_body_includes_resolved_preset_parameters(
+     resp = await call_test_tool_route(
+         "tu-http",
+         request=ToolTestRequest(
+-            llm_params={"name": "Ada"},
++            llm_params={"name": "Ada", "source": "llm"},
+             preset_params={"source": "web_widget"},
+         ),
+         user=_fake_user(),
+     )
+ 
+-    assert resp.request_body == {"name": "Ada", "source": "web_widget"}
++    assert resp.request_body == {"name": "Ada", "source": "llm"}
+ 
+ 
+ @pytest.mark.asyncio
+diff --git a/api/utils/template_renderer.py b/api/utils/template_renderer.py
+index e0b111ebf..937807a86 100644
+--- a/api/utils/template_renderer.py
++++ b/api/utils/template_renderer.py
+@@ -3,7 +3,8 @@
+ import json
+ import re
+ from datetime import datetime
+-from typing import Any, Dict, Optional, Union
++from typing import Any, Callable, Dict, Optional, Union
++from urllib.parse import quote, urlparse
+ from zoneinfo import ZoneInfo
+ 
+ from loguru import logger
+@@ -157,7 +158,42 @@ def _resolve_builtin_variable(
+     return None
+ 
+ 
+-def _render_string(template_str: str, context: Dict[str, Any]) -> str:
++def _resolve_template_value(
++    variable_path: str,
++    filter_name: Optional[str],
++    filter_value: Optional[str],
++    context: Dict[str, Any],
++    default_tz: Optional[str],
++) -> Any:
++    """Resolve one parsed template variable using the shared template semantics."""
++
++    builtin_value = _resolve_builtin_variable(variable_path, default_tz)
++    if builtin_value is not None:
++        return builtin_value
++
++    # Prompts commonly reference initial_context.<key>, while some runtime
++    # callers pass the initial context itself as the render context.
++    value = get_nested_value(context, variable_path)
++    if value is None and variable_path.startswith(_INITIAL_CONTEXT_PREFIX):
++        value = get_nested_value(context, variable_path[len(_INITIAL_CONTEXT_PREFIX) :])
++
++    # Apply fallback: new syntax {{var | default}} or legacy
++    # {{var | fallback:default}}.
++    if filter_name is not None and value in (None, ""):
++        if filter_name == "fallback":
++            return filter_value if filter_value is not None else variable_path.title()
++        return filter_name
++
++    return value
++
++
++def _render_string(
++    template_str: str,
++    context: Dict[str, Any],
++    *,
++    value_formatter: Optional[Callable[[str, Any, Optional[str]], str]] = None,
++    replace_escaped_newlines: bool = True,
++) -> str:
+     """
+     Render a string template with variable substitution.
+ 
+@@ -180,33 +216,16 @@ def _replace(match: re.Match[str]) -> str:  # type: ignore[type-arg]
+         filter_name = match.group(2).strip() if match.group(2) else None
+         filter_value = match.group(3).strip() if match.group(3) else None
+ 
+-        # Check for built-in variables first (current_time, current_weekday)
+-        builtin_value = _resolve_builtin_variable(variable_path, default_tz)
+-        if builtin_value is not None:
+-            return builtin_value
+-
+-        # Get value using nested path lookup. Prompts commonly reference
+-        # initial_context.<key>, while some runtime callers pass the initial
+-        # context itself as the render context.
+-        value = get_nested_value(context, variable_path)
+-        if value is None and variable_path.startswith(_INITIAL_CONTEXT_PREFIX):
+-            value = get_nested_value(
+-                context, variable_path[len(_INITIAL_CONTEXT_PREFIX) :]
+-            )
++        value = _resolve_template_value(
++            variable_path,
++            filter_name,
++            filter_value,
++            context,
++            default_tz,
++        )
+ 
+-        # Apply fallback: new syntax {{var | default}} or legacy {{var | fallback:default}}
+-        if filter_name is not None:
+-            if value is None or value == "":
+-                if filter_name == "fallback":
+-                    # Legacy syntax: {{var | fallback:default}}
+-                    value = (
+-                        filter_value
+-                        if filter_value is not None
+-                        else variable_path.title()
+-                    )
+-                else:
+-                    # New syntax: {{var | default}}
+-                    value = filter_name
++        if value_formatter is not None:
++            return value_formatter(variable_path, value, filter_name)
+ 
+         # Convert to string for substitution
+         if value is None:
+@@ -219,6 +238,71 @@ def _replace(match: re.Match[str]) -> str:  # type: ignore[type-arg]
+     result = re.sub(TEMPLATE_VAR_PATTERN, _replace, template_str)
+ 
+     # Handle line breaks (convert literal \n to actual newlines)
+-    result = result.replace("\\n", "\n")
++    if replace_escaped_newlines:
++        result = result.replace("\\n", "\n")
+ 
+     return result
++
++
++def render_url_template(
++    url: str,
++    context: Dict[str, Any],
++) -> str:
++    """Render URL placeholders with shared template semantics and URL safety.
++
++    Values are resolved by the same logic used by :func:`render_template`, then
++    percent-encoded before substitution. The configured scheme and authority
++    must remain unchanged.
++    """
++
++    if url.count("{{") != url.count("}}"):
++        if url.count("{{") > url.count("}}"):
++            raise ValueError("Malformed URL template: unmatched '{{' found.")
++        raise ValueError("Malformed URL template: unmatched '}}' found.")
++
++    if "{{{{" in url:
++        raise ValueError("Malformed URL template: nested '{{' found.")
++
++    if not url or "{{" not in url:
++        return url
++
++    def _format_url_value(
++        variable_path: str,
++        value: Any,
++        filter_name: Optional[str],
++    ) -> str:
++        if value is None:
++            raise ValueError(f"URL template variable '{variable_path}' has no value.")
++        if value == "" and filter_name is None:
++            raise ValueError(
++                f"URL template variable '{variable_path}' resolved to an empty string."
++            )
++        if isinstance(value, list):
++            raise ValueError("Arrays cannot be rendered directly into a URL.")
++        if isinstance(value, dict):
++            raise ValueError("Objects cannot be rendered directly into a URL.")
++
++        rendered_value = str(value).lower() if isinstance(value, bool) else str(value)
++        return quote(rendered_value, safe="")
++
++    rendered_url = _render_string(
++        url,
++        context,
++        value_formatter=_format_url_value,
++        replace_escaped_newlines=False,
++    )
++
++    if "{{" in rendered_url or "}}" in rendered_url:
++        raise ValueError("Malformed URL template: invalid placeholder syntax.")
++
++    original_parsed = urlparse(url)
++    rendered_parsed = urlparse(rendered_url)
++    if (
++        original_parsed.scheme != rendered_parsed.scheme
++        or original_parsed.netloc != rendered_parsed.netloc
++    ):
++        raise ValueError(
++            "URL placeholders cannot alter the scheme or host of the configured endpoint."
++        )
++
++    return rendered_url
+diff --git a/ui/src/app/tools/[toolUuid]/components/HttpApiToolConfig.tsx b/ui/src/app/tools/[toolUuid]/components/HttpApiToolConfig.tsx
+index 37b0d8fa1..403069e67 100644
+--- a/ui/src/app/tools/[toolUuid]/components/HttpApiToolConfig.tsx
++++ b/ui/src/app/tools/[toolUuid]/components/HttpApiToolConfig.tsx
+@@ -1,5 +1,7 @@
+ "use client";
+ 
++import { Info } from "lucide-react";
++
+ import type { RecordingResponseSchema } from "@/client/types.gen";
+ import { StaticTextWarning, TextOrAudioInput } from "@/components/flow/TextOrAudioInput";
+ import {
+@@ -75,6 +77,19 @@ export function HttpApiToolConfig({
+     onCustomMessageRecordingIdChange,
+     recordings = [],
+ }: HttpApiToolConfigProps) {
++    const systemPrefixes = ["initial_context", "gathered_context", "current_time", "current_weekday"];
++
++    // Extract path params from URL
++    const urlMatches = url.match(/\{\{\s*([^|}\s]+)\s*(?:\|[^}]+)?\}\}/g) || [];
++    const urlParams = urlMatches.map(m => m.replace(/[{}]/g, '').split('|')[0].trim());
++    const customUrlParams = Array.from(new Set(urlParams.filter(p =>
++        !systemPrefixes.some(prefix =>
++            p.startsWith(`${prefix}.`) ||
++            ((prefix === "current_time" || prefix === "current_weekday") &&
++                (p === prefix || p.startsWith(`${prefix}_`)))
++        )
++    )));
++
+     return (
+         <Card>
+             <CardHeader>
+@@ -147,6 +162,14 @@ export function HttpApiToolConfig({
+                                 placeholder="https://api.example.com/appointments"
+                                 showValidation
+                             />
++                            {customUrlParams.length > 0 && (
++                                <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3 text-sm text-blue-600 flex gap-2 items-start mt-2">
++                                    <Info className="h-4 w-4 mt-0.5 shrink-0" />
++                                    <span>
++                                        Path parameters detected: {customUrlParams.join(", ")}. Values resolve from LLM tool call arguments first, then initial context.
++                                    </span>
++                                </div>
++                            )}
+                         </div>
+ 
+                         <div className="grid gap-2 pt-4 border-t">
+diff --git a/ui/src/app/tools/[toolUuid]/components/http-tool-test/HttpToolTestDialog.tsx b/ui/src/app/tools/[toolUuid]/components/http-tool-test/HttpToolTestDialog.tsx
+index 96fdb6a97..099b3451e 100644
+--- a/ui/src/app/tools/[toolUuid]/components/http-tool-test/HttpToolTestDialog.tsx
++++ b/ui/src/app/tools/[toolUuid]/components/http-tool-test/HttpToolTestDialog.tsx
+@@ -445,7 +445,7 @@ export function HttpToolTestDialog({
+                                                 Body: {JSON.stringify(result.request_body, null, 2)}
+                                             </pre>
+                                         )}
+-                                        {result.request_params != null && (
++                                        {result.request_params != null && Object.keys(result.request_params).length > 0 && (
+                                             <pre className="whitespace-pre-wrap">
+                                                 Query:{" "}
+                                                 {Object.entries(result.request_params)

@@ -1,0 +1,1153 @@
+﻿commit e088526a27ca83e61c48b1ea02f5f664149a447f
+Author: Abhishek Kumar <abhishek@a6k.me>
+Date:   Tue Aug 4 14:15:39 2026 +0530
+
+    chore: refactor tests to send audio_out_end_silence_secs as 0
+
+diff --git a/api/tests/integrations/test_run_pipeline.py b/api/tests/integrations/test_run_pipeline.py
+index d75d35ae..99704500 100644
+--- a/api/tests/integrations/test_run_pipeline.py
++++ b/api/tests/integrations/test_run_pipeline.py
+@@ -91,7 +91,11 @@ async def test_run_pipeline_fires_initial_response_and_completes_run(
+     the workflow_run row to COMPLETED."""
+     workflow_run, user, workflow = workflow_run_setup
+     transport = MockTransport(
+-        TransportParams(audio_in_enabled=True, audio_out_enabled=True)
++        TransportParams(
++            audio_in_enabled=True,
++            audio_out_enabled=True,
++            audio_out_end_silence_secs=0,
++        )
+     )
+ 
+     captured_task: list = []
+@@ -171,7 +175,11 @@ async def test_call_stays_registered_for_drain_until_artifacts_uploaded(
+     )
+ 
+     transport = MockTransport(
+-        TransportParams(audio_in_enabled=True, audio_out_enabled=True)
++        TransportParams(
++            audio_in_enabled=True,
++            audio_out_enabled=True,
++            audio_out_end_silence_secs=0,
++        )
+     )
+     captured_task: list = []
+     audio_config = create_audio_config(WorkflowRunMode.SMALLWEBRTC.value)
+diff --git a/api/tests/integrations/test_run_pipeline_text_greeting.py b/api/tests/integrations/test_run_pipeline_text_greeting.py
+index eb34c411..c033ef1e 100644
+--- a/api/tests/integrations/test_run_pipeline_text_greeting.py
++++ b/api/tests/integrations/test_run_pipeline_text_greeting.py
+@@ -159,7 +159,11 @@ async def _run_test_body(workflow_run_setup, db_session) -> None:
+     tts = MockTTSService(mock_audio_duration_ms=50, frame_delay=0)
+ 
+     transport = MockTransport(
+-        TransportParams(audio_in_enabled=True, audio_out_enabled=True)
++        TransportParams(
++            audio_in_enabled=True,
++            audio_out_enabled=True,
++            audio_out_end_silence_secs=0,
++        )
+     )
+ 
+     captured_task: list = []
+diff --git a/api/tests/pipecat_test_utils.py b/api/tests/pipecat_test_utils.py
+new file mode 100644
+index 00000000..48fc12cc
+--- /dev/null
++++ b/api/tests/pipecat_test_utils.py
+@@ -0,0 +1,70 @@
++"""Shared helpers for running Pipecat engine tests with production-like startup."""
++
++import asyncio
++from collections.abc import Awaitable, Callable
++from typing import Any
++
++from pipecat.frames.frames import LLMContextFrame
++from pipecat.pipeline.worker import PipelineWorker
++
++from api.services.pipecat.worker_runner import run_pipeline_worker
++from api.services.workflow.pipecat_engine import PipecatEngine
++
++ReadyCallback = Callable[[], Awaitable[None]]
++
++
++async def run_engine_test_pipeline(
++    task: PipelineWorker,
++    engine: PipecatEngine,
++    transport: Any,
++    *,
++    on_ready: ReadyCallback | None = None,
++    timeout: float | None = 10.0,
++) -> None:
++    """Run an engine pipeline after the same readiness signals used in production.
++
++    Production initializes the engine before starting the worker, then starts the
++    conversation only after both the transport client and pipeline are ready. Tests
++    use a direct ``LLMContextFrame`` as their default stimulus because they are
++    exercising an LLM response rather than the configured node greeting.
++    """
++    await engine.initialize()
++
++    ready_state = {
++        "pipeline_started": False,
++        "client_connected": False,
++        "callback_started": False,
++    }
++
++    async def trigger_test() -> None:
++        if on_ready is not None:
++            await on_ready()
++            return
++
++        await engine.set_node(engine.workflow.start_node_id)
++        await engine.llm.queue_frame(LLMContextFrame(engine.context))
++
++    async def maybe_trigger_test() -> None:
++        if (
++            ready_state["pipeline_started"]
++            and ready_state["client_connected"]
++            and not ready_state["callback_started"]
++        ):
++            ready_state["callback_started"] = True
++            await trigger_test()
++
++    @transport.event_handler("on_client_connected")
++    async def on_client_connected(_transport, _participant) -> None:
++        ready_state["client_connected"] = True
++        await maybe_trigger_test()
++
++    @task.event_handler("on_pipeline_started")
++    async def on_pipeline_started(_task, _frame) -> None:
++        ready_state["pipeline_started"] = True
++        await maybe_trigger_test()
++
++    if timeout is None:
++        await run_pipeline_worker(task)
++    else:
++        async with asyncio.timeout(timeout):
++            await run_pipeline_worker(task)
+diff --git a/api/tests/test_pipecat_engine_context_update.py b/api/tests/test_pipecat_engine_context_update.py
+index 63afbbb9..026632b9 100644
+--- a/api/tests/test_pipecat_engine_context_update.py
++++ b/api/tests/test_pipecat_engine_context_update.py
+@@ -18,7 +18,6 @@ from typing import List
+ from unittest.mock import AsyncMock, patch
+ 
+ import pytest
+-from pipecat.frames.frames import LLMContextFrame
+ from pipecat.pipeline.pipeline import Pipeline
+ from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+ from pipecat.processors.aggregators.llm_context import LLMContext
+@@ -29,7 +28,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
+ from pipecat.tests.mock_transport import MockTransport
+ from pipecat.transports.base_transport import TransportParams
+ 
+-from api.services.pipecat.worker_runner import run_pipeline_worker
+ from api.services.workflow.pipecat_engine import PipecatEngine
+ from api.services.workflow.workflow_graph import WorkflowGraph
+ from api.tests.conftest import (
+@@ -37,6 +35,7 @@ from api.tests.conftest import (
+     END_CALL_SYSTEM_PROMPT,
+     START_CALL_SYSTEM_PROMPT,
+ )
++from api.tests.pipecat_test_utils import run_engine_test_pipeline
+ from pipecat.tests import (
+     ContextCapturingMockLLM,
+     MockLLMService,
+@@ -73,6 +72,7 @@ async def run_pipeline_and_capture_context(
+             audio_out_enabled=True,
+             audio_in_sample_rate=16000,
+             audio_out_sample_rate=16000,
++            audio_out_end_silence_secs=0,
+         ),
+     )
+ 
+@@ -108,6 +108,7 @@ async def run_pipeline_and_capture_context(
+     # Create the pipeline
+     pipeline = Pipeline(
+         [
++            mock_transport.input(),
+             llm,
+             tts,
+             mock_transport.output(),
+@@ -126,17 +127,7 @@ async def run_pipeline_and_capture_context(
+         new_callable=AsyncMock,
+         return_value=1,
+     ):
+-
+-        async def run_pipeline():
+-            await run_pipeline_worker(task)
+-
+-        async def initialize_engine():
+-            await asyncio.sleep(0.01)
+-            await engine.initialize()
+-            await engine.set_node(engine.workflow.start_node_id)
+-            await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-        await asyncio.gather(run_pipeline(), initialize_engine())
++        await run_engine_test_pipeline(task, engine, mock_transport)
+ 
+     return llm, context
+ 
+diff --git a/api/tests/test_pipecat_engine_end_call.py b/api/tests/test_pipecat_engine_end_call.py
+index b927369b..da5fe2bc 100644
+--- a/api/tests/test_pipecat_engine_end_call.py
++++ b/api/tests/test_pipecat_engine_end_call.py
+@@ -41,7 +41,6 @@ from pipecat.turns.user_mute import (
+ from pipecat.utils.enums import EndTaskReason
+ 
+ from api.enums import ToolCategory
+-from api.services.pipecat.worker_runner import run_pipeline_worker
+ from api.services.workflow.dto import (
+     EdgeDataDTO,
+     EndCallNodeData,
+@@ -58,6 +57,7 @@ from api.services.workflow.pipecat_engine_variable_extractor import (
+ )
+ from api.services.workflow.workflow_graph import WorkflowGraph
+ from api.tests.conftest import END_CALL_SYSTEM_PROMPT, START_CALL_SYSTEM_PROMPT
++from api.tests.pipecat_test_utils import run_engine_test_pipeline
+ from pipecat.tests import MockLLMService, MockTTSService
+ 
+ 
+@@ -136,6 +136,7 @@ async def create_engine_with_tracking(
+             audio_out_enabled=True,
+             audio_in_sample_rate=16000,
+             audio_out_sample_rate=16000,
++            audio_out_end_silence_secs=0,
+         ),
+     )
+ 
+@@ -274,17 +275,7 @@ class TestEndCallViaNodeTransition:
+                 new_callable=AsyncMock,
+                 return_value={"user_intent": "end call"},
+             ):
+-
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_engine():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
+-                    await engine.set_node(engine.workflow.start_node_id)
+-                    await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-                await asyncio.gather(run_pipeline(), initialize_engine())
++                await run_engine_test_pipeline(task, engine, transport)
+ 
+         # Verify end_call_with_reason was called
+         assert len(test_helper.end_call_reasons) >= 1, (
+@@ -372,17 +363,7 @@ class TestEndCallViaNodeTransition:
+                 new_callable=AsyncMock,
+                 return_value={"greeting_type": "formal", "user_name": "John"},
+             ):
+-
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_engine():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
+-                    await engine.set_node(engine.workflow.start_node_id)
+-                    await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-                await asyncio.gather(run_pipeline(), initialize_engine())
++                await run_engine_test_pipeline(task, engine, transport)
+ 
+         # Should have 3 LLM generations
+         assert llm.get_current_step() == 3
+@@ -465,17 +446,7 @@ class TestEndCallViaCustomTool:
+                 new_callable=AsyncMock,
+                 return_value={"user_intent": "end"},
+             ):
+-
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_engine():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
+-                    await engine.set_node(engine.workflow.start_node_id)
+-                    await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-                await asyncio.gather(run_pipeline(), initialize_engine())
++                await run_engine_test_pipeline(task, engine, transport)
+ 
+         # Verify end_call_with_reason was called with END_CALL_TOOL_REASON
+         assert len(test_helper.end_call_reasons) >= 1, (
+@@ -551,17 +522,7 @@ class TestEndCallViaCustomTool:
+                 new_callable=AsyncMock,
+                 return_value={"user_intent": "end"},
+             ):
+-
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_engine():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
+-                    await engine.set_node(engine.workflow.start_node_id)
+-                    await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-                await asyncio.gather(run_pipeline(), initialize_engine())
++                await run_engine_test_pipeline(task, engine, transport)
+ 
+         # Verify end_call_with_reason was called
+         assert len(test_helper.end_call_reasons) >= 1, (
+@@ -624,12 +585,7 @@ class TestEndCallViaClientDisconnect:
+                 return_value={"user_intent": "disconnected"},
+             ):
+ 
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_and_disconnect():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
++                async def disconnect_after_response():
+                     await engine.set_node(engine.workflow.start_node_id)
+                     await engine.llm.queue_frame(LLMContextFrame(engine.context))
+ 
+@@ -642,7 +598,12 @@ class TestEndCallViaClientDisconnect:
+                         EndTaskReason.USER_HANGUP.value, abort_immediately=True
+                     )
+ 
+-                await asyncio.gather(run_pipeline(), initialize_and_disconnect())
++                await run_engine_test_pipeline(
++                    task,
++                    engine,
++                    transport,
++                    on_ready=disconnect_after_response,
++                )
+ 
+         # Verify end_call_with_reason was called with USER_HANGUP
+         assert EndTaskReason.USER_HANGUP.value in test_helper.end_call_reasons, (
+@@ -709,12 +670,7 @@ class TestEndCallRaceConditions:
+                 return_value={"user_intent": "end"},
+             ):
+ 
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_and_race():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
++                async def race_end_calls_after_response():
+                     await engine.set_node(engine.workflow.start_node_id)
+                     await engine.llm.queue_frame(LLMContextFrame(engine.context))
+ 
+@@ -736,7 +692,12 @@ class TestEndCallRaceConditions:
+                         ),
+                     )
+ 
+-                await asyncio.gather(run_pipeline(), initialize_and_race())
++                await run_engine_test_pipeline(
++                    task,
++                    engine,
++                    transport,
++                    on_ready=race_end_calls_after_response,
++                )
+ 
+         # Due to the _call_disposed guard, only one end_call should fully execute
+         # The tracked end_call_reasons will show all attempted calls
+@@ -815,13 +776,8 @@ class TestEndCallRaceConditions:
+                 return_value={"user_intent": "end"},
+             ):
+ 
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_and_race_disconnect():
++                async def race_disconnect_after_response():
+                     nonlocal disconnect_called
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
+                     await engine.set_node(engine.workflow.start_node_id)
+                     await engine.llm.queue_frame(LLMContextFrame(engine.context))
+ 
+@@ -834,7 +790,12 @@ class TestEndCallRaceConditions:
+                         EndTaskReason.USER_HANGUP.value, abort_immediately=True
+                     )
+ 
+-                await asyncio.gather(run_pipeline(), initialize_and_race_disconnect())
++                await run_engine_test_pipeline(
++                    task,
++                    engine,
++                    transport,
++                    on_ready=race_disconnect_after_response,
++                )
+ 
+         # Verify disconnect was attempted
+         assert disconnect_called, "Disconnect should have been called"
+@@ -902,12 +863,7 @@ class TestEndCallExtractionBehavior:
+                 side_effect=mock_extraction,
+             ):
+ 
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_and_end():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
++                async def end_after_response():
+                     await engine.set_node(engine.workflow.start_node_id)
+                     await engine.llm.queue_frame(LLMContextFrame(engine.context))
+ 
+@@ -924,7 +880,12 @@ class TestEndCallExtractionBehavior:
+                         "Extraction should have completed before end_call returned"
+                     )
+ 
+-                await asyncio.gather(run_pipeline(), initialize_and_end())
++                await run_engine_test_pipeline(
++                    task,
++                    engine,
++                    transport,
++                    on_ready=end_after_response,
++                )
+ 
+         # Verify synchronous extraction was used
+         sync_extractions = [
+@@ -1022,12 +983,7 @@ class TestEndCallExtractionBehavior:
+                 extraction_mock,
+             ):
+ 
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_and_end():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
++                async def end_after_response():
+                     await engine.set_node(engine.workflow.start_node_id)
+                     await engine.llm.queue_frame(LLMContextFrame(engine.context))
+ 
+@@ -1039,7 +995,12 @@ class TestEndCallExtractionBehavior:
+                         EndTaskReason.USER_HANGUP.value, abort_immediately=True
+                     )
+ 
+-                await asyncio.gather(run_pipeline(), initialize_and_end())
++                await run_engine_test_pipeline(
++                    task,
++                    engine,
++                    transport,
++                    on_ready=end_after_response,
++                )
+ 
+         # Extraction should have been called but the inner _perform_extraction
+         # should not have been called because extraction_enabled=False
+diff --git a/api/tests/test_pipecat_engine_node_switch_with_user_speech.py b/api/tests/test_pipecat_engine_node_switch_with_user_speech.py
+index aeebfe76..b073520c 100644
+--- a/api/tests/test_pipecat_engine_node_switch_with_user_speech.py
++++ b/api/tests/test_pipecat_engine_node_switch_with_user_speech.py
+@@ -18,7 +18,6 @@ import pytest
+ from pipecat.frames.frames import (
+     Frame,
+     FunctionCallResultFrame,
+-    LLMContextFrame,
+     TranscriptionFrame,
+     UserStartedSpeakingFrame,
+     UserStoppedSpeakingFrame,
+@@ -47,9 +46,9 @@ from pipecat.turns.user_stop import (
+ from pipecat.turns.user_turn_strategies import UserTurnStrategies
+ from pipecat.utils.time import time_now_iso8601
+ 
+-from api.services.pipecat.worker_runner import run_pipeline_worker
+ from api.services.workflow.pipecat_engine import PipecatEngine
+ from api.services.workflow.workflow_graph import WorkflowGraph
++from api.tests.pipecat_test_utils import run_engine_test_pipeline
+ from pipecat.tests import MockLLMService, MockTTSService
+ 
+ 
+@@ -145,6 +144,7 @@ async def create_test_pipeline(
+             audio_out_enabled=True,
+             audio_in_sample_rate=16000,
+             audio_out_sample_rate=16000,
++            audio_out_end_silence_secs=0,
+         ),
+     )
+ 
+@@ -269,7 +269,7 @@ class TestNodeSwitchWithUserSpeech:
+         mock_steps = [step_0_chunks, step_1_chunks, step_2_chunks]
+         llm = MockLLMService(mock_steps=mock_steps, chunk_delay=0.001)
+ 
+-        engine, _transport, task = await create_test_pipeline(
++        engine, transport, task = await create_test_pipeline(
+             three_node_workflow_no_variable_extraction,
+             llm,
+             user_speech_initial_delay=user_speech_initial_delay,
+@@ -281,19 +281,7 @@ class TestNodeSwitchWithUserSpeech:
+             new_callable=AsyncMock,
+             return_value=1,
+         ):
+-
+-            async def run_pipeline():
+-                await run_pipeline_worker(task)
+-
+-            async def initialize_engine():
+-                await asyncio.sleep(0.01)
+-                await engine.initialize()
+-                await engine.set_node(engine.workflow.start_node_id)
+-                # Start the LLM generation - user speech will be injected
+-                # automatically when FunctionCallResultFrame #1 is seen
+-                await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-            await asyncio.gather(run_pipeline(), initialize_engine())
++            await run_engine_test_pipeline(task, engine, transport)
+ 
+         # Total 4 generations out of which 1 was cancelled due to interruption
+         assert llm.get_current_step() == 4
+diff --git a/api/tests/test_pipecat_engine_tool_calls.py b/api/tests/test_pipecat_engine_tool_calls.py
+index 3a92659d..62058733 100644
+--- a/api/tests/test_pipecat_engine_tool_calls.py
++++ b/api/tests/test_pipecat_engine_tool_calls.py
+@@ -4,12 +4,10 @@ This module tests the behavior when the LLM generates tool calls (single or para
+ using PipecatEngine's actual function registration and execution logic.
+ """
+ 
+-import asyncio
+ from typing import Any, Dict, List
+ from unittest.mock import AsyncMock, patch
+ 
+ import pytest
+-from pipecat.frames.frames import LLMContextFrame
+ from pipecat.pipeline.pipeline import Pipeline
+ from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+ from pipecat.processors.aggregators.llm_context import LLMContext
+@@ -20,10 +18,10 @@ from pipecat.processors.aggregators.llm_response_universal import (
+ from pipecat.tests.mock_transport import MockTransport
+ from pipecat.transports.base_transport import TransportParams
+ 
+-from api.services.pipecat.worker_runner import run_pipeline_worker
+ from api.services.workflow.pipecat_engine import PipecatEngine
+ from api.services.workflow.workflow_graph import WorkflowGraph
+ from api.tests.conftest import END_CALL_SYSTEM_PROMPT
++from api.tests.pipecat_test_utils import run_engine_test_pipeline
+ from pipecat.tests import MockLLMService, MockTTSService
+ 
+ 
+@@ -74,6 +72,7 @@ async def run_pipeline_with_tool_calls(
+             audio_out_enabled=True,
+             audio_in_sample_rate=16000,
+             audio_out_sample_rate=16000,
++            audio_out_end_silence_secs=0,
+         ),
+     )
+ 
+@@ -99,6 +98,7 @@ async def run_pipeline_with_tool_calls(
+     # Create the pipeline with the mock LLM and TTS
+     pipeline = Pipeline(
+         [
++            mock_transport.input(),
+             llm,
+             tts,
+             mock_transport.output(),
+@@ -117,19 +117,7 @@ async def run_pipeline_with_tool_calls(
+         new_callable=AsyncMock,
+         return_value=1,
+     ):
+-
+-        async def run_pipeline():
+-            await run_pipeline_worker(task)
+-
+-        async def initialize_engine():
+-            # Small delay to let runner start
+-            await asyncio.sleep(0.01)
+-            await engine.initialize()
+-            await engine.set_node(engine.workflow.start_node_id)
+-            await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-        # Run both concurrently
+-        await asyncio.gather(run_pipeline(), initialize_engine())
++        await run_engine_test_pipeline(task, engine, mock_transport)
+ 
+     return llm, context
+ 
+diff --git a/api/tests/test_pipecat_engine_transition_mute.py b/api/tests/test_pipecat_engine_transition_mute.py
+index 9a6636f3..5bd85748 100644
+--- a/api/tests/test_pipecat_engine_transition_mute.py
++++ b/api/tests/test_pipecat_engine_transition_mute.py
+@@ -13,7 +13,6 @@ import asyncio
+ from unittest.mock import AsyncMock, patch
+ 
+ import pytest
+-from pipecat.frames.frames import LLMContextFrame
+ from pipecat.pipeline.pipeline import Pipeline
+ from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+ from pipecat.processors.aggregators.llm_context import LLMContext
+@@ -30,12 +29,12 @@ from pipecat.turns.user_mute import (
+     MuteUntilFirstBotCompleteUserMuteStrategy,
+ )
+ 
+-from api.services.pipecat.worker_runner import run_pipeline_worker
+ from api.services.workflow.pipecat_engine import PipecatEngine
+ from api.services.workflow.pipecat_engine_variable_extractor import (
+     VariableExtractionManager,
+ )
+ from api.services.workflow.workflow_graph import WorkflowGraph
++from api.tests.pipecat_test_utils import run_engine_test_pipeline
+ from pipecat.tests import MockLLMService, MockTTSService
+ 
+ 
+@@ -45,7 +44,8 @@ async def _build_engine_and_pipeline(
+ ):
+     """Set up engine + pipeline mirroring the non-realtime production wiring.
+ 
+-    Returns (engine, task, function_call_mute_strategy, user_context_aggregator).
++    Returns (engine, transport, task, function_call_mute_strategy,
++    user_context_aggregator).
+     """
+     tts = MockTTSService(mock_audio_duration_ms=40, frame_delay=0)
+ 
+@@ -55,6 +55,7 @@ async def _build_engine_and_pipeline(
+             audio_out_enabled=True,
+             audio_in_sample_rate=16000,
+             audio_out_sample_rate=16000,
++            audio_out_end_silence_secs=0,
+         ),
+     )
+ 
+@@ -102,7 +103,13 @@ async def _build_engine_and_pipeline(
+     task = PipelineWorker(pipeline, params=PipelineParams(), enable_rtvi=False)
+     engine.set_task(task)
+ 
+-    return engine, task, function_call_mute_strategy, user_context_aggregator
++    return (
++        engine,
++        transport,
++        task,
++        function_call_mute_strategy,
++        user_context_aggregator,
++    )
+ 
+ 
+ class TestTransitionFunctionMutesUser:
+@@ -130,6 +137,7 @@ class TestTransitionFunctionMutesUser:
+ 
+         (
+             engine,
++            transport,
+             task,
+             function_call_mute_strategy,
+             user_context_aggregator,
+@@ -177,20 +185,7 @@ class TestTransitionFunctionMutesUser:
+                 new_callable=AsyncMock,
+                 return_value={"user_intent": "end call"},
+             ):
+-
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_engine():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
+-                    await engine.set_node(engine.workflow.start_node_id)
+-                    await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-                await asyncio.wait_for(
+-                    asyncio.gather(run_pipeline(), initialize_engine()),
+-                    timeout=10.0,
+-                )
++                await run_engine_test_pipeline(task, engine, transport)
+ 
+         assert len(captured_states) == 1, (
+             f"Expected the transition function to be invoked exactly once, "
+@@ -230,6 +225,7 @@ class TestTransitionFunctionMutesUser:
+ 
+         (
+             engine,
++            transport,
+             task,
+             function_call_mute_strategy,
+             _user_context_aggregator,
+@@ -246,20 +242,7 @@ class TestTransitionFunctionMutesUser:
+                 new_callable=AsyncMock,
+                 return_value={"user_intent": "end call"},
+             ):
+-
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_engine():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
+-                    await engine.set_node(engine.workflow.start_node_id)
+-                    await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-                await asyncio.wait_for(
+-                    asyncio.gather(run_pipeline(), initialize_engine()),
+-                    timeout=10.0,
+-                )
++                await run_engine_test_pipeline(task, engine, transport)
+ 
+         assert function_call_mute_strategy._function_call_in_progress == set(), (
+             "FunctionCallUserMuteStrategy should have cleared its in-progress "
+diff --git a/api/tests/test_pipecat_engine_variable_extraction.py b/api/tests/test_pipecat_engine_variable_extraction.py
+index 5f36c8dd..424f289b 100644
+--- a/api/tests/test_pipecat_engine_variable_extraction.py
++++ b/api/tests/test_pipecat_engine_variable_extraction.py
+@@ -11,13 +11,11 @@ The key behavior being tested:
+ 5. Variable extraction should NOT be triggered for AGENT node
+ """
+ 
+-import asyncio
+ from types import SimpleNamespace
+ from typing import Any, Dict, List
+ from unittest.mock import AsyncMock, patch
+ 
+ import pytest
+-from pipecat.frames.frames import LLMContextFrame
+ from pipecat.pipeline.pipeline import Pipeline
+ from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+ from pipecat.processors.aggregators.llm_context import LLMContext
+@@ -28,12 +26,12 @@ from pipecat.processors.aggregators.llm_response_universal import (
+ from pipecat.tests.mock_transport import MockTransport
+ from pipecat.transports.base_transport import TransportParams
+ 
+-from api.services.pipecat.worker_runner import run_pipeline_worker
+ from api.services.workflow.pipecat_engine import PipecatEngine
+ from api.services.workflow.pipecat_engine_variable_extractor import (
+     VariableExtractionManager,
+ )
+ from api.services.workflow.workflow_graph import WorkflowGraph
++from api.tests.pipecat_test_utils import run_engine_test_pipeline
+ from pipecat.tests import MockLLMService, MockTTSService
+ 
+ 
+@@ -91,6 +89,7 @@ class TestVariableExtractionDuringTransitions:
+                 audio_out_enabled=True,
+                 audio_in_sample_rate=16000,
+                 audio_out_sample_rate=16000,
++                audio_out_end_silence_secs=0,
+             ),
+         )
+ 
+@@ -135,6 +134,7 @@ class TestVariableExtractionDuringTransitions:
+         # Create the pipeline
+         pipeline = Pipeline(
+             [
++                mock_transport.input(),
+                 llm,
+                 tts,
+                 mock_transport.output(),
+@@ -164,17 +164,7 @@ class TestVariableExtractionDuringTransitions:
+                 new_callable=AsyncMock,
+                 return_value={"user_name": "John Doe"},
+             ):
+-
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_engine():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
+-                    await engine.set_node(engine.workflow.start_node_id)
+-                    await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-                await asyncio.gather(run_pipeline(), initialize_engine())
++                await run_engine_test_pipeline(task, engine, mock_transport)
+ 
+         # Should have 3 LLM generations
+         assert llm.get_current_step() == 3
+diff --git a/api/tests/test_text_and_audio_playback.py b/api/tests/test_text_and_audio_playback.py
+index 03897417..03c0b7a0 100644
+--- a/api/tests/test_text_and_audio_playback.py
++++ b/api/tests/test_text_and_audio_playback.py
+@@ -6,7 +6,6 @@ Verifies that:
+ - Covers: start node greetings, edge transition speech, tool config messages
+ """
+ 
+-import asyncio
+ from typing import Any, Dict, List
+ from unittest.mock import AsyncMock, Mock, patch
+ 
+@@ -30,7 +29,6 @@ from pipecat.tests.mock_transport import MockTransport
+ from pipecat.transports.base_transport import TransportParams
+ 
+ from api.services.pipecat.recording_audio_cache import RecordingAudio
+-from api.services.pipecat.worker_runner import run_pipeline_worker
+ from api.services.workflow.dto import (
+     EdgeDataDTO,
+     EndCallNodeData,
+@@ -43,6 +41,7 @@ from api.services.workflow.dto import (
+ from api.services.workflow.pipecat_engine import PipecatEngine
+ from api.services.workflow.pipecat_engine_custom_tools import CustomToolManager
+ from api.services.workflow.workflow_graph import WorkflowGraph
++from api.tests.pipecat_test_utils import run_engine_test_pipeline
+ from pipecat.tests import MockLLMService, MockTTSService
+ 
+ # ÔöÇÔöÇÔöÇ Constants ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+@@ -188,6 +187,7 @@ async def run_pipeline_and_capture_frames(
+             audio_out_enabled=True,
+             audio_in_sample_rate=16000,
+             audio_out_sample_rate=16000,
++            audio_out_end_silence_secs=0,
+         ),
+     )
+ 
+@@ -211,7 +211,15 @@ async def run_pipeline_and_capture_frames(
+         engine.set_fetch_recording_audio(fetch_recording_audio)
+         engine.set_transport_output(transport_output)
+ 
+-    pipeline = Pipeline([llm, tts, transport_output, context_aggregator.assistant()])
++    pipeline = Pipeline(
++        [
++            mock_transport.input(),
++            llm,
++            tts,
++            transport_output,
++            context_aggregator.assistant(),
++        ]
++    )
+     task = PipelineWorker(pipeline, params=PipelineParams(), enable_rtvi=False)
+     engine.set_task(task)
+ 
+@@ -242,17 +250,7 @@ async def run_pipeline_and_capture_frames(
+             return_value=1,
+         ),
+     ):
+-
+-        async def run():
+-            await run_pipeline_worker(task)
+-
+-        async def initialize():
+-            await asyncio.sleep(0.01)
+-            await engine.initialize()
+-            await engine.set_node(engine.workflow.start_node_id)
+-            await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-        await asyncio.gather(run(), initialize())
++        await run_engine_test_pipeline(task, engine, mock_transport)
+ 
+     return llm, context, queued_frames
+ 
+diff --git a/api/tests/test_tts_endframe_with_audio_write_failure.py b/api/tests/test_tts_endframe_with_audio_write_failure.py
+index f7cd78e2..cdac9c59 100644
+--- a/api/tests/test_tts_endframe_with_audio_write_failure.py
++++ b/api/tests/test_tts_endframe_with_audio_write_failure.py
+@@ -49,12 +49,12 @@ from pipecat.turns.user_mute import (
+ )
+ from pipecat.utils.enums import EndTaskReason
+ 
+-from api.services.pipecat.worker_runner import run_pipeline_worker
+ from api.services.workflow.pipecat_engine import PipecatEngine
+ from api.services.workflow.pipecat_engine_variable_extractor import (
+     VariableExtractionManager,
+ )
+ from api.services.workflow.workflow_graph import WorkflowGraph
++from api.tests.pipecat_test_utils import run_engine_test_pipeline
+ from pipecat.tests import MockLLMService, MockTTSService
+ 
+ 
+@@ -103,6 +103,7 @@ async def create_test_pipeline_with_failing_transport(
+             audio_out_enabled=True,
+             audio_in_sample_rate=16000,
+             audio_out_sample_rate=16000,
++            audio_out_end_silence_secs=0,
+             # Use faster failure detection for tests
+             audio_out_max_consecutive_failures=2,
+             audio_out_sleep_between_failures=0.25,
+@@ -215,12 +216,7 @@ class TestTTSPauseWithAudioWriteFailure:
+                 return_value={},
+             ):
+ 
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_and_end_call():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
++                async def end_call_after_response():
+                     await engine.set_node(engine.workflow.start_node_id)
+ 
+                     # Start LLM generation - this will trigger TTS
+@@ -235,12 +231,19 @@ class TestTTSPauseWithAudioWriteFailure:
+                     )
+ 
+                 # Create tasks explicitly for better control
+-                pipeline_task = asyncio.create_task(run_pipeline())
+-                end_call_task = asyncio.create_task(initialize_and_end_call())
++                pipeline_task = asyncio.create_task(
++                    run_engine_test_pipeline(
++                        task,
++                        engine,
++                        transport,
++                        on_ready=end_call_after_response,
++                        timeout=None,
++                    )
++                )
+ 
+                 # Wait with timeout
+                 done, pending = await asyncio.wait(
+-                    [pipeline_task, end_call_task],
++                    [pipeline_task],
+                     timeout=3.0,
+                     return_when=asyncio.ALL_COMPLETED,
+                 )
+@@ -329,12 +332,7 @@ class TestTTSPauseWithAudioWriteFailure:
+                 return_value={},
+             ):
+ 
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+-                async def initialize_and_observe():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
++                async def end_call_after_response():
+                     await engine.set_node(engine.workflow.start_node_id)
+ 
+                     await engine.llm.queue_frame(LLMContextFrame(engine.context))
+@@ -348,12 +346,19 @@ class TestTTSPauseWithAudioWriteFailure:
+                     )
+ 
+                 # Create tasks explicitly for better control
+-                pipeline_task = asyncio.create_task(run_pipeline())
+-                end_call_task = asyncio.create_task(initialize_and_observe())
++                pipeline_task = asyncio.create_task(
++                    run_engine_test_pipeline(
++                        task,
++                        engine,
++                        transport,
++                        on_ready=end_call_after_response,
++                        timeout=None,
++                    )
++                )
+ 
+                 # Wait with timeout
+                 done, pending = await asyncio.wait(
+-                    [pipeline_task, end_call_task],
++                    [pipeline_task],
+                     timeout=3.0,
+                     return_when=asyncio.ALL_COMPLETED,
+                 )
+diff --git a/api/tests/test_user_idle_handler.py b/api/tests/test_user_idle_handler.py
+index 34c6448e..a96892db 100644
+--- a/api/tests/test_user_idle_handler.py
++++ b/api/tests/test_user_idle_handler.py
+@@ -16,7 +16,6 @@ import pytest
+ from pipecat.frames.frames import (
+     BotStoppedSpeakingFrame,
+     Frame,
+-    LLMContextFrame,
+     TranscriptionFrame,
+     UserSpeakingFrame,
+     UserStartedSpeakingFrame,
+@@ -42,9 +41,9 @@ from pipecat.turns.user_stop import ExternalUserTurnStopStrategy
+ from pipecat.turns.user_turn_strategies import UserTurnStrategies
+ from pipecat.utils.time import time_now_iso8601
+ 
+-from api.services.pipecat.worker_runner import run_pipeline_worker
+ from api.services.workflow.pipecat_engine import PipecatEngine
+ from api.services.workflow.workflow_graph import WorkflowGraph
++from api.tests.pipecat_test_utils import run_engine_test_pipeline
+ from pipecat.tests import MockLLMService, MockTTSService
+ 
+ 
+@@ -100,7 +99,7 @@ async def create_pipeline_with_speech_injection(
+     speeches: list[str],
+     user_idle_timeout: float = 0.2,
+     mock_audio_duration_ms: int = 400,
+-) -> tuple[PipecatEngine, PipelineWorker, object]:
++) -> tuple[PipecatEngine, MockTransport, PipelineWorker, object]:
+     """Create a pipeline with user speech injection and idle handling.
+ 
+     Sets up a realistic pipeline with:
+@@ -117,7 +116,7 @@ async def create_pipeline_with_speech_injection(
+         mock_audio_duration_ms: TTS audio duration in milliseconds.
+ 
+     Returns:
+-        Tuple of (engine, task, user_idle_handler).
++        Tuple of (engine, transport, task, user_idle_handler).
+     """
+     tts = MockTTSService(
+         mock_audio_duration_ms=mock_audio_duration_ms, frame_delay=0.001
+@@ -129,6 +128,7 @@ async def create_pipeline_with_speech_injection(
+             audio_out_enabled=True,
+             audio_in_sample_rate=16000,
+             audio_out_sample_rate=16000,
++            audio_out_end_silence_secs=0,
+         ),
+     )
+ 
+@@ -197,7 +197,7 @@ async def create_pipeline_with_speech_injection(
+     task = PipelineWorker(pipeline, params=PipelineParams(), enable_rtvi=False)
+     engine.set_task(task)
+ 
+-    return engine, task, user_idle_handler
++    return engine, transport, task, user_idle_handler
+ 
+ 
+ class TestUserIdleHandler:
+@@ -248,7 +248,12 @@ class TestUserIdleHandler:
+ 
+         llm = MockLLMService(mock_steps=mock_steps, chunk_delay=0.001)
+ 
+-        engine, task, user_idle_handler = await create_pipeline_with_speech_injection(
++        (
++            engine,
++            transport,
++            task,
++            user_idle_handler,
++        ) = await create_pipeline_with_speech_injection(
+             workflow=three_node_workflow_no_variable_extraction,
+             mock_llm=llm,
+             speeches=["Hello", "I need help with my account"],
+@@ -261,17 +266,7 @@ class TestUserIdleHandler:
+             new_callable=AsyncMock,
+             return_value=1,
+         ):
+-
+-            async def run_pipeline():
+-                await run_pipeline_worker(task)
+-
+-            async def initialize_engine():
+-                await asyncio.sleep(0.01)
+-                await engine.initialize()
+-                await engine.set_node(engine.workflow.start_node_id)
+-                await engine.llm.queue_frame(LLMContextFrame(engine.context))
+-
+-            await asyncio.gather(run_pipeline(), initialize_engine())
++            await run_engine_test_pipeline(task, engine, transport)
+ 
+         # All 5 LLM steps should have been consumed
+         assert llm.get_current_step() == 5
+diff --git a/api/tests/test_user_muting_during_bot_speech.py b/api/tests/test_user_muting_during_bot_speech.py
+index add3c024..673183b5 100644
+--- a/api/tests/test_user_muting_during_bot_speech.py
++++ b/api/tests/test_user_muting_during_bot_speech.py
+@@ -43,12 +43,12 @@ from pipecat.turns.user_mute import (
+ from pipecat.turns.user_turn_strategies import ExternalUserTurnStrategies
+ from pipecat.utils.time import time_now_iso8601
+ 
+-from api.services.pipecat.worker_runner import run_pipeline_worker
+ from api.services.workflow.pipecat_engine import PipecatEngine
+ from api.services.workflow.pipecat_engine_variable_extractor import (
+     VariableExtractionManager,
+ )
+ from api.services.workflow.workflow_graph import WorkflowGraph
++from api.tests.pipecat_test_utils import run_engine_test_pipeline
+ from pipecat.tests import MockLLMService, MockTTSService
+ 
+ 
+@@ -146,6 +146,7 @@ async def create_engine_for_mute_test(
+             audio_out_enabled=True,
+             audio_in_sample_rate=16000,
+             audio_out_sample_rate=16000,
++            audio_out_end_silence_secs=0,
+         ),
+     )
+ 
+@@ -236,7 +237,7 @@ class TestUserMutingDuringBotSpeech:
+         (
+             engine,
+             _tts,
+-            _transport,
++            transport,
+             task,
+             _user_aggregator,
+             observer,
+@@ -254,12 +255,7 @@ class TestUserMutingDuringBotSpeech:
+                 return_value={},
+             ):
+ 
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+                 async def run_test():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
+                     await engine.set_node(engine.workflow.start_node_id)
+ 
+                     # Trigger first LLM completion
+@@ -280,10 +276,11 @@ class TestUserMutingDuringBotSpeech:
+ 
+                     await task.cancel()
+ 
+-                await asyncio.gather(
+-                    run_pipeline(),
+-                    run_test(),
+-                    return_exceptions=True,
++                await run_engine_test_pipeline(
++                    task,
++                    engine,
++                    transport,
++                    on_ready=run_test,
+                 )
+ 
+         # VERIFY: Muted at first BotStartedSpeaking
+@@ -321,7 +318,7 @@ class TestUserMutingDuringBotSpeech:
+         (
+             engine,
+             _tts,
+-            _transport,
++            transport,
+             task,
+             _user_aggregator,
+             observer,
+@@ -339,12 +336,7 @@ class TestUserMutingDuringBotSpeech:
+                 return_value={},
+             ):
+ 
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+                 async def run_test():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
+                     await engine.set_node(engine.workflow.start_node_id)
+ 
+                     # Trigger first LLM completion
+@@ -370,10 +362,11 @@ class TestUserMutingDuringBotSpeech:
+ 
+                     await task.cancel()
+ 
+-                await asyncio.gather(
+-                    run_pipeline(),
+-                    run_test(),
+-                    return_exceptions=True,
++                await run_engine_test_pipeline(
++                    task,
++                    engine,
++                    transport,
++                    on_ready=run_test,
+                 )
+ 
+         # VERIFY: First bot started - should be muted (MuteUntilFirstBotComplete)
+@@ -411,7 +404,7 @@ class TestUserMutingDuringBotSpeech:
+         (
+             engine,
+             _tts,
+-            _transport,
++            transport,
+             task,
+             _user_aggregator,
+             observer,
+@@ -429,12 +422,7 @@ class TestUserMutingDuringBotSpeech:
+                 return_value={},
+             ):
+ 
+-                async def run_pipeline():
+-                    await run_pipeline_worker(task)
+-
+                 async def run_test():
+-                    await asyncio.sleep(0.01)
+-                    await engine.initialize()
+                     await engine.set_node(engine.workflow.start_node_id)
+ 
+                     # Trigger first LLM completion
+@@ -460,10 +448,11 @@ class TestUserMutingDuringBotSpeech:
+ 
+                     await task.cancel()
+ 
+-                await asyncio.gather(
+-                    run_pipeline(),
+-                    run_test(),
+-                    return_exceptions=True,
++                await run_engine_test_pipeline(
++                    task,
++                    engine,
++                    transport,
++                    on_ready=run_test,
+                 )
+ 
+         # VERIFY: First bot started - should be muted (MuteUntilFirstBotComplete)

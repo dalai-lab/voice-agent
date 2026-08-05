@@ -39,9 +39,9 @@ from api.services.workflow.tools.custom_tool import (
     _coerce_typed_leaves,
     execute_http_tool,
     render_body_template,
-    render_url_template,
     tool_to_function_schema,
 )
+from api.utils.template_renderer import render_url_template
 from pipecat.tests import MockLLMService, run_test
 
 

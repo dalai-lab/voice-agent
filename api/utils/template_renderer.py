@@ -3,7 +3,8 @@
 import json
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable, Dict, Optional
+from urllib.parse import quote, urlparse
 from zoneinfo import ZoneInfo
 
 from api.services.workflow.workflow_graph import TEMPLATE_VAR_PATTERN
@@ -156,7 +157,42 @@ def _resolve_builtin_variable(
     return None
 
 
-def _render_string(template_str: str, context: dict[str, Any]) -> str:
+def _resolve_template_value(
+    variable_path: str,
+    filter_name: Optional[str],
+    filter_value: Optional[str],
+    context: Dict[str, Any],
+    default_tz: Optional[str],
+) -> Any:
+    """Resolve one parsed template variable using the shared template semantics."""
+
+    builtin_value = _resolve_builtin_variable(variable_path, default_tz)
+    if builtin_value is not None:
+        return builtin_value
+
+    # Prompts commonly reference initial_context.<key>, while some runtime
+    # callers pass the initial context itself as the render context.
+    value = get_nested_value(context, variable_path)
+    if value is None and variable_path.startswith(_INITIAL_CONTEXT_PREFIX):
+        value = get_nested_value(context, variable_path[len(_INITIAL_CONTEXT_PREFIX) :])
+
+    # Apply fallback: new syntax {{var | default}} or legacy
+    # {{var | fallback:default}}.
+    if filter_name is not None and value in (None, ""):
+        if filter_name == "fallback":
+            return filter_value if filter_value is not None else variable_path.title()
+        return filter_name
+
+    return value
+
+
+def _render_string(
+    template_str: str,
+    context: Dict[str, Any],
+    *,
+    value_formatter: Optional[Callable[[str, Any, Optional[str]], str]] = None,
+    replace_escaped_newlines: bool = True,
+) -> str:
     """
     Render a string template with variable substitution.
 
@@ -179,33 +215,16 @@ def _render_string(template_str: str, context: dict[str, Any]) -> str:
         filter_name = match.group(2).strip() if match.group(2) else None
         filter_value = match.group(3).strip() if match.group(3) else None
 
-        # Check for built-in variables first (current_time, current_weekday)
-        builtin_value = _resolve_builtin_variable(variable_path, default_tz)
-        if builtin_value is not None:
-            return builtin_value
+        value = _resolve_template_value(
+            variable_path,
+            filter_name,
+            filter_value,
+            context,
+            default_tz,
+        )
 
-        # Get value using nested path lookup. Prompts commonly reference
-        # initial_context.<key>, while some runtime callers pass the initial
-        # context itself as the render context.
-        value = get_nested_value(context, variable_path)
-        if value is None and variable_path.startswith(_INITIAL_CONTEXT_PREFIX):
-            value = get_nested_value(
-                context, variable_path[len(_INITIAL_CONTEXT_PREFIX) :]
-            )
-
-        # Apply fallback: new syntax {{var | default}} or legacy {{var | fallback:default}}
-        if filter_name is not None:
-            if value is None or value == "":
-                if filter_name == "fallback":
-                    # Legacy syntax: {{var | fallback:default}}
-                    value = (
-                        filter_value
-                        if filter_value is not None
-                        else variable_path.title()
-                    )
-                else:
-                    # New syntax: {{var | default}}
-                    value = filter_name
+        if value_formatter is not None:
+            return value_formatter(variable_path, value, filter_name)
 
         # Convert to string for substitution
         if value is None:
@@ -218,6 +237,76 @@ def _render_string(template_str: str, context: dict[str, Any]) -> str:
     result = re.sub(TEMPLATE_VAR_PATTERN, _replace, template_str)
 
     # Handle line breaks (convert literal \n to actual newlines)
-    result = result.replace("\\n", "\n")
+    if replace_escaped_newlines:
+        result = result.replace("\\n", "\n")
 
     return result
+
+
+def render_url_template(
+    url: str,
+    context: Dict[str, Any],
+) -> tuple[str, set[str]]:
+    """Render URL placeholders with shared template semantics and URL safety.
+
+    Returns:
+        (rendered_url, consumed_params_set)
+    """
+
+    if url.count("{{") != url.count("}}"):
+        if url.count("{{") > url.count("}}"):
+            raise ValueError("Malformed URL template: unmatched '{{' found.")
+        raise ValueError("Malformed URL template: unmatched '}}' found.")
+
+    if "{{{{" in url:
+        raise ValueError("Malformed URL template: nested '{{' found.")
+
+    if not url or "{{" not in url:
+        return url, set()
+
+    consumed_params = set()
+
+    def _format_url_value(
+        variable_path: str,
+        value: Any,
+        filter_name: Optional[str],
+    ) -> str:
+        if value is None:
+            raise ValueError(f"URL template variable '{variable_path}' has no value.")
+        if value == "" and filter_name is None:
+            raise ValueError(
+                f"URL template variable '{variable_path}' resolved to an empty string."
+            )
+        if isinstance(value, list):
+            raise ValueError("Arrays cannot be rendered directly into a URL.")
+        if isinstance(value, dict):
+            raise ValueError("Objects cannot be rendered directly into a URL.")
+
+        base_param_name = variable_path.split(".")[0]
+        if not variable_path.startswith("initial_context.") and not variable_path.startswith("gathered_context.") and not variable_path.startswith("current_time") and not variable_path.startswith("current_weekday"):
+            consumed_params.add(base_param_name)
+
+        rendered_value = str(value).lower() if isinstance(value, bool) else str(value)
+        return quote(rendered_value, safe="")
+
+    rendered_url = _render_string(
+        url,
+        context,
+        value_formatter=_format_url_value,
+        replace_escaped_newlines=False,
+    )
+
+    if "{{" in rendered_url or "}}" in rendered_url:
+        raise ValueError("Malformed URL template: invalid placeholder syntax.")
+
+    original_parsed = urlparse(url)
+    rendered_parsed = urlparse(rendered_url)
+    if (
+        original_parsed.scheme != rendered_parsed.scheme
+        or original_parsed.netloc != rendered_parsed.netloc
+    ):
+        raise ValueError(
+            "URL placeholders cannot alter the scheme or host of the configured endpoint."
+        )
+
+    return rendered_url, consumed_params

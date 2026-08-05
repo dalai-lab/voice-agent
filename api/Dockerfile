@@ -2,7 +2,7 @@
 # Multi-stage Dockerfile
 # Stage 1: Builder - Install Python dependencies into a venv via uv
 # (mirrors .devcontainer/Dockerfile's venv-builder stage).
-FROM python:3.12-slim AS builder
+FROM python:3.13-slim AS builder
 
 WORKDIR /app
 
@@ -108,7 +108,7 @@ RUN set -eu ; \
     rm -rf /tmp/ffmpeg
 
 # Stage 4: Runtime - Minimal image with only runtime dependencies
-FROM python:3.12-slim AS runner
+FROM python:3.13-slim AS runner
 
 WORKDIR /app
 

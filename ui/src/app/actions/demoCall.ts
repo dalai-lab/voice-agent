@@ -14,7 +14,7 @@ const DOGRAH_API_KEY = "dgr_vcgoAOH9gYU-uBbR7XvhVeySPWQBVGSTzM6vxyPRj9c";
 
 // Workflow mapping: Add more workflows here as they are built!
 const WORKFLOW_MAP: Record<string, string> = {
-    hotel: "a48f9cf9-7527-4b74-98fc-e499a2cad0d1",
+    hotel: "99b1e003-3332-46c9-a8dd-0ea8a4ec0f08",
     // medical: "uuid-here",
     // sales: "uuid-here",
     // service: "uuid-here",

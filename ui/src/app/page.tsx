@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 import ThemeToggle from "@/components/ThemeSwitcher";
 import { useAuth } from "@/lib/auth";
+import { initiateDemoCall } from "./actions/demoCall";
 
 const REALISTIC_VOICE_DEMO = [
     { speaker: "agent", text: "Hi! Thanks for calling Talkar. How can I assist your business today?" },
@@ -951,28 +952,73 @@ function DemoCallFormPlaceholder() {
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
     const [useCase, setUseCase] = useState("hotel");
-    const [callingState, setCallingState] = useState<"idle" | "calling" | "connected">("idle");
+    const [callingState, setCallingState] = useState<"idle" | "calling" | "connected" | "error">("idle");
+    const [errorMessage, setErrorMessage] = useState("");
 
-    const handleInitiateCall = (e: React.FormEvent) => {
+    const handleInitiateCall = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setCallingState("calling");
-        setTimeout(() => {
+        setErrorMessage("");
+
+        const formData = new FormData(e.currentTarget);
+        formData.set("useCase", useCase);
+
+        try {
+            const result = await initiateDemoCall(null, formData);
+            if (!result.success) {
+                setCallingState("error");
+                setErrorMessage(result.error || "Failed to connect to the voice agent.");
+                return;
+            }
             setCallingState("connected");
-        }, 2000);
+        } catch (error) {
+            setCallingState("error");
+            setErrorMessage("An unexpected error occurred.");
+        }
     };
 
     const handleReset = () => {
         setCallingState("idle");
+        setErrorMessage("");
     };
+
+    if (callingState === "error") {
+        return (
+            <div className="py-6 px-4 space-y-4 text-center flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300">
+                <div className="relative flex items-center justify-center my-2 text-destructive">
+                    <X className="w-12 h-12" />
+                </div>
+                <div className="space-y-1">
+                    <p className="text-sm font-bold text-foreground">Call Request Failed</p>
+                    <p className="text-xs text-muted-foreground">{errorMessage}</p>
+                </div>
+                <button
+                    onClick={handleReset}
+                    type="button"
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold border border-border bg-muted/40 hover:bg-muted/70 transition-all text-foreground mt-2"
+                >
+                    Go Back
+                </button>
+            </div>
+        );
+    }
 
     if (callingState === "calling" || callingState === "connected") {
         return (
             <div className="py-6 px-4 space-y-4 text-center flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300">
                 <div className="relative flex items-center justify-center my-2">
-                    <div className="w-14 h-14 rounded-full bg-cta/20 border-2 border-cta flex items-center justify-center animate-ping absolute inset-0 opacity-75" />
-                    <div className="w-14 h-14 rounded-full bg-cta text-cta-foreground flex items-center justify-center relative shadow-lg">
-                        <PhoneCall className="w-6 h-6 animate-pulse" />
-                    </div>
+                    {callingState === "calling" ? (
+                        <>
+                            <div className="w-14 h-14 rounded-full bg-cta/20 border-2 border-cta flex items-center justify-center animate-ping absolute inset-0 opacity-75" />
+                            <div className="w-14 h-14 rounded-full bg-cta text-cta-foreground flex items-center justify-center relative shadow-lg">
+                                <PhoneCall className="w-6 h-6 animate-pulse" />
+                            </div>
+                        </>
+                    ) : (
+                        <div className="w-14 h-14 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center relative shadow-lg text-emerald-500">
+                            <Check className="w-6 h-6" />
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-1">
@@ -986,17 +1032,18 @@ function DemoCallFormPlaceholder() {
 
                 <div className="p-3.5 rounded-xl bg-muted/60 border border-border text-xs text-muted-foreground w-full space-y-1">
                     <p className="font-semibold text-foreground">
-                        {callingState === "calling" ? "Connecting call to your mobile..." : "Ringing your mobile number..."}
+                        {callingState === "calling" ? "Connecting call to your mobile..." : "Your phone should be ringing!"}
                     </p>
                 </div>
 
-                <button
-                    onClick={handleReset}
-                    type="button"
-                    className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold border border-border bg-muted/40 hover:bg-muted/70 transition-all text-foreground"
-                >
-                    Call Again
-                </button>
+                {callingState === "connected" && (
+                    <Link
+                        href="/auth/signup"
+                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold border border-border bg-cta hover:bg-cta/90 transition-all text-cta-foreground shadow-sm flex items-center justify-center gap-2 mt-2"
+                    >
+                        Get Started <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                )}
             </div>
         );
     }
@@ -1015,6 +1062,7 @@ function DemoCallFormPlaceholder() {
                 <input
                     type="text"
                     required
+                    name="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Rahul Sharma"
@@ -1031,6 +1079,7 @@ function DemoCallFormPlaceholder() {
                     <input
                         type="tel"
                         required
+                        name="phone"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="98765 43210"

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const RATE_LIMIT_FILE = path.join(__dirname, '..', 'demo_rate_limits.json');
+const RATE_LIMIT_FILE = '/tmp/demo_rate_limits.json';
 
 try {
     if (fs.existsSync(RATE_LIMIT_FILE)) {

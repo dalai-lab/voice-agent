@@ -5,7 +5,8 @@ import fs from "fs/promises";
 import path from "path";
 
 // Rate limit configuration
-const RATE_LIMIT_FILE = path.join(process.cwd(), "demo_rate_limits.json");
+// Using /tmp/ because Docker containers often have read-only filesystems in /app
+const RATE_LIMIT_FILE = "/tmp/demo_rate_limits.json";
 const RATE_LIMIT_HOURS = 24;
 
 // Hardcoded Dograh API configuration
@@ -105,8 +106,8 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
         }
 
         // Make the API request to the Dograh backend
-        // We use 127.0.0.1:8005 because the Next.js server runs on the same VPS as the FastAPI backend
-        const url = `http://127.0.0.1:8005/api/v1/public/agent/workflow/${workflowId}`;
+        // We use the public URL because 127.0.0.1 inside a Docker container points to the container itself, not the host!
+        const url = `https://talkar.in/api/v1/public/agent/workflow/${workflowId}`;
         
         console.log(`[DemoCall] Initiating call to ${formattedPhone} for useCase: ${useCase}, IP: ${ip}`);
 

@@ -1,4 +1,4 @@
-"""GENERATED â€” do not edit by hand.
+"""GENERATED — do not edit by hand.
 
 Re-exports every typed node class so users can write
 `from dograh_sdk.typed import StartCall, AgentNode`.

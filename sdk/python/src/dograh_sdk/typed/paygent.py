@@ -1,4 +1,4 @@
-"""GENERATED â€” do not edit by hand.
+"""GENERATED — do not edit by hand.
 
 Regenerate with `python -m dograh_sdk.codegen` against the target
 Dograh backend. Source of truth: the backend's model-backed node-spec

@@ -1,4 +1,4 @@
-"""GENERATED — do not edit by hand.
+"""GENERATED � do not edit by hand.
 
 Regenerate with `python -m dograh_sdk.codegen` against the target
 Dograh backend. Source of truth: the backend's model-backed node-spec
@@ -36,10 +36,10 @@ class AgentNode_Extraction_variablesRow:
 @dataclass(kw_only=True)
 class AgentNode(TypedNode):
     """
-    Conversational step — the LLM runs one focused exchange.  LLM hint: Mid-
-    call step executed by the LLM. Most workflows are a chain of agent nodes
-    connected by edges that describe transition conditions. Each agent node
-    can invoke tools and reference documents.
+    Conversational step — the LLM runs one focused exchange.  LLM hint:
+    Mid-call step executed by the LLM. Most workflows are a chain of agent
+    nodes connected by edges that describe transition conditions. Each agent
+    node can invoke tools and reference documents.
     """
 
     type: ClassVar[str] = 'agentNode'

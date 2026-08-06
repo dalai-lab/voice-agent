@@ -68,6 +68,8 @@ import { useWorkflowState } from "../hooks/useWorkflowState";
 // Constants
 // ---------------------------------------------------------------------------
 
+const PUBLISH_WORKFLOW_REMINDER = "Publish the agent to apply the changes.";
+
 const DEFAULT_VOICEMAIL_SYSTEM_PROMPT = `You are a voicemail detection classifier for an OUTBOUND calling system. A bot has called a phone number and you need to determine if a human answered or if the call went to voicemail based on the provided text.
 
 HUMAN ANSWERED - LIVE CONVERSATION (respond "CONVERSATION"):
@@ -439,6 +441,7 @@ function GeneralSection({
                 callbacksEnabled,
                 resumeMode
             );
+            toast.success(`General settings saved. ${PUBLISH_WORKFLOW_REMINDER}`);
         } catch (error) {
             console.error("Failed to save general settings:", error);
         } finally {
@@ -1031,6 +1034,7 @@ function TemplateVariablesSection({
                 varsToSave = { ...varsToSave, [newKey]: newValue };
             }
             await onSave(varsToSave);
+            toast.success(`Template variables saved. ${PUBLISH_WORKFLOW_REMINDER}`);
         } catch (error) {
             console.error("Failed to save variables:", error);
         } finally {
@@ -1222,6 +1226,7 @@ function DictionarySection({
         setIsSaving(true);
         try {
             await onSave(dictionaryValue);
+            toast.success(`Dictionary saved. ${PUBLISH_WORKFLOW_REMINDER}`);
         } catch (error) {
             console.error("Failed to save dictionary:", error);
         } finally {
@@ -1322,6 +1327,7 @@ function VoicemailSection({
                 { ...workflowConfigurations, voicemail_detection: voicemailConfig },
                 workflowName,
             );
+            toast.success(`Voicemail settings saved. ${PUBLISH_WORKFLOW_REMINDER}`);
         } catch (error) {
             console.error("Failed to save voicemail settings:", error);
         } finally {
@@ -1510,7 +1516,7 @@ function WorkflowModelOverridesSection({
         const nextConfigurations = withoutModelConfigurationOverrides(workflowConfigurations);
         nextConfigurations.model_configuration_v2_override = configuration;
         await onSave(nextConfigurations, workflowName);
-        toast.success("Model override saved");
+        toast.success(`Model override saved. ${PUBLISH_WORKFLOW_REMINDER}`);
     };
 
     const removeV2Override = async () => {
@@ -1518,7 +1524,7 @@ function WorkflowModelOverridesSection({
         try {
             await onSave(withoutModelConfigurationOverrides(workflowConfigurations), workflowName);
             setOverrideEnabled(false);
-            toast.success("Using organization model configuration");
+            toast.success(`Organization model configuration saved. ${PUBLISH_WORKFLOW_REMINDER}`);
         } finally {
             setIsRemovingOverride(false);
         }
@@ -1743,6 +1749,7 @@ function WorkflowSettingsInner({
     const {
         workflowName,
         workflowConfigurations,
+        textChatInactivityTimeoutConstraints,
         templateContextVariables,
         dictionary,
         postCallSchema,
@@ -1990,12 +1997,17 @@ function WorkflowSettingsInner({
             </div>
 
             {/* Dialogs for complex sections */}
-            <EmbedDialog
-                open={isEmbedDialogOpen}
-                onOpenChange={setIsEmbedDialogOpen}
-                workflowId={workflowId}
-                workflowName={workflowName || workflow.name}
-            />
+            {resolvedWorkflowConfigurationsForRender && (
+                <EmbedDialog
+                    open={isEmbedDialogOpen}
+                    onOpenChange={setIsEmbedDialogOpen}
+                    workflowId={workflowId}
+                    workflowName={workflowName || workflow.name}
+                    workflowConfigurations={resolvedWorkflowConfigurationsForRender}
+                    textChatInactivityTimeoutConstraints={textChatInactivityTimeoutConstraints}
+                    onSaveWorkflowConfigurations={saveWorkflowConfigurations}
+                />
+            )}
         </div>
     );
 }

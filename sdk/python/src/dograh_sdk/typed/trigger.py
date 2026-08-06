@@ -1,4 +1,4 @@
-"""GENERATED — do not edit by hand.
+"""GENERATED � do not edit by hand.
 
 Regenerate with `python -m dograh_sdk.codegen` against the target
 Dograh backend. Source of truth: the backend's model-backed node-spec
@@ -16,9 +16,9 @@ from dograh_sdk.typed._base import TypedNode
 @dataclass(kw_only=True)
 class Trigger(TypedNode):
     """
-    Public HTTP endpoints that triggers the agent and make a call over telephone.  LLM hint: Exposes two
-    public HTTP POST endpoints derived from the auto-generated
-    `trigger_path`:   • Production:
+    Public HTTP endpoints that triggers the agent and make a call over
+    telephone.  LLM hint: Exposes two public HTTP POST endpoints derived
+    from the auto-generated `trigger_path`:   • Production:
     `<backend>/api/v1/public/agent/<trigger_path>` — runs the published
     agent. Use this from production systems.   • Test:
     `<backend>/api/v1/public/agent/test/<trigger_path>` — runs the latest
@@ -27,9 +27,10 @@ class Trigger(TypedNode):
     `X-API-Key` header. Request body fields:   • `phone_number` (string,
     required) — destination to dial.   • `initial_context` (object,
     optional) — merged into the run's initial context.   •
-    `telephony_configuration_id` (int, optional) — pick a specific telephony
-    configuration for the call. Must belong to the same organization as the
-    trigger. When omitted, the org's default outbound configuration is used.
+    `telephony_configuration_id` (int, optional) — pick a specific
+    telephony configuration for the call. Must belong to the same
+    organization as the trigger. When omitted, the org's default outbound
+    configuration is used.
     """
 
     type: ClassVar[str] = 'trigger'
@@ -48,8 +49,8 @@ class Trigger(TypedNode):
     """
     Path segment that uniquely identifies this trigger. Used in both URLs:
     • Production: `/api/v1/public/agent/<trigger_path>` — executes the
-    published agent.   • Test: `/api/v1/public/agent/test/<trigger_path>` —
-    executes the latest draft. Can be customized to a descriptive value up
-    to 36 characters using letters, numbers, hyphens, or underscores.
+    published agent.   • Test: `/api/v1/public/agent/test/<trigger_path>`
+    — executes the latest draft. Can be customized to a descriptive value
+    up to 36 characters using letters, numbers, hyphens, or underscores.
     """
 

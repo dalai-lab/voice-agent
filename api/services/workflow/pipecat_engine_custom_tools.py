@@ -37,7 +37,6 @@ from api.services.workflow.tools.transfer_resolver import (
     resolve_transfer_config,
 )
 from api.services.workflow.tools.wait import get_wait_tools
-from api.tasks.arq import enqueue_job
 from api.tasks.function_names import FunctionNames
 from api.utils.template_renderer import render_template
 from loguru import logger
@@ -1399,6 +1398,7 @@ class CustomToolManager:
                         defer_by = adjusted_time - datetime.now(UTC)
                         defer_by = max(defer_by, timedelta(seconds=5))
                         # Enqueue ARQ Job only for standalone callbacks
+                        from api.tasks.arq import enqueue_job
                         await enqueue_job(
                             FunctionNames.EXECUTE_CALLBACK,
                             to_number=to_number,

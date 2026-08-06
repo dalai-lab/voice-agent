@@ -568,7 +568,7 @@ def create_tts_service(
     if user_config.tts.provider == ServiceProviders.DEEPGRAM.value:
         return DeepgramTTSService(
             api_key=user_config.tts.api_key,
-            sample_rate=audio_config.sample_rate,
+            sample_rate=audio_config.transport_out_sample_rate,
             settings=DeepgramTTSSettings(voice=user_config.tts.voice),
             text_filters=[xml_function_tag_filter],
             skip_aggregator_types=["recording_router", "recording"],

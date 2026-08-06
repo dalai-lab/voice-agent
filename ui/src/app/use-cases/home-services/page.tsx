@@ -58,7 +58,7 @@ export default function HomeServicesUseCasePage() {
                     </h1>
 
                     <p className="text-base sm:text-lg text-zinc-300 leading-relaxed max-w-2xl mx-auto">
-                        Nova answers every emergency service call on the 1st ring, logs job locations, dispatches on-call technicians, and locks service windows 24/7.
+                        Talkar answers every emergency service call on the 1st ring, logs job locations, dispatches on-call technicians, and locks service windows 24/7.
                     </p>
 
                     <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
@@ -101,7 +101,7 @@ export default function HomeServicesUseCasePage() {
                             <p className="text-zinc-200 font-medium">"My central AC unit completely stopped working and it's 92 degrees in the house."</p>
                         </div>
                         <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 space-y-1">
-                            <p className="text-[10px] font-mono font-semibold text-amber-400">NOVA DISPATCH AGENT</p>
+                            <p className="text-[10px] font-mono font-semibold text-amber-400">TALKAR DISPATCH AGENT</p>
                             <p className="font-medium text-white">"I have logged your address and booked an emergency arrival window for tomorrow between 8:00 AM and 10:00 AM. Our on-call technician has been alerted."</p>
                         </div>
                     </div>
@@ -145,7 +145,7 @@ export default function HomeServicesUseCasePage() {
                             </span>
                             <h3 className="text-2xl font-bold text-white">Emergency Plumbing Dispatch</h3>
                             <p className="text-xs text-zinc-300 leading-relaxed">
-                                Burst pipes, main line clogs, and water heater failures. Nova captures address info and alerts your on-call plumber instantly.
+                                Burst pipes, main line clogs, and water heater failures. Talkar captures address info and alerts your on-call plumber instantly.
                             </p>
                         </div>
                     </div>
@@ -165,7 +165,7 @@ export default function HomeServicesUseCasePage() {
                             </span>
                             <h3 className="text-2xl font-bold text-white">AC & Furnace Repair Scheduling</h3>
                             <p className="text-xs text-zinc-300 leading-relaxed">
-                                Summer heatwaves and winter freeze emergencies. Nova schedules arrival windows directly into your dispatcher calendar.
+                                Summer heatwaves and winter freeze emergencies. Talkar schedules arrival windows directly into your dispatcher calendar.
                             </p>
                         </div>
                     </div>
@@ -185,7 +185,7 @@ export default function HomeServicesUseCasePage() {
                             </span>
                             <h3 className="text-2xl font-bold text-white">Electrical & Panel Upgrades</h3>
                             <p className="text-xs text-zinc-300 leading-relaxed">
-                                Outages, panel upgrades, and EV charger installations. Nova qualifies homeowner scope and schedules on-site estimates.
+                                Outages, panel upgrades, and EV charger installations. Talkar qualifies homeowner scope and schedules on-site estimates.
                             </p>
                         </div>
                     </div>
@@ -205,7 +205,7 @@ export default function HomeServicesUseCasePage() {
                             </span>
                             <h3 className="text-2xl font-bold text-white">Storm Damage & Roof Estimates</h3>
                             <p className="text-xs text-zinc-300 leading-relaxed">
-                                Storm restoration calls and roof replacement inquiries. Nova locks in site inspection appointments before callers reach competitors.
+                                Storm restoration calls and roof replacement inquiries. Talkar locks in site inspection appointments before callers reach competitors.
                             </p>
                         </div>
                     </div>
@@ -257,7 +257,7 @@ export default function HomeServicesUseCasePage() {
                         From Customer Call to On-Call Tech Alert
                     </h2>
                     <p className="text-base text-muted-foreground max-w-lg mx-auto">
-                        How Nova captures job requests and alerts your field crew in four seamless steps.
+                        How Talkar captures job requests and alerts your field crew in four seamless steps.
                     </p>
                 </div>
 
@@ -268,7 +268,7 @@ export default function HomeServicesUseCasePage() {
                         <span className="w-8 h-8 rounded-full bg-cta/10 text-cta font-bold text-xs flex items-center justify-center border border-cta/20">1</span>
                         <h3 className="text-sm font-bold text-foreground">1st Ring Emergency Pickup</h3>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            Nova picks up instantly with your business name and customized trade greeting.
+                            Talkar picks up instantly with your business name and customized trade greeting.
                         </p>
                     </div>
 
@@ -314,7 +314,7 @@ export default function HomeServicesUseCasePage() {
                         Direct Sync with Your Field Service Software
                     </h2>
                     <p className="text-base text-muted-foreground max-w-lg mx-auto">
-                        Nova logs new jobs, caller details, and arrival windows straight into the software your team uses daily.
+                        Talkar logs new jobs, caller details, and arrival windows straight into the software your team uses daily.
                     </p>
                 </div>
 

@@ -47,7 +47,7 @@ export default function MedicalUseCasePage() {
                     </h1>
 
                     <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-                        Nova answers every incoming patient phone call on the 1st ring, schedules appointments into your EMR, and handles reschedules 24/7 — fully HIPAA compliant.
+                        Talkar answers every incoming patient phone call on the 1st ring, schedules appointments into your EMR, and handles reschedules 24/7 — fully HIPAA compliant.
                     </p>
 
                     <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
@@ -104,7 +104,7 @@ export default function MedicalUseCasePage() {
                                 <p className="text-zinc-200 font-medium">"Hi, I need to schedule a routine dental checkup and cleaning for next week."</p>
                             </div>
                             <div className="p-3.5 rounded-xl bg-teal-500/15 border border-teal-500/30 text-teal-200 space-y-1">
-                                <p className="text-[10px] font-mono font-semibold text-teal-400">NOVA MEDICAL AGENT</p>
+                                <p className="text-[10px] font-mono font-semibold text-teal-400">TALKAR MEDICAL AGENT</p>
                                 <p className="font-medium text-white">"I can schedule that for you right now. Dr. Miller has an opening next Thursday at 2:00 PM. Would that work for your schedule?"</p>
                             </div>
                         </div>
@@ -165,9 +165,9 @@ export default function MedicalUseCasePage() {
 
                     <div className="p-7 rounded-3xl border border-teal-500/40 bg-teal-500/10 space-y-4 shadow-lg">
                         <span className="text-[10px] font-mono font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">STAGE 03 • THE SOLUTION</span>
-                        <h3 className="text-lg font-bold text-foreground">Nova Captures 100% of Calls</h3>
+                        <h3 className="text-lg font-bold text-foreground">Talkar Captures 100% of Calls</h3>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            Nova answers on the 1st ring, collects basic info, and locks the appointment directly into your calendar.
+                            Talkar answers on the 1st ring, collects basic info, and locks the appointment directly into your calendar.
                         </p>
                         <p className="text-xs font-bold text-teal-600 dark:text-teal-400 pt-2 border-t border-teal-500/30">
                             +$4,500 Saved in Patient Lifetime Value (LTV).
@@ -208,7 +208,7 @@ export default function MedicalUseCasePage() {
                             <span className="text-[10px] font-mono font-bold text-teal-500 uppercase tracking-widest">FLOW 01</span>
                             <h3 className="text-xl font-bold text-foreground">New Patient Intake & Scheduling</h3>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                                Nova answers new patient calls, collects contact details, verifies general insurance coverage, and books an initial consultation.
+                                Talkar answers new patient calls, collects contact details, verifies general insurance coverage, and books an initial consultation.
                             </p>
                         </div>
                         <div className="p-3.5 rounded-xl bg-muted/60 text-[11px] text-muted-foreground font-medium border border-border/40">
@@ -225,7 +225,7 @@ export default function MedicalUseCasePage() {
                             <span className="text-[10px] font-mono font-bold text-cta uppercase tracking-widest">FLOW 02</span>
                             <h3 className="text-xl font-bold text-foreground">Reschedules & Cancellation Fills</h3>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                                When a patient calls to cancel, Nova instantly offers the newly opened appointment slot to waiting patients on the schedule list.
+                                When a patient calls to cancel, Talkar instantly offers the newly opened appointment slot to waiting patients on the schedule list.
                             </p>
                         </div>
                         <div className="p-3.5 rounded-xl bg-muted/60 text-[11px] text-muted-foreground font-medium border border-border/40">
@@ -242,7 +242,7 @@ export default function MedicalUseCasePage() {
                             <span className="text-[10px] font-mono font-bold text-amber-500 uppercase tracking-widest">FLOW 03</span>
                             <h3 className="text-xl font-bold text-foreground">Urgent Care Triage & Escalation</h3>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                                Nova detects urgent medical keywords during calls and immediately transfers the caller to your on-call triage nurse or doctor.
+                                Talkar detects urgent medical keywords during calls and immediately transfers the caller to your on-call triage nurse or doctor.
                             </p>
                         </div>
                         <div className="p-3.5 rounded-xl bg-muted/60 text-[11px] text-muted-foreground font-medium border border-border/40">
@@ -326,7 +326,7 @@ export default function MedicalUseCasePage() {
                         Direct Sync with Your Practice EMR
                     </h2>
                     <p className="text-base text-muted-foreground max-w-lg mx-auto">
-                        Nova integrates with leading Electronic Medical Record and scheduling platforms.
+                        Talkar integrates with leading Electronic Medical Record and scheduling platforms.
                     </p>
                 </div>
 
@@ -403,15 +403,15 @@ export default function MedicalUseCasePage() {
                         </ul>
                     </div>
 
-                    {/* Right: Nova Medical Agent */}
+                    {/* Right: Talkar Medical Agent */}
                     <div className="p-8 rounded-3xl bg-foreground text-background space-y-6 shadow-2xl">
-                        <span className="text-[10px] font-mono font-bold text-teal-400 uppercase tracking-widest">NOVA MEDICAL PHONE AGENT</span>
+                        <span className="text-[10px] font-mono font-bold text-teal-400 uppercase tracking-widest">TALKAR MEDICAL PHONE AGENT</span>
                         <h3 className="text-xl font-bold text-background">Quiet Reception & 100% Booking Rate</h3>
                         
                         <ul className="space-y-3 text-xs text-background/80">
                             <li className="flex items-start gap-2">
                                 <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
-                                <span>Nova handles 100% of phone intake and scheduling in the background.</span>
+                                <span>Talkar handles 100% of phone intake and scheduling in the background.</span>
                             </li>
                             <li className="flex items-start gap-2">
                                 <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
@@ -438,7 +438,7 @@ export default function MedicalUseCasePage() {
                         Bring calm to your waiting room today.
                     </h2>
                     <p className="text-base text-muted-foreground max-w-xl mx-auto">
-                        Deploy your HIPAA-compliant Nova phone agent and capture every prospective patient call.
+                        Deploy your HIPAA-compliant Talkar phone agent and capture every prospective patient call.
                     </p>
 
                     <div className="flex flex-wrap items-center justify-center gap-4 pt-2">

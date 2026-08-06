@@ -40,50 +40,50 @@ const COMPARISON_ROWS = [
     {
         metric: "Monthly Payroll Cost",
         traditional: "$3,500 – $5,000 / month (Desk Staff Salaries)",
-        nova: "Starting at $149 / month (Flat Service Rate)",
-        winner: "nova"
+        talkar: "Starting at $149 / month (Flat Service Rate)",
+        winner: "talkar"
     },
     {
         metric: "Phone Call Answer Rate",
         traditional: "Misses 30%+ of calls during busy check-in hours",
-        nova: "100% Pickup Rate on 1st Ring (Day & Night)",
-        winner: "nova"
+        talkar: "100% Pickup Rate on 1st Ring (Day & Night)",
+        winner: "talkar"
     },
     {
         metric: "Languages Spoken",
         traditional: "Usually 1 or 2 local languages",
-        nova: "30+ Languages with clear human speech",
-        winner: "nova"
+        talkar: "30+ Languages with clear human speech",
+        winner: "talkar"
     },
     {
         metric: "Simultaneous Callers",
         traditional: "1 caller at a time (Others put on hold)",
-        nova: "Unlimited simultaneous callers (Zero hold time)",
-        winner: "nova"
+        talkar: "Unlimited simultaneous callers (Zero hold time)",
+        winner: "talkar"
     },
     {
         metric: "Direct Revenue Kept",
         traditional: "18% – 25% Lost to Third-Party Travel Sites",
-        nova: "100% Direct Hotel Revenue (Zero Middleman Fees)",
-        winner: "nova"
+        talkar: "100% Direct Hotel Revenue (Zero Middleman Fees)",
+        winner: "talkar"
     }
 ];
 
 const HOTEL_TESTIMONIALS = [
     {
-        quote: "Nova answers our hotel main phone line day and night. It captured $42,000 in direct room booking phone calls in our first 30 days without our front desk staff ever touching the phone.",
+        quote: "Talkar answers our hotel main phone line day and night. It captured $42,000 in direct room booking phone calls in our first 30 days without our front desk staff ever touching the phone.",
         author: "Marcus Vance",
         role: "General Manager",
         property: "The Coastal Palm Resort & Spa (140 Rooms)"
     },
     {
-        quote: "Our front desk staff used to be overwhelmed by phone calls during check-in rush hours. Nova handles 100% of room service and room availability calls automatically.",
+        quote: "Our front desk staff used to be overwhelmed by phone calls during check-in rush hours. Talkar handles 100% of room service and room availability calls automatically.",
         author: "Elena Rostova",
         role: "Director of Hospitality Operations",
         property: "Apex Boutique Hotel Collection"
     },
     {
-        quote: "Guests love how natural Nova sounds over the phone. It handles late check-in requests and room service orders instantly.",
+        quote: "Guests love how natural Talkar sounds over the phone. It handles late check-in requests and room service orders instantly.",
         author: "Julian Sterling",
         role: "VP of Revenue Management",
         property: "Grand Luxe Hotels"
@@ -98,7 +98,7 @@ export default function HotelUseCasePage() {
     // Dynamic Business ROI Math
     const estimatedMissedCallsPerMonth = Math.round(roomsCount * 0.4);
     const monthlyLostRevenue = estimatedMissedCallsPerMonth * avgRoomRate * 0.35;
-    const annualNovaSavings = Math.round(monthlyLostRevenue * 12);
+    const annualTalkarSavings = Math.round(monthlyLostRevenue * 12);
 
     return (
         <div className="w-full min-h-screen bg-background text-foreground font-sans selection:bg-foreground selection:text-background overflow-x-clip">
@@ -135,7 +135,7 @@ export default function HotelUseCasePage() {
                         </h1>
 
                         <p className="text-base text-muted-foreground leading-relaxed">
-                            Never miss a direct room reservation call again. Nova answers your hotel phone on the 1st ring, locks in direct room bookings, dispatches room service, and answers guest questions in 30+ languages.
+                            Never miss a direct room reservation call again. Talkar answers your hotel phone on the 1st ring, locks in direct room bookings, dispatches room service, and answers guest questions in 30+ languages.
                         </p>
 
                         {/* Primary CTA Buttons */}
@@ -222,7 +222,7 @@ export default function HotelUseCasePage() {
                                 <p className="text-foreground font-medium">"Do you have an Ocean View Suite available this Friday for 2 nights?"</p>
                             </div>
                             <div className="p-3 rounded-xl bg-cta/10 border border-cta/20 text-cta space-y-1">
-                                <p className="text-[10px] font-mono font-semibold">NOVA HOTEL PHONE ASSISTANT</p>
+                                <p className="text-[10px] font-mono font-semibold">TALKAR HOTEL PHONE ASSISTANT</p>
                                 <p className="font-medium text-foreground">"Yes! I have 2 Luxury Ocean Suites open starting at $340/night. I can reserve your room right now with complimentary breakfast."</p>
                             </div>
                         </div>
@@ -242,7 +242,7 @@ export default function HotelUseCasePage() {
                         <Radio className="w-3.5 h-3.5" /> Simple 3-Step Process
                     </div>
                     <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-                        How Nova Handles Incoming Calls for Your Hotel
+                        How Talkar Handles Incoming Calls for Your Hotel
                     </h2>
                     <p className="text-sm text-muted-foreground max-w-xl mx-auto">
                         No apps or downloads needed for guests. They simply call your hotel phone number as usual.
@@ -269,9 +269,9 @@ export default function HotelUseCasePage() {
                             <Mic className="w-6 h-6" />
                         </div>
                         <span className="text-[10px] font-mono font-bold text-emerald-500 uppercase">Step 02</span>
-                        <h3 className="text-lg font-bold text-foreground">Nova Answers on 1st Ring</h3>
+                        <h3 className="text-lg font-bold text-foreground">Talkar Answers on 1st Ring</h3>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            Nova answers immediately in clear human speech, checks room availability, and answers guest questions.
+                            Talkar answers immediately in clear human speech, checks room availability, and answers guest questions.
                         </p>
                     </div>
 
@@ -304,7 +304,7 @@ export default function HotelUseCasePage() {
                         How much revenue do unanswered phone calls cost your hotel?
                     </h2>
                     <p className="text-base text-muted-foreground max-w-xl mx-auto">
-                        Busy front desks miss over 30% of incoming phone calls during busy hours. Calculate how much direct profit Nova recovers for your hotel.
+                        Busy front desks miss over 30% of incoming phone calls during busy hours. Calculate how much direct profit Talkar recovers for your hotel.
                     </p>
                 </div>
 
@@ -363,9 +363,9 @@ export default function HotelUseCasePage() {
                         </span>
 
                         <div className="space-y-1">
-                            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Projected Annual Savings with Nova</p>
+                            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Projected Annual Savings with Talkar</p>
                             <h3 className="text-4xl sm:text-5xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                                +${annualNovaSavings.toLocaleString()} / yr
+                                +${annualTalkarSavings.toLocaleString()} / yr
                             </h3>
                         </div>
 
@@ -406,7 +406,7 @@ export default function HotelUseCasePage() {
                         Every phone call answered with 5-star precision.
                     </h2>
                     <p className="text-base text-muted-foreground max-w-lg mx-auto">
-                        From pre-arrival room reservations to late check-out phone requests, Nova delivers flawless hospitality over the phone.
+                        From pre-arrival room reservations to late check-out phone requests, Talkar delivers flawless hospitality over the phone.
                     </p>
                 </div>
 
@@ -474,7 +474,7 @@ export default function HotelUseCasePage() {
                                     <div className="p-4.5 rounded-2xl bg-cta text-cta-foreground space-y-1.5 shadow-md">
                                         <div className="flex items-center justify-between">
                                             <span className="font-bold flex items-center gap-1.5">
-                                                <Sparkles className="w-3.5 h-3.5" /> Nova Phone Assistant
+                                                <Sparkles className="w-3.5 h-3.5" /> Talkar Phone Assistant
                                             </span>
                                             <span className="text-[10px] font-mono opacity-80">Answered on 1st Ring</span>
                                         </div>
@@ -536,7 +536,7 @@ export default function HotelUseCasePage() {
                                     </div>
                                     <div className="p-4 rounded-xl bg-cta text-cta-foreground space-y-1">
                                         <p className="font-bold flex items-center gap-1">
-                                            <Sparkles className="w-3.5 h-3.5" /> Nova Phone Assistant Response:
+                                            <Sparkles className="w-3.5 h-3.5" /> Talkar Phone Assistant Response:
                                         </p>
                                         <p className="font-medium">"{HOTEL_SIMULATION_STEPS[1].agentResponse}"</p>
                                     </div>
@@ -632,7 +632,7 @@ export default function HotelUseCasePage() {
 
 
             {/* ------------------------------------------------------------- */}
-            {/* COMPARISON TABLE: TRADITIONAL FRONT DESK VS NOVA AI */}
+            {/* COMPARISON TABLE: TRADITIONAL FRONT DESK VS TALKAR AI */}
             {/* ------------------------------------------------------------- */}
             <section className="max-w-7xl mx-auto px-6 lg:px-12 py-24 border-b border-border/40 space-y-16">
                 
@@ -641,7 +641,7 @@ export default function HotelUseCasePage() {
                         <BarChart3 className="w-3.5 h-3.5" /> Executive Cost Comparison
                     </div>
                     <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground leading-[1.15]">
-                        Traditional Front Desk Staff vs. Nova Phone Assistant
+                        Traditional Front Desk Staff vs. Talkar Phone Assistant
                     </h2>
                     <p className="text-base text-muted-foreground max-w-lg mx-auto">
                         Compare phone call pickup rates, labor costs, and direct booking profit side-by-side.
@@ -654,7 +654,7 @@ export default function HotelUseCasePage() {
                         <div className="col-span-4">Operational Feature</div>
                         <div className="col-span-4 text-muted-foreground">Traditional Desk Staff</div>
                         <div className="col-span-4 text-cta flex items-center gap-1.5">
-                            <PhoneCall className="w-4 h-4" /> Nova Phone Assistant
+                            <PhoneCall className="w-4 h-4" /> Talkar Phone Assistant
                         </div>
                     </div>
 
@@ -668,7 +668,7 @@ export default function HotelUseCasePage() {
                                 </div>
                                 <div className="col-span-4 font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                                    {row.nova}
+                                    {row.talkar}
                                 </div>
                             </div>
                         ))}

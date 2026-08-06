@@ -28,7 +28,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nova",
+  title: "Talkar",
   description: "Build powerful voice AI workflows and configurations.",
 };
 

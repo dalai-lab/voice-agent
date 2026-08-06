@@ -9,7 +9,7 @@ import ThemeToggle from "@/components/ThemeSwitcher";
 import { useAuth } from "@/lib/auth";
 
 const REALISTIC_VOICE_DEMO = [
-    { speaker: "agent", text: "Hi! Thanks for calling Nova. How can I assist your business today?" },
+    { speaker: "agent", text: "Hi! Thanks for calling Talkar. How can I assist your business today?" },
     { speaker: "customer", text: "Hi, I need to check availability for a suite booking this Friday." },
     { speaker: "agent", text: "I have 2 luxury suites open for Friday starting at $220/night. Shall I reserve one?" },
     { speaker: "customer", text: "Yes please, confirm for 2 nights under Alex Johnson." },
@@ -166,7 +166,7 @@ export default function LandingPage() {
                     <div className="relative z-10 flex items-center justify-between gap-3 p-2 rounded-xl bg-background/90 dark:bg-zinc-950/80 backdrop-blur-md border border-border text-foreground max-w-xl mx-auto w-full shadow-sm">
                         <div className="flex items-center gap-5 text-xs font-medium px-4">
                             <Link href="#use-cases" className="hover:text-foreground/80 transition-colors">Solutions</Link>
-                            <Link href="#why-nova" className="hover:text-foreground/80 transition-colors">Why Nova</Link>
+                            <Link href="#why-talkar" className="hover:text-foreground/80 transition-colors">Why Talkar</Link>
                             <Link href="#pricing" className="hover:text-foreground/80 transition-colors">Pricing</Link>
                             <a href="https://docs.dograh.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground/80 transition-colors">Docs</a>
                         </div>
@@ -191,7 +191,7 @@ export default function LandingPage() {
                                         <PhoneCall className="w-4 h-4 text-cta" />
                                     </div>
                                     <div>
-                                        <p className="text-xs font-bold leading-none text-foreground">Nova AI Assistant</p>
+                                        <p className="text-xs font-bold leading-none text-foreground">Talkar AI Assistant</p>
                                         <p className="text-[10px] text-muted-foreground mt-0.5">Automated Phone Agent</p>
                                     </div>
                                 </div>
@@ -204,7 +204,7 @@ export default function LandingPage() {
                             {/* Chat Bubbles */}
                             <div className="space-y-3 text-xs">
                                 <div className="bg-muted/80 p-3.5 rounded-xl max-w-[85%] border border-border/50 shadow-xs">
-                                    <p className="font-medium text-foreground">Hi! Thanks for calling Nova. How can I assist your business today?</p>
+                                    <p className="font-medium text-foreground">Hi! Thanks for calling Talkar. How can I assist your business today?</p>
                                     <span className="text-[9px] text-muted-foreground block mt-1">10:00 AM</span>
                                 </div>
 
@@ -361,7 +361,7 @@ export default function LandingPage() {
                         </h2>
 
                         <p className="text-base text-muted-foreground leading-relaxed max-w-lg">
-                            Missed calls mean missed revenue. Nova answers immediately, understands caller requests, schedules appointments, and sends instant confirmations.
+                            Missed calls mean missed revenue. Talkar answers immediately, understands caller requests, schedules appointments, and sends instant confirmations.
                         </p>
 
                         <div className="space-y-3 pt-2">
@@ -633,14 +633,14 @@ export default function LandingPage() {
 
 
             {/* ------------------------------------------------------------- */}
-            {/* SECTION 3: UNIQUENESS / WHY NOVA (EXECUTIVE COMPARISON) */}
+            {/* SECTION 3: UNIQUENESS / WHY TALKAR (EXECUTIVE COMPARISON) */}
             {/* ------------------------------------------------------------- */}
-            <section id="why-nova" className="w-full bg-background text-foreground border-b border-border/40 py-24 px-6 lg:px-12">
+            <section id="why-talkar" className="w-full bg-background text-foreground border-b border-border/40 py-24 px-6 lg:px-12">
                 <div className="max-w-7xl mx-auto space-y-12">
                     
                     {/* Header */}
                     <div className="space-y-3 text-center max-w-2xl mx-auto">
-                        <p className="text-xs font-semibold text-cta tracking-wide uppercase">Why Nova</p>
+                        <p className="text-xs font-semibold text-cta tracking-wide uppercase">Why Talkar</p>
                         <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
                             Built for enterprise reliability
                         </h2>
@@ -694,7 +694,7 @@ export default function LandingPage() {
                             </div>
                         </div>
 
-                        {/* Nova Solution */}
+                        {/* Talkar Solution */}
                         <div className="p-8 rounded-xl border border-cta/50 bg-gradient-to-br from-rose-500/10 via-purple-500/10 to-emerald-500/10 dark:from-rose-950/40 dark:via-purple-950/30 dark:to-emerald-950/30 space-y-6 flex flex-col justify-between shadow-sm relative overflow-hidden group">
                             {/* Subtle Metallic Corner Light Glow */}
                             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/15 blur-3xl pointer-events-none" />
@@ -703,7 +703,7 @@ export default function LandingPage() {
                             <div className="space-y-6 relative z-10">
                                 <div className="flex items-center justify-between pb-5 border-b border-border/80">
                                     <div>
-                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-cta">Nova Platform</p>
+                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-cta">Talkar Platform</p>
                                         <h3 className="text-lg font-bold text-foreground mt-0.5 flex items-center gap-2">
                                             <BrandLogo className="text-base" /> All-In-One Voice System
                                         </h3>
@@ -894,7 +894,7 @@ export default function LandingPage() {
                     </h2>
 
                     <p className="text-base text-muted-foreground max-w-xl mx-auto leading-relaxed">
-                        Join hotels, clinics, sales teams, and service providers automated by Nova.
+                        Join hotels, clinics, sales teams, and service providers automated by Talkar.
                     </p>
 
                     <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
@@ -924,7 +924,7 @@ export default function LandingPage() {
                     <div className="md:col-span-5 space-y-4">
                         <BrandLogo className="text-xl font-bold tracking-tight" />
                         <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
-                            Nova is an all-in-one AI phone system for building, deploying, and managing automated business voice callers across industries.
+                            Talkar is an all-in-one AI phone system for building, deploying, and managing automated business voice callers across industries.
                         </p>
                     </div>
 
@@ -933,7 +933,7 @@ export default function LandingPage() {
                             <p className="font-bold text-foreground text-[11px] uppercase tracking-wider">Platform</p>
                             <ul className="space-y-2 text-muted-foreground">
                                 <li><Link href="#use-cases" className="hover:text-foreground transition-colors">Solutions</Link></li>
-                                <li><Link href="#why-nova" className="hover:text-foreground transition-colors">Why Nova</Link></li>
+                                <li><Link href="#why-talkar" className="hover:text-foreground transition-colors">Why Talkar</Link></li>
                                 <li><Link href="#pricing" className="hover:text-foreground transition-colors">Pricing</Link></li>
                                 <li><Link href="/integrations" className="hover:text-foreground transition-colors">Integrations</Link></li>
                             </ul>
@@ -960,7 +960,7 @@ export default function LandingPage() {
                 </div>
 
                 <div className="max-w-7xl mx-auto pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-                    <p className="text-[11px]">© {new Date().getFullYear()} Nova AI Phone System. All rights reserved.</p>
+                    <p className="text-[11px]">© {new Date().getFullYear()} Talkar AI Phone System. All rights reserved.</p>
                     <div className="flex gap-6 text-[11px]">
                         <a href="https://docs.dograh.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Docs</a>
                         <a href="https://github.com/dalai-lab/dograh" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Open Source</a>

@@ -149,7 +149,7 @@ const INTEGRATIONS_DATA: IntegrationItem[] = [
         id: "zapier",
         name: "Zapier Automation",
         category: "automation",
-        description: "Connect Nova call events to 5,000+ business applications with zero code.",
+        description: "Connect Talkar call events to 5,000+ business applications with zero code.",
         logoUrl: "https://raw.githubusercontent.com/gilbarbara/logos/master/logos/zapier-icon.svg",
         badge: "5,000+ App Flows",
         badgeColor: "bg-orange-500/10 text-orange-400 border-orange-500/20",
@@ -326,7 +326,7 @@ export default function IntegrationsPage() {
                         </div>
                         <div className="p-5 rounded-2xl bg-cta/15 border border-cta/30 space-y-2 relative">
                             <Sparkles className="w-6 h-6 text-cta mx-auto animate-pulse" />
-                            <h4 className="text-xs font-bold text-foreground">2. Nova Realtime Matrix</h4>
+                            <h4 className="text-xs font-bold text-foreground">2. Talkar Realtime Matrix</h4>
                             <p className="text-[11px] text-muted-foreground">OpenAI Realtime / Deepgram + ElevenLabs</p>
                         </div>
                         <div className="p-5 rounded-2xl bg-muted/40 border border-border/60 space-y-2">
@@ -437,7 +437,7 @@ export default function IntegrationsPage() {
                     <div className="lg:col-span-7">
                         <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl space-y-3 font-mono text-xs text-zinc-300 overflow-x-auto">
                             <div className="flex items-center justify-between border-b border-zinc-800 pb-3 text-zinc-500 text-[11px]">
-                                <span>POST /webhooks/nova-call-completed</span>
+                                <span>POST /webhooks/talkar-call-completed</span>
                                 <span>200 OK • 42ms</span>
                             </div>
                             <pre className="text-emerald-400 text-[11px] leading-relaxed">
@@ -453,7 +453,7 @@ export default function IntegrationsPage() {
     "check_in": "2026-02-06",
     "pms_reservation_id": "GH-9042"
   },
-  "recording_url": "https://s3.nova.ai/recordings/call_9042.mp3"
+  "recording_url": "https://s3.talkar.ai/recordings/call_9042.mp3"
 }`}
                             </pre>
                         </div>

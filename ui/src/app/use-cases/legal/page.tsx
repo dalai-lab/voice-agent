@@ -58,7 +58,7 @@ export default function LegalUseCasePage() {
                     </h1>
 
                     <p className="text-base sm:text-lg text-zinc-300 leading-relaxed max-w-2xl mx-auto">
-                        Nova answers every call on the 1st ring, gathers essential case details, checks conflicts, and locks high-value retainers on your calendar 24/7.
+                        Talkar answers every call on the 1st ring, gathers essential case details, checks conflicts, and locks high-value retainers on your calendar 24/7.
                     </p>
 
                     <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
@@ -101,7 +101,7 @@ export default function LegalUseCasePage() {
                             <p className="text-zinc-200 font-medium">"I was just involved in a severe highway collision and need representation immediately."</p>
                         </div>
                         <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 space-y-1">
-                            <p className="text-[10px] font-mono font-semibold text-amber-400">NOVA LEGAL AGENT</p>
+                            <p className="text-[10px] font-mono font-semibold text-amber-400">TALKAR LEGAL AGENT</p>
                             <p className="font-medium text-white">"I am so sorry to hear that. I have captured your incident details and am paging our senior personal injury partner right now to lock in your consultation."</p>
                         </div>
                     </div>
@@ -123,7 +123,7 @@ export default function LegalUseCasePage() {
                         Built for Every Legal Practice Area
                     </h2>
                     <p className="text-base text-muted-foreground max-w-xl mx-auto">
-                        Whether it's a 2:00 AM crisis or a corporate retainer inquiry, Nova delivers flawless legal phone intake.
+                        Whether it's a 2:00 AM crisis or a corporate retainer inquiry, Talkar delivers flawless legal phone intake.
                     </p>
                 </div>
 
@@ -145,7 +145,7 @@ export default function LegalUseCasePage() {
                             </span>
                             <h3 className="text-2xl font-bold text-white">Criminal & DUI Defense Emergencies</h3>
                             <p className="text-xs text-zinc-300 leading-relaxed max-w-md">
-                                When a client calls from jail or an accident scene at 2:00 AM, Nova answers immediately, gathers location info, and triggers an urgent partner alert.
+                                When a client calls from jail or an accident scene at 2:00 AM, Talkar answers immediately, gathers location info, and triggers an urgent partner alert.
                             </p>
                         </div>
                     </div>
@@ -231,7 +231,7 @@ export default function LegalUseCasePage() {
                         <Workflow className="w-3.5 h-3.5" /> Structured Intake
                     </div>
                     <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground leading-[1.15]">
-                        How Nova Manages Every Legal Call
+                        How Talkar Manages Every Legal Call
                     </h2>
                     <p className="text-base text-muted-foreground max-w-lg mx-auto">
                         From initial ring to conflict checking and partner dispatch in four structured steps.
@@ -246,7 +246,7 @@ export default function LegalUseCasePage() {
                         <span className="w-8 h-8 rounded-full bg-cta/10 text-cta font-bold text-xs flex items-center justify-center border border-cta/20">1</span>
                         <h3 className="text-sm font-bold text-foreground">1st Ring Pickup</h3>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                             Nova greets the caller professionally with your firm's customized legal intake script.
+                             Talkar greets the caller professionally with your firm's customized legal intake script.
                         </p>
                     </div>
 

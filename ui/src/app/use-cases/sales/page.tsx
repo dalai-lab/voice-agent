@@ -91,7 +91,7 @@ export default function SalesUseCasePage() {
 
                     {/* Subhead */}
                     <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-                        Nova answers inbound sales phone calls on the 1st ring, qualifies buyer intent and budget, and locks meetings on your calendar. Zero missed leads. Zero delay.
+                        Talkar answers inbound sales phone calls on the 1st ring, qualifies buyer intent and budget, and locks meetings on your calendar. Zero missed leads. Zero delay.
                     </p>
 
                     {/* Centered Action Buttons */}
@@ -139,7 +139,7 @@ export default function SalesUseCasePage() {
                                 <strong className="text-white">Prospect:</strong> "We need 50 seats for our sales team next month."
                             </p>
                             <p className="text-emerald-300 font-medium leading-relaxed">
-                                <strong className="text-white">Nova:</strong> "I've locked in a demo with our VP of Sales for tomorrow at 10 AM."
+                                <strong className="text-white">Talkar:</strong> "I've locked in a demo with our VP of Sales for tomorrow at 10 AM."
                             </p>
                         </div>
 
@@ -188,7 +188,7 @@ export default function SalesUseCasePage() {
                         The Anatomy of a Missed Sales Call
                     </h2>
                     <p className="text-base text-muted-foreground max-w-xl mx-auto">
-                        Inbound phone leads drop off rapidly at three critical friction points. Nova eliminates all three.
+                        Inbound phone leads drop off rapidly at three critical friction points. Talkar eliminates all three.
                     </p>
                 </div>
 
@@ -223,14 +223,14 @@ export default function SalesUseCasePage() {
                         </div>
                     </div>
 
-                    {/* Solution Point 3 (Nova) */}
+                    {/* Solution Point 3 (Talkar) */}
                     <div className="p-7 rounded-3xl border border-emerald-500/40 bg-emerald-500/10 space-y-4 relative shadow-lg">
                         <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-500 font-bold text-sm">
                             ✓
                         </div>
-                        <h3 className="text-lg font-bold text-foreground">Nova Instant 1st-Ring Answer</h3>
+                        <h3 className="text-lg font-bold text-foreground">Talkar Instant 1st-Ring Answer</h3>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            Nova handles unlimited simultaneous calls 24/7, qualifies the buyer in 60 seconds, and locks the meeting.
+                            Talkar handles unlimited simultaneous calls 24/7, qualifies the buyer in 60 seconds, and locks the meeting.
                         </p>
                         <div className="pt-2 border-t border-emerald-500/30 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                             <CheckCircle2 className="w-3.5 h-3.5" /> Result: Demo Booked Instantly
@@ -260,10 +260,10 @@ export default function SalesUseCasePage() {
                         <Clock className="w-3.5 h-3.5" /> 24-Hour Sales Automation
                     </div>
                     <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground leading-[1.15]">
-                        A Day in the Life of Nova Phone Sales
+                        A Day in the Life of Talkar Phone Sales
                     </h2>
                     <p className="text-base text-muted-foreground max-w-lg mx-auto">
-                        See how Nova manages lead flow across a full 24-hour cycle without human intervention.
+                        See how Talkar manages lead flow across a full 24-hour cycle without human intervention.
                     </p>
                 </div>
 
@@ -279,7 +279,7 @@ export default function SalesUseCasePage() {
                             <p className="text-xs text-muted-foreground">Prospect calls from another timezone asking about enterprise pricing.</p>
                         </div>
                         <div className="sm:w-[45%] p-4 rounded-2xl bg-card border border-border text-xs space-y-1.5 shadow-xs">
-                            <p className="font-bold text-foreground">Nova Action:</p>
+                            <p className="font-bold text-foreground">Talkar Action:</p>
                             <p className="text-muted-foreground">"Answers call, confirms 50-seat budget fit, and books 10 AM morning demo on AE calendar."</p>
                         </div>
                     </div>
@@ -307,8 +307,8 @@ export default function SalesUseCasePage() {
                             <p className="text-xs text-muted-foreground">High volume phone campaign generates 12 concurrent inbound calls simultaneously.</p>
                         </div>
                         <div className="sm:w-[45%] p-4 rounded-2xl bg-card border border-border text-xs space-y-1.5 shadow-xs">
-                            <p className="font-bold text-foreground">Nova Action:</p>
-                            <p className="text-muted-foreground">"Nova handles all 12 calls concurrently with 0 wait time, qualifying every single caller."</p>
+                            <p className="font-bold text-foreground">Talkar Action:</p>
+                            <p className="text-muted-foreground">"Talkar handles all 12 calls concurrently with 0 wait time, qualifying every single caller."</p>
                         </div>
                     </div>
 
@@ -384,7 +384,7 @@ export default function SalesUseCasePage() {
                         Direct to Your CRM. Direct to Your Calendar.
                     </h2>
                     <p className="text-base text-muted-foreground max-w-lg mx-auto">
-                        Nova logs call recordings, buyer scores, and calendar invites straight into your existing stack.
+                        Talkar logs call recordings, buyer scores, and calendar invites straight into your existing stack.
                     </p>
                 </div>
 
@@ -428,7 +428,7 @@ export default function SalesUseCasePage() {
                         The Executive Decision
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                        Why modern revenue teams are replacing traditional SDR cold-calling scripts with Nova phone agents.
+                        Why modern revenue teams are replacing traditional SDR cold-calling scripts with Talkar phone agents.
                     </p>
                 </div>
 
@@ -455,9 +455,9 @@ export default function SalesUseCasePage() {
                         </ul>
                     </div>
 
-                    {/* Right: Nova Phone Sales Agent */}
+                    {/* Right: Talkar Phone Sales Agent */}
                     <div className="p-8 rounded-3xl bg-foreground text-background space-y-6 shadow-2xl">
-                        <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest">NOVA PHONE SALES AGENT</span>
+                        <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest">TALKAR PHONE SALES AGENT</span>
                         <h3 className="text-xl font-bold text-background">Instant 1st-Ring Answer, Flat Pricing</h3>
                         
                         <ul className="space-y-3 text-xs text-background/80">
@@ -490,7 +490,7 @@ export default function SalesUseCasePage() {
                         Stop letting your best leads go to voicemail.
                     </h2>
                     <p className="text-base text-muted-foreground max-w-xl mx-auto">
-                        Deploy your Nova phone sales agent today and start capturing every inbound lead on the first ring.
+                        Deploy your Talkar phone sales agent today and start capturing every inbound lead on the first ring.
                     </p>
 
                     <div className="flex flex-wrap items-center justify-center gap-4 pt-2">

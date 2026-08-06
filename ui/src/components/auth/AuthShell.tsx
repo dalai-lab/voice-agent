@@ -73,7 +73,7 @@ export function AuthShell({
           <div className="space-y-4">
             <h1 className="text-4xl font-bold leading-tight tracking-tight text-white xl:text-5xl font-sans">
               The open-source <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-rose-300 to-red-500">voice AI platform</span>.
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-orange-500">voice AI platform</span>.
             </h1>
             <p className="text-zinc-400 text-sm max-w-sm leading-relaxed">
               Build, run, and scale voice agents with state-of-the-art speech-to-speech models and MCP tools.

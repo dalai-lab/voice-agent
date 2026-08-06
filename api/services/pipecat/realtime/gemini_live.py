@@ -22,7 +22,7 @@ import asyncio
 from typing import Any
 
 from api.services.pipecat.gemini_json_schema_adapter import (
-    DograhGeminiJSONSchemaAdapter,
+    DograhGeminiLiveJSONSchemaAdapter,
 )
 from api.services.pipecat.realtime.static_greeting import format_static_greeting_prompt
 from google.genai.types import Content, Part
@@ -52,10 +52,11 @@ class DograhGeminiLiveLLMService(GeminiLiveLLMService):
 
     # Route tool schemas through Gemini's ``parameters_json_schema`` field so
     # MCP/imported tools that use JSON Schema keywords (``const``, ``not``,
-    # nested ``anyOf``) rejected by the strict ``Schema`` model are accepted.
-    # Mirrors the non-realtime ``DograhGoogleLLMService`` fix;
+    # nested ``anyOf``) rejected by the strict ``Schema`` model are accepted,
+    # while keeping upstream's Live-specific tool-call-to-text conversion for
+    # seeded contexts. Mirrors the non-realtime ``DograhGoogleLLMService`` fix;
     # ``DograhGeminiLiveVertexLLMService`` inherits this via MRO.
-    adapter_class = DograhGeminiJSONSchemaAdapter
+    adapter_class = DograhGeminiLiveJSONSchemaAdapter
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

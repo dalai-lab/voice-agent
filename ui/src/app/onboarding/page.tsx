@@ -36,6 +36,8 @@ export default function OnboardingPage() {
     pocName: "",
     pocDesignation: "",
     pocPhone: "",
+    gstCertificateUrl: "",
+    businessRegistrationUrl: "",
   });
 
   const TALKAR_API = process.env.NEXT_PUBLIC_TALKAR_API_URL || "http://localhost:8001";
@@ -98,6 +100,12 @@ export default function OnboardingPage() {
       if (progress >= 100) {
         progress = 100;
         clearInterval(interval);
+        // Mock the URL returned from S3/MinIO after successful upload
+        if (type === 'gst') {
+          setFormData(prev => ({ ...prev, gstCertificateUrl: "https://talkar.s3.amazonaws.com/mock-gst.pdf" }));
+        } else {
+          setFormData(prev => ({ ...prev, businessRegistrationUrl: "https://talkar.s3.amazonaws.com/mock-reg.pdf" }));
+        }
       }
       setUploadProgress(prev => ({ ...prev, [type]: progress }));
     }, 200);
@@ -282,12 +290,9 @@ export default function OnboardingPage() {
           <CardContent className="space-y-8">
             <div className="text-center space-y-4">
               <Clock className="w-16 h-16 text-blue-500 mx-auto" />
-              <h2 className="text-2xl font-bold">Application Under Review</h2>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Our team is currently reviewing your business application. We will notify you via email within 48 hours.
-              </p>
+              <h2 className="text-2xl font-bold">Application under review. We'll notify you within 48 hours.</h2>
               <div className="pt-4">
-                <a href="mailto:support@talkar.ai" className="text-sm text-blue-600 hover:underline">Need to make changes? Contact us.</a>
+                <a href="mailto:support@talkar.ai" className="text-sm text-blue-600 hover:underline">Need changes? Contact us</a>
               </div>
             </div>
 
@@ -315,10 +320,7 @@ export default function OnboardingPage() {
         <Card className="text-center py-12 border-green-500/30 bg-green-500/5">
           <CardContent className="space-y-6">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-            <h2 className="text-2xl font-bold">Application Approved!</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Welcome to Talkar! Please complete your one-time setup fee payment so our engineering team can begin building your AI agent.
-            </p>
+            <h2 className="text-2xl font-bold">Approved! Please complete your setup fee payment.</h2>
             <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" onClick={handlePaySetupFee}>
               Pay Setup Fee
             </Button>
@@ -330,10 +332,7 @@ export default function OnboardingPage() {
         <Card className="text-center py-12">
           <CardContent className="space-y-6">
             <div className="w-16 h-16 mx-auto rounded-full border-4 border-t-blue-500 animate-spin" />
-            <h2 className="text-2xl font-bold">Your Agent is Being Built</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Our engineering team is actively building and testing your AI agent based on your submitted use case.
-            </p>
+            <h2 className="text-2xl font-bold">Your agent is being built by our team.</h2>
             
             <div className="bg-muted p-4 rounded-md inline-block mt-4 text-left border">
               <p className="text-sm font-medium mb-1 border-b pb-1">Estimated Timeline: <span className="font-normal">48-72 hours</span></p>
@@ -351,13 +350,11 @@ export default function OnboardingPage() {
         <Card className="text-center py-12 border-red-500/30 bg-red-500/5">
           <CardContent className="space-y-4">
             <XCircle className="w-16 h-16 text-red-500 mx-auto" />
-            <h2 className="text-2xl font-bold">Application Rejected</h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Unfortunately, we are unable to approve your application at this time.
-              Reason: <span className="font-medium text-foreground">{customerData?.rejection_reason || "Did not meet requirements."}</span>
+              <span className="font-medium text-foreground">{customerData?.rejection_reason || "Did not meet requirements."}</span>
             </p>
             <div className="pt-4 text-sm font-medium">
-              You may reapply in: {customerData?.reapply_countdown || "30 days"}
+              Reapply after 30 days ({customerData?.reapply_countdown || "29d 14h"})
             </div>
           </CardContent>
         </Card>
@@ -367,13 +364,10 @@ export default function OnboardingPage() {
         <Card className="text-center py-12 border-red-500/30 bg-red-500/5">
           <CardContent className="space-y-4">
             <Ban className="w-16 h-16 text-red-500 mx-auto" />
-            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">Account Suspended</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Your account has been suspended due to an extended zero balance. All agent activity has been paused.
-            </p>
-            <div className="font-bold text-xl my-4">Current Balance: ₹{customerData?.wallet_balance ? (customerData.wallet_balance / 100).toFixed(2) : "0.00"}</div>
+            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">Account suspended.</h2>
+            <div className="font-bold text-xl my-4">₹{customerData?.wallet_balance ? (customerData.wallet_balance / 100).toFixed(2) : "0.00"}</div>
             <Button size="lg" onClick={() => router.push("/wallet")}>
-              Add Credits to Reactivate
+              Add Credits
             </Button>
           </CardContent>
         </Card>

@@ -85,7 +85,7 @@ async def signup(request: SignupRequest):
                     f"{TALKAR_SERVICE_URL}/customers/",
                     json={
                         "email": request.email,
-                        "contact_name": request.name,
+                        "contact_name": request.name or request.email.split('@')[0],
                         "dograh_org_id": organization.id,
                         "dograh_user_id": user.id
                     },
@@ -100,7 +100,8 @@ async def signup(request: SignupRequest):
                 "customer"
             )
         except Exception as e:
-            logger.error(f"Failed to trigger Talkar signup webhook for user {user.id}: {e}")
+            response_text = e.response.text if hasattr(e, 'response') else ""
+            logger.error(f"Failed to trigger Talkar signup webhook for user {user.id}: {e}. Response: {response_text}")
 
     capture_event(
         distinct_id=str(user.provider_id),

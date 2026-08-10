@@ -12,8 +12,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertTriangle, Clock, CheckCircle, XCircle, Ban, UploadCloud } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import type { LocalUser } from "@/lib/auth/types";
 
 export default function OnboardingPage() {
+  const { user } = useAuth();
+  const dograhOrgId = (user as LocalUser)?.organizationId;
   const router = useRouter();
   const [status, setStatus] = useState<string>("pending_approval");
   const [customerId, setCustomerId] = useState<string>("1");
@@ -40,22 +44,22 @@ export default function OnboardingPage() {
     businessRegistrationUrl: "",
   });
 
-  const TALKAR_API = process.env.NEXT_PUBLIC_TALKAR_API_URL || "http://localhost:8002";
+  const TALKAR_API = process.env.NEXT_PUBLIC_TALKAR_API_URL || (typeof window !== "undefined" ? `http://${window.location.hostname}:8002` : "http://localhost:8002");
 
   useEffect(() => {
+    if (!dograhOrgId) return;
     async function checkStatus() {
       try {
-        const res = await fetch(`${TALKAR_API}/customers/status`);
+        const res = await fetch(`${TALKAR_API}/customers/status?dograh_org_id=${dograhOrgId}`);
         if (res.ok) {
           const data = await res.json();
           setStatus(data.status);
-          setCustomerData(data); // Store the full response (reason, form data, balance, etc)
+          setCustomerData(data);
           if (data.customer_id) setCustomerId(data.customer_id);
           if (data.status === "active") {
-            router.push("/overview"); // Actually handled by middleware, but good as a fallback
+            router.push("/overview");
           }
         } else {
-          // For dev testing if API is down, default to pending_approval
           setStatus("pending_approval");
         }
       } catch (err) {
@@ -66,7 +70,7 @@ export default function OnboardingPage() {
       }
     }
     checkStatus();
-  }, [router, TALKAR_API]);
+  }, [router, TALKAR_API, dograhOrgId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

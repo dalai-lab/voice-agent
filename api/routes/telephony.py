@@ -895,6 +895,9 @@ async def handle_inbound_run(request: Request):
             return provider_class.generate_validation_error_response(
                 TelephonyError.CONCURRENT_CALL_LIMIT
             )
+        except Exception as e:
+            logger.warning(f"Redis down, failing open for org {config.organization_id}: {e}")
+            concurrency_slot = None
 
         workflow_run_id = None
         try:

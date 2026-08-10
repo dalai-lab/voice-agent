@@ -31,6 +31,7 @@ class OnboardingStateUpdate(BaseModel):
     skipped: bool | None = None
     seen_tooltips: list[str] | None = None
     completed_actions: list[str] | None = None
+    onboarding_form_data: dict | None = None
 
     def apply_to(self, state: OnboardingState) -> OnboardingState:
         merged = state.model_copy(deep=True)

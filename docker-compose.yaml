@@ -286,6 +286,9 @@ services:
       # Posthog
       POSTHOG_KEY: "phc_ItizB1dP6yv7ZYobbcqrpxTdbomDA8hJFSEmAMdYvIr"
       POSTHOG_HOST: "https://us.posthog.com"
+
+      # Talkar Integration
+      TALKAR_API_URL: "${TALKAR_SERVICE_URL:-http://api:8001}"
     ports:
       - "3010:3010"
     depends_on:

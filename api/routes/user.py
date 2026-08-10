@@ -268,7 +268,7 @@ async def update_user_onboarding_state(
     request: OnboardingStateUpdate,
     user: UserModel = Depends(get_user),
 ) -> OnboardingState:
-    return await update_onboarding_state(user.id, request)
+    return await update_onboarding_state(user, request)
 
 
 @router.get("/configurations/user/validate")

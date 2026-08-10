@@ -32,7 +32,7 @@ interface OnboardingContextType {
     // Post-signup onboarding form gate (set once on submit/skip).
     onboardingCompletedAt: string | null;
     onboardingSkipped: boolean;
-    markOnboardingCompleted: (opts?: { skipped?: boolean }) => void;
+    markOnboardingCompleted: (opts?: { skipped?: boolean, onboarding_form_data?: Record<string, any> }) => void;
     hasSeenTooltip: (key: TooltipKey) => boolean;
     markTooltipSeen: (key: TooltipKey) => void;
     hasCompletedAction: (key: OnboardingActionKey) => boolean;
@@ -112,7 +112,7 @@ export const OnboardingProvider = ({ children }: { children: React.ReactNode }) 
             });
     }, []);
 
-    const markOnboardingCompleted = useCallback((opts?: { skipped?: boolean }) => {
+    const markOnboardingCompleted = useCallback((opts?: { skipped?: boolean, onboarding_form_data?: Record<string, any> }) => {
         const skipped = opts?.skipped ?? false;
         const completedAt = new Date().toISOString();
         // Optimistic: the gate must close immediately and never re-open.
@@ -121,7 +121,11 @@ export const OnboardingProvider = ({ children }: { children: React.ReactNode }) 
             skipped: prev.skipped || skipped,
             completed_at: prev.completed_at ?? (skipped ? null : completedAt),
         }));
-        persist(skipped ? { skipped: true } : { completed_at: completedAt });
+        const payload: Record<string, any> = skipped ? { skipped: true } : { completed_at: completedAt };
+        if (opts?.onboarding_form_data) {
+            payload.onboarding_form_data = opts.onboarding_form_data;
+        }
+        persist(payload);
     }, [persist]);
 
     const hasSeenTooltip = useCallback(

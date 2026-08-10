@@ -79,12 +79,12 @@ export function LeadFormsProvider({ children }: { children: ReactNode }) {
     })();
   }, [authLoading, onboardingLoading, user]);
 
-  const completeOnboarding = useCallback((skipped: boolean) => {
+  const completeOnboarding = useCallback((skipped: boolean, data?: Record<string, any>) => {
     // Dismiss immediately, then persist the flag through OnboardingContext
     // (optimistic local state closes the gate even if the server write lags;
     // the write itself is best-effort and cross-device).
     setOnboardingOpen(false);
-    markOnboardingCompleted({ skipped });
+    markOnboardingCompleted({ skipped, onboarding_form_data: data });
   }, [markOnboardingCompleted]);
 
   const openHireExpert = useCallback((source: LeadSource) => {

@@ -40,7 +40,7 @@ interface OnboardingModalProps {
   open: boolean;
   // Called after a tracked submit to dismiss the gate and stamp the server-side
   // "completed" flag. Onboarding is compulsory — `skipped` is always false now.
-  onComplete: (skipped: boolean) => void;
+  onComplete: (skipped: boolean, data?: Record<string, any>) => void;
 }
 
 export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
@@ -114,10 +114,10 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     setSubmitting(true);
     const data = answers();
     const efSnapshot = withEnterprise ? { ...ef } : null;
-    onComplete(false); // compulsory — always "completed", never skipped
+    onComplete(false, data); // compulsory — always "completed", never skipped, pass data
     void (async () => {
       try {
-        await submitOnboarding(data, origin, userEmail);
+        // We now send onboarding form data through the onComplete callback to Dograh API.
         // Two distinct submissions on success: onboarding answers above, and the
         // enterprise on-prem lead here (same endpoint as the standalone form).
         if (efSnapshot) {

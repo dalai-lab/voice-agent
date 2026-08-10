@@ -41,7 +41,7 @@ UI_APP_URL = os.getenv("UI_APP_URL", "http://localhost:3010")
 DATABASE_URL = os.environ["DATABASE_URL"]
 REDIS_URL = os.environ["REDIS_URL"]
 
-DEPLOYMENT_MODE = os.getenv("DEPLOYMENT_MODE", "oss")
+DEPLOYMENT_MODE = os.getenv("DEPLOYMENT_MODE", "talkar")
 TALKAR_SERVICE_URL = os.getenv("TALKAR_SERVICE_URL", "http://host.docker.internal:8002")
 CORS_ALLOWED_ORIGINS = [
     o.strip() for o in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()

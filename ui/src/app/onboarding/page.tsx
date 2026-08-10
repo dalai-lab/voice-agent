@@ -16,6 +16,7 @@ import { AlertTriangle, Clock, CheckCircle, XCircle, Ban, UploadCloud } from "lu
 export default function OnboardingPage() {
   const router = useRouter();
   const [status, setStatus] = useState<string>("pending_approval");
+  const [customerId, setCustomerId] = useState<string>("1");
   const [loading, setLoading] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<{ gst: number, reg: number }>({ gst: 0, reg: 0 });
 
@@ -45,6 +46,7 @@ export default function OnboardingPage() {
         if (res.ok) {
           const data = await res.json();
           setStatus(data.status);
+          if (data.customer_id) setCustomerId(data.customer_id);
           if (data.status === "active") {
             router.push("/overview"); // Actually handled by middleware, but good as a fallback
           }
@@ -66,7 +68,7 @@ export default function OnboardingPage() {
     e.preventDefault();
     try {
       // In a real implementation this would upload the documents first to S3/MinIO
-      const res = await fetch(`${TALKAR_API}/customers/me/onboarding`, {
+      const res = await fetch(`${TALKAR_API}/customers/${customerId}/onboarding`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)

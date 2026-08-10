@@ -513,6 +513,28 @@ async def _authorize_oss_managed_v2_correlation(
     return QuotaCheckResult(has_quota=True)
 
 
+async def _authorize_talkar_workflow_run_start(organization_id: int) -> QuotaCheckResult:
+    import httpx
+    import os
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{os.getenv('TALKAR_SERVICE_URL', 'http://localhost:8001')}/billing/check-quota",
+                json={"organization_id": organization_id},
+                timeout=2.0
+            )
+            if resp.status_code == 200 and resp.json().get("has_quota"):
+                return QuotaCheckResult(has_quota=True)
+            return QuotaCheckResult(
+                has_quota=False, 
+                error_code="insufficient_quota", 
+                error_message="Talkar wallet balance is exhausted."
+            )
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Talkar billing service unreachable: {e}. Failing open.")
+        return QuotaCheckResult(has_quota=True)
+
 async def _authorize_oss_managed_v2_run(
     *,
     workflow_id: int,
@@ -764,6 +786,9 @@ async def authorize_workflow_run_start(
             organization_id=organization_id,
             workflow_configurations=workflow_configurations,
         )
+
+        if DEPLOYMENT_MODE == "talkar":
+            return await _authorize_talkar_workflow_run_start(organization_id)
 
         if DEPLOYMENT_MODE != "oss":
             return await _authorize_hosted_workflow_run_start(

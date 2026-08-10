@@ -203,6 +203,28 @@ export function AppSidebar() {
     vonageMissingSignatureSecretCount > 0;
   const isCollapsed = !isMobile && state === "collapsed";
 
+  const talkarOrgType = config?.organizationConfigs?.find((c: any) => c.key === "TALKAR_ORG_TYPE")?.value;
+  const filteredNavSections = React.useMemo(() => {
+    if (talkarOrgType !== "customer") return NAV_SECTIONS;
+    
+    // Filter sections to only show Overview, Runs (Call History), and Billing
+    return NAV_SECTIONS.map(section => {
+      const newItems = section.items.map(item => {
+        if (item.type === "group") {
+          return {
+            ...item,
+            items: item.items.filter(sub => ["/runs", "/billing"].includes(sub.url))
+          };
+        }
+        return item;
+      }).filter(item => {
+        if (item.type === "group") return item.items.length > 0;
+        return ["/overview", "/runs", "/billing"].includes(item.url);
+      });
+      return { ...section, items: newItems };
+    }).filter(section => section.items.length > 0);
+  }, [talkarOrgType]);
+
   const versionInfo = config ? { ui: config.uiVersion, api: config.apiVersion } : null;
 
   const { latest: latestRelease, isBehind, isLatest } = useLatestReleaseVersion(
@@ -222,7 +244,7 @@ export function AppSidebar() {
 
   React.useEffect(() => {
     const nextState: Record<string, boolean> = {};
-    NAV_SECTIONS.forEach((section) => {
+    filteredNavSections.forEach((section) => {
       section.items.forEach((item) => {
         if (item.type === "group") {
           const hasActiveChild = item.items.some((child) => isActive(child.url));
@@ -233,7 +255,7 @@ export function AppSidebar() {
       });
     });
     setOpenGroups((prev) => ({ ...nextState, ...prev }));
-  }, [pathname]);
+  }, [pathname, filteredNavSections]);
 
   const toggleGroup = (title: string) => {
     setOpenGroups((prev) => ({ ...prev, [title]: !prev[title] }));
@@ -492,7 +514,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="notranslate py-4 space-y-4 no-scrollbar" translate="no">
-        {NAV_SECTIONS.map((section) => (
+        {filteredNavSections.map((section) => (
           <SidebarGroup
             key={section.label ?? "main"}
             className="p-0 space-y-1"

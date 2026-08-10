@@ -40,4 +40,19 @@ async def process_workflow_completion(
             f"Error reporting platform usage for workflow {workflow_run_id}: {e}"
         )
 
+    # TALKAR PATCH: Deduct from Talkar wallet
+    try:
+        import os
+        import httpx
+        from api.constants import DEPLOYMENT_MODE
+        if DEPLOYMENT_MODE == "talkar":
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{os.getenv('TALKAR_SERVICE_URL', 'http://localhost:8001')}/billing/deduct",
+                    json={"workflow_run_id": workflow_run_id},
+                    timeout=5.0
+                )
+    except Exception as e:
+        logger.error(f"Talkar billing deduction failed for {workflow_run_id}: {e}")
+
     logger.info(f"Completed workflow completion processing for run {workflow_run_id}")

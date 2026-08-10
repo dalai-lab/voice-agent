@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
-from api.constants import DEPLOYMENT_MODE
+from api.constants import DEPLOYMENT_MODE, TALKAR_SERVICE_URL
 from api.db import db_client
 from api.db.models import UserModel
 from api.errors.failure import (
@@ -284,12 +284,10 @@ async def _store_run_correlation_id(
 
 async def _authorize_talkar_workflow_run_start(organization_id: int) -> QuotaCheckResult:
     """Check Talkar wallet balance. Fails OPEN on billing API errors."""
-    import os
-    import httpx
     try:
         async with httpx.AsyncClient() as client:
             res = await client.post(
-                f"{os.getenv('TALKAR_SERVICE_URL', 'http://localhost:8001')}/billing/check-quota",
+                f"{TALKAR_SERVICE_URL}/billing/check-quota",
                 json={"organization_id": organization_id},
                 timeout=5.0
             )
@@ -540,12 +538,10 @@ async def _authorize_oss_managed_v2_correlation(
 
 
 async def _authorize_talkar_workflow_run_start(organization_id: int) -> QuotaCheckResult:
-    import httpx
-    import os
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                f"{os.getenv('TALKAR_SERVICE_URL', 'http://localhost:8001')}/billing/check-quota",
+                f"{TALKAR_SERVICE_URL}/billing/check-quota",
                 json={"organization_id": organization_id},
                 timeout=2.0
             )

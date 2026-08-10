@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
-from api.constants import ENABLE_SIGNUP, DEPLOYMENT_MODE
+from api.constants import ENABLE_SIGNUP, DEPLOYMENT_MODE, TALKAR_SERVICE_URL
 from api.db import db_client
 from api.db.models import UserModel
 from api.enums import OrganizationConfigurationKey, PostHogEvent
@@ -79,11 +79,10 @@ async def signup(request: SignupRequest):
     # TALKAR PATCH: SOT 111 - Trigger Talkar backend to create customer record
     if DEPLOYMENT_MODE == "talkar":
         import httpx
-        import os
         try:
             async with httpx.AsyncClient() as client:
                 await client.post(
-                    f"{os.getenv('TALKAR_SERVICE_URL', 'http://localhost:8001')}/customers/",
+                    f"{TALKAR_SERVICE_URL}/customers/",
                     json={
                         "email": request.email,
                         "contact_name": request.name,

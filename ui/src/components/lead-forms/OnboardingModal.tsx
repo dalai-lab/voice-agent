@@ -34,7 +34,7 @@ import {
 } from "./leadFieldOptions";
 import { LeadModalShell } from "./LeadModalShell";
 import { submitLead } from "./submitLead";
-import { type OnboardingAnswers, submitOnboarding } from "./submitOnboarding";
+import type { OnboardingAnswers } from "./submitOnboarding";
 
 interface OnboardingModalProps {
   open: boolean;

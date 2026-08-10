@@ -42,9 +42,8 @@ async def process_workflow_completion(
 
     # TALKAR PATCH: Deduct from Talkar wallet
     try:
-        import os
         import httpx
-        from api.constants import DEPLOYMENT_MODE
+        from api.constants import DEPLOYMENT_MODE, TALKAR_SERVICE_URL
         if DEPLOYMENT_MODE == "talkar":
             from api.db import db_client
             workflow_run = await db_client.get_workflow_run_by_id(workflow_run_id)
@@ -65,7 +64,7 @@ async def process_workflow_completion(
                     if org_id:
                         async with httpx.AsyncClient() as client:
                             await client.post(
-                                f"{os.getenv('TALKAR_SERVICE_URL', 'http://localhost:8001')}/billing/deduct",
+                                f"{TALKAR_SERVICE_URL}/billing/deduct",
                                 json={
                                     "workflow_run_id": workflow_run_id,
                                     "duration_seconds": duration_seconds,

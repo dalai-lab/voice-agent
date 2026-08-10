@@ -15,6 +15,8 @@ import { AlertTriangle, Plus, CreditCard, ReceiptText, ShieldCheck } from "lucid
 export default function WalletPage() {
   const [wallet, setWallet] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [filter, setFilter] = useState<string>("all");
+  const [page, setPage] = useState<number>(1);
   const [subscription, setSubscription] = useState<any>(null);
   const [topupAmount, setTopupAmount] = useState<string>("");
   const [autoRechargeEnabled, setAutoRechargeEnabled] = useState(false);
@@ -47,6 +49,11 @@ export default function WalletPage() {
     alert(`Initiating Razorpay checkout for ₹${amount}...`);
     // Hits POST /billing/topup/create-order
   };
+
+  const filteredTransactions = transactions.filter(tx => filter === "all" || tx.type === filter);
+  const itemsPerPage = 20;
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const currentTransactions = filteredTransactions.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-6">
@@ -228,9 +235,24 @@ export default function WalletPage() {
 
       {/* 4. Transaction History */}
       <Card>
-        <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
-          <CardDescription>Recent wallet activity and call deductions.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Transaction History</CardTitle>
+            <CardDescription>Recent wallet activity and call deductions.</CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <select 
+              className="h-9 w-[180px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={filter}
+              onChange={(e) => { setFilter(e.target.value); setPage(1); }}
+            >
+              <option value="all">All Transactions</option>
+              <option value="top_up">Top-ups</option>
+              <option value="call_deduction">Call Deductions</option>
+              <option value="refund">Refunds</option>
+              <option value="grant">Grants</option>
+            </select>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -243,7 +265,7 @@ export default function WalletPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.map(tx => (
+              {currentTransactions.map(tx => (
                 <TableRow key={tx.id}>
                   <TableCell className="font-medium">{tx.date}</TableCell>
                   <TableCell>{tx.desc}</TableCell>
@@ -253,15 +275,39 @@ export default function WalletPage() {
                   <TableCell className="text-right">₹{tx.balance.toLocaleString()}</TableCell>
                 </TableRow>
               ))}
-              {transactions.length === 0 && (
+              {currentTransactions.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center text-muted-foreground h-24">
-                    No transactions yet.
+                    No transactions found.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
+          
+          {totalPages > 1 && (
+            <div className="flex items-center justify-end space-x-2 py-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

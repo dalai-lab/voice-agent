@@ -204,42 +204,55 @@ export function AppSidebar() {
     vonageMissingSignatureSecretCount > 0;
   const isCollapsed = !isMobile && state === "collapsed";
 
-  const { userConfig } = useOrgConfig();
-  const talkarOrgType = (userConfig as any)?.organization_configs?.find((c: any) => c.key === "TALKAR_ORG_TYPE")?.value;
-  const filteredNavSections = React.useMemo(() => {
-    if (talkarOrgType !== "customer") return NAV_SECTIONS;
-    
-    // Create the Wallet & Credits item
-    const walletItem: SidebarSingleItem = {
-      title: "Wallet & Credits",
-      url: "/wallet",
-      icon: PhosphorIcons.Wallet,
-    };
+  const [isTalkarCustomer, setIsTalkarCustomer] = React.useState(false);
 
-    // Filter sections to only show Overview, Runs, and Wallet (hide Billing)
-    const newSections = NAV_SECTIONS.map(section => {
-      const newItems = section.items.map(item => {
-        if (item.type === "group") {
-          return {
-            ...item,
-            items: item.items.filter(sub => ["/runs"].includes(sub.url))
-          };
+  React.useEffect(() => {
+    async function checkOrgType() {
+      try {
+        const res = await fetch("/api/v1/organization/config/TALKAR_ORG_TYPE");
+        if (res.ok) {
+          const data = await res.json();
+          setIsTalkarCustomer(data.value === "customer");
         }
-        return item;
-      }).filter(item => {
-        if (item.type === "group") return item.items.length > 0;
-        return ["/overview", "/runs"].includes(item.url);
-      });
-      return { ...section, items: newItems };
-    }).filter(section => section.items.length > 0);
+      } catch (err) {
+        console.error("Failed to fetch talkar org type", err);
+      }
+    }
+    checkOrgType();
+  }, []);
 
-    // Inject Wallet & Credits into the first section
-    if (newSections.length > 0) {
-      newSections[0].items.push(walletItem);
+  const filteredNavSections = React.useMemo(() => {
+    const TALKAR_CUSTOMER_HIDDEN_URLS = [
+      "/workflow",
+      "/campaigns",
+      "/telephony-configurations",
+      "/model-configurations",
+      "/api-keys",
+      "/usage",
+      "/billing",
+    ];
+
+    const visibleSections = isTalkarCustomer
+      ? NAV_SECTIONS.map(section => ({
+          ...section,
+          items: section.items.filter(item => {
+            const url = item.type === "single" ? item.url : (item as any).url;
+            return url ? !TALKAR_CUSTOMER_HIDDEN_URLS.includes(url) : true;
+          }),
+        })).filter(section => section.items.length > 0)
+      : NAV_SECTIONS;
+
+    if (isTalkarCustomer && visibleSections.length > 0) {
+      visibleSections[0].items.push({
+        type: "single",
+        title: "Wallet & Credits",
+        url: "/wallet",
+        icon: PhosphorIcons.Wallet,
+      } as SidebarSingleItem);
     }
 
-    return newSections;
-  }, [talkarOrgType]);
+    return visibleSections;
+  }, [isTalkarCustomer]);
 
   const versionInfo = config ? { ui: config.uiVersion, api: config.apiVersion } : null;
 

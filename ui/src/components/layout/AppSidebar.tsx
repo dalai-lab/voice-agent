@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAppConfig } from "@/context/AppConfigContext";
+import { useOrgConfig } from "@/context/OrgConfigContext";
 import { useLeadForms } from "@/context/LeadFormsContext";
 import { useTelephonyConfigWarnings } from "@/context/TelephonyConfigWarningsContext";
 import { useLatestReleaseVersion } from "@/hooks/useLatestReleaseVersion";
@@ -203,7 +204,8 @@ export function AppSidebar() {
     vonageMissingSignatureSecretCount > 0;
   const isCollapsed = !isMobile && state === "collapsed";
 
-  const talkarOrgType = config?.organizationConfigs?.find((c: any) => c.key === "TALKAR_ORG_TYPE")?.value;
+  const { userConfig } = useOrgConfig();
+  const talkarOrgType = (userConfig as any)?.organization_configs?.find((c: any) => c.key === "TALKAR_ORG_TYPE")?.value;
   const filteredNavSections = React.useMemo(() => {
     if (talkarOrgType !== "customer") return NAV_SECTIONS;
     

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useAppConfig } from "@/context/AppConfigContext";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 
 interface WalletData {
   balance_paise: number;
@@ -21,7 +21,7 @@ export default function TalkarBillingPage() {
   const [amount, setAmount] = useState<number>(1000); // Default ₹1000
 
   // The organization_id is how Talkar links to this Dograh customer
-  const orgId = user?.organizationId;
+  const orgId = (user as any)?.organizationId || (user as any)?.organization_id;
 
   useEffect(() => {
     if (!orgId) return;

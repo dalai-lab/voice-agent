@@ -18,6 +18,7 @@ export default function OnboardingPage() {
   const [status, setStatus] = useState<string>("pending_approval");
   const [customerId, setCustomerId] = useState<string>("1");
   const [loading, setLoading] = useState(true);
+  const [customerData, setCustomerData] = useState<any>(null);
   const [uploadProgress, setUploadProgress] = useState<{ gst: number, reg: number }>({ gst: 0, reg: 0 });
 
   // Form State
@@ -46,6 +47,7 @@ export default function OnboardingPage() {
         if (res.ok) {
           const data = await res.json();
           setStatus(data.status);
+          setCustomerData(data); // Store the full response (reason, form data, balance, etc)
           if (data.customer_id) setCustomerId(data.customer_id);
           if (data.status === "active") {
             router.push("/overview"); // Actually handled by middleware, but good as a fallback
@@ -293,15 +295,15 @@ export default function OnboardingPage() {
               <h3 className="text-lg font-medium mb-4">Submitted Application Details</h3>
               <div className="opacity-70 pointer-events-none">
                 {/* Read-only form preview */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                  <div><span className="text-muted-foreground">Business Name:</span><br/>Acme Corp</div>
-                  <div><span className="text-muted-foreground">Industry:</span><br/>Healthcare</div>
-                  <div><span className="text-muted-foreground">Company Size:</span><br/>11-50 employees</div>
-                  <div><span className="text-muted-foreground">GST Number:</span><br/>22AAAAA0000A1Z5</div>
-                  <div className="col-span-2"><span className="text-muted-foreground">Use Case:</span><br/>Both (Inbound & Outbound)<br/>We need an agent to answer patient queries and book appointments.</div>
-                  <div><span className="text-muted-foreground">Expected Volume:</span><br/>500-2000 calls</div>
-                  <div><span className="text-muted-foreground">Languages:</span><br/>English, Hindi</div>
-                  <div className="col-span-2"><span className="text-muted-foreground">Integrations:</span><br/>HubSpot CRM, Google Calendar</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-left">
+                  <div><span className="text-muted-foreground">Business Name:</span><br/>{customerData?.onboarding_form?.businessName || "N/A"}</div>
+                  <div><span className="text-muted-foreground">Industry:</span><br/>{customerData?.onboarding_form?.industry || "N/A"}</div>
+                  <div><span className="text-muted-foreground">Company Size:</span><br/>{customerData?.onboarding_form?.companySize || "N/A"}</div>
+                  <div><span className="text-muted-foreground">GST Number:</span><br/>{customerData?.onboarding_form?.gstNumber || "N/A"}</div>
+                  <div className="col-span-2"><span className="text-muted-foreground">Use Case:</span><br/>{customerData?.onboarding_form?.useCaseType || "N/A"}<br/>{customerData?.onboarding_form?.useCaseDescription || "N/A"}</div>
+                  <div><span className="text-muted-foreground">Expected Volume:</span><br/>{customerData?.onboarding_form?.callVolume || "N/A"}</div>
+                  <div><span className="text-muted-foreground">Languages:</span><br/>{customerData?.onboarding_form?.languages || "N/A"}</div>
+                  <div className="col-span-2"><span className="text-muted-foreground">Integrations:</span><br/>{customerData?.onboarding_form?.integrations || "N/A"}</div>
                 </div>
               </div>
             </div>
@@ -336,10 +338,10 @@ export default function OnboardingPage() {
             <div className="bg-muted p-4 rounded-md inline-block mt-4 text-left border">
               <p className="text-sm font-medium mb-1 border-b pb-1">Estimated Timeline: <span className="font-normal">48-72 hours</span></p>
               <h4 className="text-xs text-muted-foreground mt-3 mb-1 uppercase tracking-wider font-bold">Use Case Summary</h4>
-              <p className="text-sm"><strong>Type:</strong> Inbound & Outbound</p>
-              <p className="text-sm"><strong>Description:</strong> We need an agent to answer patient queries and book appointments.</p>
-              <p className="text-sm"><strong>Languages:</strong> English, Hindi</p>
-              <p className="text-sm"><strong>Integrations:</strong> HubSpot CRM, Google Calendar</p>
+              <p className="text-sm"><strong>Type:</strong> {customerData?.onboarding_form?.useCaseType || "N/A"}</p>
+              <p className="text-sm"><strong>Description:</strong> {customerData?.onboarding_form?.useCaseDescription || "N/A"}</p>
+              <p className="text-sm"><strong>Languages:</strong> {customerData?.onboarding_form?.languages || "N/A"}</p>
+              <p className="text-sm"><strong>Integrations:</strong> {customerData?.onboarding_form?.integrations || "N/A"}</p>
             </div>
           </CardContent>
         </Card>
@@ -352,10 +354,10 @@ export default function OnboardingPage() {
             <h2 className="text-2xl font-bold">Application Rejected</h2>
             <p className="text-muted-foreground max-w-md mx-auto">
               Unfortunately, we are unable to approve your application at this time.
-              Reason: <span className="font-medium text-foreground">Did not meet minimum volume requirements.</span>
+              Reason: <span className="font-medium text-foreground">{customerData?.rejection_reason || "Did not meet requirements."}</span>
             </p>
             <div className="pt-4 text-sm font-medium">
-              You may reapply in: 29 days, 14 hours
+              You may reapply in: {customerData?.reapply_countdown || "30 days"}
             </div>
           </CardContent>
         </Card>
@@ -369,7 +371,7 @@ export default function OnboardingPage() {
             <p className="text-muted-foreground max-w-md mx-auto">
               Your account has been suspended due to an extended zero balance. All agent activity has been paused.
             </p>
-            <div className="font-bold text-xl my-4">Current Balance: ₹0.00</div>
+            <div className="font-bold text-xl my-4">Current Balance: ₹{customerData?.wallet_balance ? (customerData.wallet_balance / 100).toFixed(2) : "0.00"}</div>
             <Button size="lg" onClick={() => router.push("/wallet")}>
               Add Credits to Reactivate
             </Button>

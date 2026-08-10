@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
-from api.constants import ENABLE_SIGNUP
+from api.constants import ENABLE_SIGNUP, DEPLOYMENT_MODE
 from api.db import db_client
 from api.db.models import UserModel
 from api.enums import OrganizationConfigurationKey, PostHogEvent

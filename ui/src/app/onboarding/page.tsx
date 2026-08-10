@@ -303,12 +303,20 @@ export default function OnboardingPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-left">
                   <div><span className="text-muted-foreground">Business Name:</span><br/>{customerData?.onboarding_form?.businessName || "N/A"}</div>
                   <div><span className="text-muted-foreground">Industry:</span><br/>{customerData?.onboarding_form?.industry || "N/A"}</div>
+                  <div><span className="text-muted-foreground">Website URL:</span><br/>{customerData?.onboarding_form?.websiteUrl || "N/A"}</div>
                   <div><span className="text-muted-foreground">Company Size:</span><br/>{customerData?.onboarding_form?.companySize || "N/A"}</div>
                   <div><span className="text-muted-foreground">GST Number:</span><br/>{customerData?.onboarding_form?.gstNumber || "N/A"}</div>
                   <div className="col-span-2"><span className="text-muted-foreground">Use Case:</span><br/>{customerData?.onboarding_form?.useCaseType || "N/A"}<br/>{customerData?.onboarding_form?.useCaseDescription || "N/A"}</div>
                   <div><span className="text-muted-foreground">Expected Volume:</span><br/>{customerData?.onboarding_form?.callVolume || "N/A"}</div>
                   <div><span className="text-muted-foreground">Languages:</span><br/>{customerData?.onboarding_form?.languages || "N/A"}</div>
                   <div className="col-span-2"><span className="text-muted-foreground">Integrations:</span><br/>{customerData?.onboarding_form?.integrations || "N/A"}</div>
+                  <div className="col-span-2 border-t pt-4 mt-2"><strong className="text-foreground">Point of Contact</strong></div>
+                  <div><span className="text-muted-foreground">Name:</span><br/>{customerData?.onboarding_form?.pocName || "N/A"}</div>
+                  <div><span className="text-muted-foreground">Designation:</span><br/>{customerData?.onboarding_form?.pocDesignation || "N/A"}</div>
+                  <div><span className="text-muted-foreground">Phone:</span><br/>{customerData?.onboarding_form?.pocPhone || "N/A"}</div>
+                  <div className="col-span-2 border-t pt-4 mt-2"><strong className="text-foreground">Documents</strong></div>
+                  <div><span className="text-muted-foreground">GST Certificate:</span><br/>{customerData?.onboarding_form?.gstCertificateUrl ? <a href={customerData.onboarding_form.gstCertificateUrl} target="_blank" className="text-blue-500 underline pointer-events-auto">View Document</a> : "Not uploaded"}</div>
+                  <div><span className="text-muted-foreground">Business Registration:</span><br/>{customerData?.onboarding_form?.businessRegistrationUrl ? <a href={customerData.onboarding_form.businessRegistrationUrl} target="_blank" className="text-blue-500 underline pointer-events-auto">View Document</a> : "Not uploaded"}</div>
                 </div>
               </div>
             </div>

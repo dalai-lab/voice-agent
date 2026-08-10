@@ -81,7 +81,7 @@ export async function middleware(request: NextRequest) {
         if (status !== 'active') {
           // TALKAR PATCH: If suspended, they must be allowed to reach /wallet to add credits
           if (status === 'suspended' && pathname.startsWith('/wallet')) {
-            return; // allow through
+            return NextResponse.next(); // suspended users can reach /wallet to add credits
           }
           return NextResponse.redirect(new URL('/onboarding', request.url));
         }

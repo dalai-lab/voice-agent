@@ -665,6 +665,56 @@ async def _authorize_oss_managed_v2_run(
     return QuotaCheckResult(has_quota=True)
 
 
+# --- TALKAR PATCH START ---
+async def _authorize_talkar_workflow_run_start(
+    organization_id: int,
+) -> QuotaCheckResult:
+    """Check Talkar wallet balance before allowing a call.
+
+    Fails OPEN on billing API errors so infrastructure blips never block
+    customer calls. The outer authorize_workflow_run_start() exception handler
+    fails CLOSED — we must catch everything internally.
+    """
+    import os
+
+    talkar_billing_url = os.getenv("TALKAR_BILLING_API_URL", "http://localhost:8001")
+    talkar_billing_token = os.getenv("TALKAR_BILLING_API_TOKEN", "")
+
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(
+                f"{talkar_billing_url}/wallet/check",
+                params={"dograh_org_id": organization_id},
+                headers={"Authorization": f"Bearer {talkar_billing_token}"},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if not data.get("has_balance"):
+                    return QuotaCheckResult(
+                        has_quota=False,
+                        error_code="insufficient_credits",
+                        error_message="Insufficient wallet balance. Please top up your Talkar account.",
+                    )
+                return QuotaCheckResult(has_quota=True)
+            # Non-200 response from billing API — fail open
+            logger.warning(
+                "Talkar billing check returned {} for org {} — failing open",
+                resp.status_code,
+                organization_id,
+            )
+            return QuotaCheckResult(has_quota=True)
+    except Exception as exc:
+        # Billing API unreachable: FAIL OPEN.
+        # Never block calls due to billing infrastructure outage.
+        logger.warning(
+            "Talkar billing API unreachable for org {}: {} — failing open",
+            organization_id,
+            exc,
+        )
+        return QuotaCheckResult(has_quota=True)
+# --- TALKAR PATCH END ---
+
+
 async def authorize_workflow_run_start(
     *,
     workflow_id: int,

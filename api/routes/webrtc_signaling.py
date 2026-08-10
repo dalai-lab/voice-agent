@@ -568,6 +568,10 @@ class SignalingManager:
                         }
                     )
                     return
+                except Exception as e:
+                    # TALKAR PATCH: Redis down — fail open, never block calls on infra outage
+                    logger.warning(f"Redis concurrency check failed, failing open for org {organization_id}: {e}")
+                    concurrency_slot = None
 
             # Create new connection using correct SmallWebRTC API
             # Generate ICE servers with time-limited TURN credentials for this user

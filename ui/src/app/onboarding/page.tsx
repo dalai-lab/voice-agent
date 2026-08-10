@@ -40,7 +40,7 @@ export default function OnboardingPage() {
     businessRegistrationUrl: "",
   });
 
-  const TALKAR_API = process.env.NEXT_PUBLIC_TALKAR_API_URL || "http://localhost:8001";
+  const TALKAR_API = process.env.NEXT_PUBLIC_TALKAR_API_URL || "http://localhost:8002";
 
   useEffect(() => {
     async function checkStatus() {

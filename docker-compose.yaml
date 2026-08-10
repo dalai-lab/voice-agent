@@ -289,7 +289,7 @@ services:
       POSTHOG_HOST: "https://us.posthog.com"
 
       # Talkar Integration
-      TALKAR_API_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8001}"
+      TALKAR_API_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8002}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

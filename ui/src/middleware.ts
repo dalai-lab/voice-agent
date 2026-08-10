@@ -67,23 +67,39 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // TALKAR PATCH: Fetch user info for status and gating
+  let organizationId = null;
+  let talkarOrgType = null;
+  try {
+    const backendUrl = getServerBackendUrl();
+    const res = await fetch(`${backendUrl}/api/v1/auth/me`, {
+      headers: { Cookie: `${OSS_TOKEN_COOKIE}=${token}` }
+    });
+    if (res.ok) {
+      const userData = await res.json();
+      organizationId = userData.organization_id;
+      talkarOrgType = userData.talkar_org_type;
+    }
+  } catch (err) {
+    console.error("Failed to fetch user info in middleware", err);
+  }
+
   // TALKAR PATCH: Account status gate (Phase 5B)
   const ALLOWED_WHILE_LOCKED = ["/onboarding", "/api", "/_next", "/login", "/logout"];
-  if (!ALLOWED_WHILE_LOCKED.some(p => pathname.startsWith(p))) {
+  if (organizationId && !ALLOWED_WHILE_LOCKED.some(p => pathname.startsWith(p))) {
     try {
-      // Check Talkar account status
-      const statusRes = await fetch(`${process.env.TALKAR_API_URL}/customers/status`, {
-        headers: { 'Cookie': request.headers.get('cookie') || '' }
-      });
+      // Check Talkar account status using the org ID
+      const statusRes = await fetch(`${process.env.TALKAR_API_URL}/customers/status?dograh_org_id=${organizationId}`);
 
       if (statusRes.ok) {
         const { status } = await statusRes.json();
         if (status !== 'active') {
           // TALKAR PATCH: If suspended, they must be allowed to reach /wallet to add credits
           if (status === 'suspended' && pathname.startsWith('/wallet')) {
-            return NextResponse.next(); // suspended users can reach /wallet to add credits
+            // let it pass
+          } else {
+            return NextResponse.redirect(new URL('/onboarding', request.url));
           }
-          return NextResponse.redirect(new URL('/onboarding', request.url));
         }
       }
     } catch (err) {
@@ -97,23 +113,11 @@ export async function middleware(request: NextRequest) {
     '/model-configurations', '/api-keys'
   ];
   if (RESTRICTED_PREFIXES.some(p => pathname.startsWith(p))) {
-    try {
-      const backendUrl = getServerBackendUrl();
-      const res = await fetch(`${backendUrl}/api/v1/user-configurations/user`, {
-        headers: { Cookie: `${OSS_TOKEN_COOKIE}=${token}` }
-      });
-      if (res.ok) {
-        const userData = await res.json();
-        const talkarOrgType = userData?.organization_configs?.find((c: any) => c.key === 'TALKAR_ORG_TYPE')?.value;
-        if (talkarOrgType === 'customer') {
-          const overviewUrl = new URL('/overview', request.url);
-          // Optional: Add a query param so the UI can show a toast
-          overviewUrl.searchParams.set('restricted', 'true');
-          return NextResponse.redirect(overviewUrl);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to check Talkar org type in middleware", err);
+    if (talkarOrgType === 'customer') {
+      const overviewUrl = new URL('/overview', request.url);
+      // Optional: Add a query param so the UI can show a toast
+      overviewUrl.searchParams.set('restricted', 'true');
+      return NextResponse.redirect(overviewUrl);
     }
   }
 

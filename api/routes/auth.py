@@ -91,6 +91,13 @@ async def signup(request: SignupRequest):
                     },
                     timeout=5.0
                 )
+                
+            # Stamp TALKAR_ORG_TYPE so UI middleware blocks advanced views
+            await db_client.upsert_configuration(
+                organization.id,
+                OrganizationConfigurationKey.TALKAR_ORG_TYPE.value,
+                "customer"
+            )
         except Exception as e:
             logger.error(f"Failed to trigger Talkar signup webhook for user {user.id}: {e}")
 
@@ -155,9 +162,22 @@ async def login(request: LoginRequest):
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user(user: UserModel = Depends(get_user)):
+    talkar_org_type = None
+    if user.selected_organization_id:
+        try:
+            config = await db_client.get_configuration(
+                user.selected_organization_id,
+                OrganizationConfigurationKey.TALKAR_ORG_TYPE.value
+            )
+            if config:
+                talkar_org_type = config.value
+        except Exception:
+            pass
+
     return UserResponse(
         id=user.id,
         email=user.email,
         organization_id=user.selected_organization_id,
         provider_id=user.provider_id,
+        talkar_org_type=talkar_org_type,
     )

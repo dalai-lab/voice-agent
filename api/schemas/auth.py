@@ -25,6 +25,7 @@ class UserResponse(BaseModel):
     name: str | None = None
     organization_id: int | None = None
     provider_id: str | None = None
+    talkar_org_type: str | None = None
 
 
 class AuthResponse(BaseModel):

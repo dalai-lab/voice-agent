@@ -147,6 +147,7 @@ services:
       ENVIRONMENT: "${ENVIRONMENT:-local}"
       LOG_LEVEL: "INFO"
       DEPLOYMENT_MODE: "${DEPLOYMENT_MODE:-talkar}"
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:3010,http://localhost,https://admin.talkar.in,http://localhost:8000}"
       TALKAR_SERVICE_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8002}"
 
       # Set to "false" in .env to disable public signup (invite-only installs).

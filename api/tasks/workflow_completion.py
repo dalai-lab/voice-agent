@@ -46,12 +46,30 @@ async def process_workflow_completion(
         import httpx
         from api.constants import DEPLOYMENT_MODE
         if DEPLOYMENT_MODE == "talkar":
-            async with httpx.AsyncClient() as client:
-                await client.post(
-                    f"{os.getenv('TALKAR_SERVICE_URL', 'http://localhost:8001')}/billing/deduct",
-                    json={"workflow_run_id": workflow_run_id},
-                    timeout=5.0
-                )
+            from api.db import db_client
+            workflow_run = await db_client.get_workflow_run_by_id(workflow_run_id)
+            if workflow_run:
+                usage_info = getattr(workflow_run, "usage_info", None) or {}
+                duration = usage_info.get("call_duration_seconds")
+                try:
+                    duration_seconds = int(float(duration))
+                except (TypeError, ValueError):
+                    duration_seconds = 0
+                
+                workflow = getattr(workflow_run, "workflow", None)
+                org_id = getattr(workflow, "organization_id", None)
+                
+                if org_id:
+                    async with httpx.AsyncClient() as client:
+                        await client.post(
+                            f"{os.getenv('TALKAR_SERVICE_URL', 'http://localhost:8001')}/billing/deduct",
+                            json={
+                                "workflow_run_id": workflow_run_id,
+                                "duration_seconds": duration_seconds,
+                                "organization_id": org_id
+                            },
+                            timeout=5.0
+                        )
     except Exception as e:
         logger.error(f"Talkar billing deduction failed for {workflow_run_id}: {e}")
 

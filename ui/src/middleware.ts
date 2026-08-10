@@ -67,6 +67,32 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // TALKAR PATCH: Block restricted URLs for customers (SOT 695)
+  const RESTRICTED_PREFIXES = [
+    '/workflow', '/campaigns', '/usage', '/telephony-configurations', 
+    '/model-configurations', '/api-keys'
+  ];
+  if (RESTRICTED_PREFIXES.some(p => pathname.startsWith(p))) {
+    try {
+      const backendUrl = getServerBackendUrl();
+      const res = await fetch(`${backendUrl}/api/v1/user-configurations/user`, {
+        headers: { Cookie: `${OSS_TOKEN_COOKIE}=${token}` }
+      });
+      if (res.ok) {
+        const userData = await res.json();
+        const talkarOrgType = userData?.organization_configs?.find((c: any) => c.key === 'TALKAR_ORG_TYPE')?.value;
+        if (talkarOrgType === 'customer') {
+          const overviewUrl = new URL('/overview', request.url);
+          // Optional: Add a query param so the UI can show a toast
+          overviewUrl.searchParams.set('restricted', 'true');
+          return NextResponse.redirect(overviewUrl);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to check Talkar org type in middleware", err);
+    }
+  }
+
   return NextResponse.next();
 }
 

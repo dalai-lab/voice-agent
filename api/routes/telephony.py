@@ -172,6 +172,9 @@ async def initiate_call(
         )
     except CallConcurrencyLimitError:
         raise HTTPException(status_code=429, detail="Concurrent call limit reached")
+    except Exception as e:
+        logger.warning(f"Redis down, failing open for org {user.selected_organization_id}: {e}")
+        concurrency_slot = None
 
     try:
         if not workflow_run_id:
@@ -1065,6 +1068,9 @@ async def handle_inbound_telephony(
             return provider_class.generate_validation_error_response(
                 TelephonyError.CONCURRENT_CALL_LIMIT
             )
+        except Exception as e:
+            logger.warning(f"Redis down, failing open for org {organization_id}: {e}")
+            concurrency_slot = None
 
         workflow_run_id = None
         try:

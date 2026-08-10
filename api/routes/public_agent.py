@@ -266,6 +266,9 @@ async def _execute_resolved_target(
             status_code=429,
             detail="Concurrent call limit reached",
         )
+    except Exception as e:
+        logger.warning(f"Redis down, failing open for org {target.organization_id}: {e}")
+        concurrency_slot = None
 
     try:
         run_inputs = await prepare_workflow_run_inputs(

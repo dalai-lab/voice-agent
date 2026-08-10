@@ -17,6 +17,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [status, setStatus] = useState<string>("pending_approval");
   const [loading, setLoading] = useState(true);
+  const [uploadProgress, setUploadProgress] = useState<{ gst: number, reg: number }>({ gst: 0, reg: 0 });
 
   // Form State
   const [formData, setFormData] = useState({
@@ -83,6 +84,19 @@ export default function OnboardingPage() {
     alert("Initiating Razorpay setup fee checkout...");
     // Mock successful payment transition
     setTimeout(() => setStatus("agent_building"), 1500);
+  };
+
+  const simulateUpload = (type: 'gst' | 'reg') => {
+    setUploadProgress(prev => ({ ...prev, [type]: 10 }));
+    let progress = 10;
+    const interval = setInterval(() => {
+      progress += 20;
+      if (progress >= 100) {
+        progress = 100;
+        clearInterval(interval);
+      }
+      setUploadProgress(prev => ({ ...prev, [type]: progress }));
+    }, 200);
   };
 
   if (loading) {
@@ -205,17 +219,35 @@ export default function OnboardingPage() {
                 <h3 className="text-lg font-medium border-b pb-2">3. Documents & Point of Contact</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center bg-muted/30">
+                  <div 
+                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); simulateUpload('gst'); }}
+                  >
                     <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
-                    <p className="text-sm font-medium">Upload GST Certificate</p>
+                    <p className="text-sm font-medium">Drag & Drop GST Certificate</p>
                     <p className="text-xs text-muted-foreground">PDF or Image (Required)</p>
-                    <Input type="file" className="mt-4" required />
+                    <Input type="file" className="mt-4" required onChange={() => simulateUpload('gst')} />
+                    {uploadProgress.gst > 0 && (
+                      <div className="w-full mt-4 bg-muted rounded-full h-2">
+                        <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${uploadProgress.gst}%` }}></div>
+                      </div>
+                    )}
                   </div>
-                  <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center bg-muted/30">
+                  <div 
+                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); simulateUpload('reg'); }}
+                  >
                     <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
-                    <p className="text-sm font-medium">Upload Business Registration</p>
+                    <p className="text-sm font-medium">Drag & Drop Business Registration</p>
                     <p className="text-xs text-muted-foreground">PDF or Image (Required)</p>
-                    <Input type="file" className="mt-4" required />
+                    <Input type="file" className="mt-4" required onChange={() => simulateUpload('reg')} />
+                    {uploadProgress.reg > 0 && (
+                      <div className="w-full mt-4 bg-muted rounded-full h-2">
+                        <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${uploadProgress.reg}%` }}></div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -242,15 +274,34 @@ export default function OnboardingPage() {
       )}
 
       {status === "under_review" && (
-        <Card className="text-center py-12">
-          <CardContent className="space-y-4">
-            <Clock className="w-16 h-16 text-blue-500 mx-auto" />
-            <h2 className="text-2xl font-bold">Application Under Review</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Our team is currently reviewing your business application. We will notify you via email within 48 hours.
-            </p>
-            <div className="pt-4">
-              <a href="mailto:support@talkar.ai" className="text-sm text-blue-600 hover:underline">Need to make changes? Contact us.</a>
+        <Card className="py-8">
+          <CardContent className="space-y-8">
+            <div className="text-center space-y-4">
+              <Clock className="w-16 h-16 text-blue-500 mx-auto" />
+              <h2 className="text-2xl font-bold">Application Under Review</h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Our team is currently reviewing your business application. We will notify you via email within 48 hours.
+              </p>
+              <div className="pt-4">
+                <a href="mailto:support@talkar.ai" className="text-sm text-blue-600 hover:underline">Need to make changes? Contact us.</a>
+              </div>
+            </div>
+
+            <div className="border-t pt-8 px-4 md:px-8">
+              <h3 className="text-lg font-medium mb-4">Submitted Application Details</h3>
+              <div className="opacity-70 pointer-events-none">
+                {/* Read-only form preview */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                  <div><span className="text-muted-foreground">Business Name:</span><br/>Acme Corp</div>
+                  <div><span className="text-muted-foreground">Industry:</span><br/>Healthcare</div>
+                  <div><span className="text-muted-foreground">Company Size:</span><br/>11-50 employees</div>
+                  <div><span className="text-muted-foreground">GST Number:</span><br/>22AAAAA0000A1Z5</div>
+                  <div className="col-span-2"><span className="text-muted-foreground">Use Case:</span><br/>Both (Inbound & Outbound)<br/>We need an agent to answer patient queries and book appointments.</div>
+                  <div><span className="text-muted-foreground">Expected Volume:</span><br/>500-2000 calls</div>
+                  <div><span className="text-muted-foreground">Languages:</span><br/>English, Hindi</div>
+                  <div className="col-span-2"><span className="text-muted-foreground">Integrations:</span><br/>HubSpot CRM, Google Calendar</div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -273,14 +324,20 @@ export default function OnboardingPage() {
 
       {status === "agent_building" && (
         <Card className="text-center py-12">
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div className="w-16 h-16 mx-auto rounded-full border-4 border-t-blue-500 animate-spin" />
             <h2 className="text-2xl font-bold">Your Agent is Being Built</h2>
             <p className="text-muted-foreground max-w-md mx-auto">
               Our engineering team is actively building and testing your AI agent based on your submitted use case.
             </p>
-            <div className="bg-muted p-4 rounded-md inline-block mt-4 text-left">
-              <p className="text-sm font-medium">Estimated Timeline: <span className="font-normal">48-72 hours</span></p>
+            
+            <div className="bg-muted p-4 rounded-md inline-block mt-4 text-left border">
+              <p className="text-sm font-medium mb-1 border-b pb-1">Estimated Timeline: <span className="font-normal">48-72 hours</span></p>
+              <h4 className="text-xs text-muted-foreground mt-3 mb-1 uppercase tracking-wider font-bold">Use Case Summary</h4>
+              <p className="text-sm"><strong>Type:</strong> Inbound & Outbound</p>
+              <p className="text-sm"><strong>Description:</strong> We need an agent to answer patient queries and book appointments.</p>
+              <p className="text-sm"><strong>Languages:</strong> English, Hindi</p>
+              <p className="text-sm"><strong>Integrations:</strong> HubSpot CRM, Google Calendar</p>
             </div>
           </CardContent>
         </Card>

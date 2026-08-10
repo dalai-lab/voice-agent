@@ -76,6 +76,25 @@ async def signup(request: SignupRequest):
     # Create JWT token
     token = create_jwt_token(user.id, request.email)
 
+    # TALKAR PATCH: SOT 111 - Trigger Talkar backend to create customer record
+    if DEPLOYMENT_MODE == "talkar":
+        import httpx
+        import os
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{os.getenv('TALKAR_SERVICE_URL', 'http://localhost:8001')}/customers/",
+                    json={
+                        "email": request.email,
+                        "contact_name": request.name,
+                        "dograh_org_id": organization.id,
+                        "dograh_user_id": user.id
+                    },
+                    timeout=5.0
+                )
+        except Exception as e:
+            logger.error(f"Failed to trigger Talkar signup webhook for user {user.id}: {e}")
+
     capture_event(
         distinct_id=str(user.provider_id),
         event=PostHogEvent.SIGNED_UP,

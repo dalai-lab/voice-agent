@@ -247,7 +247,8 @@ services:
       ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-true}"
       POSTHOG_API_KEY: "phc_ItizB1dP6yv7ZYobbcqrpxTdbomDA8hJFSEmAMdYvIr"
       POSTHOG_HOST: "https://us.i.posthog.com"
-
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     depends_on:
@@ -288,7 +289,9 @@ services:
       POSTHOG_HOST: "https://us.posthog.com"
 
       # Talkar Integration
-      TALKAR_API_URL: "${TALKAR_SERVICE_URL:-http://api:8001}"
+      TALKAR_API_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8001}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "3010:3010"
     depends_on:

@@ -81,7 +81,7 @@ async def signup(request: SignupRequest):
         import httpx
         try:
             async with httpx.AsyncClient() as client:
-                await client.post(
+                res = await client.post(
                     f"{TALKAR_SERVICE_URL}/customers/",
                     json={
                         "email": request.email,
@@ -91,6 +91,7 @@ async def signup(request: SignupRequest):
                     },
                     timeout=5.0
                 )
+                res.raise_for_status()
                 
             # Stamp TALKAR_ORG_TYPE so UI middleware blocks advanced views
             await db_client.upsert_configuration(

@@ -207,19 +207,13 @@ export function AppSidebar() {
   const [isTalkarCustomer, setIsTalkarCustomer] = React.useState(false);
 
   React.useEffect(() => {
-    async function checkOrgType() {
-      try {
-        const res = await fetch("/api/v1/organization/config/TALKAR_ORG_TYPE");
-        if (res.ok) {
-          const data = await res.json();
-          setIsTalkarCustomer(data.value === "customer");
-        }
-      } catch (err) {
-        console.error("Failed to fetch talkar org type", err);
-      }
+    // Check talkar org type directly from the user object loaded by useAuth()
+    if (user && (user as any).talkar_org_type === "customer") {
+      setIsTalkarCustomer(true);
+    } else {
+      setIsTalkarCustomer(false);
     }
-    checkOrgType();
-  }, []);
+  }, [user]);
 
   const filteredNavSections = React.useMemo(() => {
     const TALKAR_CUSTOMER_HIDDEN_URLS = [

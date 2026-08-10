@@ -73,7 +73,10 @@ export async function middleware(request: NextRequest) {
   try {
     const backendUrl = getServerBackendUrl();
     const res = await fetch(`${backendUrl}/api/v1/auth/me`, {
-      headers: { Cookie: `${OSS_TOKEN_COOKIE}=${token}` }
+      headers: { 
+        Cookie: `${OSS_TOKEN_COOKIE}=${token}`,
+        Authorization: `Bearer ${token}` 
+      }
     });
     if (res.ok) {
       const userData = await res.json();

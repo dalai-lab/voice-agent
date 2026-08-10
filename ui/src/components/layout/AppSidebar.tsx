@@ -209,22 +209,36 @@ export function AppSidebar() {
   const filteredNavSections = React.useMemo(() => {
     if (talkarOrgType !== "customer") return NAV_SECTIONS;
     
-    // Filter sections to only show Overview, Runs (Call History), and Billing
-    return NAV_SECTIONS.map(section => {
+    // Create the Wallet & Credits item
+    const walletItem: SidebarSingleItem = {
+      title: "Wallet & Credits",
+      url: "/wallet",
+      icon: PhosphorIcons.Wallet,
+    };
+
+    // Filter sections to only show Overview, Runs, and Wallet (hide Billing)
+    const newSections = NAV_SECTIONS.map(section => {
       const newItems = section.items.map(item => {
         if (item.type === "group") {
           return {
             ...item,
-            items: item.items.filter(sub => ["/runs", "/billing"].includes(sub.url))
+            items: item.items.filter(sub => ["/runs"].includes(sub.url))
           };
         }
         return item;
       }).filter(item => {
         if (item.type === "group") return item.items.length > 0;
-        return ["/overview", "/runs", "/billing"].includes(item.url);
+        return ["/overview", "/runs"].includes(item.url);
       });
       return { ...section, items: newItems };
     }).filter(section => section.items.length > 0);
+
+    // Inject Wallet & Credits into the first section
+    if (newSections.length > 0) {
+      newSections[0].items.push(walletItem);
+    }
+
+    return newSections;
   }, [talkarOrgType]);
 
   const versionInfo = config ? { ui: config.uiVersion, api: config.apiVersion } : null;

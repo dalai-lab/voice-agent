@@ -67,6 +67,29 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // TALKAR PATCH: Account status gate (Phase 5B)
+  const ALLOWED_WHILE_LOCKED = ["/onboarding", "/api", "/_next", "/auth/login", "/auth/signup"];
+  if (!ALLOWED_WHILE_LOCKED.some(p => pathname.startsWith(p))) {
+    try {
+      const talkarUrl = process.env.TALKAR_SERVICE_URL || 'http://localhost:8001';
+      // Use the Dograh proxy route if Talkar URL isn't directly reachable by Edge middleware, 
+      // but for this phase we'll assume direct fetch or a proxy at /api/talkar
+      // The prompt suggests hitting Talkar API directly:
+      const statusRes = await fetch(`${talkarUrl}/customers/status`, {
+        headers: { 'Cookie': request.headers.get('cookie') || '' }
+      });
+
+      if (statusRes.ok) {
+        const { status } = await statusRes.json();
+        if (status && status !== 'active') {
+          return NextResponse.redirect(new URL('/onboarding', request.url));
+        }
+      }
+    } catch (err) {
+      console.error("Talkar account status gate fetch failed", err);
+    }
+  }
+
   // TALKAR PATCH: Block restricted URLs for customers (SOT 695)
   const RESTRICTED_PREFIXES = [
     '/workflow', '/campaigns', '/usage', '/telephony-configurations', 

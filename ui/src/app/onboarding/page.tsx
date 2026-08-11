@@ -44,7 +44,8 @@ export default function OnboardingPage() {
     businessRegistrationUrl: "",
   });
 
-  const TALKAR_API = process.env.NEXT_PUBLIC_TALKAR_API_URL || (typeof window !== "undefined" ? `http://${window.location.hostname}:8002` : "http://localhost:8002");
+  // Use server-side proxy to avoid mixed content (HTTPS page -> HTTP internal service)
+  const TALKAR_API = "/api/talkar";
 
   useEffect(() => {
     if (!dograhOrgId) return;

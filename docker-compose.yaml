@@ -293,6 +293,7 @@ services:
 
       # Talkar Integration
       TALKAR_API_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8002}"
+      TALKAR_SERVICE_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8002}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

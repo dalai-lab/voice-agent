@@ -77,17 +77,21 @@ export default function OnboardingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // In a real implementation this would upload the documents first to S3/MinIO
-      const res = await fetch(`${TALKAR_API}/customers/${customerId}/onboarding`, {
+      // Use by-org endpoint so we don't need a hardcoded customer_id
+      const res = await fetch(`${TALKAR_API}/customers/by-org/${dograhOrgId}/onboarding`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
+        // Backend expects { form: {...}, documents: [] }
+        body: JSON.stringify({ form: formData, documents: [] })
       });
       if (res.ok) {
         setStatus("under_review");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed to submit: ${err.detail || res.statusText}`);
       }
     } catch (err) {
-      alert("Failed to submit application.");
+      alert("Failed to submit application. Please try again.");
     }
   };
 
@@ -105,7 +109,9 @@ export default function OnboardingPage() {
       description: "One-time setup fee for Talkar Voice AI",
       order_id: customerData.setup_fee_order_id,
       handler: async function (response: any) {
-        setStatus("agent_building");
+        // Don't set status here — the backend webhook (payment.captured) does that.
+        // Just inform the user their payment was received.
+        alert("Payment received! Your agent is now being built. This page will update automatically.");
       },
       prefill: {
         name: formData.pocName || "Talkar Customer",

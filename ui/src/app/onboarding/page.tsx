@@ -17,7 +17,7 @@ import type { LocalUser } from "@/lib/auth/types";
 
 export default function OnboardingPage() {
   const { user } = useAuth();
-  const dograhOrgId = (user as LocalUser)?.organizationId;
+  const dograhOrgId = (user as any)?.organization_id || (user as LocalUser)?.organizationId;
   const router = useRouter();
   const [status, setStatus] = useState<string>("pending_approval");
   const [customerId, setCustomerId] = useState<string>("1");

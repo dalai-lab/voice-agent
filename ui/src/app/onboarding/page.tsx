@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
-  Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter 
+  Card, CardHeader, CardTitle, CardContent, CardDescription
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { AlertTriangle, Clock, CheckCircle, XCircle, Ban, UploadCloud } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Clock, CheckCircle, XCircle, Ban, UploadCloud, Wrench, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import type { LocalUser } from "@/lib/auth/types";
 import Script from "next/script";
@@ -21,31 +22,38 @@ export default function OnboardingPage() {
   const dograhOrgId = (user as any)?.organization_id || (user as LocalUser)?.organizationId;
   const router = useRouter();
   const [status, setStatus] = useState<string>("pending_approval");
-  const [customerId, setCustomerId] = useState<string>("1");
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [customerData, setCustomerData] = useState<any>(null);
   const [uploadProgress, setUploadProgress] = useState<{ gst: number, reg: number }>({ gst: 0, reg: 0 });
 
+  // "Build for me" toggle — true = managed/done-for-you, false = self-serve
+  const [wantsBuildForMe, setWantsBuildForMe] = useState(true);
+
   // Form State
   const [formData, setFormData] = useState({
+    // Required always
     businessName: "",
     industry: "",
-    websiteUrl: "",
-    companySize: "",
     gstNumber: "",
+    pocName: "",
+    pocPhone: "",
+    // Required only for "build for me"
     useCaseType: "both",
     useCaseDescription: "",
     callVolume: "",
     languages: "",
-    integrations: "",
-    pocName: "",
+    // Optional
+    websiteUrl: "",
+    companySize: "",
     pocDesignation: "",
-    pocPhone: "",
+    integrations: "",
     gstCertificateUrl: "",
     businessRegistrationUrl: "",
+    // Track whether user wants managed service
+    wantsBuildForMe: true,
   });
 
-  // Use server-side proxy to avoid mixed content (HTTPS page -> HTTP internal service)
   const TALKAR_API = "/api/talkar";
 
   useEffect(() => {
@@ -57,7 +65,6 @@ export default function OnboardingPage() {
           const data = await res.json();
           setStatus(data.status);
           setCustomerData(data);
-          if (data.customer_id) setCustomerId(data.customer_id);
           if (data.status === "active") {
             router.push("/overview");
           }
@@ -72,17 +79,39 @@ export default function OnboardingPage() {
       }
     }
     checkStatus();
-  }, [router, TALKAR_API, dograhOrgId]);
+  }, [router, dograhOrgId]);
+
+  // Keep wantsBuildForMe in formData in sync with local state
+  const handleToggleBuildForMe = (val: boolean) => {
+    setWantsBuildForMe(val);
+    setFormData(prev => ({ ...prev, wantsBuildForMe: val }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate required fields based on mode
+    if (!formData.businessName.trim() || !formData.industry || !formData.gstNumber.trim()) {
+      alert("Please fill in all required business information fields.");
+      return;
+    }
+    if (!formData.pocName.trim() || !formData.pocPhone.trim()) {
+      alert("Please fill in your contact name and phone number.");
+      return;
+    }
+    if (wantsBuildForMe) {
+      if (!formData.useCaseDescription.trim() || !formData.callVolume || !formData.languages.trim()) {
+        alert("Please fill in all use case fields so we can build your agent correctly.");
+        return;
+      }
+    }
+
+    setSubmitting(true);
     try {
-      // Use by-org endpoint so we don't need a hardcoded customer_id
       const res = await fetch(`${TALKAR_API}/customers/by-org/${dograhOrgId}/onboarding`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Backend expects { form: {...}, documents: [] }
-        body: JSON.stringify({ form: formData, documents: [] })
+        body: JSON.stringify({ form: { ...formData, wantsBuildForMe }, documents: [] })
       });
       if (res.ok) {
         setStatus("under_review");
@@ -92,6 +121,8 @@ export default function OnboardingPage() {
       }
     } catch (err) {
       alert("Failed to submit application. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -100,37 +131,53 @@ export default function OnboardingPage() {
       alert("Missing Razorpay order details. Please contact support.");
       return;
     }
+    if (!(window as any).Razorpay) {
+      alert("Payment gateway not loaded yet. Please try again in a moment.");
+      return;
+    }
 
     const options = {
       key: customerData.razorpay_key_id,
-      amount: 100, // ₹1 (100 paise)
+      amount: 100, // ₹1 (100 paise) — test amount
       currency: "INR",
       name: "Talkar Setup Fee",
       description: "One-time setup fee for Talkar Voice AI",
       order_id: customerData.setup_fee_order_id,
       handler: async function (response: any) {
-        // Don't set status here — the backend webhook (payment.captured) does that.
-        // Just inform the user their payment was received.
-        alert("Payment received! Your agent is now being built. This page will update automatically.");
+        // Verify payment server-side and trigger provisioning
+        // This bypasses the need for a configured Razorpay webhook
+        try {
+          const res = await fetch(`${TALKAR_API}/billing/confirm-payment`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          if (res.ok) {
+            setStatus("agent_building");
+          } else {
+            const err = await res.json().catch(() => ({}));
+            alert(`Payment confirmed but setup failed: ${err.detail || "Please contact support."}`);
+          }
+        } catch {
+          alert("Payment received but could not reach server. Please refresh the page.");
+        }
       },
       prefill: {
         name: formData.pocName || "Talkar Customer",
         contact: formData.pocPhone || "",
       },
-      theme: {
-        color: "#18181b",
-      },
+      theme: { color: "#18181b" },
     };
-    
-    if (!(window as any).Razorpay) {
-      alert("Payment gateway not loaded yet. Please try again in a moment.");
-      return;
-    }
+
     const rzp = new (window as any).Razorpay(options);
     rzp.open();
   };
 
-  const simulateUpload = (type: 'gst' | 'reg') => {
+  const simulateUpload = (type: "gst" | "reg") => {
     setUploadProgress(prev => ({ ...prev, [type]: 10 }));
     let progress = 10;
     const interval = setInterval(() => {
@@ -138,8 +185,7 @@ export default function OnboardingPage() {
       if (progress >= 100) {
         progress = 100;
         clearInterval(interval);
-        // Mock the URL returned from S3/MinIO after successful upload
-        if (type === 'gst') {
+        if (type === "gst") {
           setFormData(prev => ({ ...prev, gstCertificateUrl: "https://talkar.s3.amazonaws.com/mock-gst.pdf" }));
         } else {
           setFormData(prev => ({ ...prev, businessRegistrationUrl: "https://talkar.s3.amazonaws.com/mock-reg.pdf" }));
@@ -161,24 +207,26 @@ export default function OnboardingPage() {
         <p className="text-muted-foreground mt-2">Your AI Voice Agent Platform</p>
       </div>
 
+      {/* ── PENDING APPROVAL: Show the application form ── */}
       {status === "pending_approval" && (
         <Card>
           <CardHeader>
             <CardTitle>Complete Your Application</CardTitle>
-            <CardDescription>Tell us about your business so we can build your perfect AI agent.</CardDescription>
+            <CardDescription>Tell us about your business to get started with Talkar.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Business Information */}
+
+              {/* ── 1. Business Information (always required) ── */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium border-b pb-2">1. Business Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="businessName">Business Name</Label>
+                    <Label htmlFor="businessName">Business Name <span className="text-red-500">*</span></Label>
                     <Input id="businessName" required value={formData.businessName} onChange={e => setFormData({...formData, businessName: e.target.value})} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="industry">Industry</Label>
+                    <Label htmlFor="industry">Industry <span className="text-red-500">*</span></Label>
                     <Select required onValueChange={val => setFormData({...formData, industry: val})}>
                       <SelectTrigger><SelectValue placeholder="Select Industry" /></SelectTrigger>
                       <SelectContent>
@@ -193,12 +241,12 @@ export default function OnboardingPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="websiteUrl">Website URL</Label>
-                    <Input id="websiteUrl" type="url" value={formData.websiteUrl} onChange={e => setFormData({...formData, websiteUrl: e.target.value})} />
+                    <Label htmlFor="gstNumber">GST Number <span className="text-red-500">*</span></Label>
+                    <Input id="gstNumber" required value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="companySize">Company Size</Label>
-                    <Select required onValueChange={val => setFormData({...formData, companySize: val})}>
+                    <Label htmlFor="companySize">Company Size <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                    <Select onValueChange={val => setFormData({...formData, companySize: val})}>
                       <SelectTrigger><SelectValue placeholder="Select Size" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="1-10">1–10 employees</SelectItem>
@@ -209,165 +257,200 @@ export default function OnboardingPage() {
                     </Select>
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="gstNumber">GST Number <span className="text-red-500">*</span></Label>
-                    <Input id="gstNumber" required value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} />
+                    <Label htmlFor="websiteUrl">Website URL <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                    <Input id="websiteUrl" type="url" placeholder="https://..." value={formData.websiteUrl} onChange={e => setFormData({...formData, websiteUrl: e.target.value})} />
                   </div>
                 </div>
               </div>
 
-              {/* Use Case */}
+              {/* ── 2. Point of Contact (always required) ── */}
               <div className="space-y-4">
-                <h3 className="text-lg font-medium border-b pb-2">2. Use Case</h3>
-                <div className="space-y-3">
-                  <Label>Agent Type</Label>
-                  <RadioGroup defaultValue="both" onValueChange={val => setFormData({...formData, useCaseType: val})} className="flex gap-4">
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="inbound" id="inbound" />
-                      <Label htmlFor="inbound">Inbound</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="outbound" id="outbound" />
-                      <Label htmlFor="outbound">Outbound</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="both" id="both" />
-                      <Label htmlFor="both">Both</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="useCaseDescription">Describe your use case</Label>
-                  <Textarea id="useCaseDescription" required placeholder="E.g., We need an agent to answer patient queries and book appointments..." value={formData.useCaseDescription} onChange={e => setFormData({...formData, useCaseDescription: e.target.value})} />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="callVolume">Expected Monthly Volume</Label>
-                    <Select required onValueChange={val => setFormData({...formData, callVolume: val})}>
-                      <SelectTrigger><SelectValue placeholder="Select Volume" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="<100">Less than 100 calls</SelectItem>
-                        <SelectItem value="100-500">100–500 calls</SelectItem>
-                        <SelectItem value="500-2000">500–2,000 calls</SelectItem>
-                        <SelectItem value="2000+">2,000+ calls</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="languages">Languages Needed</Label>
-                    <Input id="languages" required placeholder="Hindi, English, Hinglish..." value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="integrations">Existing Tools to Integrate (CRM, Calendars, WhatsApp)</Label>
-                    <Input id="integrations" placeholder="E.g., HubSpot CRM, Google Calendar" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Documents & POC */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium border-b pb-2">3. Documents & Point of Contact</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div 
-                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => { e.preventDefault(); simulateUpload('gst'); }}
-                  >
-                    <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
-                    <p className="text-sm font-medium">Drag & Drop GST Certificate</p>
-                    <p className="text-xs text-muted-foreground">PDF or Image (Required)</p>
-                    <Input type="file" className="mt-4" required onChange={() => simulateUpload('gst')} />
-                    {uploadProgress.gst > 0 && (
-                      <div className="w-full mt-4 bg-muted rounded-full h-2">
-                        <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${uploadProgress.gst}%` }}></div>
-                      </div>
-                    )}
-                  </div>
-                  <div 
-                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => { e.preventDefault(); simulateUpload('reg'); }}
-                  >
-                    <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
-                    <p className="text-sm font-medium">Drag & Drop Business Registration</p>
-                    <p className="text-xs text-muted-foreground">PDF or Image (Required)</p>
-                    <Input type="file" className="mt-4" required onChange={() => simulateUpload('reg')} />
-                    {uploadProgress.reg > 0 && (
-                      <div className="w-full mt-4 bg-muted rounded-full h-2">
-                        <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${uploadProgress.reg}%` }}></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
+                <h3 className="text-lg font-medium border-b pb-2">2. Point of Contact</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="pocName">POC Name</Label>
+                    <Label htmlFor="pocName">Full Name <span className="text-red-500">*</span></Label>
                     <Input id="pocName" required value={formData.pocName} onChange={e => setFormData({...formData, pocName: e.target.value})} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="pocDesignation">POC Designation</Label>
-                    <Input id="pocDesignation" required value={formData.pocDesignation} onChange={e => setFormData({...formData, pocDesignation: e.target.value})} />
+                    <Label htmlFor="pocPhone">Phone Number <span className="text-red-500">*</span></Label>
+                    <Input id="pocPhone" type="tel" required value={formData.pocPhone} onChange={e => setFormData({...formData, pocPhone: e.target.value})} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="pocPhone">POC Phone</Label>
-                    <Input id="pocPhone" required value={formData.pocPhone} onChange={e => setFormData({...formData, pocPhone: e.target.value})} />
+                    <Label htmlFor="pocDesignation">Designation <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                    <Input id="pocDesignation" placeholder="e.g. CTO, Operations Head" value={formData.pocDesignation} onChange={e => setFormData({...formData, pocDesignation: e.target.value})} />
                   </div>
                 </div>
               </div>
 
-              <Button type="submit" className="w-full" size="lg">Submit Application</Button>
+              {/* ── 3. Build for Me toggle ── */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium border-b pb-2">3. How do you want to get started?</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Self-Serve option */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleBuildForMe(false)}
+                    className={`rounded-xl border-2 p-5 text-left transition-all ${!wantsBuildForMe ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"}`}
+                  >
+                    <Wrench className="w-6 h-6 mb-2 text-muted-foreground" />
+                    <p className="font-semibold">I'll build it myself</p>
+                    <p className="text-sm text-muted-foreground mt-1">My team will create and manage the AI agent on Dograh. I just need the platform access.</p>
+                  </button>
+                  {/* Managed option */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleBuildForMe(true)}
+                    className={`rounded-xl border-2 p-5 text-left transition-all ${wantsBuildForMe ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"}`}
+                  >
+                    <Sparkles className="w-6 h-6 mb-2 text-primary" />
+                    <p className="font-semibold">Build it for me <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full ml-1">Recommended</span></p>
+                    <p className="text-sm text-muted-foreground mt-1">Our team will design, build, and deploy your AI agent. You just describe what you need.</p>
+                  </button>
+                </div>
+              </div>
+
+              {/* ── 4. Use Case Details — only required if "build for me" ── */}
+              {wantsBuildForMe && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium border-b pb-2">4. Tell Us About Your Agent</h3>
+                  <p className="text-sm text-muted-foreground">Help our team build the perfect agent for your business.</p>
+
+                  <div className="space-y-3">
+                    <Label>Agent Type <span className="text-red-500">*</span></Label>
+                    <RadioGroup defaultValue="both" onValueChange={val => setFormData({...formData, useCaseType: val})} className="flex gap-4">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="inbound" id="inbound" />
+                        <Label htmlFor="inbound">Inbound</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="outbound" id="outbound" />
+                        <Label htmlFor="outbound">Outbound</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="both" id="both" />
+                        <Label htmlFor="both">Both</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="useCaseDescription">Describe your use case <span className="text-red-500">*</span></Label>
+                    <Textarea
+                      id="useCaseDescription"
+                      placeholder="E.g., We need an agent to answer patient queries and book appointments in Hindi and English..."
+                      value={formData.useCaseDescription}
+                      onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="callVolume">Expected Monthly Volume <span className="text-red-500">*</span></Label>
+                      <Select onValueChange={val => setFormData({...formData, callVolume: val})}>
+                        <SelectTrigger><SelectValue placeholder="Select Volume" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="<100">Less than 100 calls</SelectItem>
+                          <SelectItem value="100-500">100–500 calls</SelectItem>
+                          <SelectItem value="500-2000">500–2,000 calls</SelectItem>
+                          <SelectItem value="2000+">2,000+ calls</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="languages">Languages Needed <span className="text-red-500">*</span></Label>
+                      <Input id="languages" placeholder="Hindi, English, Hinglish..." value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="integrations">Existing Tools to Integrate <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                      <Input id="integrations" placeholder="E.g., HubSpot CRM, Google Calendar, WhatsApp" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── 5. Documents (optional for self-serve, recommended for build-for-me) ── */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium border-b pb-2">
+                  {wantsBuildForMe ? "5." : "4."} Documents <span className="text-muted-foreground text-sm font-normal">(optional — speeds up verification)</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div
+                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); simulateUpload("gst"); }}
+                  >
+                    <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium">GST Certificate</p>
+                    <p className="text-xs text-muted-foreground">PDF or Image</p>
+                    <Input type="file" className="mt-4" onChange={() => simulateUpload("gst")} />
+                    {uploadProgress.gst > 0 && (
+                      <div className="w-full mt-4 bg-muted rounded-full h-2">
+                        <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${uploadProgress.gst}%` }} />
+                      </div>
+                    )}
+                  </div>
+                  <div
+                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); simulateUpload("reg"); }}
+                  >
+                    <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium">Business Registration</p>
+                    <p className="text-xs text-muted-foreground">PDF or Image</p>
+                    <Input type="file" className="mt-4" onChange={() => simulateUpload("reg")} />
+                    {uploadProgress.reg > 0 && (
+                      <div className="w-full mt-4 bg-muted rounded-full h-2">
+                        <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${uploadProgress.reg}%` }} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <Button type="submit" className="w-full" size="lg" disabled={submitting}>
+                {submitting ? "Submitting..." : "Submit Application"}
+              </Button>
             </form>
           </CardContent>
         </Card>
       )}
 
+      {/* ── UNDER REVIEW ── */}
       {status === "under_review" && (
         <Card className="py-8">
           <CardContent className="space-y-8">
             <div className="text-center space-y-4">
               <Clock className="w-16 h-16 text-blue-500 mx-auto" />
-              <h2 className="text-2xl font-bold">Application under review. We'll notify you within 48 hours.</h2>
-              <div className="pt-4">
-                <a href="mailto:support@talkar.ai" className="text-sm text-blue-600 hover:underline">Need changes? Contact us</a>
-              </div>
+              <h2 className="text-2xl font-bold">Application under review.</h2>
+              <p className="text-muted-foreground">We'll notify you within 48 hours. <a href="mailto:support@talkar.ai" className="text-blue-600 hover:underline">Need changes? Contact us</a></p>
             </div>
-
             <div className="border-t pt-8 px-4 md:px-8">
-              <h3 className="text-lg font-medium mb-4">Submitted Application Details</h3>
-              <div className="opacity-70 pointer-events-none">
-                {/* Read-only form preview */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-left">
-                  <div><span className="text-muted-foreground">Business Name:</span><br/>{customerData?.onboarding_form?.businessName || "N/A"}</div>
-                  <div><span className="text-muted-foreground">Industry:</span><br/>{customerData?.onboarding_form?.industry || "N/A"}</div>
-                  <div><span className="text-muted-foreground">Website URL:</span><br/>{customerData?.onboarding_form?.websiteUrl || "N/A"}</div>
-                  <div><span className="text-muted-foreground">Company Size:</span><br/>{customerData?.onboarding_form?.companySize || "N/A"}</div>
-                  <div><span className="text-muted-foreground">GST Number:</span><br/>{customerData?.onboarding_form?.gstNumber || "N/A"}</div>
-                  <div className="col-span-2"><span className="text-muted-foreground">Use Case:</span><br/>{customerData?.onboarding_form?.useCaseType || "N/A"}<br/>{customerData?.onboarding_form?.useCaseDescription || "N/A"}</div>
-                  <div><span className="text-muted-foreground">Expected Volume:</span><br/>{customerData?.onboarding_form?.callVolume || "N/A"}</div>
-                  <div><span className="text-muted-foreground">Languages:</span><br/>{customerData?.onboarding_form?.languages || "N/A"}</div>
-                  <div className="col-span-2"><span className="text-muted-foreground">Integrations:</span><br/>{customerData?.onboarding_form?.integrations || "N/A"}</div>
-                  <div className="col-span-2 border-t pt-4 mt-2"><strong className="text-foreground">Point of Contact</strong></div>
-                  <div><span className="text-muted-foreground">Name:</span><br/>{customerData?.onboarding_form?.pocName || "N/A"}</div>
-                  <div><span className="text-muted-foreground">Designation:</span><br/>{customerData?.onboarding_form?.pocDesignation || "N/A"}</div>
-                  <div><span className="text-muted-foreground">Phone:</span><br/>{customerData?.onboarding_form?.pocPhone || "N/A"}</div>
-                  <div className="col-span-2 border-t pt-4 mt-2"><strong className="text-foreground">Documents</strong></div>
-                  <div><span className="text-muted-foreground">GST Certificate:</span><br/>{customerData?.onboarding_form?.gstCertificateUrl ? <a href={customerData.onboarding_form.gstCertificateUrl} target="_blank" className="text-blue-500 underline pointer-events-auto">View Document</a> : "Not uploaded"}</div>
-                  <div><span className="text-muted-foreground">Business Registration:</span><br/>{customerData?.onboarding_form?.businessRegistrationUrl ? <a href={customerData.onboarding_form.businessRegistrationUrl} target="_blank" className="text-blue-500 underline pointer-events-auto">View Document</a> : "Not uploaded"}</div>
+              <h3 className="text-lg font-medium mb-4">Submitted Details</h3>
+              <div className="opacity-70 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div><span className="text-muted-foreground">Business:</span><br />{customerData?.onboarding_form?.businessName || "N/A"}</div>
+                <div><span className="text-muted-foreground">Industry:</span><br />{customerData?.onboarding_form?.industry || "N/A"}</div>
+                <div><span className="text-muted-foreground">GST:</span><br />{customerData?.onboarding_form?.gstNumber || "N/A"}</div>
+                <div><span className="text-muted-foreground">Contact:</span><br />{customerData?.onboarding_form?.pocName || "N/A"} · {customerData?.onboarding_form?.pocPhone || "N/A"}</div>
+                <div className="md:col-span-2"><span className="text-muted-foreground">Service Type:</span><br />
+                  {customerData?.onboarding_form?.wantsBuildForMe ? "✨ Managed — Build for me" : "🔧 Self-Serve — I'll build it myself"}
                 </div>
+                {customerData?.onboarding_form?.wantsBuildForMe && (
+                  <div className="md:col-span-2"><span className="text-muted-foreground">Use Case:</span><br />{customerData?.onboarding_form?.useCaseDescription || "N/A"}</div>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
+      {/* ── APPROVED: Pay setup fee ── */}
       {status === "approved" && (
         <Card className="text-center py-12 border-green-500/30 bg-green-500/5">
           <CardContent className="space-y-6">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-            <h2 className="text-2xl font-bold">Approved! Please complete your setup fee payment.</h2>
+            <h2 className="text-2xl font-bold">You're approved! Complete your setup fee payment to get started.</h2>
+            <p className="text-muted-foreground text-sm">One-time setup fee · Secure payment via Razorpay</p>
             <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" onClick={handlePaySetupFee}>
               Pay Setup Fee
             </Button>
@@ -375,12 +458,12 @@ export default function OnboardingPage() {
         </Card>
       )}
 
+      {/* ── AGENT BUILDING ── */}
       {status === "agent_building" && (
         <Card className="text-center py-12">
           <CardContent className="space-y-6">
             <div className="w-16 h-16 mx-auto rounded-full border-4 border-t-blue-500 animate-spin" />
             <h2 className="text-2xl font-bold">Your agent is being built by our team.</h2>
-            
             <div className="bg-muted p-4 rounded-md inline-block mt-4 text-left border">
               <p className="text-sm font-medium mb-1 border-b pb-1">Estimated Timeline: <span className="font-normal">48-72 hours</span></p>
               <h4 className="text-xs text-muted-foreground mt-3 mb-1 uppercase tracking-wider font-bold">Use Case Summary</h4>
@@ -393,10 +476,12 @@ export default function OnboardingPage() {
         </Card>
       )}
 
+      {/* ── REJECTED ── */}
       {status === "rejected" && (
         <Card className="text-center py-12 border-red-500/30 bg-red-500/5">
           <CardContent className="space-y-4">
             <XCircle className="w-16 h-16 text-red-500 mx-auto" />
+            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">Application Not Approved</h2>
             <p className="text-muted-foreground max-w-md mx-auto">
               <span className="font-medium text-foreground">{customerData?.rejection_reason || "Did not meet requirements."}</span>
             </p>
@@ -407,14 +492,16 @@ export default function OnboardingPage() {
         </Card>
       )}
 
+      {/* ── SUSPENDED ── */}
       {status === "suspended" && (
         <Card className="text-center py-12 border-red-500/30 bg-red-500/5">
           <CardContent className="space-y-4">
             <Ban className="w-16 h-16 text-red-500 mx-auto" />
-            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">Account suspended.</h2>
-            <div className="font-bold text-xl my-4">₹{customerData?.wallet_balance ? (customerData.wallet_balance / 100).toFixed(2) : "0.00"}</div>
+            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">Account Suspended</h2>
+            <p className="text-muted-foreground">Your account has been suspended due to low wallet balance.</p>
+            <div className="font-bold text-xl my-4">Balance: ₹{customerData?.wallet_balance ? (customerData.wallet_balance / 100).toFixed(2) : "0.00"}</div>
             <Button size="lg" onClick={() => router.push("/wallet")}>
-              Add Credits
+              Add Credits to Reactivate
             </Button>
           </CardContent>
         </Card>

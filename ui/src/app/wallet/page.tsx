@@ -11,52 +11,248 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from "@/components/ui/table";
 import { AlertTriangle, Plus, CreditCard, ReceiptText, ShieldCheck } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import type { LocalUser } from "@/lib/auth/types";
+import Script from "next/script";
 
 export default function WalletPage() {
+  const { user } = useAuth();
+  const dograhOrgId = (user as any)?.organization_id || (user as LocalUser)?.organizationId;
+  const TALKAR = "/api/talkar";
+
   const [wallet, setWallet] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [page, setPage] = useState<number>(1);
   const [subscription, setSubscription] = useState<any>(null);
+  const [usage, setUsage] = useState<any>(null);
+  
   const [topupAmount, setTopupAmount] = useState<string>("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  
   const [autoRechargeEnabled, setAutoRechargeEnabled] = useState(false);
   const [threshold, setThreshold] = useState("1000");
   const [rechargeAmount, setRechargeAmount] = useState("5000");
-
-  const TALKAR_API = process.env.NEXT_PUBLIC_TALKAR_API_URL || "http://localhost:8001";
+  const [isSavingRecharge, setIsSavingRecharge] = useState(false);
+  const [hasSavedCard, setHasSavedCard] = useState(false);
+  const [isRequestingUpgrade, setIsRequestingUpgrade] = useState(false);
 
   useEffect(() => {
-    // In a real app, we'd fetch this from Talkar's API passing the dograh org id or user token
-    // For now, setting up the UI structure as specified in Phase 5C
-    setWallet({ balance_paise: 0 }); // Mock starting with 0
-    setSubscription({ plan: "Pro", monthly_fee: 15000, rate: 14, limit: 10, next_billing: "2026-09-01" });
-    setTransactions([
-      { id: 1, date: "2026-08-10", type: "top_up", desc: "Razorpay Top-up", amount: 5000, balance: 5000 },
-      { id: 2, date: "2026-08-11", type: "call_deduction", desc: "Call Cost (12m)", amount: -168, balance: 4832 }
-    ]);
-  }, []);
+    if (!dograhOrgId) return;
+
+    Promise.all([
+      fetch(`${TALKAR}/billing/wallet/by-org/${dograhOrgId}`).then(r => r.json()),
+      fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()),
+      fetch(`${TALKAR}/billing/transactions/by-org/${dograhOrgId}?limit=100`).then(r => r.json()),
+      fetch(`${TALKAR}/billing/usage/by-org/${dograhOrgId}`).then(r => r.json()),
+    ]).then(([walletData, subData, txnData, usageData]) => {
+      setWallet(walletData);
+      setSubscription(subData);
+      setTransactions(txnData.transactions || []);
+      setUsage(usageData);
+      
+      setAutoRechargeEnabled(walletData.auto_recharge_enabled);
+      setThreshold(String((walletData.auto_recharge_threshold_paise || 100000) / 100));
+      setRechargeAmount(String((walletData.auto_recharge_amount_paise || 500000) / 100));
+      setHasSavedCard(walletData.has_saved_card);
+    }).catch(console.error);
+  }, [dograhOrgId]);
 
   const balanceRupees = wallet ? (wallet.balance_paise / 100).toFixed(2) : "0.00";
   const isZero = wallet?.balance_paise === 0;
-  const isLow = wallet?.balance_paise > 0 && wallet?.balance_paise < 50000; // < 500 rupees
+  const isLow = wallet?.balance_paise > 0 && wallet?.balance_paise < 50000;
 
-  const handleTopup = () => {
+  const handleTopup = async () => {
+    if (!dograhOrgId) return;
     const amount = parseInt(topupAmount);
     if (amount < 500) {
       alert("Minimum top-up is ₹500");
       return;
     }
-    alert(`Initiating Razorpay checkout for ₹${amount}...`);
-    // Hits POST /billing/topup/create-order
+    
+    setIsProcessing(true);
+    try {
+      // 1. Create top-up order
+      const orderRes = await fetch(`${TALKAR}/billing/topup/create-order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dograh_org_id: dograhOrgId, amount_rupees: amount })
+      });
+      const order = await orderRes.json();
+      
+      if (!order.razorpay_order_id) {
+        throw new Error(order.detail || "Failed to create order");
+      }
+      
+      // 2. Get Razorpay key
+      const statusRes = await fetch(`${TALKAR}/customers/status?dograh_org_id=${dograhOrgId}`);
+      const statusData = await statusRes.json();
+      const rzpKey = statusData.razorpay_key_id;
+
+      // 3. Open Razorpay checkout
+      const rzp = new (window as any).Razorpay({
+        key: rzpKey,
+        amount: order.amount_paise,
+        currency: order.currency,
+        name: "Talkar Wallet Top-Up",
+        order_id: order.razorpay_order_id,
+        handler: async (response: any) => {
+          // 4. Confirm payment
+          const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              dograh_org_id: dograhOrgId,
+              amount_paise: order.amount_paise,
+            })
+          });
+          const result = await confirmRes.json();
+          // Update state smoothly
+          setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
+          setTopupAmount("");
+          setIsProcessing(false);
+          alert("Wallet successfully topped up!");
+          
+          // Refresh transactions
+          fetch(`${TALKAR}/billing/transactions/by-org/${dograhOrgId}?limit=100`)
+            .then(r => r.json())
+            .then(data => setTransactions(data.transactions || []));
+        },
+        modal: {
+          ondismiss: () => {
+             setIsProcessing(false);
+          }
+        },
+        prefill: {
+          name: (user as any)?.name || (user as any)?.displayName,
+          email: (user as any)?.email || (user as any)?.primaryEmail,
+        }
+      });
+      rzp.open();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "An error occurred");
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSaveAutoRecharge = async () => {
+    setIsSavingRecharge(true);
+    try {
+      const res = await fetch(`${TALKAR}/billing/wallet/auto-recharge/by-org/${dograhOrgId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: autoRechargeEnabled,
+          threshold_paise: parseInt(threshold) * 100,
+          amount_paise: parseInt(rechargeAmount) * 100,
+        })
+      });
+      if (res.ok) {
+        alert("Auto-recharge settings saved!");
+      } else {
+        const errorData = await res.json();
+        alert(errorData.detail || "Failed to save settings");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save settings");
+    } finally {
+      setIsSavingRecharge(false);
+    }
+  };
+
+  const handleAddCard = async () => {
+    if (!dograhOrgId) return;
+    try {
+      // 1. Create Razorpay customer
+      const custRes = await fetch(`${TALKAR}/billing/razorpay-customer/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          dograh_org_id: dograhOrgId, 
+          name: (user as any)?.name || (user as any)?.displayName, 
+          email: (user as any)?.email || (user as any)?.primaryEmail 
+        })
+      });
+      const { razorpay_customer_id } = await custRes.json();
+      
+      // 2. Get Razorpay key
+      const statusRes = await fetch(`${TALKAR}/customers/status?dograh_org_id=${dograhOrgId}`);
+      const statusData = await statusRes.json();
+      const rzpKey = statusData.razorpay_key_id;
+
+      // 3. Open Razorpay checkout in recurring mode
+      const rzp = new (window as any).Razorpay({
+        key: rzpKey,
+        amount: 100,  // ₹1 authorization — Razorpay does not support amount:0 for checkout. Refundable.
+        currency: "INR",
+        name: "Talkar — Save Card for Auto-Recharge",
+        customer_id: razorpay_customer_id,
+        recurring: "1",
+        handler: async (response: any) => {
+          try {
+            const saveRes = await fetch(`${TALKAR}/billing/save-card`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                dograh_org_id: dograhOrgId,
+                razorpay_payment_method_id: response.razorpay_payment_id,
+              })
+            });
+            if (saveRes.ok) {
+              setHasSavedCard(true);
+              alert("Card successfully saved for auto-recharge!");
+            } else {
+              alert("Failed to save card token.");
+            }
+          } catch (e) {
+            alert("Card save failed. Please try again.");
+          }
+        }
+      });
+      rzp.open();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to initiate card setup");
+    }
+  };
+
+  const handleUpgradeRequest = async (requestedPlan: string) => {
+    if (!dograhOrgId) return;
+    setIsRequestingUpgrade(true);
+    try {
+      const res = await fetch(`${TALKAR}/customers/by-org/${dograhOrgId}/request-plan-upgrade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requested_plan: requestedPlan })
+      });
+      if (res.ok) {
+        alert("Your upgrade request has been sent. Our team will process it within 24 hours.");
+        setSubscription((prev: any) => ({ ...prev, plan_upgrade_requested: requestedPlan }));
+      } else {
+        const errorData = await res.json();
+        alert(errorData.detail || "Failed to request upgrade");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to request upgrade");
+    } finally {
+      setIsRequestingUpgrade(false);
+    }
   };
 
   const filteredTransactions = transactions.filter(tx => filter === "all" || tx.type === filter);
   const itemsPerPage = 20;
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
   const currentTransactions = filteredTransactions.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-6">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Wallet & Credits</h1>
         <p className="text-muted-foreground mt-2">Manage your Talkar balance, auto-recharge, and billing history.</p>
@@ -99,6 +295,11 @@ export default function WalletPage() {
             <div className="text-5xl font-bold text-foreground">
               ₹{balanceRupees}
             </div>
+            {usage && (
+               <div className="mt-4 text-sm text-muted-foreground">
+                 Usage this month: {usage.total_minutes} mins (₹{(usage.total_spend_paise / 100).toFixed(2)})
+               </div>
+            )}
           </CardContent>
         </Card>
 
@@ -132,9 +333,9 @@ export default function WalletPage() {
                   onChange={(e) => setTopupAmount(e.target.value)}
                 />
               </div>
-              <Button onClick={handleTopup} disabled={!topupAmount || parseInt(topupAmount) < 500}>
+              <Button onClick={handleTopup} disabled={!topupAmount || parseInt(topupAmount) < 500 || isProcessing}>
                 <Plus className="w-4 h-4 mr-2" />
-                Add Credits
+                {isProcessing ? "Processing..." : "Add Credits"}
               </Button>
             </div>
           </CardContent>
@@ -178,14 +379,26 @@ export default function WalletPage() {
                     </div>
                   </div>
                 </div>
-                <div className="bg-muted p-3 rounded-md flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-6 bg-background rounded border flex items-center justify-center text-xs font-bold">VISA</div>
-                    <span className="text-sm">Ending in 4242</span>
+                {hasSavedCard ? (
+                  <div className="bg-muted p-3 rounded-md flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="w-5 h-5 text-green-600" />
+                      <span className="text-sm font-medium">Card on File (Active)</span>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={handleAddCard}>Update Card</Button>
                   </div>
-                  <Button variant="ghost" size="sm">Update Card</Button>
-                </div>
-                <Button className="w-full">Save Settings</Button>
+                ) : (
+                  <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-md flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="w-5 h-5" />
+                      <span className="text-sm font-medium">No card saved</span>
+                    </div>
+                    <Button variant="default" size="sm" onClick={handleAddCard}>Add Card</Button>
+                  </div>
+                )}
+                <Button className="w-full" onClick={handleSaveAutoRecharge} disabled={isSavingRecharge}>
+                   {isSavingRecharge ? "Saving..." : "Save Settings"}
+                </Button>
               </div>
             )}
           </CardContent>
@@ -201,37 +414,89 @@ export default function WalletPage() {
             <CardDescription>Your monthly Talkar plan details.</CardDescription>
           </CardHeader>
           <CardContent>
-            {subscription && (
+            {subscription && subscription.status !== "not_provisioned" ? (
               <div className="space-y-4">
                 <div className="flex justify-between items-center pb-4 border-b">
                   <div>
                     <p className="text-sm text-muted-foreground">Current Plan</p>
-                    <p className="text-xl font-bold">{subscription.plan}</p>
+                    <p className="text-xl font-bold capitalize">{subscription.plan}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Monthly Fee</p>
-                    <p className="text-xl font-bold">₹{subscription.monthly_fee.toLocaleString()}</p>
+                    <p className="text-xl font-bold">₹{(subscription.monthly_fee_paise / 100).toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div>
                     <p className="text-sm text-muted-foreground">Per-Minute Rate</p>
-                    <p className="font-medium">₹{subscription.rate}</p>
+                    <p className="font-medium">₹{(subscription.per_minute_rate_paise / 100).toFixed(2)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Concurrent Limit</p>
-                    <p className="font-medium">{subscription.limit} active calls</p>
+                    <p className="font-medium">{subscription.concurrent_call_limit} active calls</p>
                   </div>
                   <div className="col-span-2">
                     <p className="text-sm text-muted-foreground">Next Billing Date</p>
-                    <p className="font-medium">{subscription.next_billing}</p>
+                    <p className="font-medium">{new Date(subscription.next_billing_date).toLocaleDateString()}</p>
                   </div>
                 </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-muted-foreground">
+                <p>Plan information unavailable or setup in progress.</p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* 6. Upgrade Plan Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ReceiptText className="w-5 h-5" />
+            Upgrade Plan
+          </CardTitle>
+          <CardDescription>Request an upgrade to access higher limits and better rates.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="p-4 border rounded-lg space-y-3">
+              <h3 className="font-bold text-lg">Starter</h3>
+              <p className="text-muted-foreground text-sm">Great for testing and low volume.</p>
+              <div className="text-2xl font-bold">₹0<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+              <ul className="space-y-2 text-sm">
+                <li>• ₹1.5 / minute</li>
+                <li>• 2 concurrent calls</li>
+              </ul>
+            </div>
+            <div className="p-4 border rounded-lg space-y-3 border-indigo-500/50 bg-indigo-500/5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-indigo-500 text-white text-xs px-2 py-1 rounded-bl-lg font-medium">Recommended</div>
+              <h3 className="font-bold text-lg text-indigo-500">Pro</h3>
+              <p className="text-muted-foreground text-sm">For scaling businesses.</p>
+              <div className="text-2xl font-bold">₹15,000<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+              <ul className="space-y-2 text-sm">
+                <li>• ₹1.1 / minute</li>
+                <li>• 10 concurrent calls</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="bg-muted/50 flex justify-end">
+          {subscription?.plan === 'pro' ? (
+            <p className="text-sm font-medium text-muted-foreground">You're on the highest plan.</p>
+          ) : subscription?.plan_upgrade_requested ? (
+            <p className="text-sm font-medium text-amber-600">Upgrade request pending for {subscription.plan_upgrade_requested}.</p>
+          ) : (
+            <Button 
+              onClick={() => handleUpgradeRequest('pro')} 
+              disabled={isRequestingUpgrade}
+            >
+              {isRequestingUpgrade ? "Requesting..." : "Upgrade to Pro"}
+            </Button>
+          )}
+        </CardFooter>
+      </Card>
 
       {/* 4. Transaction History */}
       <Card>
@@ -251,6 +516,7 @@ export default function WalletPage() {
               <option value="call_deduction">Call Deductions</option>
               <option value="refund">Refunds</option>
               <option value="grant">Grants</option>
+              <option value="monthly_fee">Monthly Fees</option>
             </select>
           </div>
         </CardHeader>
@@ -261,23 +527,21 @@ export default function WalletPage() {
                 <TableHead>Date</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Balance After</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {currentTransactions.map(tx => (
                 <TableRow key={tx.id}>
-                  <TableCell className="font-medium">{tx.date}</TableCell>
-                  <TableCell>{tx.desc}</TableCell>
-                  <TableCell className={`text-right ${tx.amount > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                    {tx.amount > 0 ? "+" : ""}₹{Math.abs(tx.amount).toLocaleString()}
+                  <TableCell className="font-medium">{new Date(tx.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>{tx.description}</TableCell>
+                  <TableCell className={`text-right ${tx.amount_paise > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                    {tx.amount_paise > 0 ? "+" : ""}₹{(Math.abs(tx.amount_paise) / 100).toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-right">₹{tx.balance.toLocaleString()}</TableCell>
                 </TableRow>
               ))}
               {currentTransactions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground h-24">
+                  <TableCell colSpan={3} className="text-center text-muted-foreground h-24">
                     No transactions found.
                   </TableCell>
                 </TableRow>

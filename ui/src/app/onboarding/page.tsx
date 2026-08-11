@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertTriangle, Clock, CheckCircle, XCircle, Ban, UploadCloud } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import type { LocalUser } from "@/lib/auth/types";
+import Script from "next/script";
 
 export default function OnboardingPage() {
   const { user } = useAuth();
@@ -91,10 +92,36 @@ export default function OnboardingPage() {
   };
 
   const handlePaySetupFee = () => {
-    // Hits POST /billing/setup-fee/create-order
-    alert("Initiating Razorpay setup fee checkout...");
-    // Mock successful payment transition
-    setTimeout(() => setStatus("agent_building"), 1500);
+    if (!customerData?.setup_fee_order_id || !customerData?.razorpay_key_id) {
+      alert("Missing Razorpay order details. Please contact support.");
+      return;
+    }
+
+    const options = {
+      key: customerData.razorpay_key_id,
+      amount: 100, // ₹1 (100 paise)
+      currency: "INR",
+      name: "Talkar Setup Fee",
+      description: "One-time setup fee for Talkar Voice AI",
+      order_id: customerData.setup_fee_order_id,
+      handler: async function (response: any) {
+        setStatus("agent_building");
+      },
+      prefill: {
+        name: formData.pocName || "Talkar Customer",
+        contact: formData.pocPhone || "",
+      },
+      theme: {
+        color: "#18181b",
+      },
+    };
+    
+    if (!(window as any).Razorpay) {
+      alert("Payment gateway not loaded yet. Please try again in a moment.");
+      return;
+    }
+    const rzp = new (window as any).Razorpay(options);
+    rzp.open();
   };
 
   const simulateUpload = (type: 'gst' | 'reg') => {
@@ -122,6 +149,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold tracking-tight">Welcome to Talkar</h1>
         <p className="text-muted-foreground mt-2">Your AI Voice Agent Platform</p>

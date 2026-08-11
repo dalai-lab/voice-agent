@@ -126,11 +126,12 @@ export default function OnboardingPage() {
     }
   };
 
-  const handlePaySetupFee = () => {
+  const handlePaySetupFee = async () => {
     if (!customerData?.setup_fee_order_id || !customerData?.razorpay_key_id) {
       alert("Missing Razorpay order details. Please contact support.");
       return;
     }
+
     if (!(window as any).Razorpay) {
       alert("Payment gateway not loaded yet. Please try again in a moment.");
       return;
@@ -175,6 +176,29 @@ export default function OnboardingPage() {
 
     const rzp = new (window as any).Razorpay(options);
     rzp.open();
+  };
+
+  const handleMockSetupFee = async () => {
+    if (!customerData?.setup_fee_order_id) return;
+    try {
+      const res = await fetch(`${TALKAR_API}/billing/confirm-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          razorpay_payment_id: "mock_payment_id",
+          razorpay_order_id: customerData.setup_fee_order_id,
+          razorpay_signature: "mock_signature",
+        }),
+      });
+      if (res.ok) {
+        setStatus("agent_building");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Mock payment confirmed but setup failed: ${err.detail || "Error"}`);
+      }
+    } catch {
+      alert("Mock payment failed to reach server.");
+    }
   };
 
   const simulateUpload = (type: "gst" | "reg") => {
@@ -451,9 +475,16 @@ export default function OnboardingPage() {
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
             <h2 className="text-2xl font-bold">You're approved! Complete your setup fee payment to get started.</h2>
             <p className="text-muted-foreground text-sm">One-time setup fee · Secure payment via Razorpay</p>
-            <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" onClick={handlePaySetupFee}>
-              Pay Setup Fee
-            </Button>
+            <div className="flex gap-4 justify-center mt-4">
+              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" onClick={handlePaySetupFee}>
+                Pay Setup Fee
+              </Button>
+              {process.env.NODE_ENV !== 'production' && (
+                <Button onClick={handleMockSetupFee} variant="secondary" size="lg">
+                  Bypass Payment (Dev)
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

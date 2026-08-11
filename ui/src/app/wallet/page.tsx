@@ -62,7 +62,7 @@ export default function WalletPage() {
   const isZero = wallet?.balance_paise === 0;
   const isLow = wallet?.balance_paise > 0 && wallet?.balance_paise < 50000;
 
-  const handleTopup = async () => {
+  const handleTopup = async (isMock = false) => {
     if (!dograhOrgId) return;
     const amount = parseInt(topupAmount);
     if (amount < 500) {
@@ -88,6 +88,36 @@ export default function WalletPage() {
       const statusRes = await fetch(`${TALKAR}/customers/status?dograh_org_id=${dograhOrgId}`);
       const statusData = await statusRes.json();
       const rzpKey = statusData.razorpay_key_id;
+
+      // MOCK MODE: Manual bypass
+      if (isMock) {
+        const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            razorpay_payment_id: "mock_payment_id",
+            razorpay_order_id: order.razorpay_order_id,
+            razorpay_signature: "mock_signature",
+            dograh_org_id: dograhOrgId,
+            amount_paise: order.amount_paise,
+          })
+        });
+        const result = await confirmRes.json();
+        setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
+        setTopupAmount("");
+        setIsProcessing(false);
+        alert("Mock Top-Up Successful!");
+        fetch(`${TALKAR}/billing/transactions/by-org/${dograhOrgId}?limit=100`)
+          .then(r => r.json())
+          .then(data => setTransactions(data.transactions || []));
+        return;
+      }
+
+      if (!rzpKey) {
+        alert("Razorpay key missing. Please configure your environment or use the Dev bypass.");
+        setIsProcessing(false);
+        return;
+      }
 
       // 3. Open Razorpay checkout
       const rzp = new (window as any).Razorpay({
@@ -165,7 +195,7 @@ export default function WalletPage() {
     }
   };
 
-  const handleAddCard = async () => {
+  const handleAddCard = async (isMock = false) => {
     if (!dograhOrgId) return;
     try {
       // 1. Create Razorpay customer
@@ -184,6 +214,30 @@ export default function WalletPage() {
       const statusRes = await fetch(`${TALKAR}/customers/status?dograh_org_id=${dograhOrgId}`);
       const statusData = await statusRes.json();
       const rzpKey = statusData.razorpay_key_id;
+
+      // MOCK MODE: Manual bypass
+      if (isMock) {
+        const saveRes = await fetch(`${TALKAR}/billing/save-card`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dograh_org_id: dograhOrgId,
+            razorpay_payment_method_id: "mock_payment_method_id",
+          })
+        });
+        if (saveRes.ok) {
+          setHasSavedCard(true);
+          alert("Mock Card successfully saved for auto-recharge!");
+        } else {
+          alert("Failed to save mock card token.");
+        }
+        return;
+      }
+
+      if (!rzpKey) {
+        alert("Razorpay key missing. Please configure your environment or use the Dev bypass.");
+        return;
+      }
 
       // 3. Open Razorpay checkout in recurring mode
       const rzp = new (window as any).Razorpay({
@@ -333,10 +387,17 @@ export default function WalletPage() {
                   onChange={(e) => setTopupAmount(e.target.value)}
                 />
               </div>
-              <Button onClick={handleTopup} disabled={!topupAmount || parseInt(topupAmount) < 500 || isProcessing}>
-                <Plus className="w-4 h-4 mr-2" />
-                {isProcessing ? "Processing..." : "Add Credits"}
-              </Button>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button onClick={() => handleTopup(false)} disabled={!topupAmount || parseInt(topupAmount) < 500 || isProcessing}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  {isProcessing ? "Processing..." : "Add Credits"}
+                </Button>
+                {process.env.NODE_ENV !== 'production' && (
+                  <Button variant="secondary" onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < 500 || isProcessing}>
+                    Bypass (Dev)
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -385,7 +446,12 @@ export default function WalletPage() {
                       <CreditCard className="w-5 h-5 text-green-600" />
                       <span className="text-sm font-medium">Card on File (Active)</span>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={handleAddCard}>Update Card</Button>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => handleAddCard(false)}>Update Card</Button>
+                      {process.env.NODE_ENV !== 'production' && (
+                        <Button variant="ghost" size="sm" onClick={() => handleAddCard(true)}>Bypass (Dev)</Button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-md flex items-center justify-between">
@@ -393,7 +459,12 @@ export default function WalletPage() {
                       <AlertTriangle className="w-5 h-5" />
                       <span className="text-sm font-medium">No card saved</span>
                     </div>
-                    <Button variant="default" size="sm" onClick={handleAddCard}>Add Card</Button>
+                    <div className="flex gap-2">
+                      <Button variant="default" size="sm" onClick={() => handleAddCard(false)}>Add Card</Button>
+                      {process.env.NODE_ENV !== 'production' && (
+                        <Button variant="secondary" size="sm" onClick={() => handleAddCard(true)}>Bypass (Dev)</Button>
+                      )}
+                    </div>
                   </div>
                 )}
                 <Button className="w-full" onClick={handleSaveAutoRecharge} disabled={isSavingRecharge}>

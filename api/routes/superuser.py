@@ -126,7 +126,7 @@ async def impersonate(
     # ------------------------------------------------------------------
     # Call Stack Auth to create the impersonation session
     # ------------------------------------------------------------------
-    from api.config import AUTH_PROVIDER
+    from api.constants import AUTH_PROVIDER
     if AUTH_PROVIDER == "local":
         from api.utils.auth import create_jwt_token
         

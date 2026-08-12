@@ -39,6 +39,14 @@ export async function GET(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 30,
       path: '/',
     });
+    
+    // Set a session cookie to flag that this is an admin impersonating
+    response.cookies.set('talkar_admin_bypass', 'true', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
 
     response.cookies.set(OSS_USER_COOKIE, JSON.stringify(userData), {
       httpOnly: true,

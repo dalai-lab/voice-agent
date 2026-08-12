@@ -99,7 +99,11 @@ export async function middleware(request: NextRequest) {
         const { status } = await statusRes.json();
         if (status !== 'active') {
           // TALKAR PATCH: Status state machine routing
-          if (status === 'suspended' && (pathname.startsWith('/wallet') || pathname.startsWith('/billing'))) {
+          const isAdminBypass = request.cookies.get('talkar_admin_bypass')?.value;
+          
+          if (isAdminBypass === 'true') {
+            // Bypass the lock for Talkar Admins impersonating a user
+          } else if (status === 'suspended' && (pathname.startsWith('/wallet') || pathname.startsWith('/billing'))) {
             // let it pass
           } else if (status === 'pending_deposit') {
             if (!pathname.startsWith('/wallet')) {

@@ -289,15 +289,21 @@ export default function WalletPage() {
         body: JSON.stringify({ requested_tier: requestedTier })
       });
       if (res.ok) {
-        alert("Your upgrade request has been sent. Our team will process it within 24 hours.");
-        setSubscription((prev: any) => ({ ...prev, tier_upgrade_requested: requestedTier }));
+        alert("Your tier has been successfully updated!");
+        
+        // Refresh the subscription data immediately
+        fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`)
+          .then(r => r.json())
+          .then(setSubscription)
+          .catch(console.error);
+          
       } else {
         const errorData = await res.json();
-        alert(errorData.detail || "Failed to request upgrade");
+        alert(errorData.detail || "Failed to switch tier");
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to request upgrade");
+      alert("Failed to switch tier");
     } finally {
       setIsRequestingUpgrade(false);
     }
@@ -553,21 +559,20 @@ export default function WalletPage() {
           </div>
         </CardContent>
         <CardFooter className="bg-muted/50 flex justify-end gap-2">
-          {subscription?.tier === 'elite' ? (
-            <p className="text-sm font-medium text-muted-foreground">You're on the highest tier.</p>
-          ) : subscription?.tier_upgrade_requested ? (
-            <p className="text-sm font-medium text-amber-600">Upgrade request pending for {subscription.tier_upgrade_requested}.</p>
-          ) : (
-            <>
-              {subscription?.tier !== 'pro' && subscription?.tier !== 'elite' && (
-                <Button onClick={() => handleUpgradeRequest('pro')} disabled={isRequestingUpgrade} variant="secondary">
-                  Request Pro
-                </Button>
-              )}
-              <Button onClick={() => handleUpgradeRequest('elite')} disabled={isRequestingUpgrade}>
-                Request Elite
-              </Button>
-            </>
+          {subscription?.tier !== 'starter' && (
+            <Button onClick={() => handleUpgradeRequest('starter')} disabled={isRequestingUpgrade} variant="outline">
+              Switch to Starter
+            </Button>
+          )}
+          {subscription?.tier !== 'pro' && (
+            <Button onClick={() => handleUpgradeRequest('pro')} disabled={isRequestingUpgrade} variant={subscription?.tier === 'elite' ? "outline" : "secondary"}>
+              Switch to Pro
+            </Button>
+          )}
+          {subscription?.tier !== 'elite' && (
+            <Button onClick={() => handleUpgradeRequest('elite')} disabled={isRequestingUpgrade}>
+              Switch to Elite
+            </Button>
           )}
         </CardFooter>
       </Card>

@@ -126,6 +126,29 @@ async def impersonate(
     # ------------------------------------------------------------------
     # Call Stack Auth to create the impersonation session
     # ------------------------------------------------------------------
+    from api.config import AUTH_PROVIDER
+    if AUTH_PROVIDER == "local":
+        from api.utils.auth import create_jwt_token
+        
+        # Ensure we have the db_user
+        if 'db_user' not in locals():
+            if provider_user_id:
+                db_user = await db_client.get_user_by_provider_id(provider_user_id)
+            else:
+                db_user = None
+                
+        if not db_user:
+            raise HTTPException(404, "User not found in local database")
+            
+        token = create_jwt_token(
+            user_id=db_user.id, 
+            email=db_user.email or email or "impersonated@example.com"
+        )
+        return ImpersonateResponse(
+            refresh_token=token,
+            access_token=token,
+        )
+
     try:
         session = await stackauth.impersonate(provider_user_id)
     except StackAuthSessionError as exc:

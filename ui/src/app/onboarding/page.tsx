@@ -355,6 +355,8 @@ export default function OnboardingPage() {
                       <Input id="integrations" placeholder="E.g., HubSpot CRM, Google Calendar, WhatsApp" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} />
                     </div>
                   </div>
+              </div>
+
               {/* ── 4. Custom API Integration ── */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium border-b pb-2">4. Custom API Integration</h3>

@@ -8,8 +8,13 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get('token');
   
+  // Construct the correct base URL for redirects (avoid 0.0.0.0 Docker bind addresses)
+  const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'talkar.in';
+  const proto = request.headers.get('x-forwarded-proto') || (process.env.NODE_ENV === 'production' ? 'https' : 'http');
+  const baseUrl = `${proto}://${forwardedHost}`;
+  
   if (!token) {
-    return NextResponse.redirect(new URL('/auth/login', request.url));
+    return NextResponse.redirect(new URL('/auth/login', baseUrl));
   }
 
   // Verify the token and get the user object from Dograh backend
@@ -23,13 +28,13 @@ export async function GET(request: NextRequest) {
 
     if (!res.ok) {
       console.error("Impersonation failed: token rejected by backend", await res.text());
-      return NextResponse.redirect(new URL('/auth/login?error=invalid_token', request.url));
+      return NextResponse.redirect(new URL('/auth/login?error=invalid_token', baseUrl));
     }
 
     const userData = await res.json();
 
     // Generate redirect response to the overview page
-    const response = NextResponse.redirect(new URL('/overview', request.url));
+    const response = NextResponse.redirect(new URL('/overview', baseUrl));
 
     // Set the authentication cookies
     response.cookies.set(OSS_TOKEN_COOKIE, token, {
@@ -58,7 +63,7 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("Impersonation fetch failed", error);
-    return NextResponse.redirect(new URL('/auth/login?error=server_error', request.url));
+    console.error("Impersonation error", error);
+    return NextResponse.redirect(new URL('/auth/login?error=server_error', baseUrl));
   }
 }

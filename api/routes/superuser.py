@@ -130,10 +130,19 @@ async def impersonate(
     if AUTH_PROVIDER == "local":
         from api.utils.auth import create_jwt_token
         
-        # Ensure we have the db_user
-        if 'db_user' not in locals():
-            if provider_user_id:
-                db_user = await db_client.get_user_by_provider_id(provider_user_id)
+        # In local mode, resolve the user. The request may come in with:
+        # - user_id (internal DB id) - set by Talkar's assign endpoint
+        # - provider_user_id (which in local mode is the same as user_id stringified)
+        # 'db_user' may already be set above in the resolver block (user_id path)
+        if 'db_user' not in locals() or db_user is None:
+            if request.user_id is not None:
+                db_user = await db_client.get_user_by_id(request.user_id)
+            elif provider_user_id:
+                # In local OSS mode, provider_id is the string form of the internal user id
+                try:
+                    db_user = await db_client.get_user_by_id(int(provider_user_id))
+                except (ValueError, TypeError):
+                    db_user = None
             else:
                 db_user = None
                 

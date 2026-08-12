@@ -62,8 +62,8 @@ export default function WalletPage() {
     }).catch(console.error);
   }, [dograhOrgId]);
 
-  const balanceRupees = wallet ? (wallet.balance_paise / 100).toFixed(2) : "0.00";
-  const isZero = wallet?.balance_paise === 0;
+  const balanceRupees = wallet && typeof wallet.balance_paise === 'number' ? (wallet.balance_paise / 100).toFixed(2) : "0.00";
+  const isZero = !wallet || wallet.balance_paise === 0 || wallet.balance_paise === undefined;
   const isLow = wallet?.balance_paise > 0 && wallet?.balance_paise < 50000;
 
   const handleTopup = async (isMock = false) => {
@@ -408,11 +408,9 @@ export default function WalletPage() {
                   <Plus className="w-4 h-4 mr-2" />
                   {isProcessing ? "Processing..." : "Add Credits"}
                 </Button>
-                {process.env.NODE_ENV !== 'production' && (
-                  <Button variant="secondary" onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing}>
-                    Bypass (Dev)
-                  </Button>
-                )}
+                <Button variant="secondary" onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing}>
+                  Bypass (Dev)
+                </Button>
               </div>
             </div>
           </CardContent>

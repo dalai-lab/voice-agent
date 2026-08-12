@@ -23,5 +23,13 @@ export async function POST() {
     path: '/',
   });
 
+  cookieStore.set('talkar_admin_bypass', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 0,
+    path: '/',
+  });
+
   return NextResponse.json({ success: true });
 }

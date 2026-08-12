@@ -279,32 +279,124 @@ export default function WalletPage() {
     }
   };
 
-  const handleUpgradeRequest = async (requestedTier: string) => {
+  const handleUpgradeRequest = async (requestedTier: string, isMock = false) => {
     if (!dograhOrgId) return;
+    
+    const minDeposits: Record<string, number> = { "pro": 10000, "elite": 25000 };
+    const requiredAmount = minDeposits[requestedTier] || 0;
+    
+    if (requiredAmount > 0) {
+      if (!confirm(`To unlock the ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)} tier, a minimum deposit of ₹${requiredAmount} is required. This entire amount will be added to your wallet for call usage. Proceed?`)) {
+        return;
+      }
+    }
+
     setIsRequestingUpgrade(true);
     try {
-      const res = await fetch(`${TALKAR}/customers/by-org/${dograhOrgId}/request-tier-upgrade`, {
+      // 1. Create upgrade order
+      const orderRes = await fetch(`${TALKAR}/billing/upgrade/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requested_tier: requestedTier })
+        body: JSON.stringify({ dograh_org_id: dograhOrgId, requested_tier: requestedTier })
       });
-      if (res.ok) {
-        alert("Your tier has been successfully updated!");
-        
-        // Refresh the subscription data immediately
-        fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`)
-          .then(r => r.json())
-          .then(setSubscription)
-          .catch(console.error);
-          
-      } else {
-        const errorData = await res.json();
-        alert(errorData.detail || "Failed to switch tier");
+      
+      if (!orderRes.ok) {
+        // If it's starter, we just use the old instant request flow since there's no deposit
+        if (requestedTier === 'starter') {
+          const res = await fetch(`${TALKAR}/customers/by-org/${dograhOrgId}/request-tier-upgrade`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requested_tier: requestedTier })
+          });
+          if (res.ok) {
+            alert("Your tier has been successfully updated!");
+            fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
+          }
+          setIsRequestingUpgrade(false);
+          return;
+        }
+        const err = await orderRes.json();
+        throw new Error(err.detail || "Failed to create upgrade order");
       }
-    } catch (err) {
+      
+      const order = await orderRes.json();
+      
+      // MOCK MODE BYPASS
+      if (isMock) {
+        const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            razorpay_payment_id: "mock_payment_id",
+            razorpay_order_id: order.razorpay_order_id,
+            razorpay_signature: "mock_signature",
+            dograh_org_id: dograhOrgId,
+            amount_paise: order.amount_paise,
+            requested_tier: requestedTier
+          })
+        });
+        const result = await confirmRes.json();
+        setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
+        fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
+        setIsRequestingUpgrade(false);
+        alert(`Successfully deposited ₹${requiredAmount} and upgraded to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}!`);
+        return;
+      }
+
+      // 2. Get Razorpay key
+      const statusRes = await fetch(`${TALKAR}/customers/status?dograh_org_id=${dograhOrgId}`);
+      const statusData = await statusRes.json();
+      const rzpKey = statusData.razorpay_key_id;
+
+      if (!rzpKey) {
+        alert("Razorpay key missing. Please configure your environment or use the Dev bypass.");
+        setIsRequestingUpgrade(false);
+        return;
+      }
+
+      // 3. Open Razorpay checkout
+      const rzp = new (window as any).Razorpay({
+        key: rzpKey,
+        amount: order.amount_paise,
+        currency: order.currency,
+        name: `Talkar Upgrade — ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}`,
+        order_id: order.razorpay_order_id,
+        handler: async (response: any) => {
+          // 4. Confirm payment & apply upgrade
+          const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              dograh_org_id: dograhOrgId,
+              amount_paise: order.amount_paise,
+              requested_tier: requestedTier
+            })
+          });
+          const result = await confirmRes.json();
+          setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
+          
+          fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
+          setIsRequestingUpgrade(false);
+          alert(`Successfully deposited ₹${requiredAmount} and upgraded to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}!`);
+        },
+        modal: {
+          ondismiss: () => {
+             setIsRequestingUpgrade(false);
+          }
+        },
+        prefill: {
+          name: (user as any)?.name || (user as any)?.displayName,
+          email: (user as any)?.email || (user as any)?.primaryEmail,
+        }
+      });
+      rzp.open();
+
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to switch tier");
-    } finally {
+      alert(err.message || "Failed to switch tier");
       setIsRequestingUpgrade(false);
     }
   };
@@ -552,28 +644,44 @@ export default function WalletPage() {
               <h3 className="font-bold text-lg">Elite</h3>
               <p className="text-muted-foreground text-sm">Enterprise scale.</p>
               <ul className="space-y-2 text-sm">
-                <li>• ₹25 / minute</li>
+                <li>• ₹12 / minute</li>
                 <li>• Unlimited concurrent calls</li>
               </ul>
             </div>
           </div>
         </CardContent>
-        <CardFooter className="bg-muted/50 flex justify-end gap-2">
-          {subscription?.tier !== 'starter' && (
-            <Button onClick={() => handleUpgradeRequest('starter')} disabled={isRequestingUpgrade} variant="outline">
-              Switch to Starter
-            </Button>
-          )}
-          {subscription?.tier !== 'pro' && (
-            <Button onClick={() => handleUpgradeRequest('pro')} disabled={isRequestingUpgrade} variant={subscription?.tier === 'elite' ? "outline" : "secondary"}>
-              Switch to Pro
-            </Button>
-          )}
-          {subscription?.tier !== 'elite' && (
-            <Button onClick={() => handleUpgradeRequest('elite')} disabled={isRequestingUpgrade}>
-              Switch to Elite
-            </Button>
-          )}
+        <CardFooter className="bg-muted/50 flex flex-col items-end gap-2">
+          <div className="flex gap-2">
+            {subscription?.tier !== 'starter' && (
+              <Button onClick={() => handleUpgradeRequest('starter')} disabled={isRequestingUpgrade} variant="outline">
+                Switch to Starter
+              </Button>
+            )}
+            {subscription?.tier !== 'pro' && (
+              <>
+                <Button onClick={() => handleUpgradeRequest('pro')} disabled={isRequestingUpgrade} variant={subscription?.tier === 'elite' ? "outline" : "secondary"}>
+                  Switch to Pro
+                </Button>
+                {process.env.NODE_ENV !== 'production' && (
+                  <Button onClick={() => handleUpgradeRequest('pro', true)} variant="ghost" size="sm" disabled={isRequestingUpgrade}>
+                    Dev Bypass (Pro)
+                  </Button>
+                )}
+              </>
+            )}
+            {subscription?.tier !== 'elite' && (
+              <>
+                <Button onClick={() => handleUpgradeRequest('elite')} disabled={isRequestingUpgrade}>
+                  Switch to Elite
+                </Button>
+                {process.env.NODE_ENV !== 'production' && (
+                  <Button onClick={() => handleUpgradeRequest('elite', true)} variant="ghost" size="sm" disabled={isRequestingUpgrade}>
+                    Dev Bypass (Elite)
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
         </CardFooter>
       </Card>
 

@@ -48,11 +48,6 @@ async function fetchAuthProvider(): Promise<string> {
 export async function middleware(request: NextRequest) {
   const authProvider = await fetchAuthProvider();
 
-  // Only handle OSS mode
-  if (authProvider !== 'local') {
-    return NextResponse.next();
-  }
-
   const token = request.cookies.get(OSS_TOKEN_COOKIE)?.value;
   const { pathname } = request.nextUrl;
 
@@ -61,8 +56,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // If no token, redirect to login
-  if (!token) {
+  // If local auth and no token, redirect to login
+  if (authProvider === 'local' && !token) {
     const loginUrl = new URL('/auth/login', request.url);
     return NextResponse.redirect(loginUrl);
   }
@@ -72,17 +67,41 @@ export async function middleware(request: NextRequest) {
   let talkarOrgType = null;
   try {
     const backendUrl = getServerBackendUrl();
-    const res = await fetch(`${backendUrl}/api/v1/auth/me`, {
-      headers: { 
-        Cookie: `${OSS_TOKEN_COOKIE}=${token}`,
-        Authorization: `Bearer ${token}` 
+    const headers = new Headers(request.headers);
+    headers.delete('host');
+
+    if (authProvider === 'local') {
+      if (token) {
+        headers.set('Cookie', `${OSS_TOKEN_COOKIE}=${token}`);
+        headers.set('Authorization', `Bearer ${token}`);
       }
+    } else {
+      // For Stack Auth, locate the JWT token in cookies
+      let stackToken = null;
+      for (const cookie of request.cookies.getAll()) {
+        if (cookie.value.startsWith('eyJ')) {
+          stackToken = cookie.value;
+          break;
+        }
+      }
+      
+      // If no token found, skip the gate and let Stack Auth handle the unauthenticated state
+      if (!stackToken) {
+        return NextResponse.next();
+      }
+      
+      headers.set('Authorization', `Bearer ${stackToken}`);
+    }
+
+    const res = await fetch(`${backendUrl}/api/v1/auth/me`, {
+      headers
     });
     if (res.ok) {
       const userData = await res.json();
       organizationId = userData.organization_id;
       talkarOrgType = userData.talkar_org_type;
     }
+
   } catch (err) {
     console.error("Failed to fetch user info in middleware", err);
   }

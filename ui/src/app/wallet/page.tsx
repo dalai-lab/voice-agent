@@ -13,11 +13,15 @@ import {
 import { AlertTriangle, Plus, CreditCard, ReceiptText, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import type { LocalUser } from "@/lib/auth/types";
+import { useSearchParams } from "next/navigation";
 import Script from "next/script";
 
 export default function WalletPage() {
   const { user } = useAuth();
   const dograhOrgId = (user as any)?.organization_id || (user as LocalUser)?.organizationId;
+  const searchParams = useSearchParams();
+  const isActivation = searchParams.get("activation") === "true";
+  const minTopup = isActivation ? 2000 : 500;
   const TALKAR = "/api/talkar";
 
   const [wallet, setWallet] = useState<any>(null);
@@ -27,7 +31,7 @@ export default function WalletPage() {
   const [subscription, setSubscription] = useState<any>(null);
   const [usage, setUsage] = useState<any>(null);
   
-  const [topupAmount, setTopupAmount] = useState<string>("");
+  const [topupAmount, setTopupAmount] = useState<string>(isActivation ? "2000" : "");
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [autoRechargeEnabled, setAutoRechargeEnabled] = useState(false);
@@ -65,8 +69,8 @@ export default function WalletPage() {
   const handleTopup = async (isMock = false) => {
     if (!dograhOrgId) return;
     const amount = parseInt(topupAmount);
-    if (amount < 500) {
-      alert("Minimum top-up is ₹500");
+    if (amount < minTopup) {
+      alert(`Minimum top-up is ₹${minTopup}`);
       return;
     }
     
@@ -275,18 +279,18 @@ export default function WalletPage() {
     }
   };
 
-  const handleUpgradeRequest = async (requestedPlan: string) => {
+  const handleUpgradeRequest = async (requestedTier: string) => {
     if (!dograhOrgId) return;
     setIsRequestingUpgrade(true);
     try {
-      const res = await fetch(`${TALKAR}/customers/by-org/${dograhOrgId}/request-plan-upgrade`, {
+      const res = await fetch(`${TALKAR}/customers/by-org/${dograhOrgId}/request-tier-upgrade`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requested_plan: requestedPlan })
+        body: JSON.stringify({ requested_tier: requestedTier })
       });
       if (res.ok) {
         alert("Your upgrade request has been sent. Our team will process it within 24 hours.");
-        setSubscription((prev: any) => ({ ...prev, plan_upgrade_requested: requestedPlan }));
+        setSubscription((prev: any) => ({ ...prev, tier_upgrade_requested: requestedTier }));
       } else {
         const errorData = await res.json();
         alert(errorData.detail || "Failed to request upgrade");
@@ -312,7 +316,19 @@ export default function WalletPage() {
         <p className="text-muted-foreground mt-2">Manage your Talkar balance, auto-recharge, and billing history.</p>
       </div>
 
-      {isZero && (
+      {isActivation && (
+        <div className="bg-blue-500/15 border border-blue-500/50 rounded-lg p-4 flex items-start gap-4 mb-6">
+          <ShieldCheck className="w-6 h-6 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-blue-600 dark:text-blue-400">Activate Your Agent</h3>
+            <p className="text-sm text-blue-600/80 dark:text-blue-400/80 mt-1">
+              Add a minimum of ₹2000 to your wallet to activate your agent and select a usage tier.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isZero && !isActivation && (
         <div className="bg-red-500/15 border border-red-500/50 rounded-lg p-4 flex items-start gap-4">
           <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
           <div>
@@ -380,20 +396,20 @@ export default function WalletPage() {
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
                 <Input 
                   type="number" 
-                  min="500"
+                  min={minTopup.toString()}
                   className="pl-8" 
-                  placeholder="Custom amount (min 500)"
+                  placeholder={`Custom amount (min ${minTopup})`}
                   value={topupAmount}
                   onChange={(e) => setTopupAmount(e.target.value)}
                 />
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
-                <Button onClick={() => handleTopup(false)} disabled={!topupAmount || parseInt(topupAmount) < 500 || isProcessing}>
+                <Button onClick={() => handleTopup(false)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing}>
                   <Plus className="w-4 h-4 mr-2" />
                   {isProcessing ? "Processing..." : "Add Credits"}
                 </Button>
                 {process.env.NODE_ENV !== 'production' && (
-                  <Button variant="secondary" onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < 500 || isProcessing}>
+                  <Button variant="secondary" onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing}>
                     Bypass (Dev)
                   </Button>
                 )}
@@ -475,96 +491,85 @@ export default function WalletPage() {
           </CardContent>
         </Card>
 
-        {/* 5. Current Plan Card */}
+        {/* 5. Current Tier Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ReceiptText className="w-5 h-5" />
-              Subscription Plan
+              Usage Tier
             </CardTitle>
-            <CardDescription>Your monthly Talkar plan details.</CardDescription>
+            <CardDescription>Your current Talkar usage tier.</CardDescription>
           </CardHeader>
           <CardContent>
             {subscription && subscription.status !== "not_provisioned" ? (
               <div className="space-y-4">
                 <div className="flex justify-between items-center pb-4 border-b">
                   <div>
-                    <p className="text-sm text-muted-foreground">Current Plan</p>
-                    <p className="text-xl font-bold capitalize">{subscription.plan}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Monthly Fee</p>
-                    <p className="text-xl font-bold">₹{(subscription.monthly_fee_paise / 100).toLocaleString()}</p>
+                    <p className="text-sm text-muted-foreground">Current Tier</p>
+                    <p className="text-xl font-bold capitalize">{subscription.tier || "N/A"}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div>
                     <p className="text-sm text-muted-foreground">Per-Minute Rate</p>
-                    <p className="font-medium">₹{(subscription.per_minute_rate_paise / 100).toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Concurrent Limit</p>
-                    <p className="font-medium">{subscription.concurrent_call_limit} active calls</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-sm text-muted-foreground">Next Billing Date</p>
-                    <p className="font-medium">{new Date(subscription.next_billing_date).toLocaleDateString()}</p>
+                    <p className="font-medium">₹{subscription.per_minute_rate_paise ? (subscription.per_minute_rate_paise / 100).toFixed(2) : "0.00"}</p>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="py-8 text-center text-muted-foreground">
-                <p>Plan information unavailable or setup in progress.</p>
+                <p>Tier information unavailable or setup in progress.</p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* 6. Upgrade Plan Card */}
+      {/* 6. Upgrade Tier Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ReceiptText className="w-5 h-5" />
-            Upgrade Plan
+            Upgrade Tier
           </CardTitle>
-          <CardDescription>Request an upgrade to access higher limits and better rates.</CardDescription>
+          <CardDescription>Request an upgrade to access better rates.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6">
             <div className="p-4 border rounded-lg space-y-3">
-              <h3 className="font-bold text-lg">Starter</h3>
-              <p className="text-muted-foreground text-sm">Great for testing and low volume.</p>
-              <div className="text-2xl font-bold">₹0<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+              <h3 className="font-bold text-lg">Pro</h3>
+              <p className="text-muted-foreground text-sm">For scaling businesses.</p>
               <ul className="space-y-2 text-sm">
-                <li>• ₹1.5 / minute</li>
-                <li>• 2 concurrent calls</li>
+                <li>• ₹14 / minute</li>
+                <li>• 10 concurrent calls</li>
               </ul>
             </div>
-            <div className="p-4 border rounded-lg space-y-3 border-indigo-500/50 bg-indigo-500/5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-indigo-500 text-white text-xs px-2 py-1 rounded-bl-lg font-medium">Recommended</div>
-              <h3 className="font-bold text-lg text-indigo-500">Pro</h3>
-              <p className="text-muted-foreground text-sm">For scaling businesses.</p>
-              <div className="text-2xl font-bold">₹15,000<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+            <div className="p-4 border rounded-lg space-y-3">
+              <h3 className="font-bold text-lg">Elite</h3>
+              <p className="text-muted-foreground text-sm">Enterprise scale.</p>
               <ul className="space-y-2 text-sm">
-                <li>• ₹1.1 / minute</li>
-                <li>• 10 concurrent calls</li>
+                <li>• Custom pricing</li>
+                <li>• 50+ concurrent calls</li>
               </ul>
             </div>
           </div>
         </CardContent>
-        <CardFooter className="bg-muted/50 flex justify-end">
-          {subscription?.plan === 'pro' ? (
-            <p className="text-sm font-medium text-muted-foreground">You're on the highest plan.</p>
-          ) : subscription?.plan_upgrade_requested ? (
-            <p className="text-sm font-medium text-amber-600">Upgrade request pending for {subscription.plan_upgrade_requested}.</p>
+        <CardFooter className="bg-muted/50 flex justify-end gap-2">
+          {subscription?.tier === 'elite' ? (
+            <p className="text-sm font-medium text-muted-foreground">You're on the highest tier.</p>
+          ) : subscription?.tier_upgrade_requested ? (
+            <p className="text-sm font-medium text-amber-600">Upgrade request pending for {subscription.tier_upgrade_requested}.</p>
           ) : (
-            <Button 
-              onClick={() => handleUpgradeRequest('pro')} 
-              disabled={isRequestingUpgrade}
-            >
-              {isRequestingUpgrade ? "Requesting..." : "Upgrade to Pro"}
-            </Button>
+            <>
+              {subscription?.tier !== 'pro' && subscription?.tier !== 'elite' && (
+                <Button onClick={() => handleUpgradeRequest('pro')} disabled={isRequestingUpgrade} variant="secondary">
+                  Request Pro
+                </Button>
+              )}
+              <Button onClick={() => handleUpgradeRequest('elite')} disabled={isRequestingUpgrade}>
+                Request Elite
+              </Button>
+            </>
           )}
         </CardFooter>
       </Card>

@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { Clock, CheckCircle, XCircle, Ban, UploadCloud, Wrench, Sparkles } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Ban, UploadCloud } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import type { LocalUser } from "@/lib/auth/types";
 import Script from "next/script";
@@ -27,31 +27,25 @@ export default function OnboardingPage() {
   const [customerData, setCustomerData] = useState<any>(null);
   const [uploadProgress, setUploadProgress] = useState<{ gst: number, reg: number }>({ gst: 0, reg: 0 });
 
-  // "Build for me" toggle — true = managed/done-for-you, false = self-serve
-  const [wantsBuildForMe, setWantsBuildForMe] = useState(true);
-
   // Form State
   const [formData, setFormData] = useState({
-    // Required always
     businessName: "",
     industry: "",
     gstNumber: "",
     pocName: "",
     pocPhone: "",
-    // Required only for "build for me"
     useCaseType: "both",
     useCaseDescription: "",
     callVolume: "",
     languages: "",
-    // Optional
     websiteUrl: "",
     companySize: "",
     pocDesignation: "",
     integrations: "",
     gstCertificateUrl: "",
     businessRegistrationUrl: "",
-    // Track whether user wants managed service
-    wantsBuildForMe: true,
+    needsApiIntegration: false,
+    apiIntegrationDetails: "",
   });
 
   const TALKAR_API = "/api/talkar";
@@ -81,11 +75,7 @@ export default function OnboardingPage() {
     checkStatus();
   }, [router, dograhOrgId]);
 
-  // Keep wantsBuildForMe in formData in sync with local state
-  const handleToggleBuildForMe = (val: boolean) => {
-    setWantsBuildForMe(val);
-    setFormData(prev => ({ ...prev, wantsBuildForMe: val }));
-  };
+  // No handleToggleBuildForMe anymore, always managed
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,11 +89,14 @@ export default function OnboardingPage() {
       alert("Please fill in your contact name and phone number.");
       return;
     }
-    if (wantsBuildForMe) {
-      if (!formData.useCaseDescription.trim() || !formData.callVolume || !formData.languages.trim()) {
-        alert("Please fill in all use case fields so we can build your agent correctly.");
-        return;
-      }
+    if (!formData.useCaseDescription.trim() || !formData.callVolume || !formData.languages.trim()) {
+      alert("Please fill in all use case fields so we can build your agent correctly.");
+      return;
+    }
+
+    if (formData.needsApiIntegration && !formData.apiIntegrationDetails.trim()) {
+      alert("Please provide details for your custom API integration.");
+      return;
     }
 
     setSubmitting(true);
@@ -111,7 +104,7 @@ export default function OnboardingPage() {
       const res = await fetch(`${TALKAR_API}/customers/by-org/${dograhOrgId}/onboarding`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ form: { ...formData, wantsBuildForMe }, documents: [] })
+        body: JSON.stringify({ form: formData, documents: [] })
       });
       if (res.ok) {
         setStatus("under_review");
@@ -141,8 +134,8 @@ export default function OnboardingPage() {
       key: customerData.razorpay_key_id,
       amount: 100, // ₹1 (100 paise) — test amount
       currency: "INR",
-      name: "Talkar Setup Fee",
-      description: "One-time setup fee for Talkar Voice AI",
+      name: "Talkar Integration Fee",
+      description: "One-time custom API integration fee",
       order_id: customerData.setup_fee_order_id,
       handler: async function (response: any) {
         // Verify payment server-side and trigger provisioning
@@ -306,38 +299,10 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              {/* ── 3. Build for Me toggle ── */}
+              {/* ── 3. Use Case Details ── */}
               <div className="space-y-4">
-                <h3 className="text-lg font-medium border-b pb-2">3. How do you want to get started?</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Self-Serve option */}
-                  <button
-                    type="button"
-                    onClick={() => handleToggleBuildForMe(false)}
-                    className={`rounded-xl border-2 p-5 text-left transition-all ${!wantsBuildForMe ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"}`}
-                  >
-                    <Wrench className="w-6 h-6 mb-2 text-muted-foreground" />
-                    <p className="font-semibold">I'll build it myself</p>
-                    <p className="text-sm text-muted-foreground mt-1">My team will create and manage the AI agent on Dograh. I just need the platform access.</p>
-                  </button>
-                  {/* Managed option */}
-                  <button
-                    type="button"
-                    onClick={() => handleToggleBuildForMe(true)}
-                    className={`rounded-xl border-2 p-5 text-left transition-all ${wantsBuildForMe ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"}`}
-                  >
-                    <Sparkles className="w-6 h-6 mb-2 text-primary" />
-                    <p className="font-semibold">Build it for me <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full ml-1">Recommended</span></p>
-                    <p className="text-sm text-muted-foreground mt-1">Our team will design, build, and deploy your AI agent. You just describe what you need.</p>
-                  </button>
-                </div>
-              </div>
-
-              {/* ── 4. Use Case Details — only required if "build for me" ── */}
-              {wantsBuildForMe && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium border-b pb-2">4. Tell Us About Your Agent</h3>
-                  <p className="text-sm text-muted-foreground">Help our team build the perfect agent for your business.</p>
+                <h3 className="text-lg font-medium border-b pb-2">3. Tell Us About Your Agent</h3>
+                <p className="text-sm text-muted-foreground">Help our team build the perfect agent for your business.</p>
 
                   <div className="space-y-3">
                     <Label>Agent Type <span className="text-red-500">*</span></Label>
@@ -390,13 +355,36 @@ export default function OnboardingPage() {
                       <Input id="integrations" placeholder="E.g., HubSpot CRM, Google Calendar, WhatsApp" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} />
                     </div>
                   </div>
+              {/* ── 4. Custom API Integration ── */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium border-b pb-2">4. Custom API Integration</h3>
+                <p className="text-sm text-muted-foreground">Do you need your AI agent to integrate with a custom internal tool, proprietary API, or custom webhook? (If yes, we will quote a custom integration fee).</p>
+                <div className="flex items-center space-x-2">
+                  <Switch 
+                    id="needsApiIntegration" 
+                    checked={formData.needsApiIntegration} 
+                    onCheckedChange={val => setFormData({...formData, needsApiIntegration: val})}
+                  />
+                  <Label htmlFor="needsApiIntegration">Yes, I need custom API integration</Label>
                 </div>
-              )}
+                {formData.needsApiIntegration && (
+                  <div className="space-y-2 mt-4 border-l-2 border-primary pl-4">
+                    <Label htmlFor="apiIntegrationDetails">Describe the integration <span className="text-red-500">*</span></Label>
+                    <Textarea
+                      id="apiIntegrationDetails"
+                      placeholder="E.g., I need to pull customer records from my proprietary CRM via REST API..."
+                      value={formData.apiIntegrationDetails}
+                      onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
+                      rows={3}
+                    />
+                  </div>
+                )}
+              </div>
 
-              {/* ── 5. Documents (optional for self-serve, recommended for build-for-me) ── */}
+              {/* ── 5. Documents ── */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium border-b pb-2">
-                  {wantsBuildForMe ? "5." : "4."} Documents <span className="text-muted-foreground text-sm font-normal">(optional — speeds up verification)</span>
+                  5. Documents <span className="text-muted-foreground text-sm font-normal">(optional — speeds up verification)</span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div
@@ -456,28 +444,26 @@ export default function OnboardingPage() {
                 <div><span className="text-muted-foreground">Industry:</span><br />{customerData?.onboarding_form?.industry || "N/A"}</div>
                 <div><span className="text-muted-foreground">GST:</span><br />{customerData?.onboarding_form?.gstNumber || "N/A"}</div>
                 <div><span className="text-muted-foreground">Contact:</span><br />{customerData?.onboarding_form?.pocName || "N/A"} · {customerData?.onboarding_form?.pocPhone || "N/A"}</div>
-                <div className="md:col-span-2"><span className="text-muted-foreground">Service Type:</span><br />
-                  {customerData?.onboarding_form?.wantsBuildForMe ? "✨ Managed — Build for me" : "🔧 Self-Serve — I'll build it myself"}
+                <div className="md:col-span-2"><span className="text-muted-foreground">Custom API Integration:</span><br />
+                  {customerData?.onboarding_form?.needsApiIntegration ? "Yes — " + customerData?.onboarding_form?.apiIntegrationDetails : "No"}
                 </div>
-                {customerData?.onboarding_form?.wantsBuildForMe && (
-                  <div className="md:col-span-2"><span className="text-muted-foreground">Use Case:</span><br />{customerData?.onboarding_form?.useCaseDescription || "N/A"}</div>
-                )}
+                <div className="md:col-span-2"><span className="text-muted-foreground">Use Case:</span><br />{customerData?.onboarding_form?.useCaseDescription || "N/A"}</div>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* ── APPROVED: Pay setup fee ── */}
+      {/* ── APPROVED: Pay integration fee ── */}
       {status === "approved" && (
         <Card className="text-center py-12 border-green-500/30 bg-green-500/5">
           <CardContent className="space-y-6">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-            <h2 className="text-2xl font-bold">You're approved! Complete your setup fee payment to get started.</h2>
-            <p className="text-muted-foreground text-sm">One-time setup fee · Secure payment via Razorpay</p>
+            <h2 className="text-2xl font-bold">Integration Fee Quoted</h2>
+            <p className="text-muted-foreground text-sm">We have approved your application and quoted a one-time fee for your custom API integration. Complete the payment to begin development.</p>
             <div className="flex gap-4 justify-center mt-4">
               <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" onClick={handlePaySetupFee}>
-                Pay Setup Fee
+                Pay Integration Fee
               </Button>
               {process.env.NODE_ENV !== 'production' && (
                 <Button onClick={handleMockSetupFee} variant="secondary" size="lg">

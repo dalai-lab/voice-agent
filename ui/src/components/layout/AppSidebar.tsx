@@ -217,8 +217,6 @@ export function AppSidebar() {
 
   const filteredNavSections = React.useMemo(() => {
     const TALKAR_CUSTOMER_HIDDEN_URLS = [
-      "/workflow",
-      "/campaigns",
       "/telephony-configurations",
       "/model-configurations",
       "/api-keys",

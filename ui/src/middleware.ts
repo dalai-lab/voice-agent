@@ -92,16 +92,28 @@ export async function middleware(request: NextRequest) {
   if (organizationId && !ALLOWED_WHILE_LOCKED.some(p => pathname.startsWith(p))) {
     try {
       // Check Talkar account status using the org ID
-      const statusRes = await fetch(`${process.env.TALKAR_API_URL}/customers/status?dograh_org_id=${organizationId}`);
+      const TALKAR_SERVICE = process.env.TALKAR_SERVICE_URL || "http://host.docker.internal:8002";
+      const statusRes = await fetch(`${TALKAR_SERVICE}/customers/status?dograh_org_id=${organizationId}`);
 
       if (statusRes.ok) {
         const { status } = await statusRes.json();
         if (status !== 'active') {
-          // TALKAR PATCH: If suspended, they must be allowed to reach /wallet to add credits
+          // TALKAR PATCH: Status state machine routing
           if (status === 'suspended' && (pathname.startsWith('/wallet') || pathname.startsWith('/billing'))) {
             // let it pass
+          } else if (status === 'pending_deposit') {
+            if (!pathname.startsWith('/wallet')) {
+              return NextResponse.redirect(new URL('/wallet?activation=true', request.url));
+            }
+          } else if (status === 'pending_plan_selection') {
+            if (!pathname.startsWith('/onboarding/select-plan')) {
+              return NextResponse.redirect(new URL('/onboarding/select-plan', request.url));
+            }
           } else {
-            return NextResponse.redirect(new URL('/onboarding', request.url));
+            // All other non-active states (pending_approval, under_review, approved, agent_building, rejected)
+            if (!pathname.startsWith('/onboarding')) {
+              return NextResponse.redirect(new URL('/onboarding', request.url));
+            }
           }
         }
       }
@@ -112,7 +124,7 @@ export async function middleware(request: NextRequest) {
 
   // TALKAR PATCH: Block restricted URLs for customers (SOT 695)
   const RESTRICTED_PREFIXES = [
-    '/workflow', '/campaigns', '/usage', '/telephony-configurations', 
+    '/usage', '/telephony-configurations', 
     '/model-configurations', '/api-keys'
   ];
   if (RESTRICTED_PREFIXES.some(p => pathname.startsWith(p))) {

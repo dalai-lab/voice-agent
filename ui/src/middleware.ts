@@ -80,9 +80,14 @@ export async function middleware(request: NextRequest) {
       let stackToken = null;
       console.log("[MIDDLEWARE] ALL COOKIES:", request.cookies.getAll().map(c => ({ name: c.name, val_start: c.value.substring(0, 10) })));
       for (const cookie of request.cookies.getAll()) {
-        if (cookie.name.includes('stack') || cookie.value.startsWith('eyJ')) {
-          stackToken = cookie.value;
-          console.log("[MIDDLEWARE] SELECTED STACK TOKEN COOKIE:", cookie.name);
+        if (cookie.name.includes('stack') || cookie.name.includes('hexclave-access')) {
+          try {
+            const parsed = JSON.parse(decodeURIComponent(cookie.value));
+            stackToken = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : cookie.value;
+          } catch(e) {
+            stackToken = cookie.value;
+          }
+          console.log("[MIDDLEWARE] SELECTED STACK TOKEN COOKIE:", cookie.name, "TOKEN:", stackToken.substring(0, 10));
           break;
         }
       }
@@ -96,6 +101,7 @@ export async function middleware(request: NextRequest) {
       headers.set('Authorization', `Bearer ${stackToken}`);
     }
 
+    console.log("[MIDDLEWARE] Fetching from:", `${backendUrl}/api/v1/auth/me`);
     const res = await fetch(`${backendUrl}/api/v1/auth/me`, {
       headers
     });

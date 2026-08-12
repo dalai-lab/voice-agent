@@ -152,6 +152,45 @@ async def get_user(
                         exc_info=True,
                     )
 
+                # TALKAR PATCH: Create customer record in talkar-service for
+                # new Stack Auth signups (mirrors the same call in auth.py /signup)
+                try:
+                    from api.constants import DEPLOYMENT_MODE, TALKAR_SERVICE_URL
+                    if DEPLOYMENT_MODE == "talkar":
+                        import httpx
+                        stack_email = stack_user.get("primary_email", "")
+                        stack_name = (
+                            stack_user.get("display_name")
+                            or (stack_email.split("@")[0] if stack_email else "")
+                        )
+                        async with httpx.AsyncClient() as client:
+                            res = await client.post(
+                                f"{TALKAR_SERVICE_URL}/customers/",
+                                json={
+                                    "email": stack_email,
+                                    "contact_name": stack_name,
+                                    "dograh_org_id": organization.id,
+                                    "dograh_user_id": user_model.id,
+                                },
+                                timeout=5.0,
+                            )
+                            res.raise_for_status()
+
+                        # Stamp TALKAR_ORG_TYPE so UI middleware blocks advanced views
+                        from api.enums import OrganizationConfigurationKey
+                        await db_client.upsert_configuration(
+                            organization.id,
+                            OrganizationConfigurationKey.TALKAR_ORG_TYPE.value,
+                            "customer",
+                        )
+                except Exception as e:
+                    logger.error(
+                        "Failed to trigger Talkar signup webhook for Stack Auth "
+                        "user {}: {}",
+                        user_model.id,
+                        e,
+                    )
+
                 existing_cfg = await db_client.get_user_configurations(user_model.id)
                 if not (existing_cfg.llm or existing_cfg.tts or existing_cfg.stt):
                     mps_config = await create_user_configuration_with_mps_key(

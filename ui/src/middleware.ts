@@ -132,7 +132,8 @@ export async function middleware(request: NextRequest) {
     '/model-configurations', '/api-keys'
   ];
   if (RESTRICTED_PREFIXES.some(p => pathname.startsWith(p))) {
-    if (talkarOrgType === 'customer') {
+    const isAdminBypass = request.cookies.get('talkar_admin_bypass')?.value;
+    if (talkarOrgType === 'customer' && isAdminBypass !== 'true') {
       const overviewUrl = new URL('/overview', request.url);
       // Optional: Add a query param so the UI can show a toast
       overviewUrl.searchParams.set('restricted', 'true');

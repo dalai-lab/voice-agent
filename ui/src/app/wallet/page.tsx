@@ -540,7 +540,7 @@ export default function WalletPage() {
               <h3 className="font-bold text-lg">Pro</h3>
               <p className="text-muted-foreground text-sm">For scaling businesses.</p>
               <ul className="space-y-2 text-sm">
-                <li>• ₹14 / minute</li>
+                <li>• ₹18 / minute</li>
                 <li>• 10 concurrent calls</li>
               </ul>
             </div>
@@ -548,8 +548,8 @@ export default function WalletPage() {
               <h3 className="font-bold text-lg">Elite</h3>
               <p className="text-muted-foreground text-sm">Enterprise scale.</p>
               <ul className="space-y-2 text-sm">
-                <li>• Custom pricing</li>
-                <li>• 50+ concurrent calls</li>
+                <li>• ₹25 / minute</li>
+                <li>• Unlimited concurrent calls</li>
               </ul>
             </div>
           </div>
@@ -592,7 +592,6 @@ export default function WalletPage() {
               <option value="call_deduction">Call Deductions</option>
               <option value="refund">Refunds</option>
               <option value="grant">Grants</option>
-              <option value="monthly_fee">Monthly Fees</option>
             </select>
           </div>
         </CardHeader>

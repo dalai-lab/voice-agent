@@ -147,15 +147,18 @@ export async function middleware(request: NextRequest) {
               return NextResponse.redirect(new URL('/onboarding/select-plan', request.url));
             }
           } else {
-            // All other non-active states (pending_approval, under_review, approved, agent_building, rejected)
-            if (!pathname.startsWith('/onboarding')) {
-              return NextResponse.redirect(new URL('/onboarding', request.url));
-            }
+            return NextResponse.redirect(new URL('/onboarding', request.url));
           }
         }
+      } else {
+        // If the customer doesn't exist yet (404) or API is down, force them to onboarding
+        console.log(`[MIDDLEWARE] Talkar status check failed (${statusRes.status}), forcing onboarding`);
+        return NextResponse.redirect(new URL('/onboarding', request.url));
       }
     } catch (err) {
       console.error("Talkar account status gate fetch failed", err);
+      // Failsafe: If Talkar API is unreachable, do not let them bypass the lock!
+      return NextResponse.redirect(new URL('/onboarding', request.url));
     }
   }
 

@@ -78,15 +78,18 @@ export async function middleware(request: NextRequest) {
     } else {
       // For Stack Auth, locate the JWT token in cookies
       let stackToken = null;
+      console.log("[MIDDLEWARE] ALL COOKIES:", request.cookies.getAll().map(c => ({ name: c.name, val_start: c.value.substring(0, 10) })));
       for (const cookie of request.cookies.getAll()) {
-        if (cookie.value.startsWith('eyJ')) {
+        if (cookie.name.includes('stack') || cookie.value.startsWith('eyJ')) {
           stackToken = cookie.value;
+          console.log("[MIDDLEWARE] SELECTED STACK TOKEN COOKIE:", cookie.name);
           break;
         }
       }
       
       // If no token found, skip the gate and let Stack Auth handle the unauthenticated state
       if (!stackToken) {
+        console.log("[MIDDLEWARE] NO STACK TOKEN FOUND, SKIPPING GATE");
         return NextResponse.next();
       }
       

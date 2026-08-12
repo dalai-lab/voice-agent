@@ -83,8 +83,11 @@ async def get_user(
             "primary_email"
         )
         if stack_email and user_model.email != stack_email:
-            await db_client.update_user_email(user_model.id, stack_email)
-            user_model.email = stack_email
+            try:
+                await db_client.update_user_email(user_model.id, stack_email)
+                user_model.email = stack_email
+            except Exception as e:
+                logger.warning(f"Could not sync email {stack_email} for user {user_model.id}: {e}")
 
         if user_was_created:
             capture_event(

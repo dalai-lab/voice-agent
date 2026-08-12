@@ -141,6 +141,7 @@ services:
       - app-network
 
   api:
+    build: ./api
     image: ${REGISTRY:-dograhai}/dograh-api:latest
     environment:
       # Core application config
@@ -275,6 +276,7 @@ services:
       - app-network
 
   ui:
+    build: ./ui
     image: ${REGISTRY:-dograhai}/dograh-ui:latest
     environment:
       # Bind the Next.js standalone server to all interfaces

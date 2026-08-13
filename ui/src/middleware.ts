@@ -101,12 +101,10 @@ export async function middleware(request: NextRequest) {
       headers.set('Authorization', `Bearer ${stackToken}`);
     }
 
-    // The backendUrl is set to host.docker.internal in docker-compose so
-    // Edge runtime can resolve it. If for some reason it still has 'api',
-    // fall back to host.docker.internal.
-    const edgeBackendUrl = backendUrl.includes('//api:')
-      ? backendUrl.replace('//api:', '//host.docker.internal:')
-      : backendUrl;
+    // Use MIDDLEWARE_BACKEND_URL which is set to host.docker.internal in docker-compose.
+    // Regular BACKEND_URL (http://api:8000) can't be resolved by the Next.js Edge runtime.
+    const edgeBackendUrl = process.env.MIDDLEWARE_BACKEND_URL
+      || (backendUrl.includes('//api:') ? backendUrl.replace('//api:', '//host.docker.internal:') : backendUrl);
     
     // Only forward Authorization header - no browser cookies or host headers
     const safeHeaders = new Headers();

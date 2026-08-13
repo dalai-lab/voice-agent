@@ -2,14 +2,15 @@
 
 import { AlertTriangle, Menu, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import React, { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import React, { ReactNode, useEffect, useRef } from "react";
 
 import { BrandLogo } from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { SidebarInset, SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { useAppConfig } from "@/context/AppConfigContext";
 import { LeadFormsProvider } from "@/context/LeadFormsContext";
+import { useAuth } from "@/lib/auth";
 
 import { AppSidebar } from "./AppSidebar";
 
@@ -72,6 +73,61 @@ function BackendStatusBanner() {
   );
 }
 
+// TALKAR PATCH: Client-side status gate.
+// We cannot use middleware for this because the Stack Auth opaque access token
+// in hexclave-access cannot be validated server-side from Edge runtime.
+// The browser already has a valid session, so the /api/talkar proxy works fine.
+const TALKAR_ALLOWED_PATHS = ["/onboarding", "/wallet", "/billing", "/handler", "/auth", "/api"];
+
+function TalkarStatusGate() {
+  const { user } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+  const checkedRef = useRef(false);
+
+  useEffect(() => {
+    // Reset check when pathname changes so navigating to a new page re-checks
+    checkedRef.current = false;
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!user || checkedRef.current) return;
+    if (TALKAR_ALLOWED_PATHS.some(p => pathname.startsWith(p))) return;
+    if (document.cookie.includes('talkar_admin_bypass=true')) return;
+
+    // Get the user's email - available on both Stack Auth and local auth users
+    const email = (user as any)?.primaryEmail ?? (user as any)?.email;
+    // Also try org_id for local auth users that have it
+    const orgId = (user as any)?.organization_id ?? (user as any)?.organizationId;
+
+    if (!email && !orgId) return;
+
+    checkedRef.current = true;
+
+    const query = orgId
+      ? `dograh_org_id=${orgId}`
+      : `contact_email=${encodeURIComponent(email)}`;
+
+    fetch(`/api/talkar/customers/status?${query}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return; // Talkar API down — fail open
+        const { status } = data;
+        if (status === 'active') return;
+        if (status === 'pending_deposit') {
+          router.replace('/wallet?activation=true');
+        } else if (status === 'pending_plan_selection') {
+          router.replace('/onboarding/select-plan');
+        } else {
+          router.replace('/onboarding');
+        }
+      })
+      .catch(() => { /* fail open */ });
+  }, [user, pathname, router]);
+
+  return null;
+}
+
 interface AppLayoutProps {
   children: ReactNode;
   headerActions?: ReactNode;
@@ -102,6 +158,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   // across route changes (avoids React hooks ordering violations during navigation).
   return (
     <SidebarProvider defaultOpen>
+      {/* TALKAR PATCH: Client-side status gate (works with Stack Auth unlike middleware) */}
+      <TalkarStatusGate />
       {shouldShowSidebar ? (
         <LeadFormsProvider>
           <div className="flex min-h-screen w-full">

@@ -109,10 +109,8 @@ export async function middleware(request: NextRequest) {
     
     // Only forward safe headers (Authorization) to prevent Edge runtime crashes from invalid browser headers
     const safeHeaders = new Headers();
-    if (stackToken) {
-      safeHeaders.set('Authorization', `Bearer ${stackToken}`);
-    } else if (token && authProvider === 'local') {
-      safeHeaders.set('Authorization', `Bearer ${token}`);
+    if (headers.has('Authorization')) {
+      safeHeaders.set('Authorization', headers.get('Authorization')!);
     }
     
     console.log("[MIDDLEWARE] Fetching from:", `${edgeBackendUrl}/api/v1/auth/me`);

@@ -106,9 +106,18 @@ export async function middleware(request: NextRequest) {
     if (edgeBackendUrl.includes('//api:8000')) {
       edgeBackendUrl = edgeBackendUrl.replace('//api:8000', '//host.docker.internal:8000');
     }
+    
+    // Only forward safe headers (Authorization) to prevent Edge runtime crashes from invalid browser headers
+    const safeHeaders = new Headers();
+    if (stackToken) {
+      safeHeaders.set('Authorization', `Bearer ${stackToken}`);
+    } else if (token && authProvider === 'local') {
+      safeHeaders.set('Authorization', `Bearer ${token}`);
+    }
+    
     console.log("[MIDDLEWARE] Fetching from:", `${edgeBackendUrl}/api/v1/auth/me`);
     const res = await fetch(`${edgeBackendUrl}/api/v1/auth/me`, {
-      headers
+      headers: safeHeaders
     });
     if (res.ok) {
       const userData = await res.json();

@@ -116,10 +116,15 @@ export async function middleware(request: NextRequest) {
     const res = await fetch(`${edgeBackendUrl}/api/v1/auth/me`, {
       headers: safeHeaders
     });
+    console.log("[MIDDLEWARE] /auth/me status:", res.status);
     if (res.ok) {
       const userData = await res.json();
+      console.log("[MIDDLEWARE] /auth/me response:", JSON.stringify(userData));
       organizationId = userData.organization_id;
       talkarOrgType = userData.talkar_org_type;
+    } else {
+      const errText = await res.text().catch(() => '(unreadable)');
+      console.log("[MIDDLEWARE] /auth/me failed body:", errText.substring(0, 200));
     }
 
   } catch (err) {
@@ -128,14 +133,18 @@ export async function middleware(request: NextRequest) {
 
   // TALKAR PATCH: Account status gate (Phase 5B)
   const ALLOWED_WHILE_LOCKED = ["/onboarding", "/api", "/_next", "/login", "/logout"];
+  console.log("[MIDDLEWARE] Gate check - organizationId:", organizationId, "pathname:", pathname);
   if (organizationId && !ALLOWED_WHILE_LOCKED.some(p => pathname.startsWith(p))) {
     try {
       // Check Talkar account status using the org ID
       const TALKAR_SERVICE = process.env.TALKAR_SERVICE_URL || "http://host.docker.internal:8002";
+      console.log("[MIDDLEWARE] Checking Talkar status at:", `${TALKAR_SERVICE}/customers/status?dograh_org_id=${organizationId}`);
       const statusRes = await fetch(`${TALKAR_SERVICE}/customers/status?dograh_org_id=${organizationId}`);
+      console.log("[MIDDLEWARE] Talkar status response:", statusRes.status);
 
       if (statusRes.ok) {
         const { status } = await statusRes.json();
+        console.log("[MIDDLEWARE] Talkar customer status:", status);
         if (status !== 'active') {
           // TALKAR PATCH: Status state machine routing
           const isAdminBypass = request.cookies.get('talkar_admin_bypass')?.value;

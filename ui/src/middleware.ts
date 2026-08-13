@@ -101,13 +101,14 @@ export async function middleware(request: NextRequest) {
       headers.set('Authorization', `Bearer ${stackToken}`);
     }
 
-    // Edge runtime cannot resolve Docker DNS 'api'. Substitute with host.docker.internal.
-    let edgeBackendUrl = backendUrl;
-    if (edgeBackendUrl.includes('//api:8000')) {
-      edgeBackendUrl = edgeBackendUrl.replace('//api:8000', '//host.docker.internal:8000');
-    }
+    // The backendUrl is set to host.docker.internal in docker-compose so
+    // Edge runtime can resolve it. If for some reason it still has 'api',
+    // fall back to host.docker.internal.
+    const edgeBackendUrl = backendUrl.includes('//api:')
+      ? backendUrl.replace('//api:', '//host.docker.internal:')
+      : backendUrl;
     
-    // Only forward safe headers (Authorization) to prevent Edge runtime crashes from invalid browser headers
+    // Only forward Authorization header - no browser cookies or host headers
     const safeHeaders = new Headers();
     if (headers.has('Authorization')) {
       safeHeaders.set('Authorization', headers.get('Authorization')!);

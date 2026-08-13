@@ -283,7 +283,8 @@ services:
       HOSTNAME: "0.0.0.0"
 
       # Server-side URL (SSR, internal Docker network)
-      BACKEND_URL: "${BACKEND_URL:-http://api:8000}"
+      # NOTE: Next.js Edge runtime cannot resolve Docker DNS names ('api') - use host.docker.internal
+      BACKEND_URL: "${BACKEND_URL:-http://host.docker.internal:8000}"
       NODE_ENV: "oss"
 
       # Flag to enable/ disable posthog

@@ -67,51 +67,37 @@ export async function middleware(request: NextRequest) {
   let talkarOrgType = null;
   try {
     const backendUrl = getServerBackendUrl();
-    const headers = new Headers(request.headers);
-    headers.delete('host');
-
-    if (authProvider === 'local') {
-      if (token) {
-        headers.set('Cookie', `${OSS_TOKEN_COOKIE}=${token}`);
-        headers.set('Authorization', `Bearer ${token}`);
-      }
-    } else {
-      // For Stack Auth, locate the JWT token in cookies
-      let stackToken = null;
-      console.log("[MIDDLEWARE] ALL COOKIES:", request.cookies.getAll().map(c => ({ name: c.name, val_start: c.value.substring(0, 10) })));
-      for (const cookie of request.cookies.getAll()) {
-        if (cookie.name.includes('stack') || cookie.name.includes('hexclave-access')) {
-          try {
-            const parsed = JSON.parse(decodeURIComponent(cookie.value));
-            stackToken = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : cookie.value;
-          } catch(e) {
-            stackToken = cookie.value;
-          }
-          console.log("[MIDDLEWARE] SELECTED STACK TOKEN COOKIE:", cookie.name, "TOKEN:", stackToken.substring(0, 10));
-          break;
-        }
-      }
-      
-      // If no token found, skip the gate and let Stack Auth handle the unauthenticated state
-      if (!stackToken) {
-        console.log("[MIDDLEWARE] NO STACK TOKEN FOUND, SKIPPING GATE");
-        return NextResponse.next();
-      }
-      
-      headers.set('Authorization', `Bearer ${stackToken}`);
-    }
 
     // Use MIDDLEWARE_BACKEND_URL which is set to host.docker.internal in docker-compose.
     // Regular BACKEND_URL (http://api:8000) can't be resolved by the Next.js Edge runtime.
     const edgeBackendUrl = process.env.MIDDLEWARE_BACKEND_URL
       || (backendUrl.includes('//api:') ? backendUrl.replace('//api:', '//host.docker.internal:') : backendUrl);
-    
-    // Only forward Authorization header - no browser cookies or host headers
+
+    // Build auth headers for /auth/me call
     const safeHeaders = new Headers();
-    if (headers.has('Authorization')) {
-      safeHeaders.set('Authorization', headers.get('Authorization')!);
+
+    if (authProvider === 'local') {
+      // Local auth: pass the session cookie + Bearer token
+      if (token) {
+        safeHeaders.set('Cookie', `${OSS_TOKEN_COOKIE}=${token}`);
+        safeHeaders.set('Authorization', `Bearer ${token}`);
+      } else {
+        // No local token, can't check org - skip gate
+        return NextResponse.next();
+      }
+    } else {
+      // Stack Auth: the backend's Stack Auth SDK validates using the raw session cookies.
+      // The hexclave-access value is an opaque token (NOT a Bearer JWT), so we must
+      // forward ALL cookies and let the backend resolve the user server-side.
+      const rawCookie = request.headers.get('cookie');
+      console.log("[MIDDLEWARE] ALL COOKIES:", request.cookies.getAll().map(c => ({ name: c.name, val_start: c.value.substring(0, 10) })));
+      if (!rawCookie || !rawCookie.includes('hexclave-access')) {
+        console.log("[MIDDLEWARE] NO STACK SESSION FOUND, SKIPPING GATE");
+        return NextResponse.next();
+      }
+      safeHeaders.set('Cookie', rawCookie);
     }
-    
+
     console.log("[MIDDLEWARE] Fetching from:", `${edgeBackendUrl}/api/v1/auth/me`);
     const res = await fetch(`${edgeBackendUrl}/api/v1/auth/me`, {
       headers: safeHeaders

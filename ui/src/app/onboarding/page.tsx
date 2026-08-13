@@ -48,13 +48,20 @@ export default function OnboardingPage() {
     apiIntegrationDetails: "",
   });
 
+  const email = (user as any)?.primaryEmail ?? (user as any)?.email;
+  
   const TALKAR_API = "/api/talkar";
 
   useEffect(() => {
-    if (!dograhOrgId) return;
+    if (!dograhOrgId && !email) return;
+    
     async function checkStatus() {
       try {
-        const res = await fetch(`${TALKAR_API}/customers/status?dograh_org_id=${dograhOrgId}`);
+        const query = dograhOrgId 
+          ? `dograh_org_id=${dograhOrgId}` 
+          : `contact_email=${encodeURIComponent(email)}`;
+          
+        const res = await fetch(`${TALKAR_API}/customers/status?${query}`);
         if (res.ok) {
           const data = await res.json();
           setStatus(data.status);
@@ -101,7 +108,11 @@ export default function OnboardingPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${TALKAR_API}/customers/by-org/${dograhOrgId}/onboarding`, {
+      const endpoint = customerData?.customer_id 
+        ? `${TALKAR_API}/customers/${customerData.customer_id}/onboarding`
+        : `${TALKAR_API}/customers/by-org/${dograhOrgId}/onboarding`;
+        
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ form: formData, documents: [] })

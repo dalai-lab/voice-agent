@@ -106,6 +106,10 @@ export default function WalletPage() {
             amount_paise: order.amount_paise,
           })
         });
+        if (!confirmRes.ok) {
+          const err = await confirmRes.json().catch(() => ({}));
+          throw new Error(err.detail || "Mock bypass failed. (Are you on production with a Razorpay Secret set?)");
+        }
         const result = await confirmRes.json();
         setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
         setTopupAmount("");
@@ -143,6 +147,10 @@ export default function WalletPage() {
               amount_paise: order.amount_paise,
             })
           });
+          if (!confirmRes.ok) {
+            const err = await confirmRes.json().catch(() => ({}));
+            throw new Error(err.detail || "Failed to confirm payment on server");
+          }
           const result = await confirmRes.json();
           // Update state smoothly
           setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
@@ -308,10 +316,12 @@ export default function WalletPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ requested_tier: requestedTier })
           });
-          if (res.ok) {
-            alert("Your tier has been successfully updated!");
-            fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || "Failed to switch to starter tier");
           }
+          alert("Your tier has been successfully updated!");
+          fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
           setIsRequestingUpgrade(false);
           return;
         }
@@ -335,6 +345,10 @@ export default function WalletPage() {
             requested_tier: requestedTier
           })
         });
+        if (!confirmRes.ok) {
+            const err = await confirmRes.json().catch(() => ({}));
+            throw new Error(err.detail || "Mock bypass failed. (Are you on production with a Razorpay Secret set?)");
+        }
         const result = await confirmRes.json();
         setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
         fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
@@ -375,6 +389,10 @@ export default function WalletPage() {
               requested_tier: requestedTier
             })
           });
+          if (!confirmRes.ok) {
+            const err = await confirmRes.json().catch(() => ({}));
+            throw new Error(err.detail || "Failed to confirm upgrade on server");
+          }
           const result = await confirmRes.json();
           setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
           

@@ -19,6 +19,27 @@ import Script from "next/script";
 export default function WalletPage() {
   const { user } = useAuth();
   const email = (user as any)?.primaryEmail ?? (user as any)?.email;
+  const searchParams = useSearchParams();
+  const isActivation = searchParams.get("activation") === "true";
+  const minTopup = isActivation ? 2000 : 500;
+  const TALKAR = "/api/talkar";
+
+  const [wallet, setWallet] = useState<any>(null);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [filter, setFilter] = useState<string>("all");
+  const [page, setPage] = useState<number>(1);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [usage, setUsage] = useState<any>(null);
+  
+  const [topupAmount, setTopupAmount] = useState<string>(isActivation ? "2000" : "");
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  const [autoRechargeEnabled, setAutoRechargeEnabled] = useState(false);
+  const [threshold, setThreshold] = useState("1000");
+  const [rechargeAmount, setRechargeAmount] = useState("5000");
+  const [isSavingRecharge, setIsSavingRecharge] = useState(false);
+  const [hasSavedCard, setHasSavedCard] = useState(false);
+  const [isRequestingUpgrade, setIsRequestingUpgrade] = useState(false);
 
   const [resolvedOrgId, setResolvedOrgId] = useState<number | null>(null);
 

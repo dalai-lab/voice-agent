@@ -179,17 +179,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   // Only match the exact editor page /workflow/<id>, not sub-routes like /workflow/<id>/runs
   const isWorkflowEditor = /^\/workflow\/\d+$/.test(pathname);
 
-  // Always render SidebarProvider to keep the component tree shape consistent
+  // always render SidebarProvider to keep the component tree shape consistent
   // across route changes (avoids React hooks ordering violations during navigation).
   return (
     <SidebarProvider defaultOpen>
-      {/* TALKAR PATCH: Client-side status gate (works with Stack Auth unlike middleware) */}
-      <TalkarStatusGate />
       {shouldShowSidebar ? (
         <LeadFormsProvider>
           <div className="flex min-h-screen w-full">
             <AppSidebar />
             <SidebarInset className="flex-1">
+              <TalkarStatusGate />
               <BackendStatusBanner />
               {!isWorkflowEditor && <AppHeader />}
               {/* Optional header area for specific pages */}
@@ -223,6 +222,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         </LeadFormsProvider>
       ) : (
         <div className="app-surface w-full flex-1">
+          <TalkarStatusGate />
           <BackendStatusBanner />
           {children}
         </div>

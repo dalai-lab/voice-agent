@@ -236,9 +236,9 @@ export function AppSidebar() {
             return url ? !TALKAR_CUSTOMER_HIDDEN_URLS.includes(url) : true;
           }).filter(item => item.type === "single" || (item.type === "group" && (item as SidebarGroupItem).items.length > 0)),
         })).filter(section => section.items.length > 0)
-      : NAV_SECTIONS;
+      : NAV_SECTIONS.map(section => ({ ...section, items: [...section.items] }));
 
-    if (isCustomerView && visibleSections.length > 0) {
+    if (isTalkarCustomer && visibleSections.length > 0) {
       visibleSections[0].items.push({
         type: "single",
         title: "Wallet & Credits",

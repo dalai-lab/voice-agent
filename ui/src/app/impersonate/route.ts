@@ -105,11 +105,15 @@ export async function GET(request: NextRequest) {
         return new Response("Stack auth is not configured", { status: 400 });
     }
 
-    const fallbackRedirectUrl = new URL("/workflow/create", request.url);
+    const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3010';
+    const proto = request.headers.get('x-forwarded-proto') || (process.env.NODE_ENV === 'production' ? 'https' : 'http');
+    const baseUrl = `${proto}://${forwardedHost}`;
+
+    const fallbackRedirectUrl = new URL("/overview", baseUrl);
     let redirectUrl = fallbackRedirectUrl.toString();
     try {
-        const requestedRedirectUrl = new URL(redirectPath, request.url);
-        if (requestedRedirectUrl.origin === request.nextUrl.origin) {
+        const requestedRedirectUrl = new URL(redirectPath, baseUrl);
+        if (requestedRedirectUrl.origin === fallbackRedirectUrl.origin) {
             redirectUrl = requestedRedirectUrl.toString();
         }
     } catch {

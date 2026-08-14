@@ -9,6 +9,7 @@
  * and forwards them to the internal Talkar service. The response is returned as-is.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { getServerUser } from "@/lib/auth/server";
 
 const TALKAR_INTERNAL_URL =
   process.env.TALKAR_SERVICE_URL || "http://host.docker.internal:8002";
@@ -17,9 +18,16 @@ async function proxy(request: NextRequest, method: string, path: string) {
   const search = request.nextUrl.search;
   const targetUrl = `${TALKAR_INTERNAL_URL}/${path}${search}`;
 
+  const user = await getServerUser();
+  const userEmail = (user as any)?.primaryEmail || (user as any)?.email;
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
+  
+  if (userEmail) {
+    headers["X-Talkar-Email"] = userEmail;
+  }
 
   let body: string | undefined;
   if (method !== "GET" && method !== "HEAD") {

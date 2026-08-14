@@ -241,6 +241,13 @@ export function AppSidebar() {
         url: "/wallet",
         icon: PhosphorIcons.Wallet,
       } as SidebarSingleItem);
+
+      visibleSections[0].items.push({
+        type: "single",
+        title: "Support Requests",
+        url: "/support",
+        icon: PhosphorIcons.Question,
+      } as SidebarSingleItem);
     }
 
     return visibleSections;

@@ -84,6 +84,7 @@ function TalkarStatusGate() {
   const pathname = usePathname();
   const router = useRouter();
   const checkedRef = useRef(false);
+  const [talkarStatus, setTalkarStatus] = React.useState<string | null>(null);
 
   useEffect(() => {
     // Reset check when pathname changes so navigating to a new page re-checks
@@ -113,7 +114,8 @@ function TalkarStatusGate() {
       .then(data => {
         if (!data) return; // Talkar API down — fail open
         const { status } = data;
-        if (status === 'active') return;
+        setTalkarStatus(status);
+        if (status === 'active' || status === 'agent_building') return;
         if (status === 'pending_deposit') {
           router.replace('/wallet?activation=true');
         } else if (status === 'pending_plan_selection') {
@@ -124,6 +126,14 @@ function TalkarStatusGate() {
       })
       .catch(() => { /* fail open */ });
   }, [user, pathname, router]);
+
+  if (talkarStatus === 'agent_building') {
+    return (
+      <div className="bg-blue-600 text-white text-center py-2 text-sm font-medium z-50 sticky top-0">
+        Your Talkar Agent is currently being built! You can explore the dashboard while you wait.
+      </div>
+    );
+  }
 
   return null;
 }

@@ -205,8 +205,10 @@ export function AppSidebar() {
   const isCollapsed = !isMobile && state === "collapsed";
 
   const [isTalkarCustomer, setIsTalkarCustomer] = React.useState(false);
+  const [isAdminBypass, setIsAdminBypass] = React.useState(false);
 
   React.useEffect(() => {
+    setIsAdminBypass(document.cookie.includes('talkar_admin_bypass=true'));
     // Check talkar org type directly from the user object loaded by useAuth()
     if (user && (user as any).talkar_org_type === "customer") {
       setIsTalkarCustomer(true);
@@ -224,17 +226,19 @@ export function AppSidebar() {
       "/billing",
     ];
 
-    const visibleSections = isTalkarCustomer
+    const isCustomerView = isTalkarCustomer && !isAdminBypass;
+
+    const visibleSections = isCustomerView
       ? NAV_SECTIONS.map(section => ({
           ...section,
           items: section.items.filter(item => {
             const url = item.type === "single" ? item.url : (item as any).url;
             return url ? !TALKAR_CUSTOMER_HIDDEN_URLS.includes(url) : true;
-          }),
+          }).filter(item => item.type === "single" || (item.type === "group" && (item as SidebarGroupItem).items.length > 0)),
         })).filter(section => section.items.length > 0)
       : NAV_SECTIONS;
 
-    if (isTalkarCustomer && visibleSections.length > 0) {
+    if (isCustomerView && visibleSections.length > 0) {
       visibleSections[0].items.push({
         type: "single",
         title: "Wallet & Credits",
@@ -242,16 +246,27 @@ export function AppSidebar() {
         icon: PhosphorIcons.Wallet,
       } as SidebarSingleItem);
 
-      visibleSections[0].items.push({
-        type: "single",
-        title: "Support Requests",
-        url: "/support",
-        icon: PhosphorIcons.Question,
-      } as SidebarSingleItem);
+      visibleSections.push({
+        label: "HELP & SUPPORT",
+        items: [
+          {
+            type: "single",
+            title: "Contact Support",
+            url: "mailto:it@4thorbit.in?subject=Support%20Request",
+            icon: PhosphorIcons.Envelope,
+          },
+          {
+            type: "single",
+            title: "Feature Requests",
+            url: "mailto:it@4thorbit.in?subject=Feature%20Request",
+            icon: PhosphorIcons.Lightbulb,
+          }
+        ]
+      });
     }
 
     return visibleSections;
-  }, [isTalkarCustomer]);
+  }, [isTalkarCustomer, isAdminBypass]);
 
   const versionInfo = config ? { ui: config.uiVersion, api: config.apiVersion } : null;
 

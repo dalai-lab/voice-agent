@@ -115,22 +115,37 @@ function TalkarStatusGate() {
         if (!data) return; // Talkar API down — fail open
         const { status } = data;
         setTalkarStatus(status);
-        if (status === 'active' || status === 'agent_building') return;
-        if (status === 'pending_deposit') {
-          router.replace('/wallet?activation=true');
-        } else if (status === 'pending_plan_selection') {
-          router.replace('/onboarding/select-plan');
-        } else {
-          router.replace('/onboarding');
-        }
+        if (status === 'active' || status === 'agent_building' || status === 'pending_deposit' || status === 'pending_plan_selection' || status === 'suspended') return;
+        router.replace('/onboarding');
       })
       .catch(() => { /* fail open */ });
   }, [user, pathname, router]);
 
   if (talkarStatus === 'agent_building') {
     return (
-      <div className="bg-blue-600 text-white text-center py-2 text-sm font-medium z-50 sticky top-0">
-        Your Talkar Agent is currently being built! You can explore the dashboard while you wait.
+      <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-900 border-b border-indigo-500/30 text-white text-center py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3">
+        <div className="w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
+        Your Talkar Agent is currently being built by our experts. Feel free to explore the dashboard in the meantime!
+      </div>
+    );
+  }
+
+  if (talkarStatus === 'pending_deposit') {
+    return (
+      <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 border-b border-orange-400/30 text-white text-center py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3">
+        <span className="text-lg">💰</span>
+        Activate your agent! Please add credits to your wallet to get started.
+        <a href="/wallet" className="ml-2 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs transition-colors">Go to Wallet →</a>
+      </div>
+    );
+  }
+
+  if (talkarStatus === 'pending_plan_selection') {
+    return (
+      <div className="bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-600 border-b border-green-400/30 text-white text-center py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3">
+        <span className="text-lg">🚀</span>
+        Your AI Agent is ready! Please choose a plan to activate it.
+        <a href="/billing" className="ml-2 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs transition-colors">Choose Plan →</a>
       </div>
     );
   }

@@ -18,37 +18,42 @@ import Script from "next/script";
 
 export default function WalletPage() {
   const { user } = useAuth();
-  const dograhOrgId = (user as any)?.organization_id || (user as LocalUser)?.organizationId;
-  const searchParams = useSearchParams();
-  const isActivation = searchParams.get("activation") === "true";
-  const minTopup = isActivation ? 2000 : 500;
-  const TALKAR = "/api/talkar";
+  const email = (user as any)?.primaryEmail ?? (user as any)?.email;
 
-  const [wallet, setWallet] = useState<any>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [filter, setFilter] = useState<string>("all");
-  const [page, setPage] = useState<number>(1);
-  const [subscription, setSubscription] = useState<any>(null);
-  const [usage, setUsage] = useState<any>(null);
-  
-  const [topupAmount, setTopupAmount] = useState<string>(isActivation ? "2000" : "");
-  const [isProcessing, setIsProcessing] = useState(false);
-  
-  const [autoRechargeEnabled, setAutoRechargeEnabled] = useState(false);
-  const [threshold, setThreshold] = useState("1000");
-  const [rechargeAmount, setRechargeAmount] = useState("5000");
-  const [isSavingRecharge, setIsSavingRecharge] = useState(false);
-  const [hasSavedCard, setHasSavedCard] = useState(false);
-  const [isRequestingUpgrade, setIsRequestingUpgrade] = useState(false);
+  const [resolvedOrgId, setResolvedOrgId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!dograhOrgId) return;
+    if (!user) return;
+
+    // Fast path: if orgId is present on user object (LocalAuth)
+    const initialOrgId = (user as any)?.organization_id || (user as LocalUser)?.organizationId;
+    
+    if (initialOrgId) {
+      setResolvedOrgId(parseInt(initialOrgId));
+      return;
+    }
+
+    // Fallback: resolve using email via status endpoint (StackAuth)
+    if (email) {
+      fetch(`${TALKAR}/customers/status?contact_email=${encodeURIComponent(email)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && data.dograh_org_id) {
+            setResolvedOrgId(data.dograh_org_id);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [user, email]);
+
+  useEffect(() => {
+    if (!resolvedOrgId) return;
 
     Promise.all([
-      fetch(`${TALKAR}/billing/wallet/by-org/${dograhOrgId}`).then(r => r.json()),
-      fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()),
-      fetch(`${TALKAR}/billing/transactions/by-org/${dograhOrgId}?limit=100`).then(r => r.json()),
-      fetch(`${TALKAR}/billing/usage/by-org/${dograhOrgId}`).then(r => r.json()),
+      fetch(`${TALKAR}/billing/wallet/by-org/${resolvedOrgId}`).then(r => r.json()),
+      fetch(`${TALKAR}/billing/subscription/by-org/${resolvedOrgId}`).then(r => r.json()),
+      fetch(`${TALKAR}/billing/transactions/by-org/${resolvedOrgId}?limit=100`).then(r => r.json()),
+      fetch(`${TALKAR}/billing/usage/by-org/${resolvedOrgId}`).then(r => r.json()),
     ]).then(([walletData, subData, txnData, usageData]) => {
       setWallet(walletData);
       setSubscription(subData);
@@ -60,14 +65,15 @@ export default function WalletPage() {
       setRechargeAmount(String((walletData.auto_recharge_amount_paise || 500000) / 100));
       setHasSavedCard(walletData.has_saved_card);
     }).catch(console.error);
-  }, [dograhOrgId]);
+  }, [resolvedOrgId]);
 
   const balanceRupees = wallet && typeof wallet.balance_paise === 'number' ? (wallet.balance_paise / 100).toFixed(2) : "0.00";
   const isZero = !wallet || wallet.balance_paise === 0 || wallet.balance_paise === undefined;
   const isLow = wallet?.balance_paise > 0 && wallet?.balance_paise < 50000;
 
   const handleTopup = async (isMock = false) => {
-    if (!dograhOrgId) return;
+    if (!resolvedOrgId) return;
+    const dograhOrgId = resolvedOrgId;
     const amount = parseInt(topupAmount);
     if (amount < minTopup) {
       alert(`Minimum top-up is ₹${minTopup}`);
@@ -182,6 +188,8 @@ export default function WalletPage() {
   };
 
   const handleSaveAutoRecharge = async () => {
+    if (!resolvedOrgId) return;
+    const dograhOrgId = resolvedOrgId;
     setIsSavingRecharge(true);
     try {
       const res = await fetch(`${TALKAR}/billing/wallet/auto-recharge/by-org/${dograhOrgId}`, {
@@ -208,7 +216,8 @@ export default function WalletPage() {
   };
 
   const handleAddCard = async (isMock = false) => {
-    if (!dograhOrgId) return;
+    if (!resolvedOrgId) return;
+    const dograhOrgId = resolvedOrgId;
     try {
       // 1. Create Razorpay customer
       const custRes = await fetch(`${TALKAR}/billing/razorpay-customer/create`, {
@@ -288,7 +297,8 @@ export default function WalletPage() {
   };
 
   const handleUpgradeRequest = async (requestedTier: string, isMock = false) => {
-    if (!dograhOrgId) return;
+    if (!resolvedOrgId) return;
+    const dograhOrgId = resolvedOrgId;
     
     const minDeposits: Record<string, number> = { "pro": 10000, "elite": 25000 };
     const requiredAmount = minDeposits[requestedTier] || 0;

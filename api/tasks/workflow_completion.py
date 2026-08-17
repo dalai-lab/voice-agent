@@ -71,7 +71,7 @@ async def process_workflow_completion(
                                     "duration_seconds": duration_seconds,
                                     "organization_id": org_id
                                 },
-                                timeout=5.0
+                                timeout=15.0
                             )
                             res.raise_for_status()
     except Exception as e:

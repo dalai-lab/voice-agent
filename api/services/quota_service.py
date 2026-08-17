@@ -282,30 +282,6 @@ async def _store_run_correlation_id(
     )
 
 
-async def _authorize_talkar_workflow_run_start(organization_id: int) -> QuotaCheckResult:
-    """Check Talkar wallet balance. Fails OPEN on billing API errors."""
-    try:
-        async with httpx.AsyncClient() as client:
-            res = await client.post(
-                f"{TALKAR_SERVICE_URL}/billing/check-quota",
-                json={"organization_id": organization_id},
-                timeout=5.0
-            )
-            res.raise_for_status()
-            data = res.json()
-            if not data.get("has_quota"):
-                return QuotaCheckResult(
-                    has_quota=False,
-                    error_code="insufficient_credits",
-                    error_message="Insufficient wallet balance. Please top up to continue.",
-                )
-            return QuotaCheckResult(has_quota=True)
-    except Exception as e:
-        # Fail OPEN: if billing service is unreachable, do NOT block the call.
-        logger.warning(f"Talkar billing API unreachable — failing open for org {organization_id}: {e}")
-        return QuotaCheckResult(has_quota=True)
-
-
 async def _authorize_hosted_workflow_run_start(
     *,
     workflow_owner: UserModel,

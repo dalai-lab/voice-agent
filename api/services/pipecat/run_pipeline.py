@@ -624,7 +624,17 @@ async def _run_pipeline_impl(
     if run_configs:
         if "max_call_duration" in run_configs:
             max_call_duration_seconds = run_configs["max_call_duration"]
+            
+    # D-09 FIX: Enforce org-level Talkar WORKFLOW_TIMEOUT_SECONDS over workflow config
+    from api.enums import OrganizationConfigurationKey
+    org_timeout_cfg = await db_client.get_configuration(workflow.organization_id, OrganizationConfigurationKey.WORKFLOW_TIMEOUT_SECONDS.value)
+    if org_timeout_cfg and org_timeout_cfg.value:
+        try:
+            max_call_duration_seconds = int(org_timeout_cfg.value.get("value", max_call_duration_seconds))
+        except (ValueError, TypeError):
+            pass
 
+    if run_configs:
         if "max_user_idle_timeout" in run_configs:
             max_user_idle_timeout = run_configs["max_user_idle_timeout"]
 

@@ -54,7 +54,8 @@ async def process_workflow_completion(
                     usage_info = getattr(workflow_run, "usage_info", None) or {}
                     duration = usage_info.get("call_duration_seconds")
                     try:
-                        duration_seconds = int(float(duration))
+                        import math
+                        duration_seconds = math.ceil(float(duration))
                     except (TypeError, ValueError):
                         duration_seconds = 0
                     
@@ -63,7 +64,7 @@ async def process_workflow_completion(
                     
                     if org_id:
                         async with httpx.AsyncClient() as client:
-                            await client.post(
+                            res = await client.post(
                                 f"{TALKAR_SERVICE_URL}/billing/deduct",
                                 json={
                                     "workflow_run_id": workflow_run_id,
@@ -72,6 +73,7 @@ async def process_workflow_completion(
                                 },
                                 timeout=5.0
                             )
+                            res.raise_for_status()
     except Exception as e:
         logger.error(f"Talkar billing deduction failed for {workflow_run_id}: {e}")
 

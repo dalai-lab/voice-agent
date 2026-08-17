@@ -131,7 +131,8 @@ COPY --from=builder /opt/venv /opt/venv
 
 # Activate the venv for subsequent RUN/CMD layers.
 ENV VIRTUAL_ENV=/opt/venv \
-    PATH=/opt/venv/bin:$PATH
+    PATH=/opt/venv/bin:$PATH \
+    NLTK_DATA=/opt/venv/nltk_data
 
 # Set Python to not generate .pyc files in runtime
 ENV PYTHONDONTWRITEBYTECODE=1

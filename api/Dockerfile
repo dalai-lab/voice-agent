@@ -40,7 +40,11 @@ RUN --mount=type=bind,source=pipecat,target=/tmp/pipecat,rw \
     uv pip install '/tmp/pipecat[cartesia,deepgram,openai,elevenlabs,groq,google,azure,sarvam,soundfile,silero,webrtc,speechmatics,openrouter,camb,mcp,inworld,smallest]' \
  && uv pip uninstall opencv-python \
  && uv pip install opencv-python-headless \
- && python -c "import nltk; nltk.download('punkt_tab', download_dir='/opt/venv/nltk_data', quiet=True)"
+ && python -c "import urllib.request, zipfile, io, os; \
+    os.makedirs('/opt/venv/nltk_data/tokenizers', exist_ok=True); \
+    url = 'https://cdn.jsdelivr.net/gh/nltk/nltk_data@gh-pages/packages/tokenizers/punkt_tab.zip'; \
+    urllib.request.urlretrieve(url, '/tmp/p.zip'); \
+    zipfile.ZipFile('/tmp/p.zip').extractall('/opt/venv/nltk_data/tokenizers')"
 
 # Strip cache files, test/example dirs, and type stubs from the venv
 RUN find /opt/venv -type f -name '*.pyc' -delete && \

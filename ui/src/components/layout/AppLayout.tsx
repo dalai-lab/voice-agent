@@ -145,7 +145,7 @@ function TalkarStatusGate() {
       <div className="bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-600 border-b border-green-400/30 text-white text-center py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3">
         <span className="text-lg">🚀</span>
         Your AI Agent is ready! Please choose a plan to activate it.
-        <a href="/billing" className="ml-2 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs transition-colors">Choose Plan →</a>
+        <a href="/onboarding/select-plan" className="ml-2 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs transition-colors">Choose Plan →</a>
       </div>
     );
   }

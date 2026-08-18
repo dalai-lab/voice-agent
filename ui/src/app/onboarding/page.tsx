@@ -66,7 +66,7 @@ export default function OnboardingPage() {
           const data = await res.json();
           setStatus(data.status);
           setCustomerData(data);
-          if (data.status === "active") {
+          if (data.status === "active" || data.status === "pending_deposit" || data.status === "pending_plan_selection") {
             router.push("/overview");
           }
         } else {

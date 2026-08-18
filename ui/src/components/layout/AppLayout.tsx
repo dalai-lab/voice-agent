@@ -110,9 +110,14 @@ function TalkarStatusGate() {
       : `contact_email=${encodeURIComponent(email)}`;
 
     fetch(`/api/talkar/customers/status?${query}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (!data) return; // Talkar API down — fail open
+      .then(async r => {
+        if (r.status === 404) {
+          // New workspace — no Talkar customer yet. Send to onboarding.
+          router.replace('/onboarding');
+          return;
+        }
+        if (!r.ok) return; // Real API error — fail open, don't block the user
+        const data = await r.json();
         const { status, is_sub_org, has_onboarding_form } = data;
         setTalkarStatus(status);
         
@@ -125,7 +130,7 @@ function TalkarStatusGate() {
         if (status === 'active' || status === 'agent_building' || status === 'pending_deposit' || status === 'pending_plan_selection' || status === 'suspended') return;
         router.replace('/onboarding');
       })
-      .catch(() => { /* fail open */ });
+      .catch(() => { /* network failure — fail open */ });
   }, [user, pathname, router]);
 
   if (talkarStatus === 'agent_building') {

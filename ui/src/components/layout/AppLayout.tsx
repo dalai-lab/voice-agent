@@ -113,8 +113,15 @@ function TalkarStatusGate() {
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) return; // Talkar API down — fail open
-        const { status } = data;
+        const { status, is_sub_org, has_onboarding_form } = data;
         setTalkarStatus(status);
+        
+        // Edge case: Sub-orgs in 'agent_building' but with no form need to fill the brief
+        if (status === 'agent_building' && is_sub_org && !has_onboarding_form) {
+            router.replace('/onboarding');
+            return;
+        }
+        
         if (status === 'active' || status === 'agent_building' || status === 'pending_deposit' || status === 'pending_plan_selection' || status === 'suspended') return;
         router.replace('/onboarding');
       })

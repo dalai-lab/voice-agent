@@ -68,6 +68,9 @@ export default function OnboardingPage() {
           setCustomerData(data);
           if (data.status === "active" || data.status === "pending_deposit" || data.status === "pending_plan_selection") {
             router.push("/overview");
+          } else if (data.status === "agent_building" && (!data.is_sub_org || data.has_onboarding_form)) {
+            // Master orgs, or sub-orgs that already filled the brief, just go to overview to see the spinner banner
+            router.push("/overview");
           }
         } else {
           setStatus("pending_approval");
@@ -125,6 +128,39 @@ export default function OnboardingPage() {
       }
     } catch (err) {
       alert("Failed to submit application. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitBrief = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.useCaseDescription.trim() || !formData.callVolume || !formData.languages.trim()) {
+      alert("Please fill in all use case fields so we can build your agent correctly.");
+      return;
+    }
+    if (formData.needsApiIntegration && !formData.apiIntegrationDetails.trim()) {
+      alert("Please provide details for your custom API integration.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${TALKAR_API}/customers/by-org/${dograhOrgId}/new-agent-brief`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ form: formData })
+      });
+      if (res.ok) {
+        // Just reload, which will trigger checkStatus again and push them to overview since has_onboarding_form is now true
+        window.location.reload();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed to submit brief: ${err.detail || res.statusText}`);
+      }
+    } catch (err) {
+      alert("Failed to submit brief. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -234,6 +270,88 @@ export default function OnboardingPage() {
         <h1 className="text-3xl font-bold tracking-tight">Welcome to Talkar</h1>
         <p className="text-muted-foreground mt-2">Your AI Voice Agent Platform</p>
       </div>
+
+      {/* ── NEW AGENT BRIEF (For Sub-Orgs without a form) ── */}
+      {status === "agent_building" && customerData?.is_sub_org && !customerData?.has_onboarding_form && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Tell us about your new agent</CardTitle>
+            <CardDescription>Give our experts a brief so we can build this workspace's agent to your exact specifications.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmitBrief} className="space-y-8">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="useCaseType">Primary Function <span className="text-red-500">*</span></Label>
+                    <Select value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inbound">Inbound (Customer Support)</SelectItem>
+                        <SelectItem value="outbound">Outbound (Sales/Follow-up)</SelectItem>
+                        <SelectItem value="both">Both</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="callVolume">Monthly Call Volume <span className="text-red-500">*</span></Label>
+                    <Select value={formData.callVolume} onValueChange={val => setFormData({...formData, callVolume: val})}>
+                      <SelectTrigger><SelectValue placeholder="Select Volume" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="<1000">Less than 1,000 mins</SelectItem>
+                        <SelectItem value="1000-5000">1,000 - 5,000 mins</SelectItem>
+                        <SelectItem value="5000-10000">5,000 - 10,000 mins</SelectItem>
+                        <SelectItem value="10000+">10,000+ mins</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="languages">Languages Required <span className="text-red-500">*</span></Label>
+                  <Input id="languages" placeholder="e.g., English, Hindi, Spanish" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="useCaseDescription">Use Case Description <span className="text-red-500">*</span></Label>
+                  <Textarea
+                    id="useCaseDescription"
+                    placeholder="Describe exactly what this agent should do. E.g., 'Take restaurant reservations and check table availability...'"
+                    value={formData.useCaseDescription}
+                    onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
+                    rows={4}
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2 pt-2">
+                  <Switch
+                    id="needsApiIntegration"
+                    checked={formData.needsApiIntegration}
+                    onCheckedChange={(checked) => setFormData({...formData, needsApiIntegration: checked})}
+                  />
+                  <Label htmlFor="needsApiIntegration">Yes, I need custom API integration for this agent</Label>
+                </div>
+                {formData.needsApiIntegration && (
+                  <div className="space-y-2 mt-4 border-l-2 border-primary pl-4">
+                    <Label htmlFor="apiIntegrationDetails">Describe the integration <span className="text-red-500">*</span></Label>
+                    <Textarea
+                      id="apiIntegrationDetails"
+                      placeholder="E.g., I need to pull customer records from my proprietary CRM via REST API..."
+                      value={formData.apiIntegrationDetails}
+                      onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
+                      rows={3}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full" size="lg" disabled={submitting}>
+                {submitting ? "Submitting Brief..." : "Submit Brief"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── PENDING APPROVAL: Show the application form ── */}
       {status === "pending_approval" && (

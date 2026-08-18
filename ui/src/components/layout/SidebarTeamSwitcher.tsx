@@ -2,9 +2,12 @@
 
 import type { CurrentUser, Team } from "@stackframe/stack";
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Plus } from "lucide-react";
 
 import SpinLoader from "@/components/SpinLoader";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { reloadApp } from "@/lib/browserReload";
 import logger from "@/lib/logger";
@@ -36,6 +39,7 @@ export function SidebarTeamSwitcher() {
 
 function SidebarTeamSwitcherContent({ user }: { user: CurrentUser }) {
   const [isSwitching, setIsSwitching] = useState(false);
+  const router = useRouter();
 
   const handleChange = async (team: Team | null) => {
     setIsSwitching(true);
@@ -64,6 +68,15 @@ function SidebarTeamSwitcherContent({ user }: { user: CurrentUser }) {
           triggerClassName="w-full"
         />
       </React.Suspense>
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="w-full justify-start mt-1 text-xs text-muted-foreground hover:text-foreground"
+        onClick={() => router.push("/handler/account-settings")}
+      >
+        <Plus className="mr-2 h-3 w-3" />
+        New Workspace
+      </Button>
       {isSwitching && (
         <div
           className="fixed inset-0 z-[100] flex min-h-screen items-center justify-center bg-background/90 backdrop-blur-sm"

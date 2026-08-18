@@ -8,6 +8,17 @@ import { Plus } from "lucide-react";
 
 import SpinLoader from "@/components/SpinLoader";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
 import { reloadApp } from "@/lib/browserReload";
 import logger from "@/lib/logger";
@@ -54,6 +65,29 @@ function SidebarTeamSwitcherContent({ user }: { user: CurrentUser }) {
     }
   };
 
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const handleCreateTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTeamName.trim()) return;
+
+    setIsCreating(true);
+    try {
+      const newTeam = await user.createTeam({ displayName: newTeamName });
+      await user.setSelectedTeam(newTeam);
+      setDialogOpen(false);
+      setNewTeamName("");
+      reloadApp();
+    } catch (error: any) {
+      logger.error("Failed to create Stack team", error);
+      toast.error(error.message || "Could not create workspace. Please try again.");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   return (
     <div className="relative">
       <React.Suspense
@@ -68,22 +102,56 @@ function SidebarTeamSwitcherContent({ user }: { user: CurrentUser }) {
           triggerClassName="w-full"
         />
       </React.Suspense>
-      <Button 
-        variant="ghost" 
-        size="sm" 
-        className="w-full justify-start mt-1 text-xs text-muted-foreground hover:text-foreground"
-        onClick={() => router.push("/handler/account-settings")}
-      >
-        <Plus className="mr-2 h-3 w-3" />
-        New Workspace
-      </Button>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogTrigger asChild>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="w-full justify-start mt-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <Plus className="mr-2 h-3 w-3" />
+            New Workspace
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Workspace</DialogTitle>
+            <DialogDescription>
+              A workspace gives you a dedicated agent and billing context. You can switch between workspaces at any time.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateTeam} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="teamName">Workspace Name</Label>
+              <Input
+                id="teamName"
+                placeholder="e.g. Acme Corp Support"
+                value={newTeamName}
+                onChange={(e) => setNewTeamName(e.target.value)}
+                autoFocus
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={isCreating}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isCreating || !newTeamName.trim()}>
+                {isCreating ? "Creating..." : "Create Workspace"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {isSwitching && (
         <div
           className="fixed inset-0 z-[100] flex min-h-screen items-center justify-center bg-background/90 backdrop-blur-sm"
           role="status"
           aria-live="polite"
         >
-          <SpinLoader label="Switching teams..." />
+          <SpinLoader label="Switching workspaces..." />
         </div>
       )}
     </div>

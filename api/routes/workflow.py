@@ -562,7 +562,7 @@ async def create_workflow_from_template(
     """
     try:
         # Call MPS API to generate workflow using the client
-        if DEPLOYMENT_MODE == "oss":
+        if DEPLOYMENT_MODE in ("oss", "talkar"):
             workflow_data = await mps_service_key_client.call_workflow_api(
                 call_type=request.call_type.upper(),
                 use_case=request.use_case,

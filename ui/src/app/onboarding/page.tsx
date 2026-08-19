@@ -93,11 +93,21 @@ export default function OnboardingPage() {
           if (!cancelled) {
             // Sub-orgs in "pending_approval" that already have their brief submitted
             // should see the "under review" screen, not the full application form.
-            const effectiveStatus = (
-              data.status === "pending_approval" &&
-              data.is_sub_org &&
-              data.has_onboarding_form
-            ) ? "under_review" : data.status;
+            // Sub-orgs with no form (or only the _needs_brief tag) should see the brief form.
+            let effectiveStatus = data.status;
+
+            if (data.is_sub_org) {
+              if (data.status === "pending_approval" && data.has_onboarding_form) {
+                // Brief already submitted — show under review
+                effectiveStatus = "under_review";
+              } else if (data.status === "pending_approval" && !data.has_onboarding_form) {
+                // Sub-org was auto-created by workspace hook but hasn't filled brief yet
+                effectiveStatus = "new_agent_brief";
+              } else if (data.status === "agent_building" && !data.has_onboarding_form) {
+                // Sub-org in agent_building (master was active at time of creation) but no brief
+                effectiveStatus = "new_agent_brief";
+              }
+            }
 
             setStatus(effectiveStatus);
             setCustomerData(data);
@@ -107,7 +117,7 @@ export default function OnboardingPage() {
               // Master org already building — send to overview for the banner
               router.push("/overview");
             }
-            // Sub-org in agent_building without form falls through to show the brief form
+            // All other cases (under_review, new_agent_brief, rejected, suspended etc.) render on this page
           }
         } else {
           if (!cancelled) setStatus("pending_approval");
@@ -186,11 +196,12 @@ export default function OnboardingPage() {
 
     setSubmitting(true);
     try {
-      // status==="new_agent_brief" means no customer record yet for this org — the backend will create it
-      // status==="agent_building" means a sub-org customer record already exists — just update its form
-      const endpoint = status === "new_agent_brief"
-        ? `${TALKAR_API}/customers/by-org/${dograhOrgId}/new-agent-request`
-        : `${TALKAR_API}/customers/by-org/${dograhOrgId}/new-agent-brief`;
+      // customerData.customer_id is set when the sub-org record was auto-created by the
+      // Dograh workspace hook (POST /customers/). In that case, use new-agent-brief to
+      // update the existing record. Only use new-agent-request when there's truly no record.
+      const endpoint = customerData?.customer_id
+        ? `${TALKAR_API}/customers/by-org/${dograhOrgId}/new-agent-brief`
+        : `${TALKAR_API}/customers/by-org/${dograhOrgId}/new-agent-request`;
 
       const res = await fetch(endpoint, {
         method: "POST",

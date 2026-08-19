@@ -119,15 +119,18 @@ export default function OnboardingPage() {
             setCustomerData(data);
             if (effectiveStatus === "active" || effectiveStatus === "pending_deposit" || effectiveStatus === "pending_plan_selection") {
               router.push("/overview");
-            } else if (effectiveStatus === "agent_building" && !data.is_sub_org) {
-              // Master org already building — send to overview for the banner
+            } else if (effectiveStatus === "agent_building") {
+              // All agent_building orgs (master or sub) go to the dashboard — the
+              // AppLayout banner handles the "being built" message there.
               router.push("/overview");
             } else if (effectiveStatus === "under_review" && !data.is_sub_org) {
               // Master org under review — send to overview (banner shown there, platform accessible)
               router.push("/overview");
-            } else if (effectiveStatus === "under_review" || effectiveStatus === "brief_submitted") {
-              // Fetch full customer record so submitted details show real values (not N/A).
-              // /customers/status only returns metadata; onboarding_form is in the full object.
+            } else if (effectiveStatus === "brief_submitted") {
+              // Sub-org brief submitted — head to dashboard, banner handles messaging
+              router.push("/overview");
+            } else if (effectiveStatus === "under_review" && data.is_sub_org) {
+              // Sub-org still waiting on review — stay on /onboarding, fetch real form data
               if (!cancelled) {
                 fetch(`${TALKAR_API}/customers/by-org/${dograhOrgId}`)
                   .then(r => r.ok ? r.json() : null)
@@ -139,7 +142,7 @@ export default function OnboardingPage() {
                   .catch(() => {});
               }
             }
-            // All other cases (new_agent_brief, rejected, suspended etc.) render on this page
+            // All other cases (new_agent_brief, rejected, suspended) render on this page
           }
         } else {
           if (!cancelled) setStatus("pending_approval");
@@ -699,23 +702,6 @@ export default function OnboardingPage() {
         </Card>
       )}
 
-      {/* ── AGENT BUILDING ── */}
-      {status === "agent_building" && (
-        <Card className="text-center py-12">
-          <CardContent className="space-y-6">
-            <div className="w-16 h-16 mx-auto rounded-full border-4 border-t-blue-500 animate-spin" />
-            <h2 className="text-2xl font-bold">Your agent is being built by our team.</h2>
-            <div className="bg-muted p-4 rounded-md inline-block mt-4 text-left border">
-              <p className="text-sm font-medium mb-1 border-b pb-1">Estimated Timeline: <span className="font-normal">48-72 hours</span></p>
-              <h4 className="text-xs text-muted-foreground mt-3 mb-1 uppercase tracking-wider font-bold">Use Case Summary</h4>
-              <p className="text-sm"><strong>Type:</strong> {customerData?.onboarding_form?.useCaseType || "N/A"}</p>
-              <p className="text-sm"><strong>Description:</strong> {customerData?.onboarding_form?.useCaseDescription || "N/A"}</p>
-              <p className="text-sm"><strong>Languages:</strong> {customerData?.onboarding_form?.languages || "N/A"}</p>
-              <p className="text-sm"><strong>Integrations:</strong> {customerData?.onboarding_form?.integrations || "N/A"}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* ── REJECTED ── */}
       {status === "rejected" && (

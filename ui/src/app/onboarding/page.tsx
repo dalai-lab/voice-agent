@@ -98,8 +98,8 @@ export default function OnboardingPage() {
 
             if (data.is_sub_org) {
               if (data.status === "pending_approval" && data.has_onboarding_form) {
-                // Brief already submitted — show under review
-                effectiveStatus = "under_review";
+                // Brief already submitted — show simple confirmation
+                effectiveStatus = "brief_submitted";
               } else if (data.status === "pending_approval" && !data.has_onboarding_form) {
                 // Sub-org was auto-created by workspace hook but hasn't filled brief yet
                 effectiveStatus = "new_agent_brief";
@@ -210,7 +210,7 @@ export default function OnboardingPage() {
       });
       if (res.ok) {
         setCustomerData((prev: any) => ({ ...prev, onboarding_form: formData } as any));
-        setStatus("under_review");
+        setStatus("brief_submitted");
       } else {
         const err = await res.json().catch(() => ({}));
         alert(`Failed to submit brief: ${err.detail || res.statusText}`);
@@ -409,8 +409,8 @@ export default function OnboardingPage() {
         </Card>
       )}
 
-      {/* ── UNDER REVIEW: Brief submitted, waiting for admin ── */}
-      {status === "under_review" && (
+      {/* ── BRIEF SUBMITTED: Sub-org brief sent, waiting for admin ── */}
+      {status === "brief_submitted" && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

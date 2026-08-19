@@ -231,10 +231,27 @@ export function AppSidebar() {
     const visibleSections = isCustomerView
       ? NAV_SECTIONS.map(section => ({
           ...section,
-          items: section.items.filter(item => {
-            const url = item.type === "single" ? item.url : (item as any).url;
-            return url ? !TALKAR_CUSTOMER_HIDDEN_URLS.includes(url) : true;
-          }).filter(item => item.type === "single" || (item.type === "group" && (item as SidebarGroupItem).items.length > 0)),
+          items: section.items.map(item => {
+            if (item.type === "group") {
+              const group = item as SidebarGroupItem;
+              return {
+                ...group,
+                items: group.items.filter(subItem => {
+                  const url = subItem.url;
+                  return url ? !TALKAR_CUSTOMER_HIDDEN_URLS.includes(url) : true;
+                })
+              };
+            }
+            return item;
+          }).filter(item => {
+            if (item.type === "single") {
+              return !(item as SidebarSingleItem).url || !TALKAR_CUSTOMER_HIDDEN_URLS.includes((item as SidebarSingleItem).url);
+            }
+            if (item.type === "group") {
+              return (item as SidebarGroupItem).items.length > 0;
+            }
+            return false;
+          }),
         })).filter(section => section.items.length > 0)
       : NAV_SECTIONS.map(section => ({ ...section, items: [...section.items] }));
 

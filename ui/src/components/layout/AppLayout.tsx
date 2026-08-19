@@ -86,25 +86,24 @@ function TalkarStatusGate() {
   const dograhOrgId = orgContext?.organization_id;
   const pathname = usePathname();
   const router = useRouter();
-  const checkedRef = useRef(false);
+  // Track the last org we checked. Re-fires when switching workspaces (different orgId)
+  // but ignores same-org double-fires from auth context settling.
+  const lastCheckedOrgRef = useRef<number | null>(null);
   const [talkarStatus, setTalkarStatus] = React.useState<string | null>(null);
 
   useEffect(() => {
-    // Reset check when EITHER the page changes or the org context resolves
-    checkedRef.current = false;
-  }, [pathname, dograhOrgId]);
-
-  useEffect(() => {
-    if (!user || checkedRef.current) return;
+    if (!user) return;
     if (TALKAR_ALLOWED_PATHS.some(p => pathname.startsWith(p))) return;
     if (document.cookie.includes('talkar_admin_bypass=true')) return;
-
-    // Wait for the org context to resolve before making any check.
-    // Firing with just contact_email causes 404s when dograhOrgId isn't loaded yet
-    // and creates a redirect loop back to /onboarding.
     if (!dograhOrgId) return;
 
-    checkedRef.current = true;
+    // Skip if we already checked this exact org on this exact page
+    if (lastCheckedOrgRef.current === dograhOrgId) return;
+
+    // Mark in-flight before any async work
+    lastCheckedOrgRef.current = dograhOrgId;
+    // Clear stale banner from previous org immediately
+    setTalkarStatus(null);
 
     fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
       .then(async r => {
@@ -118,8 +117,8 @@ function TalkarStatusGate() {
         const { status, is_sub_org, has_onboarding_form } = data;
         setTalkarStatus(status);
         
-        // Edge case: Sub-orgs in 'agent_building' but with no form need to fill the brief
-        if (status === 'agent_building' && is_sub_org && !has_onboarding_form) {
+        // Edge case: Sub-orgs with no brief form need to fill it first
+        if (is_sub_org && !has_onboarding_form && (status === 'agent_building' || status === 'pending_approval')) {
             router.replace('/onboarding');
             return;
         }

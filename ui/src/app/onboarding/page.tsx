@@ -28,8 +28,8 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [customerData, setCustomerData] = useState<any>(null);
   const [uploadProgress, setUploadProgress] = useState<{ gst: number, reg: number }>({ gst: 0, reg: 0 });
-  // Once checkStatus succeeds, don't let a subsequent dograhOrgId change (stale token) overwrite the result
-  const statusDetectedRef = useRef(false);
+  // Track which orgId we last checked so we re-fire on workspace switch but ignore same-org double-fires
+  const lastCheckedOrgRef = useRef<number | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -58,10 +58,16 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!dograhOrgId) return;  // Wait for org context to resolve before checking
-    if (statusDetectedRef.current) return; // Semaphore: already resolved or in-flight
-    
-    // Lock the semaphore SYNCHRONOUSLY before any await.
-    statusDetectedRef.current = true;
+    if (lastCheckedOrgRef.current === dograhOrgId) return; // Already checked this exact org — skip
+
+    // Mark this org as in-flight BEFORE any await to prevent double-fires from same-org re-renders.
+    lastCheckedOrgRef.current = dograhOrgId;
+
+    // Reset UI state for the new org
+    setLoading(true);
+    setStatus("pending_approval");
+    setCustomerData(null);
+
     let cancelled = false;
 
     async function checkStatus() {

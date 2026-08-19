@@ -18,8 +18,7 @@ import type { LocalUser } from "@/lib/auth/types";
 import Script from "next/script";
 
 export default function OnboardingPage() {
-  const { user } = useAuth();
-  const dograhOrgId = (user as any)?.organization_id || (user as LocalUser)?.organizationId;
+  const { user, organizationId: dograhOrgId } = useAuth();
   const router = useRouter();
   const [status, setStatus] = useState<string>("pending_approval");
   const [loading, setLoading] = useState(true);

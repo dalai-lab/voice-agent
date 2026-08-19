@@ -17,7 +17,7 @@ import { useSearchParams } from "next/navigation";
 import Script from "next/script";
 
 export default function WalletPage() {
-  const { user } = useAuth();
+  const { user, organizationId } = useAuth();
   const email = (user as any)?.primaryEmail ?? (user as any)?.email;
   const searchParams = useSearchParams();
   const isActivation = searchParams.get("activation") === "true";
@@ -46,15 +46,13 @@ export default function WalletPage() {
   useEffect(() => {
     if (!user) return;
 
-    // Fast path: if orgId is present on user object (LocalAuth)
-    const initialOrgId = (user as any)?.organization_id || (user as LocalUser)?.organizationId;
-    
-    if (initialOrgId) {
-      setResolvedOrgId(parseInt(initialOrgId));
+    // Use the organizationId from auth context (Stack: selectedTeam.id, Local: organizationId)
+    if (organizationId) {
+      setResolvedOrgId(parseInt(organizationId));
       return;
     }
 
-    // Fallback: resolve using email via status endpoint (StackAuth)
+    // Legacy email fallback for users without an org_id
     if (email) {
       fetch(`${TALKAR}/customers/status?contact_email=${encodeURIComponent(email)}`)
         .then(r => r.ok ? r.json() : null)
@@ -65,7 +63,7 @@ export default function WalletPage() {
         })
         .catch(console.error);
     }
-  }, [user, email]);
+  }, [user, organizationId, email]);
 
   useEffect(() => {
     if (!resolvedOrgId) return;

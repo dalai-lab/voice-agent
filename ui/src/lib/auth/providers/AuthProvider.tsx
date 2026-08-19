@@ -12,6 +12,7 @@ export interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
   loading: boolean;
+  organizationId: string | undefined;  // Stack: selectedTeam.id | Local: organizationId
   getAccessToken: () => Promise<string>;
   redirectToLogin: () => void;
   logout: () => Promise<void>;

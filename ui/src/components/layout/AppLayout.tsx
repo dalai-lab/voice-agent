@@ -80,7 +80,7 @@ function BackendStatusBanner() {
 const TALKAR_ALLOWED_PATHS = ["/onboarding", "/wallet", "/billing", "/handler", "/auth", "/api"];
 
 function TalkarStatusGate() {
-  const { user } = useAuth();
+  const { user, organizationId } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const checkedRef = useRef(false);
@@ -96,17 +96,15 @@ function TalkarStatusGate() {
     if (TALKAR_ALLOWED_PATHS.some(p => pathname.startsWith(p))) return;
     if (document.cookie.includes('talkar_admin_bypass=true')) return;
 
-    // Get the user's email - available on both Stack Auth and local auth users
     const email = (user as any)?.primaryEmail ?? (user as any)?.email;
-    // Also try org_id for local auth users that have it
-    const orgId = (user as any)?.organization_id ?? (user as any)?.organizationId;
+    const orgId = organizationId; // from auth context (Stack: selectedTeam.id, Local: organizationId)
 
     if (!email && !orgId) return;
 
     checkedRef.current = true;
 
     const query = orgId
-      ? `dograh_org_id=${orgId}`
+      ? `dograh_org_id=${encodeURIComponent(orgId)}`
       : `contact_email=${encodeURIComponent(email)}`;
 
     fetch(`/api/talkar/customers/status?${query}`)

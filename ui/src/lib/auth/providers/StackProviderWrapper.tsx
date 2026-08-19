@@ -100,6 +100,7 @@ function StackAuthContextProvider({
     user: stackUser,
     isAuthenticated: !!stackUser,
     loading: false,
+    organizationId: stackUser?.selectedTeam?.id,
     getAccessToken,
     redirectToLogin,
     logout,

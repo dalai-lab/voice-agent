@@ -72,6 +72,7 @@ export function LocalProviderWrapper({ children }: { children: React.ReactNode }
     user: user as AuthUser,
     isAuthenticated: !!user,
     loading,
+    organizationId: user?.organizationId,
     getAccessToken,
     redirectToLogin,
     logout,

@@ -63,8 +63,7 @@ const TIERS = [
 ];
 
 export default function SelectPlanPage() {
-  const { user } = useAuth();
-  const dograhOrgId = (user as any)?.organization_id || (user as LocalUser)?.organizationId;
+  const { organizationId: dograhOrgId } = useAuth();
   const router = useRouter();
   const [submitting, setSubmitting] = useState<string | null>(null);
 

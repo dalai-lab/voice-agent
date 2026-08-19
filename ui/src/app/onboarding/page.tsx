@@ -58,8 +58,14 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!dograhOrgId && !email) return;
-    if (statusDetectedRef.current) return; // Already resolved — don't let a stale-token re-run stomp the result
+    if (statusDetectedRef.current) return; // Semaphore: already resolved or in-flight
     
+    // Lock the semaphore SYNCHRONOUSLY before any await.
+    // This prevents a second effect run (from dograhOrgId changing) from
+    // racing with this one while the fetch is still in flight.
+    statusDetectedRef.current = true;
+    let cancelled = false;
+
     async function checkStatus() {
       try {
         const query = dograhOrgId 
@@ -67,50 +73,52 @@ export default function OnboardingPage() {
           : `contact_email=${encodeURIComponent(email)}`;
           
         const res = await fetch(`${TALKAR_API}/customers/status?${query}`);
+        if (cancelled) return;
+
         if (res.status === 404) {
           // No Talkar customer for this org yet. Check if user already has another org (returning customer).
           if (email) {
             const existingRes = await fetch(`${TALKAR_API}/customers/existing?contact_email=${encodeURIComponent(email)}`);
+            if (cancelled) return;
             if (existingRes.ok) {
               const existing = await existingRes.json();
               if (existing?.customer_id) {
                 // Returning customer creating a new workspace — show the brief form
-                statusDetectedRef.current = true;
-                setStatus("new_agent_brief");
-                setCustomerData({ master_customer_id: existing.customer_id, ...existing });
-                setLoading(false);
+                if (!cancelled) {
+                  setStatus("new_agent_brief");
+                  setCustomerData({ master_customer_id: existing.customer_id, ...existing });
+                }
                 return;
               }
             }
           }
-          // Brand new customer
-          statusDetectedRef.current = true;
-          setStatus("pending_approval");
+          // Brand new customer — show the full application form
+          if (!cancelled) setStatus("pending_approval");
         } else if (res.ok) {
           const data = await res.json();
-          statusDetectedRef.current = true;
-          setStatus(data.status);
-          setCustomerData(data);
-          if (data.status === "active" || data.status === "pending_deposit" || data.status === "pending_plan_selection") {
-            router.push("/overview");
-          } else if (data.status === "agent_building" && !data.is_sub_org) {
-            // Master org already building — send to overview so they see the building banner
-            router.push("/overview");
+          if (!cancelled) {
+            setStatus(data.status);
+            setCustomerData(data);
+            if (data.status === "active" || data.status === "pending_deposit" || data.status === "pending_plan_selection") {
+              router.push("/overview");
+            } else if (data.status === "agent_building" && !data.is_sub_org) {
+              // Master org already building — send to overview for the banner
+              router.push("/overview");
+            }
+            // Sub-org in agent_building without form falls through to show the brief form
           }
-          // Sub-org in agent_building without form falls through and shows the brief form below
         } else {
-          statusDetectedRef.current = true;
-          setStatus("pending_approval");
+          if (!cancelled) setStatus("pending_approval");
         }
       } catch (err) {
         console.error("Failed to fetch onboarding status", err);
-        statusDetectedRef.current = true;
-        setStatus("pending_approval");
+        if (!cancelled) setStatus("pending_approval");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     checkStatus();
+    return () => { cancelled = true; };
   }, [router, dograhOrgId, email]);
 
   // No handleToggleBuildForMe anymore, always managed

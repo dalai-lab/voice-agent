@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Zap, Shield, Rocket } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useOrgConfig } from "@/context/OrgConfigContext";
 import type { LocalUser } from "@/lib/auth/types";
 
 const TIERS = [
@@ -63,7 +64,9 @@ const TIERS = [
 ];
 
 export default function SelectPlanPage() {
-  const { organizationId: dograhOrgId } = useAuth();
+  const { user } = useAuth();
+  const { orgContext } = useOrgConfig();
+  const dograhOrgId = orgContext?.organization_id;
   const router = useRouter();
   const [submitting, setSubmitting] = useState<string | null>(null);
 

@@ -15,9 +15,11 @@ import { useAuth } from "@/lib/auth";
 import type { LocalUser } from "@/lib/auth/types";
 import { useSearchParams } from "next/navigation";
 import Script from "next/script";
+import { useOrgConfig } from "@/context/OrgConfigContext";
 
 export default function WalletPage() {
-  const { user, organizationId } = useAuth();
+  const { user } = useAuth();
+  const { orgContext } = useOrgConfig();
   const email = (user as any)?.primaryEmail ?? (user as any)?.email;
   const searchParams = useSearchParams();
   const isActivation = searchParams.get("activation") === "true";
@@ -46,9 +48,9 @@ export default function WalletPage() {
   useEffect(() => {
     if (!user) return;
 
-    // Use the organizationId from auth context (Stack: selectedTeam.id, Local: organizationId)
-    if (organizationId) {
-      setResolvedOrgId(parseInt(organizationId));
+    // Use the Dograh numeric org ID from OrgConfigContext (authoritative source)
+    if (orgContext?.organization_id) {
+      setResolvedOrgId(orgContext.organization_id);
       return;
     }
 
@@ -63,7 +65,7 @@ export default function WalletPage() {
         })
         .catch(console.error);
     }
-  }, [user, organizationId, email]);
+  }, [user, orgContext?.organization_id, email]);
 
   useEffect(() => {
     if (!resolvedOrgId) return;

@@ -15,10 +15,13 @@ import { Switch } from "@/components/ui/switch";
 import { Clock, CheckCircle, XCircle, Ban, UploadCloud } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import type { LocalUser } from "@/lib/auth/types";
+import { useOrgConfig } from "@/context/OrgConfigContext";
 import Script from "next/script";
 
 export default function OnboardingPage() {
-  const { user, organizationId: dograhOrgId } = useAuth();
+  const { user } = useAuth();
+  const { orgContext } = useOrgConfig();
+  const dograhOrgId = orgContext?.organization_id;
   const router = useRouter();
   const [status, setStatus] = useState<string>("pending_approval");
   const [loading, setLoading] = useState(true);

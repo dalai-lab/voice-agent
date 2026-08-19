@@ -4,6 +4,7 @@ import { AlertTriangle, Menu, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React, { ReactNode, useEffect, useRef } from "react";
+import { useOrgConfig } from "@/context/OrgConfigContext";
 
 import { BrandLogo } from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
@@ -80,7 +81,9 @@ function BackendStatusBanner() {
 const TALKAR_ALLOWED_PATHS = ["/onboarding", "/wallet", "/billing", "/handler", "/auth", "/api"];
 
 function TalkarStatusGate() {
-  const { user, organizationId } = useAuth();
+  const { user } = useAuth();
+  const { orgContext } = useOrgConfig();
+  const dograhOrgId = orgContext?.organization_id;
   const pathname = usePathname();
   const router = useRouter();
   const checkedRef = useRef(false);
@@ -97,14 +100,13 @@ function TalkarStatusGate() {
     if (document.cookie.includes('talkar_admin_bypass=true')) return;
 
     const email = (user as any)?.primaryEmail ?? (user as any)?.email;
-    const orgId = organizationId; // from auth context (Stack: selectedTeam.id, Local: organizationId)
 
-    if (!email && !orgId) return;
+    if (!email && !dograhOrgId) return;
 
     checkedRef.current = true;
 
-    const query = orgId
-      ? `dograh_org_id=${encodeURIComponent(orgId)}`
+    const query = dograhOrgId
+      ? `dograh_org_id=${dograhOrgId}`
       : `contact_email=${encodeURIComponent(email)}`;
 
     fetch(`/api/talkar/customers/status?${query}`)
@@ -129,7 +131,7 @@ function TalkarStatusGate() {
         router.replace('/onboarding');
       })
       .catch(() => { /* network failure — fail open */ });
-  }, [user, pathname, router]);
+  }, [user, dograhOrgId, pathname, router]);
 
   if (talkarStatus === 'agent_building') {
     return (

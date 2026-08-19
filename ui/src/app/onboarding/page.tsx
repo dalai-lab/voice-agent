@@ -64,16 +64,34 @@ export default function OnboardingPage() {
           : `contact_email=${encodeURIComponent(email)}`;
           
         const res = await fetch(`${TALKAR_API}/customers/status?${query}`);
-        if (res.ok) {
+        if (res.status === 404) {
+          // No Talkar customer for this org yet. Check if user already has another org (returning customer).
+          if (email) {
+            const existingRes = await fetch(`${TALKAR_API}/customers/existing?contact_email=${encodeURIComponent(email)}`);
+            if (existingRes.ok) {
+              const existing = await existingRes.json();
+              if (existing?.customer_id) {
+                // Returning customer creating a new workspace — show the brief form
+                setStatus("new_agent_brief");
+                setCustomerData({ master_customer_id: existing.customer_id, ...existing });
+                setLoading(false);
+                return;
+              }
+            }
+          }
+          // Brand new customer
+          setStatus("pending_approval");
+        } else if (res.ok) {
           const data = await res.json();
           setStatus(data.status);
           setCustomerData(data);
           if (data.status === "active" || data.status === "pending_deposit" || data.status === "pending_plan_selection") {
             router.push("/overview");
-          } else if (data.status === "agent_building" && (!data.is_sub_org || data.has_onboarding_form)) {
-            // Master orgs, or sub-orgs that already filled the brief, just go to overview to see the spinner banner
+          } else if (data.status === "agent_building" && !data.is_sub_org) {
+            // Master org already building — send to overview so they see the building banner
             router.push("/overview");
           }
+          // Sub-org in agent_building without form falls through and shows the brief form below
         } else {
           setStatus("pending_approval");
         }
@@ -85,7 +103,7 @@ export default function OnboardingPage() {
       }
     }
     checkStatus();
-  }, [router, dograhOrgId]);
+  }, [router, dograhOrgId, email]);
 
   // No handleToggleBuildForMe anymore, always managed
 
@@ -149,14 +167,19 @@ export default function OnboardingPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${TALKAR_API}/customers/by-org/${dograhOrgId}/new-agent-brief`, {
+      // status==="new_agent_brief" means no customer record yet for this org — the backend will create it
+      // status==="agent_building" means a sub-org customer record already exists — just update its form
+      const endpoint = status === "new_agent_brief"
+        ? `${TALKAR_API}/customers/by-org/${dograhOrgId}/new-agent-request`
+        : `${TALKAR_API}/customers/by-org/${dograhOrgId}/new-agent-brief`;
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ form: formData })
+        body: JSON.stringify({ form: formData, master_customer_id: customerData?.master_customer_id })
       });
       if (res.ok) {
-        // Just reload, which will trigger checkStatus again and push them to overview since has_onboarding_form is now true
-        window.location.reload();
+        setStatus("under_review");
       } else {
         const err = await res.json().catch(() => ({}));
         alert(`Failed to submit brief: ${err.detail || res.statusText}`);
@@ -273,8 +296,8 @@ export default function OnboardingPage() {
         <p className="text-muted-foreground mt-2">Your AI Voice Agent Platform</p>
       </div>
 
-      {/* ── NEW AGENT BRIEF (For Sub-Orgs without a form) ── */}
-      {status === "agent_building" && customerData?.is_sub_org && !customerData?.has_onboarding_form && (
+      {/* ── NEW AGENT BRIEF (Sub-org without form, OR returning customer with new workspace) ── */}
+      {(status === "new_agent_brief" || (status === "agent_building" && customerData?.is_sub_org && !customerData?.has_onboarding_form)) && (
         <Card>
           <CardHeader>
             <CardTitle>Tell us about your new agent</CardTitle>
@@ -352,6 +375,21 @@ export default function OnboardingPage() {
               </Button>
             </form>
           </CardContent>
+        </Card>
+      )}
+
+      {/* ── UNDER REVIEW: Brief submitted, waiting for admin ── */}
+      {status === "under_review" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Request Received!
+            </CardTitle>
+            <CardDescription>
+              Our team has been notified and will start building your new agent. We&apos;ll reach out within 24 hours.
+            </CardDescription>
+          </CardHeader>
         </Card>
       )}
 

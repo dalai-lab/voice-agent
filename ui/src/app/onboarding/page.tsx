@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { 
   Card, CardHeader, CardTitle, CardContent, CardDescription
@@ -28,6 +28,8 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [customerData, setCustomerData] = useState<any>(null);
   const [uploadProgress, setUploadProgress] = useState<{ gst: number, reg: number }>({ gst: 0, reg: 0 });
+  // Once checkStatus succeeds, don't let a subsequent dograhOrgId change (stale token) overwrite the result
+  const statusDetectedRef = useRef(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -56,6 +58,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!dograhOrgId && !email) return;
+    if (statusDetectedRef.current) return; // Already resolved — don't let a stale-token re-run stomp the result
     
     async function checkStatus() {
       try {
@@ -72,6 +75,7 @@ export default function OnboardingPage() {
               const existing = await existingRes.json();
               if (existing?.customer_id) {
                 // Returning customer creating a new workspace — show the brief form
+                statusDetectedRef.current = true;
                 setStatus("new_agent_brief");
                 setCustomerData({ master_customer_id: existing.customer_id, ...existing });
                 setLoading(false);
@@ -80,9 +84,11 @@ export default function OnboardingPage() {
             }
           }
           // Brand new customer
+          statusDetectedRef.current = true;
           setStatus("pending_approval");
         } else if (res.ok) {
           const data = await res.json();
+          statusDetectedRef.current = true;
           setStatus(data.status);
           setCustomerData(data);
           if (data.status === "active" || data.status === "pending_deposit" || data.status === "pending_plan_selection") {
@@ -93,10 +99,12 @@ export default function OnboardingPage() {
           }
           // Sub-org in agent_building without form falls through and shows the brief form below
         } else {
+          statusDetectedRef.current = true;
           setStatus("pending_approval");
         }
       } catch (err) {
         console.error("Failed to fetch onboarding status", err);
+        statusDetectedRef.current = true;
         setStatus("pending_approval");
       } finally {
         setLoading(false);

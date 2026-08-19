@@ -362,6 +362,14 @@ export default function WalletPage() {
       
       const order = await orderRes.json();
       
+      // If the user already had enough wallet balance, the server processed it instantly
+      if (order.status === "upgraded_from_wallet") {
+        alert(`Successfully upgraded to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)} using your existing wallet balance!`);
+        fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
+        setIsRequestingUpgrade(false);
+        return;
+      }
+      
       // MOCK MODE BYPASS
       if (isMock) {
         const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {

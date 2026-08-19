@@ -648,24 +648,37 @@ export default function WalletPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <ReceiptText className="w-5 h-5" />
-              Usage Tier
+              <ReceiptText className="w-5 h-5 text-purple-400" />
+              Active AI Voice Engine
             </CardTitle>
-            <CardDescription>Your current Talkar usage tier.</CardDescription>
+            <CardDescription>Your account's assigned neural model architecture.</CardDescription>
           </CardHeader>
           <CardContent>
             {subscription && subscription.status !== "not_provisioned" ? (
               <div className="space-y-4">
-                <div className="flex justify-between items-center pb-4 border-b">
+                <div className="flex justify-between items-center pb-4 border-b border-border/50">
                   <div>
-                    <p className="text-sm text-muted-foreground">Current Tier</p>
-                    <p className="text-xl font-bold capitalize">{subscription.tier || "N/A"}</p>
+                    <p className="text-xs text-muted-foreground uppercase font-mono tracking-wider">Current Engine</p>
+                    <p className="text-xl font-bold text-foreground mt-0.5">
+                      {subscription.tier === "pro" ? "Talkar NeuralVocal Pro v2" :
+                       subscription.tier === "elite" ? "Talkar Apex Omni Prime" :
+                       "Talkar Echo-Lite 1.0"}
+                    </p>
                   </div>
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30 uppercase tracking-wider">
+                    {subscription.tier || "Starter"}
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="grid grid-cols-2 gap-4 pt-1 text-sm">
                   <div>
-                    <p className="text-sm text-muted-foreground">Per-Minute Rate</p>
-                    <p className="font-medium">₹{subscription.per_minute_rate_paise ? (subscription.per_minute_rate_paise / 100).toFixed(2) : "0.00"}</p>
+                    <p className="text-xs text-muted-foreground">Per-Minute Rate</p>
+                    <p className="font-semibold text-foreground">₹{subscription.per_minute_rate_paise ? (subscription.per_minute_rate_paise / 100).toFixed(2) : "25.00"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Max Concurrency</p>
+                    <p className="font-semibold text-foreground">
+                      {subscription.tier === "pro" ? "10 Calls" : subscription.tier === "elite" ? "50 Calls" : "2 Calls"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -689,20 +702,38 @@ export default function WalletPage() {
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="p-4 border rounded-lg space-y-3">
-              <h3 className="font-bold text-lg">Pro</h3>
-              <p className="text-muted-foreground text-sm">For scaling businesses.</p>
-              <ul className="space-y-2 text-sm">
-                <li>• ₹18 / minute</li>
-                <li>• 10 concurrent calls</li>
+            <div className="p-4 border border-purple-500/30 bg-purple-500/5 rounded-lg space-y-3 relative">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-lg text-foreground">Talkar NeuralVocal Pro v2</h3>
+                  <p className="text-xs text-purple-400 font-medium">Pro Tier Engine</p>
+                </div>
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                  ₹18 / min
+                </span>
+              </div>
+              <p className="text-muted-foreground text-xs leading-relaxed">Human-grade emotive voice synthesis with ~250ms latency & 10 channels.</p>
+              <ul className="space-y-1.5 text-xs text-foreground/90">
+                <li>• <b>ElevenLabs Flash v2.5</b> + GPT-4o</li>
+                <li>• 10 Concurrent Call Channels</li>
+                <li>• 2 Free Phone Numbers Included</li>
               </ul>
             </div>
-            <div className="p-4 border rounded-lg space-y-3">
-              <h3 className="font-bold text-lg">Elite</h3>
-              <p className="text-muted-foreground text-sm">Enterprise scale.</p>
-              <ul className="space-y-2 text-sm">
-                <li>• ₹12 / minute</li>
-                <li>• Unlimited concurrent calls</li>
+            <div className="p-4 border border-amber-500/30 bg-amber-500/5 rounded-lg space-y-3 relative">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-lg text-foreground">Talkar Apex Omni Prime</h3>
+                  <p className="text-xs text-amber-400 font-medium">Elite Tier Engine</p>
+                </div>
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                  ₹12 / min
+                </span>
+              </div>
+              <p className="text-muted-foreground text-xs leading-relaxed">Enterprise low-latency cluster with custom voice clone & 50 channels.</p>
+              <ul className="space-y-1.5 text-xs text-foreground/90">
+                <li>• <b>Dedicated Compute Instance</b> (~180ms latency)</li>
+                <li>• 50 Concurrent Call Capacity</li>
+                <li>• 5 Free Phone Numbers + Voice Cloning</li>
               </ul>
             </div>
           </div>

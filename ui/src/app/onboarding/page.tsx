@@ -1,151 +1,98 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import { 
-  Card, CardHeader, CardTitle, CardContent, CardDescription
+  Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { Clock, CheckCircle, XCircle, Ban, UploadCloud } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { 
+  CheckCircle, Clock, UploadCloud, Building2, User, Bot, Wrench, Shield, 
+  ArrowRight, ArrowLeft, Sparkles, FileText, Check, CreditCard, ChevronRight, HelpCircle
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import type { LocalUser } from "@/lib/auth/types";
 import { useOrgConfig } from "@/context/OrgConfigContext";
-import Script from "next/script";
+
+const TALKAR_API = "/api/talkar";
 
 export default function OnboardingPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const { orgContext } = useOrgConfig();
   const dograhOrgId = orgContext?.organization_id;
-  const router = useRouter();
-  const [status, setStatus] = useState<string>("pending_approval");
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [customerData, setCustomerData] = useState<any>(null);
-  const [uploadProgress, setUploadProgress] = useState<{ gst: number, reg: number }>({ gst: 0, reg: 0 });
-  // Track which orgId we last checked so we re-fire on workspace switch but ignore same-org double-fires
-  const lastCheckedOrgRef = useRef<number | null>(null);
+  const email = (user as any)?.primaryEmail ?? (user as any)?.email;
 
-  // Form State
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<string>("pending_approval");
+  const [customerData, setCustomerData] = useState<any>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Form State — Preserving ALL original fields
   const [formData, setFormData] = useState({
     businessName: "",
     industry: "",
     gstNumber: "",
+    companySize: "",
+    websiteUrl: "",
     pocName: "",
     pocPhone: "",
+    pocDesignation: "",
     useCaseType: "both",
     useCaseDescription: "",
     callVolume: "",
-    languages: "",
-    websiteUrl: "",
-    companySize: "",
-    pocDesignation: "",
+    languages: "English, Hindi",
     integrations: "",
-    gstCertificateUrl: "",
-    businessRegistrationUrl: "",
     needsApiIntegration: false,
     apiIntegrationDetails: "",
+    gstCertificateUrl: "",
+    businessRegistrationUrl: "",
   });
 
-  const email = (user as any)?.primaryEmail ?? (user as any)?.email;
-  
-  const TALKAR_API = "/api/talkar";
+  // Step Wizards
+  const [activeStep, setActiveStep] = useState(1); // 1..4 for main onboarding
+  const [briefStep, setBriefStep] = useState(1);   // 1..2 for 2nd agent brief
+
+  // Upload Progress State
+  const [uploadProgress, setUploadProgress] = useState({ gst: 0, reg: 0 });
 
   useEffect(() => {
-    if (!dograhOrgId) return;  // Wait for org context to resolve before checking
-    if (lastCheckedOrgRef.current === dograhOrgId) return; // Already checked this exact org — skip
-
-    // Mark this org as in-flight BEFORE any await to prevent double-fires from same-org re-renders.
-    lastCheckedOrgRef.current = dograhOrgId;
-
-    // Reset UI state for the new org
-    setLoading(true);
-    setStatus("pending_approval");
-    setCustomerData(null);
+    if (!dograhOrgId && !email) {
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
 
     async function checkStatus() {
       try {
-        const res = await fetch(`${TALKAR_API}/customers/status?dograh_org_id=${dograhOrgId}`);
-        if (cancelled) return;
+        let url = `${TALKAR_API}/customers/status?`;
+        if (dograhOrgId) url += `dograh_org_id=${dograhOrgId}`;
+        else url += `contact_email=${encodeURIComponent(email)}`;
 
-        if (res.status === 404) {
-          // No Talkar customer for this org yet. Check if user already has another org (returning customer).
-          if (email) {
-            const existingRes = await fetch(`${TALKAR_API}/customers/existing?contact_email=${encodeURIComponent(email)}`);
-            if (cancelled) return;
-            if (existingRes.ok) {
-              const existing = await existingRes.json();
-              if (existing?.customer_id) {
-                // Returning customer creating a new workspace — show the brief form
-                if (!cancelled) {
-                  setStatus("new_agent_brief");
-                  setCustomerData({ master_customer_id: existing.customer_id, ...existing });
-                }
-                return;
-              }
-            }
-          }
-          // Brand new customer — show the full application form
-          if (!cancelled) setStatus("pending_approval");
-        } else if (res.ok) {
+        const res = await fetch(url);
+        if (res.ok) {
           const data = await res.json();
-          if (!cancelled) {
-            // Sub-orgs in "pending_approval" that already have their brief submitted
-            // should see the "under review" screen, not the full application form.
-            // Sub-orgs with no form (or only the _needs_brief tag) should see the brief form.
-            let effectiveStatus = data.status;
+          if (cancelled) return;
+          setCustomerData(data);
+          setStatus(data.status);
 
-            if (data.is_sub_org) {
-              if (data.status === "pending_approval" && data.has_onboarding_form) {
-                // Brief already submitted — show simple confirmation
-                effectiveStatus = "brief_submitted";
-              } else if (data.status === "pending_approval" && !data.has_onboarding_form) {
-                // Sub-org was auto-created by workspace hook but hasn't filled brief yet
-                effectiveStatus = "new_agent_brief";
-              } else if (data.status === "agent_building" && !data.has_onboarding_form) {
-                // Sub-org in agent_building (master was active at time of creation) but no brief
-                effectiveStatus = "new_agent_brief";
-              }
-            }
-
-            setStatus(effectiveStatus);
-            setCustomerData(data);
-            if (effectiveStatus === "active" || effectiveStatus === "pending_deposit" || effectiveStatus === "pending_plan_selection") {
-              router.push("/overview");
-            } else if (effectiveStatus === "agent_building") {
-              // All agent_building orgs (master or sub) go to the dashboard — the
-              // AppLayout banner handles the "being built" message there.
-              router.push("/overview");
-            } else if (effectiveStatus === "under_review" && !data.is_sub_org) {
-              // Master org under review — send to overview (banner shown there, platform accessible)
-              router.push("/overview");
-            } else if (effectiveStatus === "brief_submitted") {
-              // Sub-org brief submitted — head to dashboard, banner handles messaging
-              router.push("/overview");
-            } else if (effectiveStatus === "under_review" && data.is_sub_org) {
-              // Sub-org still waiting on review — stay on /onboarding, fetch real form data
-              if (!cancelled) {
-                fetch(`${TALKAR_API}/customers/by-org/${dograhOrgId}`)
-                  .then(r => r.ok ? r.json() : null)
-                  .then(full => {
-                    if (full && !cancelled) {
-                      setCustomerData((prev: any) => ({ ...prev, onboarding_form: full.onboarding_form }));
-                    }
-                  })
-                  .catch(() => {});
-              }
-            }
-            // All other cases (new_agent_brief, rejected, suspended) render on this page
+          if (data.onboarding_form) {
+            setFormData(prev => ({ ...prev, ...data.onboarding_form }));
           }
-        } else {
-          if (!cancelled) setStatus("pending_approval");
+
+          if (data.status === "active") {
+            router.push("/overview");
+          } else if (data.status === "agent_building" && !data.has_onboarding_form) {
+            setStatus("new_agent_brief");
+          }
         }
       } catch (err) {
         console.error("Failed to fetch onboarding status", err);
@@ -158,27 +105,44 @@ export default function OnboardingPage() {
     return () => { cancelled = true; };
   }, [router, dograhOrgId, email]);
 
-  // No handleToggleBuildForMe anymore, always managed
+  // Step Validation Handlers
+  const validateStep = (step: number) => {
+    if (step === 1) {
+      if (!formData.businessName.trim() || !formData.industry || !formData.gstNumber.trim()) {
+        alert("Please fill in all required fields in Step 1 (Business Name, Industry, GST Number).");
+        return false;
+      }
+    } else if (step === 2) {
+      if (!formData.pocName.trim() || !formData.pocPhone.trim()) {
+        alert("Please fill in all required fields in Step 2 (Full Name, Phone Number).");
+        return false;
+      }
+    } else if (step === 3) {
+      if (!formData.useCaseDescription.trim() || !formData.callVolume || !formData.languages.trim()) {
+        alert("Please fill in all required fields in Step 3 (Use Case Description, Volume, Languages).");
+        return false;
+      }
+    }
+    return true;
+  };
 
+  const handleNextStep = () => {
+    if (validateStep(activeStep)) {
+      setActiveStep(prev => Math.min(4, prev + 1));
+    }
+  };
+
+  const handlePrevStep = () => {
+    setActiveStep(prev => Math.max(1, prev - 1));
+  };
+
+  // Submission Handler for Main Application
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Validate required fields based on mode
-    if (!formData.businessName.trim() || !formData.industry || !formData.gstNumber.trim()) {
-      alert("Please fill in all required business information fields.");
-      return;
-    }
-    if (!formData.pocName.trim() || !formData.pocPhone.trim()) {
-      alert("Please fill in your contact name and phone number.");
-      return;
-    }
-    if (!formData.useCaseDescription.trim() || !formData.callVolume || !formData.languages.trim()) {
-      alert("Please fill in all use case fields so we can build your agent correctly.");
-      return;
-    }
+    if (!validateStep(1) || !validateStep(2) || !validateStep(3)) return;
 
     if (formData.needsApiIntegration && !formData.apiIntegrationDetails.trim()) {
-      alert("Please provide details for your custom API integration.");
+      alert("Please provide details for your custom API integration in Step 4.");
       return;
     }
 
@@ -207,6 +171,7 @@ export default function OnboardingPage() {
     }
   };
 
+  // Submission Handler for 2nd Agent Brief
   const handleSubmitBrief = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -221,9 +186,6 @@ export default function OnboardingPage() {
 
     setSubmitting(true);
     try {
-      // customerData.customer_id is set when the sub-org record was auto-created by the
-      // Dograh workspace hook (POST /customers/). In that case, use new-agent-brief to
-      // update the existing record. Only use new-agent-request when there's truly no record.
       const endpoint = customerData?.customer_id
         ? `${TALKAR_API}/customers/by-org/${dograhOrgId}/new-agent-brief`
         : `${TALKAR_API}/customers/by-org/${dograhOrgId}/new-agent-request`;
@@ -247,6 +209,7 @@ export default function OnboardingPage() {
     }
   };
 
+  // Payment Handlers
   const handlePaySetupFee = async () => {
     if (!customerData?.setup_fee_order_id || !customerData?.razorpay_key_id) {
       alert("Missing Razorpay order details. Please contact support.");
@@ -260,14 +223,12 @@ export default function OnboardingPage() {
 
     const options = {
       key: customerData.razorpay_key_id,
-      amount: 100, // ₹1 (100 paise) — test amount
+      amount: 100,
       currency: "INR",
       name: "Talkar Integration Fee",
       description: "One-time custom API integration fee",
       order_id: customerData.setup_fee_order_id,
       handler: async function (response: any) {
-        // Verify payment server-side and trigger provisioning
-        // This bypasses the need for a configured Razorpay webhook
         try {
           const res = await fetch(`${TALKAR_API}/billing/confirm-payment`, {
             method: "POST",
@@ -292,7 +253,7 @@ export default function OnboardingPage() {
         name: formData.pocName || "Talkar Customer",
         contact: formData.pocPhone || "",
       },
-      theme: { color: "#18181b" },
+      theme: { color: "#8b5cf6" },
     };
 
     const rzp = new (window as any).Razorpay(options);
@@ -341,395 +302,535 @@ export default function OnboardingPage() {
   };
 
   if (loading) {
-    return <div className="p-8 max-w-4xl mx-auto flex items-center justify-center min-h-[50vh]">Loading account status...</div>;
+    return (
+      <div className="p-8 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <div className="w-8 h-8 rounded-full border-3 border-purple-500 border-t-transparent animate-spin" />
+        <p className="text-sm text-muted-foreground">Loading Talkar workspace initialization...</p>
+      </div>
+    );
   }
 
+  const mainSteps = [
+    { num: 1, label: "Business Identity", icon: Building2 },
+    { num: 2, label: "Point of Contact", icon: User },
+    { num: 3, label: "Agent Requirements", icon: Bot },
+    { num: 4, label: "Integrations & Docs", icon: Wrench },
+  ];
+
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8 min-h-[85vh] flex flex-col justify-center">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold tracking-tight">Welcome to Talkar</h1>
-        <p className="text-muted-foreground mt-2">Your AI Voice Agent Platform</p>
+
+      {/* ── HEADER BRANDING ── */}
+      <div className="text-center space-y-2">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs font-semibold uppercase tracking-wider">
+          <Sparkles className="w-3.5 h-3.5" /> Talkar Platform Onboarding
+        </div>
+        <h1 className="text-3xl font-extrabold tracking-tight">AI Agent Deployment Brief</h1>
+        <p className="text-muted-foreground text-sm max-w-lg mx-auto">
+          Complete your application details below. Our conversational AI engineering team builds and deploys your workspace's agent within 24 hours.
+        </p>
       </div>
 
-      {/* ── NEW AGENT BRIEF (Sub-org without form, OR returning customer with new workspace) ── */}
+      {/* ── 1. NEW AGENT BRIEF (Sub-org or Returning Customer) ── */}
       {(status === "new_agent_brief" || (status === "agent_building" && customerData?.is_sub_org && !customerData?.has_onboarding_form)) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Tell us about your new agent</CardTitle>
-            <CardDescription>Give our experts a brief so we can build this workspace's agent to your exact specifications.</CardDescription>
+        <Card className="border-purple-500/30 shadow-lg shadow-purple-500/5 bg-card">
+          <CardHeader className="border-b border-border/40 pb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <Bot className="w-5 h-5 text-purple-400" />
+                  Workspace Agent Brief
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">
+                  Specify the voice persona, objective, and volume requirements for this new workspace agent.
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30 font-mono text-[10px]">
+                STEP {briefStep} OF 2
+              </Badge>
+            </div>
+
+            {/* Brief Progress Tracker */}
+            <div className="w-full bg-secondary h-1.5 rounded-full mt-4 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-purple-500 to-indigo-500 h-full transition-all duration-300 rounded-full"
+                style={{ width: `${(briefStep / 2) * 100}%` }}
+              />
+            </div>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmitBrief} className="space-y-8">
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="useCaseType">Primary Function <span className="text-red-500">*</span></Label>
-                    <Select value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="inbound">Inbound (Customer Support)</SelectItem>
-                        <SelectItem value="outbound">Outbound (Sales/Follow-up)</SelectItem>
-                        <SelectItem value="both">Both</SelectItem>
-                      </SelectContent>
-                    </Select>
+
+          <CardContent className="pt-6">
+            <form onSubmit={handleSubmitBrief} className="space-y-6">
+              {briefStep === 1 ? (
+                <div className="space-y-5 animate-in fade-in-50 duration-200">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="useCaseType" className="text-xs font-semibold">Primary Direction <span className="text-red-500">*</span></Label>
+                      <Select value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})}>
+                        <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="inbound">Inbound (Support & Inquiries)</SelectItem>
+                          <SelectItem value="outbound">Outbound (Sales & Follow-ups)</SelectItem>
+                          <SelectItem value="both">Inbound + Outbound (Dual Role)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="callVolume" className="text-xs font-semibold">Monthly Call Volume <span className="text-red-500">*</span></Label>
+                      <Select value={formData.callVolume} onValueChange={val => setFormData({...formData, callVolume: val})}>
+                        <SelectTrigger className="h-10"><SelectValue placeholder="Select Volume" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="<1000">Less than 1,000 mins</SelectItem>
+                          <SelectItem value="1000-5000">1,000 – 5,000 mins</SelectItem>
+                          <SelectItem value="5000-10000">5,000 – 10,000 mins</SelectItem>
+                          <SelectItem value="10000+">10,000+ mins (High Volume)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="callVolume">Monthly Call Volume <span className="text-red-500">*</span></Label>
-                    <Select value={formData.callVolume} onValueChange={val => setFormData({...formData, callVolume: val})}>
-                      <SelectTrigger><SelectValue placeholder="Select Volume" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="<1000">Less than 1,000 mins</SelectItem>
-                        <SelectItem value="1000-5000">1,000 - 5,000 mins</SelectItem>
-                        <SelectItem value="5000-10000">5,000 - 10,000 mins</SelectItem>
-                        <SelectItem value="10000+">10,000+ mins</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="languages" className="text-xs font-semibold">Required Languages <span className="text-red-500">*</span></Label>
+                    <Input id="languages" className="h-10" placeholder="e.g. English, Hindi, Hinglish" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="languages">Languages Required <span className="text-red-500">*</span></Label>
-                  <Input id="languages" placeholder="e.g., English, Hindi, Spanish" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="useCaseDescription">Use Case Description <span className="text-red-500">*</span></Label>
-                  <Textarea
-                    id="useCaseDescription"
-                    placeholder="Describe exactly what this agent should do. E.g., 'Take restaurant reservations and check table availability...'"
-                    value={formData.useCaseDescription}
-                    onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
-                    rows={4}
-                  />
-                </div>
-
-                <div className="flex items-center space-x-2 pt-2">
-                  <Switch
-                    id="needsApiIntegration"
-                    checked={formData.needsApiIntegration}
-                    onCheckedChange={(checked) => setFormData({...formData, needsApiIntegration: checked})}
-                  />
-                  <Label htmlFor="needsApiIntegration">Yes, I need custom API integration for this agent</Label>
-                </div>
-                {formData.needsApiIntegration && (
-                  <div className="space-y-2 mt-4 border-l-2 border-primary pl-4">
-                    <Label htmlFor="apiIntegrationDetails">Describe the integration <span className="text-red-500">*</span></Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="useCaseDescription" className="text-xs font-semibold">Agent Workflow Objective <span className="text-red-500">*</span></Label>
                     <Textarea
-                      id="apiIntegrationDetails"
-                      placeholder="E.g., I need to pull customer records from my proprietary CRM via REST API..."
-                      value={formData.apiIntegrationDetails}
-                      onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
-                      rows={3}
+                      id="useCaseDescription"
+                      placeholder="Describe what this specific agent should execute (e.g. 'Answer hotel availability questions and capture guest name, check-in date, and room type...')"
+                      value={formData.useCaseDescription}
+                      onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
+                      rows={4}
+                      className="resize-none"
                     />
                   </div>
+                </div>
+              ) : (
+                <div className="space-y-5 animate-in fade-in-50 duration-200">
+                  <div className="p-4 border border-purple-500/20 bg-purple-500/5 rounded-lg space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="needsApiIntegration" className="font-semibold text-sm cursor-pointer">Custom API Integration Needed?</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">Check this if the agent must call external REST endpoints, proprietary CRMs, or custom webhooks during calls.</p>
+                      </div>
+                      <Switch
+                        id="needsApiIntegration"
+                        checked={formData.needsApiIntegration}
+                        onCheckedChange={(checked) => setFormData({...formData, needsApiIntegration: checked})}
+                      />
+                    </div>
+
+                    {formData.needsApiIntegration && (
+                      <div className="space-y-2 pt-3 border-t border-purple-500/20">
+                        <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold">API Details & System Specs <span className="text-red-500">*</span></Label>
+                        <Textarea
+                          id="apiIntegrationDetails"
+                          placeholder="Detail your API authentication scheme, endpoint URLs, and required payload fields..."
+                          value={formData.apiIntegrationDetails}
+                          onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
+                          rows={4}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t border-border/40">
+                {briefStep > 1 ? (
+                  <Button type="button" variant="outline" onClick={() => setBriefStep(1)}>
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                  </Button>
+                ) : <div />}
+
+                {briefStep < 2 ? (
+                  <Button type="button" onClick={() => {
+                    if (!formData.useCaseDescription.trim() || !formData.callVolume || !formData.languages.trim()) {
+                      alert("Please complete all required fields on Step 1.");
+                      return;
+                    }
+                    setBriefStep(2);
+                  }} className="bg-purple-600 hover:bg-purple-700 text-white">
+                    Continue to Integrations <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                ) : (
+                  <Button type="submit" disabled={submitting} className="bg-purple-600 hover:bg-purple-700 text-white min-w-[140px]">
+                    {submitting ? "Submitting..." : "Submit Agent Brief"}
+                  </Button>
                 )}
               </div>
-
-              <Button type="submit" className="w-full" size="lg" disabled={submitting}>
-                {submitting ? "Submitting Brief..." : "Submit Brief"}
-              </Button>
             </form>
           </CardContent>
         </Card>
       )}
 
-      {/* ── BRIEF SUBMITTED: Sub-org brief sent, waiting for admin ── */}
+      {/* ── 2. BRIEF SUBMITTED CONFIRMATION ── */}
       {status === "brief_submitted" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              Request Received!
-            </CardTitle>
-            <CardDescription>
-              Our team has been notified and will start building your new agent. We&apos;ll reach out within 24 hours.
-            </CardDescription>
-          </CardHeader>
+        <Card className="border-green-500/30 bg-green-500/5 text-center py-10">
+          <CardContent className="space-y-4">
+            <CheckCircle className="w-14 h-14 text-green-500 mx-auto animate-bounce" />
+            <h2 className="text-2xl font-bold">Agent Request Submitted!</h2>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">
+              Our engineering team has received your workspace brief and is reviewing your workflow specifications.
+            </p>
+            <div className="pt-2">
+              <Button onClick={() => router.push("/overview")} variant="outline">
+                Return to Dashboard
+              </Button>
+            </div>
+          </CardContent>
         </Card>
       )}
 
-      {/* ── PENDING APPROVAL: Show the application form ── */}
+      {/* ── 3. PENDING APPROVAL: Multi-Step Application Wizard ── */}
       {status === "pending_approval" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Complete Your Application</CardTitle>
-            <CardDescription>Tell us about your business to get started with Talkar.</CardDescription>
+        <Card className="border-border/80 shadow-xl bg-card">
+          <CardHeader className="border-b border-border/40 pb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-xl font-bold">Client Onboarding Application</CardTitle>
+                <CardDescription className="text-xs mt-0.5">Step {activeStep} of 4: {mainSteps[activeStep - 1].label}</CardDescription>
+              </div>
+
+              {/* Wizard Steps Indicator */}
+              <div className="flex items-center gap-2">
+                {mainSteps.map((s) => {
+                  const IconComp = s.icon;
+                  const isDone = activeStep > s.num;
+                  const isCurrent = activeStep === s.num;
+                  return (
+                    <div 
+                      key={s.num}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                        isCurrent ? "bg-purple-600 text-white shadow-md" :
+                        isDone ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" :
+                        "bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      {isDone ? <Check className="w-3.5 h-3.5" /> : <IconComp className="w-3.5 h-3.5" />}
+                      <span className="hidden sm:inline">{s.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-secondary h-1.5 rounded-full mt-4 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-purple-600 via-indigo-500 to-emerald-500 h-full transition-all duration-300 rounded-full"
+                style={{ width: `${(activeStep / 4) * 100}%` }}
+              />
+            </div>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-8">
 
-              {/* ── 1. Business Information (always required) ── */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium border-b pb-2">1. Business Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="businessName">Business Name <span className="text-red-500">*</span></Label>
-                    <Input id="businessName" required value={formData.businessName} onChange={e => setFormData({...formData, businessName: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="industry">Industry <span className="text-red-500">*</span></Label>
-                    <Select required onValueChange={val => setFormData({...formData, industry: val})}>
-                      <SelectTrigger><SelectValue placeholder="Select Industry" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Healthcare">Healthcare</SelectItem>
-                        <SelectItem value="Hospitality">Hospitality</SelectItem>
-                        <SelectItem value="Real Estate">Real Estate</SelectItem>
-                        <SelectItem value="Education">Education</SelectItem>
-                        <SelectItem value="Retail">Retail</SelectItem>
-                        <SelectItem value="Finance">Finance</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="gstNumber">GST Number <span className="text-red-500">*</span></Label>
-                    <Input id="gstNumber" required value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companySize">Company Size <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                    <Select onValueChange={val => setFormData({...formData, companySize: val})}>
-                      <SelectTrigger><SelectValue placeholder="Select Size" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1-10">1–10 employees</SelectItem>
-                        <SelectItem value="11-50">11–50 employees</SelectItem>
-                        <SelectItem value="51-200">51–200 employees</SelectItem>
-                        <SelectItem value="200+">200+ employees</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="websiteUrl">Website URL <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                    <Input id="websiteUrl" type="url" placeholder="https://..." value={formData.websiteUrl} onChange={e => setFormData({...formData, websiteUrl: e.target.value})} />
+          <CardContent className="pt-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+
+              {/* STEP 1: BUSINESS IDENTITY */}
+              {activeStep === 1 && (
+                <div className="space-y-5 animate-in fade-in-50 duration-200">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="businessName" className="text-xs font-semibold">Registered Business Name <span className="text-red-500">*</span></Label>
+                      <Input id="businessName" required value={formData.businessName} onChange={e => setFormData({...formData, businessName: e.target.value})} placeholder="e.g. Acme Health Tech Pvt Ltd" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="industry" className="text-xs font-semibold">Industry Sector <span className="text-red-500">*</span></Label>
+                      <Select required value={formData.industry} onValueChange={val => setFormData({...formData, industry: val})}>
+                        <SelectTrigger><SelectValue placeholder="Select Industry" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Healthcare">Healthcare & Wellness</SelectItem>
+                          <SelectItem value="Hospitality">Hospitality & Tourism</SelectItem>
+                          <SelectItem value="Real Estate">Real Estate & Construction</SelectItem>
+                          <SelectItem value="Education">Education & E-Learning</SelectItem>
+                          <SelectItem value="Retail">Retail & E-Commerce</SelectItem>
+                          <SelectItem value="Finance">Finance & Insurance</SelectItem>
+                          <SelectItem value="Other">Other Industry</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="gstNumber" className="text-xs font-semibold">GST Identification Number (GSTIN) <span className="text-red-500">*</span></Label>
+                      <Input id="gstNumber" required value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} placeholder="27AAAAA0000A1Z5" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="companySize" className="text-xs font-semibold">Company Size <span className="text-muted-foreground text-[10px]">(optional)</span></Label>
+                      <Select value={formData.companySize} onValueChange={val => setFormData({...formData, companySize: val})}>
+                        <SelectTrigger><SelectValue placeholder="Select Team Size" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1-10">1–10 employees</SelectItem>
+                          <SelectItem value="11-50">11–50 employees</SelectItem>
+                          <SelectItem value="51-200">51–200 employees</SelectItem>
+                          <SelectItem value="200+">200+ employees</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="websiteUrl" className="text-xs font-semibold">Company Website URL <span className="text-muted-foreground text-[10px]">(optional)</span></Label>
+                      <Input id="websiteUrl" type="url" placeholder="https://www.example.com" value={formData.websiteUrl} onChange={e => setFormData({...formData, websiteUrl: e.target.value})} />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* ── 2. Point of Contact (always required) ── */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium border-b pb-2">2. Point of Contact</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="pocName">Full Name <span className="text-red-500">*</span></Label>
-                    <Input id="pocName" required value={formData.pocName} onChange={e => setFormData({...formData, pocName: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pocPhone">Phone Number <span className="text-red-500">*</span></Label>
-                    <Input id="pocPhone" type="tel" required value={formData.pocPhone} onChange={e => setFormData({...formData, pocPhone: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pocDesignation">Designation <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                    <Input id="pocDesignation" placeholder="e.g. CTO, Operations Head" value={formData.pocDesignation} onChange={e => setFormData({...formData, pocDesignation: e.target.value})} />
+              {/* STEP 2: POINT OF CONTACT */}
+              {activeStep === 2 && (
+                <div className="space-y-5 animate-in fade-in-50 duration-200">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="pocName" className="text-xs font-semibold">Primary Contact Name <span className="text-red-500">*</span></Label>
+                      <Input id="pocName" required value={formData.pocName} onChange={e => setFormData({...formData, pocName: e.target.value})} placeholder="Alex Johnson" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="pocPhone" className="text-xs font-semibold">Phone Number <span className="text-red-500">*</span></Label>
+                      <Input id="pocPhone" type="tel" required value={formData.pocPhone} onChange={e => setFormData({...formData, pocPhone: e.target.value})} placeholder="+91 98765 43210" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="pocDesignation" className="text-xs font-semibold">Designation / Role <span className="text-muted-foreground text-[10px]">(optional)</span></Label>
+                      <Input id="pocDesignation" placeholder="e.g. Head of Operations" value={formData.pocDesignation} onChange={e => setFormData({...formData, pocDesignation: e.target.value})} />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* ── 3. Use Case Details ── */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium border-b pb-2">3. Tell Us About Your Agent</h3>
-                <p className="text-sm text-muted-foreground">Help our team build the perfect agent for your business.</p>
-
+              {/* STEP 3: AGENT REQUIREMENTS */}
+              {activeStep === 3 && (
+                <div className="space-y-5 animate-in fade-in-50 duration-200">
                   <div className="space-y-3">
-                    <Label>Agent Type <span className="text-red-500">*</span></Label>
-                    <RadioGroup defaultValue="both" onValueChange={val => setFormData({...formData, useCaseType: val})} className="flex gap-4">
-                      <div className="flex items-center space-x-2">
+                    <Label className="text-xs font-semibold">Agent Direction <span className="text-red-500">*</span></Label>
+                    <RadioGroup value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})} className="flex gap-4">
+                      <div className="flex items-center space-x-2 border border-border/60 p-3 rounded-lg flex-1 cursor-pointer">
                         <RadioGroupItem value="inbound" id="inbound" />
-                        <Label htmlFor="inbound">Inbound</Label>
+                        <Label htmlFor="inbound" className="cursor-pointer text-xs font-medium">Inbound Only</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 border border-border/60 p-3 rounded-lg flex-1 cursor-pointer">
                         <RadioGroupItem value="outbound" id="outbound" />
-                        <Label htmlFor="outbound">Outbound</Label>
+                        <Label htmlFor="outbound" className="cursor-pointer text-xs font-medium">Outbound Only</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 border border-border/60 p-3 rounded-lg flex-1 cursor-pointer">
                         <RadioGroupItem value="both" id="both" />
-                        <Label htmlFor="both">Both</Label>
+                        <Label htmlFor="both" className="cursor-pointer text-xs font-medium">Inbound & Outbound</Label>
                       </div>
                     </RadioGroup>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="useCaseDescription">Describe your use case <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="useCaseDescription" className="text-xs font-semibold">Detailed Use Case Description <span className="text-red-500">*</span></Label>
                     <Textarea
                       id="useCaseDescription"
-                      placeholder="E.g., We need an agent to answer patient queries and book appointments in Hindi and English..."
+                      placeholder="Describe what conversation flow you need (e.g., Answer customer queries about order status, collect delivery address, and send SMS confirmation...)"
                       value={formData.useCaseDescription}
                       onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
-                      rows={3}
+                      rows={4}
+                      className="resize-none"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="callVolume">Expected Monthly Volume <span className="text-red-500">*</span></Label>
-                      <Select onValueChange={val => setFormData({...formData, callVolume: val})}>
-                        <SelectTrigger><SelectValue placeholder="Select Volume" /></SelectTrigger>
+                      <Label htmlFor="callVolume" className="text-xs font-semibold">Expected Monthly Volume <span className="text-red-500">*</span></Label>
+                      <Select value={formData.callVolume} onValueChange={val => setFormData({...formData, callVolume: val})}>
+                        <SelectTrigger><SelectValue placeholder="Select Call Volume" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="<100">Less than 100 calls</SelectItem>
-                          <SelectItem value="100-500">100–500 calls</SelectItem>
-                          <SelectItem value="500-2000">500–2,000 calls</SelectItem>
+                          <SelectItem value="100-500">100 – 500 calls</SelectItem>
+                          <SelectItem value="500-2000">500 – 2,000 calls</SelectItem>
                           <SelectItem value="2000+">2,000+ calls</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="languages">Languages Needed <span className="text-red-500">*</span></Label>
-                      <Input id="languages" placeholder="Hindi, English, Hinglish..." value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="integrations">Existing Tools to Integrate <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                      <Input id="integrations" placeholder="E.g., HubSpot CRM, Google Calendar, WhatsApp" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} />
-                    </div>
-                  </div>
-              </div>
 
-              {/* ── 4. Custom API Integration ── */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium border-b pb-2">4. Custom API Integration</h3>
-                <p className="text-sm text-muted-foreground">Do you need your AI agent to integrate with a custom internal tool, proprietary API, or custom webhook? (If yes, we will quote a custom integration fee).</p>
-                <div className="flex items-center space-x-2">
-                  <Switch 
-                    id="needsApiIntegration" 
-                    checked={formData.needsApiIntegration} 
-                    onCheckedChange={val => setFormData({...formData, needsApiIntegration: val})}
-                  />
-                  <Label htmlFor="needsApiIntegration">Yes, I need custom API integration</Label>
-                </div>
-                {formData.needsApiIntegration && (
-                  <div className="space-y-2 mt-4 border-l-2 border-primary pl-4">
-                    <Label htmlFor="apiIntegrationDetails">Describe the integration <span className="text-red-500">*</span></Label>
-                    <Textarea
-                      id="apiIntegrationDetails"
-                      placeholder="E.g., I need to pull customer records from my proprietary CRM via REST API..."
-                      value={formData.apiIntegrationDetails}
-                      onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
-                      rows={3}
-                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="languages" className="text-xs font-semibold">Spoken Languages Needed <span className="text-red-500">*</span></Label>
+                      <Input id="languages" placeholder="e.g. English, Hindi, Tamil" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="integrations" className="text-xs font-semibold">Existing Tools & Software <span className="text-muted-foreground text-[10px]">(optional)</span></Label>
+                      <Input id="integrations" placeholder="e.g. HubSpot, Google Sheets, WhatsApp Business API" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} />
+                    </div>
                   </div>
+                </div>
+              )}
+
+              {/* STEP 4: INTEGRATIONS & COMPLIANCE DOCS */}
+              {activeStep === 4 && (
+                <div className="space-y-6 animate-in fade-in-50 duration-200">
+                  <div className="p-4 border border-purple-500/20 bg-purple-500/5 rounded-lg space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="needsApiIntegration" className="font-semibold text-sm cursor-pointer">Custom API Integration Required?</Label>
+                        <p className="text-xs text-muted-foreground">Select if your agent requires proprietary CRM endpoints or real-time webhook triggers.</p>
+                      </div>
+                      <Switch 
+                        id="needsApiIntegration" 
+                        checked={formData.needsApiIntegration} 
+                        onCheckedChange={val => setFormData({...formData, needsApiIntegration: val})}
+                      />
+                    </div>
+
+                    {formData.needsApiIntegration && (
+                      <div className="space-y-2 pt-3 border-t border-purple-500/20">
+                        <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold">API Details & Authentication Specs <span className="text-red-500">*</span></Label>
+                        <Textarea
+                          id="apiIntegrationDetails"
+                          placeholder="Describe the REST endpoints, headers, authentication method, or webhook payloads..."
+                          value={formData.apiIntegrationDetails}
+                          onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
+                          rows={3}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-xs font-semibold">Verification Documents <span className="text-muted-foreground font-normal">(Optional — Accelerates Approval)</span></Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div
+                        className="border-2 border-dashed border-border/80 rounded-xl p-5 flex flex-col items-center justify-center text-center bg-secondary/30 hover:bg-secondary/60 transition-colors cursor-pointer"
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={e => { e.preventDefault(); simulateUpload("gst"); }}
+                      >
+                        <UploadCloud className="w-7 h-7 text-purple-400 mb-2" />
+                        <p className="text-xs font-semibold">GST Certificate</p>
+                        <p className="text-[10px] text-muted-foreground">Drag & drop or click to upload</p>
+                        {uploadProgress.gst > 0 && (
+                          <div className="w-full mt-3 bg-secondary rounded-full h-1.5">
+                            <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${uploadProgress.gst}%` }} />
+                          </div>
+                        )}
+                      </div>
+
+                      <div
+                        className="border-2 border-dashed border-border/80 rounded-xl p-5 flex flex-col items-center justify-center text-center bg-secondary/30 hover:bg-secondary/60 transition-colors cursor-pointer"
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={e => { e.preventDefault(); simulateUpload("reg"); }}
+                      >
+                        <UploadCloud className="w-7 h-7 text-purple-400 mb-2" />
+                        <p className="text-xs font-semibold">Business Registration</p>
+                        <p className="text-[10px] text-muted-foreground">Drag & drop or click to upload</p>
+                        {uploadProgress.reg > 0 && (
+                          <div className="w-full mt-3 bg-secondary rounded-full h-1.5">
+                            <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${uploadProgress.reg}%` }} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Wizard Navigation Footer */}
+              <div className="flex items-center justify-between pt-6 border-t border-border/40">
+                {activeStep > 1 ? (
+                  <Button type="button" variant="outline" onClick={handlePrevStep}>
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Previous Step
+                  </Button>
+                ) : <div />}
+
+                {activeStep < 4 ? (
+                  <Button type="button" onClick={handleNextStep} className="bg-purple-600 hover:bg-purple-700 text-white">
+                    Next Step <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                ) : (
+                  <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white min-w-[160px] shadow-lg">
+                    {submitting ? "Submitting Application..." : "Submit Application"}
+                  </Button>
                 )}
               </div>
-
-              {/* ── 5. Documents ── */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium border-b pb-2">
-                  5. Documents <span className="text-muted-foreground text-sm font-normal">(optional — speeds up verification)</span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div
-                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onDragOver={e => e.preventDefault()}
-                    onDrop={e => { e.preventDefault(); simulateUpload("gst"); }}
-                  >
-                    <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
-                    <p className="text-sm font-medium">GST Certificate</p>
-                    <p className="text-xs text-muted-foreground">PDF or Image</p>
-                    <Input type="file" className="mt-4" onChange={() => simulateUpload("gst")} />
-                    {uploadProgress.gst > 0 && (
-                      <div className="w-full mt-4 bg-muted rounded-full h-2">
-                        <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${uploadProgress.gst}%` }} />
-                      </div>
-                    )}
-                  </div>
-                  <div
-                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onDragOver={e => e.preventDefault()}
-                    onDrop={e => { e.preventDefault(); simulateUpload("reg"); }}
-                  >
-                    <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
-                    <p className="text-sm font-medium">Business Registration</p>
-                    <p className="text-xs text-muted-foreground">PDF or Image</p>
-                    <Input type="file" className="mt-4" onChange={() => simulateUpload("reg")} />
-                    {uploadProgress.reg > 0 && (
-                      <div className="w-full mt-4 bg-muted rounded-full h-2">
-                        <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${uploadProgress.reg}%` }} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full" size="lg" disabled={submitting}>
-                {submitting ? "Submitting..." : "Submit Application"}
-              </Button>
             </form>
           </CardContent>
         </Card>
       )}
 
-      {/* ── UNDER REVIEW ── */}
+      {/* ── 4. UNDER REVIEW SCREEN ── */}
       {status === "under_review" && (
-        <Card className="py-8">
-          <CardContent className="space-y-8">
-            <div className="text-center space-y-4">
-              <Clock className="w-16 h-16 text-blue-500 mx-auto" />
-              <h2 className="text-2xl font-bold">Application under review.</h2>
-              <p className="text-muted-foreground">We'll notify you within 48 hours. <a href="mailto:support@talkar.ai" className="text-blue-600 hover:underline">Need changes? Contact us</a></p>
+        <Card className="text-center py-12 border-blue-500/30 bg-blue-500/5">
+          <CardContent className="space-y-6">
+            <Clock className="w-16 h-16 text-blue-500 mx-auto animate-spin" />
+            <div>
+              <h2 className="text-2xl font-bold">Application Under Engineering Review</h2>
+              <p className="text-muted-foreground text-sm max-w-md mx-auto mt-2">
+                Our solutions architecture team is reviewing your use case details. We will notify you via email once approved.
+              </p>
             </div>
-            <div className="border-t pt-8 px-4 md:px-8">
-              <h3 className="text-lg font-medium mb-4">Submitted Details</h3>
-              <div className="opacity-70 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div><span className="text-muted-foreground">Business:</span><br />{customerData?.onboarding_form?.businessName || "N/A"}</div>
-                <div><span className="text-muted-foreground">Industry:</span><br />{customerData?.onboarding_form?.industry || "N/A"}</div>
-                <div><span className="text-muted-foreground">GST:</span><br />{customerData?.onboarding_form?.gstNumber || "N/A"}</div>
-                <div><span className="text-muted-foreground">Contact:</span><br />{customerData?.onboarding_form?.pocName || "N/A"} · {customerData?.onboarding_form?.pocPhone || "N/A"}</div>
-                <div className="md:col-span-2"><span className="text-muted-foreground">Custom API Integration:</span><br />
-                  {customerData?.onboarding_form?.needsApiIntegration ? "Yes — " + customerData?.onboarding_form?.apiIntegrationDetails : "No"}
-                </div>
-                <div className="md:col-span-2"><span className="text-muted-foreground">Use Case:</span><br />{customerData?.onboarding_form?.useCaseDescription || "N/A"}</div>
-              </div>
+            <div className="pt-2">
+              <Button onClick={() => router.push("/overview")} variant="outline">
+                Explore Dashboard Overview
+              </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* ── APPROVED: Pay integration fee ── */}
+      {/* ── 5. APPROVED SCREEN: Custom Integration Fee Quoted Invoice ── */}
       {status === "approved" && (
-        <Card className="text-center py-12 border-green-500/30 bg-green-500/5">
-          <CardContent className="space-y-6">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-            <h2 className="text-2xl font-bold">Integration Fee Quoted</h2>
-            <p className="text-muted-foreground text-sm">We have approved your application and quoted a one-time fee for your custom API integration. Complete the payment to begin development.</p>
-            <div className="flex gap-4 justify-center mt-4">
-              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" onClick={handlePaySetupFee}>
-                Pay Integration Fee
+        <Card className="border-emerald-500/40 bg-gradient-to-b from-emerald-500/5 via-card to-card shadow-2xl">
+          <CardHeader className="text-center pb-4 border-b border-border/40">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-2">
+              <CheckCircle className="w-7 h-7" />
+            </div>
+            <CardTitle className="text-2xl font-extrabold">Application Approved!</CardTitle>
+            <CardDescription className="text-xs">
+              Custom API Integration Fee Quoted
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-6">
+            <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-center">
+              <span className="text-xs uppercase tracking-wider text-emerald-400 font-mono font-semibold">One-Time Integration Quote</span>
+              <div className="text-4xl font-extrabold text-foreground mt-1">
+                {customerData?.onboarding_form?.integration_fee_paise 
+                  ? `₹${(customerData.onboarding_form.integration_fee_paise / 100).toLocaleString()}`
+                  : "Custom Quoted Fee"}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {customerData?.onboarding_form?.integration_description || "Covers proprietary REST API bindings, custom webhooks, and sandbox testing."}
+              </p>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <span className="font-semibold uppercase tracking-wider text-muted-foreground text-[10px]">What's Included:</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="flex items-center gap-2 p-2 rounded bg-secondary/40">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Custom REST & Webhook Handlers</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded bg-secondary/40">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>End-to-End Pipeline Testing</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded bg-secondary/40">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Dedicated Integration Engineer</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded bg-secondary/40">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>24-Hour Agent Delivery SLA</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4 border-t border-border/40">
+              <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-lg min-w-[200px]" onClick={handlePaySetupFee}>
+                <CreditCard className="w-4 h-4 mr-2" /> Pay Integration Fee
               </Button>
+              
               {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
                 <Button onClick={handleMockSetupFee} variant="secondary" size="lg">
                   Bypass Payment (Dev)
                 </Button>
               )}
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-
-      {/* ── REJECTED ── */}
-      {status === "rejected" && (
-        <Card className="text-center py-12 border-red-500/30 bg-red-500/5">
-          <CardContent className="space-y-4">
-            <XCircle className="w-16 h-16 text-red-500 mx-auto" />
-            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">Application Not Approved</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              <span className="font-medium text-foreground">{customerData?.rejection_reason || "Did not meet requirements."}</span>
-            </p>
-            <div className="pt-4 text-sm font-medium">
-              Reapply after 30 days ({customerData?.reapply_countdown || "29d 14h"})
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── SUSPENDED ── */}
-      {status === "suspended" && (
-        <Card className="text-center py-12 border-red-500/30 bg-red-500/5">
-          <CardContent className="space-y-4">
-            <Ban className="w-16 h-16 text-red-500 mx-auto" />
-            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">Account Suspended</h2>
-            <p className="text-muted-foreground">Your account has been suspended due to low wallet balance.</p>
-            <div className="font-bold text-xl my-4">Balance: ₹{customerData?.wallet_balance ? (customerData.wallet_balance / 100).toFixed(2) : "0.00"}</div>
-            <Button size="lg" onClick={() => router.push("/wallet")}>
-              Add Credits to Reactivate
-            </Button>
           </CardContent>
         </Card>
       )}

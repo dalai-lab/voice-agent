@@ -83,6 +83,11 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         icon: PhosphorIcons.SquaresFour,
       },
       {
+        title: "AI Voice Models",
+        url: "/models",
+        icon: PhosphorIcons.Brain,
+      },
+      {
         title: "Voice Agents",
         url: "/workflow",
         icon: PhosphorIcons.Robot,

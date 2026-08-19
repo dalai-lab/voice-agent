@@ -195,6 +195,8 @@ export function AppSidebar() {
   const { provider, logout, user } = useAuth();
   const { config } = useAppConfig();
   const { openHireExpert } = useLeadForms();
+  const { orgContext } = useOrgConfig();
+  const dograhOrgId = orgContext?.organization_id;
   const {
     telnyxMissingWebhookPublicKeyCount,
     vonageMissingSignatureSecretCount,
@@ -209,13 +211,21 @@ export function AppSidebar() {
 
   React.useEffect(() => {
     setIsAdminBypass(document.cookie.includes('talkar_admin_bypass=true'));
-    // Check talkar org type directly from the user object loaded by useAuth()
-    if (user && (user as any).talkar_org_type === "customer") {
-      setIsTalkarCustomer(true);
-    } else {
-      setIsTalkarCustomer(false);
-    }
-  }, [user]);
+  }, []);
+
+  React.useEffect(() => {
+    // Skip if admin bypass is active, or org context not loaded yet
+    if (isAdminBypass || !dograhOrgId) return;
+
+    fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
+      .then(async r => {
+        if (!r.ok) return; // 404 = new customer, fail open (will be gated by AppLayout anyway)
+        const data = await r.json();
+        // Any valid Talkar customer record means this is a managed Talkar org
+        if (data?.status) setIsTalkarCustomer(true);
+      })
+      .catch(() => { /* fail open */ });
+  }, [dograhOrgId, isAdminBypass]);
 
   const filteredNavSections = React.useMemo(() => {
     const TALKAR_CUSTOMER_HIDDEN_URLS = [

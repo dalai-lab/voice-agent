@@ -90,26 +90,23 @@ function TalkarStatusGate() {
   const [talkarStatus, setTalkarStatus] = React.useState<string | null>(null);
 
   useEffect(() => {
-    // Reset check when pathname changes so navigating to a new page re-checks
+    // Reset check when EITHER the page changes or the org context resolves
     checkedRef.current = false;
-  }, [pathname]);
+  }, [pathname, dograhOrgId]);
 
   useEffect(() => {
     if (!user || checkedRef.current) return;
     if (TALKAR_ALLOWED_PATHS.some(p => pathname.startsWith(p))) return;
     if (document.cookie.includes('talkar_admin_bypass=true')) return;
 
-    const email = (user as any)?.primaryEmail ?? (user as any)?.email;
-
-    if (!email && !dograhOrgId) return;
+    // Wait for the org context to resolve before making any check.
+    // Firing with just contact_email causes 404s when dograhOrgId isn't loaded yet
+    // and creates a redirect loop back to /onboarding.
+    if (!dograhOrgId) return;
 
     checkedRef.current = true;
 
-    const query = dograhOrgId
-      ? `dograh_org_id=${dograhOrgId}`
-      : `contact_email=${encodeURIComponent(email)}`;
-
-    fetch(`/api/talkar/customers/status?${query}`)
+    fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
       .then(async r => {
         if (r.status === 404) {
           // New workspace — no Talkar customer yet. Send to onboarding.

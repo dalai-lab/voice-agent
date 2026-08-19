@@ -157,6 +157,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({ form: formData, documents: [] })
       });
       if (res.ok) {
+        setCustomerData(prev => ({ ...prev, onboarding_form: formData } as any));
         setStatus("under_review");
       } else {
         const err = await res.json().catch(() => ({}));
@@ -195,6 +196,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({ form: formData, master_customer_id: customerData?.master_customer_id })
       });
       if (res.ok) {
+        setCustomerData(prev => ({ ...prev, onboarding_form: formData } as any));
         setStatus("under_review");
       } else {
         const err = await res.json().catch(() => ({}));
@@ -291,9 +293,9 @@ export default function OnboardingPage() {
         progress = 100;
         clearInterval(interval);
         if (type === "gst") {
-          setFormData(prev => ({ ...prev, gstCertificateUrl: "https://talkar.s3.amazonaws.com/mock-gst.pdf" }));
+          setFormData(prev => ({ ...prev, gstCertificateUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf" }));
         } else {
-          setFormData(prev => ({ ...prev, businessRegistrationUrl: "https://talkar.s3.amazonaws.com/mock-reg.pdf" }));
+          setFormData(prev => ({ ...prev, businessRegistrationUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf" }));
         }
       }
       setUploadProgress(prev => ({ ...prev, [type]: progress }));

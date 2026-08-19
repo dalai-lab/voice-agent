@@ -279,7 +279,7 @@ export default function OnboardingPage() {
             }),
           });
           if (res.ok) {
-            setStatus("agent_building");
+            window.location.href = "/";
           } else {
             const err = await res.json().catch(() => ({}));
             alert(`Payment confirmed but setup failed: ${err.detail || "Please contact support."}`);
@@ -312,7 +312,7 @@ export default function OnboardingPage() {
         }),
       });
       if (res.ok) {
-        setStatus("agent_building");
+        window.location.href = "/";
       } else {
         const err = await res.json().catch(() => ({}));
         alert(`Mock payment confirmed but setup failed: ${err.detail || "Error"}`);

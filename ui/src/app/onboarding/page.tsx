@@ -692,7 +692,7 @@ export default function OnboardingPage() {
               <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" onClick={handlePaySetupFee}>
                 Pay Integration Fee
               </Button>
-              {process.env.NODE_ENV !== 'production' && (
+              {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
                 <Button onClick={handleMockSetupFee} variant="secondary" size="lg">
                   Bypass Payment (Dev)
                 </Button>

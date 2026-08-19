@@ -168,7 +168,7 @@ const NAV_SECTIONS: SidebarNavSection[] = [
             showsTelephonyWarning: true,
           },
           {
-            title: "AI Models",
+            title: "Models Configuration",
             url: "/model-configurations",
             icon: PhosphorIcons.Brain,
           },

@@ -696,11 +696,13 @@ export default function OnboardingPage() {
                   <div className="space-y-3">
                     <Label className="text-xs font-semibold">Verification Documents <span className="text-muted-foreground font-normal">(Optional — Accelerates Approval)</span></Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div
+                      <label
+                        htmlFor="gst-upload"
                         className="border-2 border-dashed border-border/80 rounded-xl p-5 flex flex-col items-center justify-center text-center bg-secondary/30 hover:bg-secondary/60 transition-colors cursor-pointer"
                         onDragOver={e => e.preventDefault()}
                         onDrop={e => { e.preventDefault(); simulateUpload("gst"); }}
                       >
+                        <input type="file" id="gst-upload" className="hidden" onChange={() => simulateUpload("gst")} />
                         <UploadCloud className="w-7 h-7 text-purple-400 mb-2" />
                         <p className="text-xs font-semibold">GST Certificate</p>
                         <p className="text-[10px] text-muted-foreground">Drag & drop or click to upload</p>
@@ -709,13 +711,15 @@ export default function OnboardingPage() {
                             <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${uploadProgress.gst}%` }} />
                           </div>
                         )}
-                      </div>
+                      </label>
 
-                      <div
+                      <label
+                        htmlFor="reg-upload"
                         className="border-2 border-dashed border-border/80 rounded-xl p-5 flex flex-col items-center justify-center text-center bg-secondary/30 hover:bg-secondary/60 transition-colors cursor-pointer"
                         onDragOver={e => e.preventDefault()}
                         onDrop={e => { e.preventDefault(); simulateUpload("reg"); }}
                       >
+                        <input type="file" id="reg-upload" className="hidden" onChange={() => simulateUpload("reg")} />
                         <UploadCloud className="w-7 h-7 text-purple-400 mb-2" />
                         <p className="text-xs font-semibold">Business Registration</p>
                         <p className="text-[10px] text-muted-foreground">Drag & drop or click to upload</p>
@@ -724,7 +728,7 @@ export default function OnboardingPage() {
                             <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${uploadProgress.reg}%` }} />
                           </div>
                         )}
-                      </div>
+                      </label>
                     </div>
                   </div>
                 </div>

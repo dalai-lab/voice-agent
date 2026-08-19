@@ -122,8 +122,24 @@ export default function OnboardingPage() {
             } else if (effectiveStatus === "agent_building" && !data.is_sub_org) {
               // Master org already building — send to overview for the banner
               router.push("/overview");
+            } else if (effectiveStatus === "under_review" && !data.is_sub_org) {
+              // Master org under review — send to overview (banner shown there, platform accessible)
+              router.push("/overview");
+            } else if (effectiveStatus === "under_review" || effectiveStatus === "brief_submitted") {
+              // Fetch full customer record so submitted details show real values (not N/A).
+              // /customers/status only returns metadata; onboarding_form is in the full object.
+              if (!cancelled) {
+                fetch(`${TALKAR_API}/customers/by-org/${dograhOrgId}`)
+                  .then(r => r.ok ? r.json() : null)
+                  .then(full => {
+                    if (full && !cancelled) {
+                      setCustomerData((prev: any) => ({ ...prev, onboarding_form: full.onboarding_form }));
+                    }
+                  })
+                  .catch(() => {});
+              }
             }
-            // All other cases (under_review, new_agent_brief, rejected, suspended etc.) render on this page
+            // All other cases (new_agent_brief, rejected, suspended etc.) render on this page
           }
         } else {
           if (!cancelled) setStatus("pending_approval");

@@ -123,7 +123,7 @@ function TalkarStatusGate() {
             return;
         }
         
-        if (status === 'active' || status === 'agent_building' || status === 'pending_deposit' || status === 'pending_plan_selection' || status === 'suspended') return;
+        if (status === 'active' || status === 'agent_building' || status === 'under_review' || status === 'pending_deposit' || status === 'pending_plan_selection' || status === 'suspended') return;
         router.replace('/onboarding');
       })
       .catch(() => { /* network failure — fail open */ });
@@ -134,6 +134,15 @@ function TalkarStatusGate() {
       <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-900 border-b border-indigo-500/30 text-white text-center py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3">
         <div className="w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
         Your Talkar Agent is currently being built by our experts. Feel free to explore the dashboard in the meantime!
+      </div>
+    );
+  }
+
+  if (talkarStatus === 'under_review') {
+    return (
+      <div className="bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 border-b border-slate-500/30 text-white text-center py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3">
+        <div className="w-4 h-4 rounded-full border-2 border-slate-300 border-t-transparent animate-spin" />
+        Your application is under review. We&apos;ll notify you within 48 hours. Feel free to explore in the meantime!
       </div>
     );
   }

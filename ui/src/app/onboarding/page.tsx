@@ -157,7 +157,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({ form: formData, documents: [] })
       });
       if (res.ok) {
-        setCustomerData(prev => ({ ...prev, onboarding_form: formData } as any));
+        setCustomerData((prev: any) => ({ ...prev, onboarding_form: formData } as any));
         setStatus("under_review");
       } else {
         const err = await res.json().catch(() => ({}));
@@ -196,7 +196,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({ form: formData, master_customer_id: customerData?.master_customer_id })
       });
       if (res.ok) {
-        setCustomerData(prev => ({ ...prev, onboarding_form: formData } as any));
+        setCustomerData((prev: any) => ({ ...prev, onboarding_form: formData } as any));
         setStatus("under_review");
       } else {
         const err = await res.json().catch(() => ({}));

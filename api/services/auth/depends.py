@@ -87,7 +87,14 @@ async def get_user(
                 await db_client.update_user_email(user_model.id, stack_email)
                 user_model.email = stack_email
             except Exception as e:
-                logger.warning(f"Could not sync email {stack_email} for user {user_model.id}: {e}")
+                err_str = str(e)
+                if "UniqueViolationError" in err_str or "unique constraint" in err_str.lower() or "duplicate key" in err_str.lower():
+                    # Another user already owns this email address (duplicate user records
+                    # from test cycles or impersonation). Treat the sync as done by updating
+                    # the in-memory model so we don't retry on every request and spam logs.
+                    user_model.email = stack_email
+                else:
+                    logger.warning(f"Could not sync email {stack_email} for user {user_model.id}: {e}")
 
         if user_was_created:
             capture_event(

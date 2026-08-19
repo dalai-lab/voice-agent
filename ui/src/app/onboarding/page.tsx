@@ -57,22 +57,16 @@ export default function OnboardingPage() {
   const TALKAR_API = "/api/talkar";
 
   useEffect(() => {
-    if (!dograhOrgId && !email) return;
+    if (!dograhOrgId) return;  // Wait for org context to resolve before checking
     if (statusDetectedRef.current) return; // Semaphore: already resolved or in-flight
     
     // Lock the semaphore SYNCHRONOUSLY before any await.
-    // This prevents a second effect run (from dograhOrgId changing) from
-    // racing with this one while the fetch is still in flight.
     statusDetectedRef.current = true;
     let cancelled = false;
 
     async function checkStatus() {
       try {
-        const query = dograhOrgId 
-          ? `dograh_org_id=${dograhOrgId}` 
-          : `contact_email=${encodeURIComponent(email)}`;
-          
-        const res = await fetch(`${TALKAR_API}/customers/status?${query}`);
+        const res = await fetch(`${TALKAR_API}/customers/status?dograh_org_id=${dograhOrgId}`);
         if (cancelled) return;
 
         if (res.status === 404) {
@@ -97,11 +91,19 @@ export default function OnboardingPage() {
         } else if (res.ok) {
           const data = await res.json();
           if (!cancelled) {
-            setStatus(data.status);
+            // Sub-orgs in "pending_approval" that already have their brief submitted
+            // should see the "under review" screen, not the full application form.
+            const effectiveStatus = (
+              data.status === "pending_approval" &&
+              data.is_sub_org &&
+              data.has_onboarding_form
+            ) ? "under_review" : data.status;
+
+            setStatus(effectiveStatus);
             setCustomerData(data);
-            if (data.status === "active" || data.status === "pending_deposit" || data.status === "pending_plan_selection") {
+            if (effectiveStatus === "active" || effectiveStatus === "pending_deposit" || effectiveStatus === "pending_plan_selection") {
               router.push("/overview");
-            } else if (data.status === "agent_building" && !data.is_sub_org) {
+            } else if (effectiveStatus === "agent_building" && !data.is_sub_org) {
               // Master org already building — send to overview for the banner
               router.push("/overview");
             }

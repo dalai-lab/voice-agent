@@ -261,31 +261,31 @@ export default function OnboardingPage() {
 
     const options = {
       key: customerData.razorpay_key_id,
-      amount: 100,
-      currency: "INR",
       name: "Talkar Integration Fee",
       description: "One-time custom API integration fee",
       order_id: customerData.setup_fee_order_id,
-      handler: async function (response: any) {
-        try {
-          const res = await fetch(`${TALKAR_API}/billing/confirm-payment`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          });
-          if (res.ok) {
-            window.location.href = "/";
-          } else {
-            const err = await res.json().catch(() => ({}));
-            alert(`Payment confirmed but setup failed: ${err.detail || "Please contact support."}`);
+      handler: function (response: any) {
+        (async () => {
+          try {
+            const res = await fetch(`${TALKAR_API}/billing/confirm-payment`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+            if (res.ok) {
+              window.location.href = "/";
+            } else {
+              const err = await res.json().catch(() => ({}));
+              alert(`Payment confirmed but setup failed: ${err.detail || "Please contact support."}`);
+            }
+          } catch {
+            alert("Payment received but could not reach server. Please refresh the page.");
           }
-        } catch {
-          alert("Payment received but could not reach server. Please refresh the page.");
-        }
+        })();
       },
       prefill: {
         name: formData.pocName || "Talkar Customer",

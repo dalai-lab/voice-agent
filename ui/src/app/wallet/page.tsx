@@ -101,11 +101,11 @@ export default function WalletPage() {
   const currentPlan = subscription?.plan || plan || "starter";
   const minTopup = PLAN_MINIMUMS[currentPlan] ?? 6000;
 
-  const handleTopup = async (isMock = false) => {
+  const handleTopup = async (isMock = false, isLiveTest = false) => {
     if (!resolvedOrgId) return;
     const dograhOrgId = resolvedOrgId;
-    const amount = parseInt(topupAmount);
-    if (amount < minTopup) {
+    const amount = isLiveTest ? 1 : parseInt(topupAmount);
+    if (!isLiveTest && amount < minTopup) {
       alert(`Minimum top-up is ₹${minTopup}`);
       return;
     }
@@ -485,6 +485,9 @@ export default function WalletPage() {
             <div className="flex gap-2 shrink-0">
               <Button onClick={() => handleTopup(false)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} className="bg-primary text-primary-foreground hover:bg-primary/95 rounded-md h-10 px-4 text-xs font-semibold shadow-xs">
                 {isProcessing ? "Processing..." : "Add Credits"}
+              </Button>
+              <Button variant="outline" onClick={() => handleTopup(false, true)} disabled={isProcessing} className="border-border/80 text-orange-500 hover:bg-orange-50 rounded-md h-10 text-xs font-bold border-orange-200">
+                Test ₹1 (Live)
               </Button>
               {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
                 <Button variant="outline" onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} className="border-border/80 hover:bg-accent text-foreground rounded-md h-10 text-xs">

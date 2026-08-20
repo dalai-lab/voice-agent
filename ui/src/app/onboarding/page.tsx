@@ -868,7 +868,7 @@ export default function OnboardingPage() {
                 ) : <div />}
 
                 {briefStep < 2 ? (
-                  <Button type="button" onClick={() => {
+                  <Button key="next-brief-btn" type="button" onClick={() => {
                     if (!formData.useCaseDescription.trim() || !formData.callVolume || !formData.languages.trim()) {
                       alert("Please complete all required fields on Step 1.");
                       return;
@@ -878,7 +878,7 @@ export default function OnboardingPage() {
                     Continue to Integrations <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 ) : (
-                  <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-12 px-8 font-bold min-w-[160px] shadow-lg shadow-orange-500/25">
+                  <Button key="submit-brief-btn" type="button" disabled={submitting} onClick={handleSubmitBrief as any} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-12 px-8 font-bold min-w-[160px] shadow-lg shadow-orange-500/25">
                     {submitting ? "Submitting..." : "Submit Agent Details"}
                   </Button>
                 )}

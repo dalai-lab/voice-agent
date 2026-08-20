@@ -134,6 +134,7 @@ export default function ModelsPage() {
   const dograhOrgId = orgContext?.organization_id;
   const [activeTier, setActiveTier] = useState<string>("starter");
   const [activeVoiceId, setActiveVoiceId] = useState<string>("");
+  const [isProvisioned, setIsProvisioned] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [updatingVoice, setUpdatingVoice] = useState<string | null>(null);
 
@@ -143,20 +144,19 @@ export default function ModelsPage() {
       return;
     }
 
-    Promise.all([
-      fetch(`/api/talkar/billing/subscription/by-org/${dograhOrgId}`).then(r => r.ok ? r.json() : null),
-      fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`).then(r => r.ok ? r.json() : null)
-    ])
-    .then(([billingData, statusData]) => {
-      if (billingData && billingData.plan) {
-        setActiveTier(billingData.plan.toLowerCase());
-      }
-      if (statusData && statusData.voice_id) {
-        setActiveVoiceId(statusData.voice_id);
-      }
-    })
-    .catch(console.error)
-    .finally(() => setLoading(false));
+    // GET /status now returns plan, voice_id, and is_provisioned in one call.
+    // The old /billing/subscription/by-org endpoint doesn't exist and always returned null.
+    fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(statusData => {
+        if (statusData) {
+          if (statusData.plan) setActiveTier(statusData.plan.toLowerCase());
+          if (statusData.voice_id) setActiveVoiceId(statusData.voice_id);
+          setIsProvisioned(statusData.is_provisioned === true);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [dograhOrgId]);
 
   const handleVoiceChange = async (voiceId: string, provider: string) => {
@@ -346,108 +346,123 @@ export default function ModelsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {/* Starter Catalog */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold">{VOICE_CATALOG.starter.label}</h3>
-                <p className="text-xs text-muted-foreground">{VOICE_CATALOG.starter.description}</p>
-              </div>
+        {/* Pending state — agent config not yet injected */}
+        {!isProvisioned ? (
+          <div className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed border-border/60 bg-muted/20 text-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+              <Mic2 className="w-5 h-5 text-muted-foreground" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {VOICE_CATALOG.starter.voices.map(voice => (
-                <div 
-                  key={voice.id}
-                  className={`relative flex items-center justify-between p-3 rounded-lg border transition-all ${
-                    activeVoiceId === voice.id 
-                      ? "bg-emerald-500/5 border-emerald-500/40 ring-1 ring-emerald-500/40" 
-                      : "bg-card border-border hover:border-foreground/20"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span className="text-sm font-semibold">{voice.name}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{voice.gender}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {activeVoiceId === voice.id ? (
-                      <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 text-[9px] px-1.5 py-0 shadow-none">Active</Badge>
-                    ) : (
-                      <Button 
-                        size="sm" 
-                        variant="secondary" 
-                        className="h-7 text-xs px-3"
-                        disabled={updatingVoice !== null}
-                        onClick={() => handleVoiceChange(voice.id, VOICE_CATALOG.starter.provider)}
-                      >
-                        {updatingVoice === voice.id ? "Applying..." : "Select"}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className="space-y-1 max-w-xs">
+              <p className="text-sm font-semibold text-foreground">Voice selection isn't available yet</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Your agent is still being configured by our team. Once it goes live, you'll be able to pick your voice here.
+              </p>
             </div>
           </div>
-
-          {/* Premium Catalog */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold flex items-center gap-2">
-                  {VOICE_CATALOG.premium.label}
-                  {!isPremiumUnlocked && <Badge variant="outline" className="text-[9px] bg-muted/50">Pro Required</Badge>}
-                </h3>
-                <p className="text-xs text-muted-foreground">{VOICE_CATALOG.premium.description}</p>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Starter Catalog */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold">{VOICE_CATALOG.starter.label}</h3>
+                  <p className="text-xs text-muted-foreground">{VOICE_CATALOG.starter.description}</p>
+                </div>
               </div>
-              {!isPremiumUnlocked && (
-                <Button asChild size="sm" className="h-7 text-xs px-3 bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 border-0 text-white">
-                  <Link href="/wallet">Upgrade to Unlock</Link>
-                </Button>
-              )}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {VOICE_CATALOG.premium.voices.map(voice => (
-                <div 
-                  key={voice.id}
-                  className={`relative flex items-center justify-between p-3 rounded-lg border transition-all ${
-                    !isPremiumUnlocked 
-                      ? "opacity-50 grayscale bg-muted/30 border-transparent" 
-                      : activeVoiceId === voice.id 
-                        ? "bg-orange-500/5 border-orange-500/40 ring-1 ring-orange-500/40" 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {VOICE_CATALOG.starter.voices.map(voice => (
+                  <div 
+                    key={voice.id}
+                    className={`relative flex items-center justify-between p-3 rounded-lg border transition-all ${
+                      activeVoiceId === voice.id 
+                        ? "bg-emerald-500/5 border-emerald-500/40 ring-1 ring-emerald-500/40" 
                         : "bg-card border-border hover:border-foreground/20"
-                  }`}
-                >
-                  <div className="flex flex-col">
-                    <span className="text-sm font-semibold flex items-center gap-1.5">
-                      {voice.name}
-                      {!isPremiumUnlocked && <Lock className="w-3 h-3 text-muted-foreground" />}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{voice.gender}</span>
+                    }`}
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold">{voice.name}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{voice.gender}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {activeVoiceId === voice.id ? (
+                        <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 text-[9px] px-1.5 py-0 shadow-none">Active</Badge>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          className="h-7 text-xs px-3"
+                          disabled={updatingVoice !== null}
+                          onClick={() => handleVoiceChange(voice.id, VOICE_CATALOG.starter.provider)}
+                        >
+                          {updatingVoice === voice.id ? "Applying..." : "Select"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {activeVoiceId === voice.id ? (
-                      <Badge className="bg-orange-500 text-white hover:bg-orange-600 text-[9px] px-1.5 py-0 shadow-none">Active</Badge>
-                    ) : (
-                      <Button 
-                        size="sm" 
-                        variant="secondary" 
-                        className="h-7 text-xs px-3"
-                        disabled={!isPremiumUnlocked || updatingVoice !== null}
-                        onClick={() => handleVoiceChange(voice.id, VOICE_CATALOG.premium.provider)}
-                      >
-                        {updatingVoice === voice.id ? "Applying..." : "Select"}
-                      </Button>
-                    )}
-                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Premium Catalog */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    {VOICE_CATALOG.premium.label}
+                    {!isPremiumUnlocked && <Badge variant="outline" className="text-[9px] bg-muted/50">Pro Required</Badge>}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">{VOICE_CATALOG.premium.description}</p>
                 </div>
-              ))}
+                {!isPremiumUnlocked && (
+                  <Button asChild size="sm" className="h-7 text-xs px-3 bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 border-0 text-white">
+                    <Link href="/wallet">Upgrade to Unlock</Link>
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {VOICE_CATALOG.premium.voices.map(voice => (
+                  <div 
+                    key={voice.id}
+                    className={`relative flex items-center justify-between p-3 rounded-lg border transition-all ${
+                      !isPremiumUnlocked 
+                        ? "opacity-50 grayscale bg-muted/30 border-transparent" 
+                        : activeVoiceId === voice.id 
+                          ? "bg-orange-500/5 border-orange-500/40 ring-1 ring-orange-500/40" 
+                          : "bg-card border-border hover:border-foreground/20"
+                    }`}
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold flex items-center gap-1.5">
+                        {voice.name}
+                        {!isPremiumUnlocked && <Lock className="w-3 h-3 text-muted-foreground" />}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{voice.gender}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {activeVoiceId === voice.id ? (
+                        <Badge className="bg-orange-500 text-white hover:bg-orange-600 text-[9px] px-1.5 py-0 shadow-none">Active</Badge>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          className="h-7 text-xs px-3"
+                          disabled={!isPremiumUnlocked || updatingVoice !== null}
+                          onClick={() => handleVoiceChange(voice.id, VOICE_CATALOG.premium.provider)}
+                        >
+                          {updatingVoice === voice.id ? "Applying..." : "Select"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-
-        </div>
+        )}
       </section>
 
     </div>
   );
 }
+
+

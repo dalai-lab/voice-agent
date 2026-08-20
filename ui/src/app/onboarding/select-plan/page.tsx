@@ -14,9 +14,10 @@ const TIERS = [
     id: "starter",
     name: "Starter",
     icon: <Zap className="w-8 h-8 text-blue-500 mb-4" />,
-    price: "₹25",
+    price: "₹6",
     priceUnit: "per minute",
     description: "Perfect for small businesses getting started with voice AI.",
+    depositRequired: "₹6,000 wallet minimum",
     features: [
       "2 Concurrent Calls",
       "Up to 15 min calls",
@@ -31,9 +32,10 @@ const TIERS = [
     id: "pro",
     name: "Pro",
     icon: <Rocket className="w-8 h-8 text-purple-500 mb-4" />,
-    price: "₹18",
+    price: "₹4",
     priceUnit: "per minute",
     description: "For growing businesses needing higher volume and better AI.",
+    depositRequired: "₹8,000 wallet minimum",
     features: [
       "10 Concurrent Calls",
       "Up to 30 min calls",
@@ -43,23 +45,6 @@ const TIERS = [
       "2 Free Phone Numbers",
     ],
     recommended: true,
-  },
-  {
-    id: "elite",
-    name: "Elite",
-    icon: <Shield className="w-8 h-8 text-amber-500 mb-4" />,
-    price: "₹12",
-    priceUnit: "per minute",
-    description: "High-volume scale with enterprise-grade AI and dedicated support.",
-    features: [
-      "50 Concurrent Calls",
-      "Up to 20 min calls",
-      "Premium Voices (ElevenLabs)",
-      "GPT-4o",
-      "Dedicated Account Manager",
-      "5 Free Phone Numbers",
-    ],
-    recommended: false,
   },
 ];
 
@@ -80,10 +65,15 @@ export default function SelectPlanPage() {
         body: JSON.stringify({ tier: tierId }),
       });
       if (res.ok) {
-        router.push("/overview");
+        const data = await res.json();
+        if (data.status === "pending_deposit" && data.redirect) {
+          router.push(data.redirect);
+        } else {
+          router.push("/overview");
+        }
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(`Failed to select tier: ${err.detail || res.statusText}`);
+        alert(`Failed to select tier: ${err.detail || err.message || res.statusText}`);
         setSubmitting(null);
       }
     } catch (err) {
@@ -161,6 +151,7 @@ export default function SelectPlanPage() {
                 <div className="mt-4">
                   <span className="text-4xl font-extrabold text-white">{tier.price}</span>
                   <span className="text-zinc-500 ml-2">/ {tier.priceUnit}</span>
+                  <p className="text-orange-400 text-xs font-medium mt-2">{tier.depositRequired}</p>
                 </div>
                 <ul className="space-y-3 text-sm text-left pt-4 border-t border-white/5">
                   {tier.features.map((feature, i) => (

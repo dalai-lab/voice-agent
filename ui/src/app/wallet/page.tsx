@@ -19,7 +19,9 @@ export default function WalletPage() {
   const email = (user as any)?.primaryEmail ?? (user as any)?.email;
   const searchParams = useSearchParams();
   const isActivation = searchParams.get("activation") === "true";
-  const minTopup = isActivation ? 2000 : 500;
+  const plan = searchParams.get("plan") || "starter";
+  const PLAN_MINIMUMS: Record<string, number> = { starter: 6000, pro: 8000 };
+  const minTopup = isActivation ? (PLAN_MINIMUMS[plan] ?? 6000) : 500;
   const TALKAR = "/api/talkar";
 
   const [wallet, setWallet] = useState<any>(null);
@@ -29,7 +31,7 @@ export default function WalletPage() {
   const [subscription, setSubscription] = useState<any>(null);
   const [usage, setUsage] = useState<any>(null);
   
-  const [topupAmount, setTopupAmount] = useState<string>(isActivation ? "2000" : "");
+  const [topupAmount, setTopupAmount] = useState<string>(isActivation ? String(PLAN_MINIMUMS[plan] ?? 6000) : "");
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [autoRechargeEnabled, setAutoRechargeEnabled] = useState(false);
@@ -112,6 +114,32 @@ export default function WalletPage() {
       const statusData = await statusRes.json();
       const rzpKey = statusData.razorpay_key_id;
 
+      const handleTopupSuccess = async (newBalance: number) => {
+        setWallet((prev: any) => ({ ...prev, balance_paise: newBalance }));
+        setTopupAmount("");
+        setIsProcessing(false);
+        alert(isMock ? "Mock Top-Up Successful!" : "Wallet successfully topped up!");
+        
+        if (isActivation && plan) {
+          const activateRes = await fetch(`${TALKAR}/customers/by-org/${dograhOrgId}/select-tier`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tier: plan })
+          });
+          if (activateRes.ok) {
+            const activateData = await activateRes.json();
+            if (activateData.status === "active") {
+              window.location.href = "/overview";
+              return;
+            }
+          }
+        }
+        
+        fetch(`${TALKAR}/billing/transactions/by-org/${dograhOrgId}?limit=100`)
+          .then(r => r.json())
+          .then(data => setTransactions(data.transactions || []));
+      };
+
       if (isMock) {
         const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
           method: "POST",
@@ -129,13 +157,7 @@ export default function WalletPage() {
           throw new Error(err.detail || "Mock bypass failed.");
         }
         const result = await confirmRes.json();
-        setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
-        setTopupAmount("");
-        setIsProcessing(false);
-        alert("Mock Top-Up Successful!");
-        fetch(`${TALKAR}/billing/transactions/by-org/${dograhOrgId}?limit=100`)
-          .then(r => r.json())
-          .then(data => setTransactions(data.transactions || []));
+        await handleTopupSuccess(result.new_balance_paise);
         return;
       }
 
@@ -168,14 +190,7 @@ export default function WalletPage() {
             throw new Error(err.detail || "Failed to confirm payment on server");
           }
           const result = await confirmRes.json();
-          setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
-          setTopupAmount("");
-          setIsProcessing(false);
-          alert("Wallet successfully topped up!");
-          
-          fetch(`${TALKAR}/billing/transactions/by-org/${dograhOrgId}?limit=100`)
-            .then(r => r.json())
-            .then(data => setTransactions(data.transactions || []));
+          await handleTopupSuccess(result.new_balance_paise);
         },
         modal: {
           ondismiss: () => {
@@ -312,15 +327,6 @@ export default function WalletPage() {
     if (!resolvedOrgId) return;
     const dograhOrgId = resolvedOrgId;
     
-    const minDeposits: Record<string, number> = { "pro": 10000, "elite": 25000 };
-    const requiredAmount = minDeposits[requestedTier] || 0;
-    
-    if (requiredAmount > 0) {
-      if (!confirm(`To unlock the ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)} tier, a minimum deposit of ₹${requiredAmount} is required. This entire amount will be added to your wallet for call usage. Proceed?`)) {
-        return;
-      }
-    }
-
     setIsRequestingUpgrade(true);
     try {
       const orderRes = await fetch(`${TALKAR}/billing/upgrade/create-order`, {
@@ -330,110 +336,20 @@ export default function WalletPage() {
       });
       
       if (!orderRes.ok) {
-        if (requestedTier === 'starter') {
-          const res = await fetch(`${TALKAR}/customers/by-org/${dograhOrgId}/request-tier-upgrade`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ requested_tier: requestedTier })
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.detail || "Failed to switch to starter tier");
-          }
-          alert("Your tier has been successfully updated!");
-          fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
-          setIsRequestingUpgrade(false);
-          return;
-        }
-        const err = await orderRes.json();
+        const err = await orderRes.json().catch(() => ({}));
         throw new Error(err.detail || "Failed to create upgrade order");
       }
       
       const order = await orderRes.json();
       
       if (order.status === "upgraded_from_wallet") {
-        alert(`Successfully upgraded to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)} using your existing wallet balance!`);
+        alert(`Successfully upgraded to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}!`);
         fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
-        setIsRequestingUpgrade(false);
-        return;
       }
-      
-      if (isMock) {
-        const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            razorpay_payment_id: "mock_payment_id",
-            razorpay_order_id: order.razorpay_order_id,
-            razorpay_signature: "mock_signature",
-            dograh_org_id: dograhOrgId,
-            amount_paise: order.amount_paise,
-            requested_tier: requestedTier
-          })
-        });
-        if (!confirmRes.ok) {
-            const err = await confirmRes.json().catch(() => ({}));
-            throw new Error(err.detail || "Mock bypass failed.");
-        }
-        const result = await confirmRes.json();
-        setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
-        fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
-        setIsRequestingUpgrade(false);
-        alert(`Successfully deposited ₹${requiredAmount} and upgraded to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}!`);
-        return;
-      }
-
-      const statusRes = await fetch(`${TALKAR}/customers/status?dograh_org_id=${dograhOrgId}`);
-      const statusData = await statusRes.json();
-      const rzpKey = statusData.razorpay_key_id;
-
-      if (!rzpKey) {
-        alert("Razorpay key missing. Please configure your environment or use the Dev bypass.");
-        setIsRequestingUpgrade(false);
-        return;
-      }
-
-      const rzp = new (window as any).Razorpay({
-        key: rzpKey,
-        amount: order.amount_paise,
-        currency: order.currency,
-        name: `Talkar Upgrade — ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}`,
-        order_id: order.razorpay_order_id,
-        handler: async (response: any) => {
-          const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-              dograh_org_id: dograhOrgId,
-              amount_paise: order.amount_paise,
-              requested_tier: requestedTier
-            })
-          });
-          if (confirmRes.ok) {
-            const result = await confirmRes.json();
-            setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
-            fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
-            alert(`Upgrade successful! Your account is now in ${requestedTier.toUpperCase()} tier.`);
-          }
-          setIsRequestingUpgrade(false);
-        },
-        modal: {
-          ondismiss: () => {
-             setIsRequestingUpgrade(false);
-          }
-        },
-        prefill: {
-          name: (user as any)?.name || "",
-          email: (user as any)?.email || "",
-        }
-      });
-      rzp.open();
     } catch (err: any) {
       console.error(err);
       alert(err.message || "An error occurred during upgrade");
+    } finally {
       setIsRequestingUpgrade(false);
     }
   };
@@ -692,7 +608,7 @@ export default function WalletPage() {
                 <p className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold">Recommended Engine</p>
               </div>
               <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-orange-500/20 bg-orange-500/5 text-orange-600 dark:text-orange-400 font-mono">
-                ₹18 / min
+                ₹4 / min
               </span>
             </div>
             <p className="text-muted-foreground text-xs leading-relaxed">Emotive vocal structures designed for client calls, clinical routes, and outbound campaigns.</p>
@@ -704,29 +620,6 @@ export default function WalletPage() {
               <li className="flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                 <span>Includes 2 phone lines</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="p-4 border border-border/50 bg-background rounded-lg space-y-3">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-bold text-foreground text-sm">Apex Omni Prime Engine</h3>
-                <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">Enterprise Tier</p>
-              </div>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-rose-500/20 bg-rose-500/5 text-rose-600 dark:text-rose-400 font-mono">
-                ₹12 / min
-              </span>
-            </div>
-            <p className="text-muted-foreground text-xs leading-relaxed">Maximum call volumes running on isolated dedicated virtual compute clusters.</p>
-            <ul className="space-y-1 text-xs text-foreground/90">
-              <li className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>50 active concurrent call lines</span>
-              </li>
-              <li className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>Custom brand voice cloning support</span>
               </li>
             </ul>
           </div>
@@ -743,23 +636,6 @@ export default function WalletPage() {
               <Button onClick={() => handleUpgradeRequest('pro')} disabled={isRequestingUpgrade} variant="secondary" className="rounded-md h-9 px-4 text-xs font-semibold">
                 Switch to Pro
               </Button>
-              {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
-                <Button onClick={() => handleUpgradeRequest('pro', true)} variant="ghost" size="sm" disabled={isRequestingUpgrade} className="text-zinc-500 text-[10px] h-auto p-0">
-                  Bypass Pro (Dev)
-                </Button>
-              )}
-            </>
-          )}
-          {subscription?.tier !== 'elite' && (
-            <>
-              <Button onClick={() => handleUpgradeRequest('elite')} disabled={isRequestingUpgrade} className="bg-primary text-primary-foreground hover:bg-primary/95 rounded-md h-9 px-4 text-xs font-bold shadow-xs">
-                Switch to Elite
-              </Button>
-              {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
-                <Button onClick={() => handleUpgradeRequest('elite', true)} variant="ghost" size="sm" disabled={isRequestingUpgrade} className="text-zinc-500 text-[10px] h-auto p-0">
-                  Bypass Elite (Dev)
-                </Button>
-              )}
             </>
           )}
         </div>

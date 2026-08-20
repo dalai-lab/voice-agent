@@ -12,8 +12,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { 
-  CheckCircle, Clock, UploadCloud, Building2, User, Bot, Wrench, Shield, 
-  ArrowRight, ArrowLeft, Sparkles, FileText, Check, CreditCard, ChevronRight, HelpCircle
+  Check, ArrowRight, ArrowLeft, Sparkles, Building2, User, Bot, Wrench, 
+  Clock, CheckCircle2, CreditCard, UploadCloud, ChevronRight
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useOrgConfig } from "@/context/OrgConfigContext";
@@ -197,7 +197,7 @@ export default function OnboardingPage() {
         setStatus("brief_submitted");
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(`Failed to submit: ${err.detail || res.statusText}`);
+        alert(`Failed to submit brief: ${err.detail || res.statusText}`);
       }
     } catch (err) {
       alert("Failed to submit brief. Please try again.");
@@ -309,119 +309,426 @@ export default function OnboardingPage() {
   }
 
   const mainSteps = [
-    { num: 1, label: "Company Details", icon: Building2 },
-    { num: 2, label: "Contact Person", icon: User },
-    { num: 3, label: "Call Objectives", icon: Bot },
-    { num: 4, label: "Integrations & Docs", icon: Wrench },
+    { num: 1, label: "Company Profile", icon: Building2 },
+    { num: 2, label: "Contact Details", icon: User },
+    { num: 3, label: "Agent Settings", icon: Bot },
+    { num: 4, label: "Integrations & Setup", icon: Wrench },
   ];
 
   return (
-    <div className="min-h-screen bg-[#090A0F] text-zinc-100 flex flex-col justify-center py-12 px-4 relative overflow-x-hidden font-sans">
+    <div className="min-h-screen bg-[#090A0F] text-zinc-100 flex flex-col relative overflow-x-hidden font-sans">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       <div className="absolute inset-0 hero-bg pointer-events-none -z-10" />
       <div className="absolute inset-0 hero-stripe-pattern pointer-events-none -z-10" />
       
       {/* Background ambient glows */}
-      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-orange-500/[0.02] rounded-full blur-3xl pointer-events-none -z-10" />
-      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-rose-500/[0.02] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-orange-500/[0.02] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-rose-500/[0.02] rounded-full blur-3xl pointer-events-none -z-10" />
 
-      <div className="w-full max-w-3xl mx-auto space-y-8 z-10">
-        
-        {/* ── HEADER BRANDING ── */}
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-400 text-xs font-semibold uppercase tracking-wider badge-glow">
-            <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Talkar Platform Configuration
+      {/* Corporate Header */}
+      <header className="w-full border-b border-white/5 bg-black/10 backdrop-blur-md sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
+              <span className="font-extrabold text-base font-sans">T</span>
+            </div>
+            <span className="font-bold text-lg tracking-tight text-white">Talkar</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white font-sans">AI Call Agent Deployment Setup</h1>
-          <p className="text-zinc-400 text-sm max-w-lg mx-auto leading-relaxed">
-            Provide details about your business and communication requirements below. Our solutions engineering team will configure and deploy your custom voice agent within 24 hours.
-          </p>
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-orange-500/25 bg-orange-500/5 text-orange-400 text-[10px] font-semibold uppercase tracking-wider badge-glow">
+            <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Workspace Activation
+          </div>
         </div>
+      </header>
+
+      {/* Main Container - Large Wide Space Layout */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12 lg:py-20 z-10">
+        
+        {/* ── 3. PENDING APPROVAL: Premium Split-Screen Wizard ── */}
+        {status === "pending_approval" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-start">
+            
+            {/* LEFT COLUMN: Progress & Navigation Timeline */}
+            <div className="lg:col-span-4 space-y-8 lg:sticky lg:top-28">
+              <div className="space-y-3">
+                <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-white">
+                  Let's activate <br />
+                  your voice network.
+                </h1>
+                <p className="text-zinc-400 text-sm leading-relaxed max-w-md">
+                  Provide your business profile and routing parameters. We configure your automated voice channels within 24 hours.
+                </p>
+              </div>
+
+              {/* Vertical Custom Timeline */}
+              <div className="relative pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-zinc-800">
+                {mainSteps.map((s) => {
+                  const IconComp = s.icon;
+                  const isDone = activeStep > s.num;
+                  const isCurrent = activeStep === s.num;
+                  return (
+                    <div key={s.num} className="relative flex items-start gap-4">
+                      {/* Node circle */}
+                      <div 
+                        className={`absolute -left-[20px] w-6 h-6 rounded-full border flex items-center justify-center transition-all duration-300 ${
+                          isCurrent ? "bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-500/30 scale-110" :
+                          isDone ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400" :
+                          "bg-zinc-950 border-zinc-800 text-zinc-500"
+                        }`}
+                      >
+                        {isDone ? <Check className="w-3.5 h-3.5" /> : <span className="text-[10px] font-bold">{s.num}</span>}
+                      </div>
+
+                      <div className="space-y-1 pl-4">
+                        <h4 className={`text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
+                          isCurrent ? "text-orange-400" : isDone ? "text-emerald-400" : "text-zinc-500"
+                        }`}>
+                          {s.label}
+                        </h4>
+                        {isCurrent && (
+                          <p className="text-[11px] text-zinc-400 max-w-xs leading-normal animate-in fade-in-50 duration-300">
+                            Currently editing company configuration parameters.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: The Form Content (Borderless, Clean) */}
+            <div className="lg:col-span-8 space-y-12">
+              <form onSubmit={handleSubmit} className="space-y-10">
+
+                {/* STEP 1: COMPANY PROFILE */}
+                {activeStep === 1 && (
+                  <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                    <div className="border-b border-white/5 pb-4">
+                      <h3 className="text-xl font-bold text-white">Company Profile Details</h3>
+                      <p className="text-xs text-zinc-400 mt-1">Specify your corporate entity and registration identifier.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="businessName" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Registered Company Name <span className="text-orange-500">*</span></Label>
+                        <Input id="businessName" required value={formData.businessName} onChange={e => setFormData({...formData, businessName: e.target.value})} placeholder="e.g. Acme Hospitality Pvt Ltd" className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="industry" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Industry Segment <span className="text-orange-500">*</span></Label>
+                        <Select required value={formData.industry} onValueChange={val => setFormData({...formData, industry: val})}>
+                          <SelectTrigger className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all">
+                            <SelectValue placeholder="Select Industry" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
+                            <SelectItem value="Healthcare">Healthcare & Biotech</SelectItem>
+                            <SelectItem value="Hospitality">Hospitality & Tourism</SelectItem>
+                            <SelectItem value="Real Estate">Real Estate & Assets</SelectItem>
+                            <SelectItem value="Education">Education & E-learning</SelectItem>
+                            <SelectItem value="Retail">Retail & E-commerce</SelectItem>
+                            <SelectItem value="Finance">Finance & Brokerage</SelectItem>
+                            <SelectItem value="Other">Other Business</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="gstNumber" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">GST Registration Identifier <span className="text-orange-500">*</span></Label>
+                        <Input id="gstNumber" required value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} placeholder="e.g., 27AAAAA0000A1Z5" className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="companySize" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Company Size <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
+                        <Select value={formData.companySize} onValueChange={val => setFormData({...formData, companySize: val})}>
+                          <SelectTrigger className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all">
+                            <SelectValue placeholder="Select Team Size" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
+                            <SelectItem value="1-10">1–10 employees</SelectItem>
+                            <SelectItem value="11-50">11–50 employees</SelectItem>
+                            <SelectItem value="51-200">51–200 employees</SelectItem>
+                            <SelectItem value="200+">200+ employees</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="websiteUrl" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Corporate Website Address <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
+                        <Input id="websiteUrl" type="url" placeholder="https://www.company.com" value={formData.websiteUrl} onChange={e => setFormData({...formData, websiteUrl: e.target.value})} className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 2: CONTACT DETAILS */}
+                {activeStep === 2 && (
+                  <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                    <div className="border-b border-white/5 pb-4">
+                      <h3 className="text-xl font-bold text-white">Point of Contact</h3>
+                      <p className="text-xs text-zinc-400 mt-1">Provide information for the primary account administrator.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="pocName" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Contact Person Name <span className="text-orange-500">*</span></Label>
+                        <Input id="pocName" required value={formData.pocName} onChange={e => setFormData({...formData, pocName: e.target.value})} placeholder="e.g. Alex Johnson" className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="pocPhone" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Direct Phone Number <span className="text-orange-500">*</span></Label>
+                        <Input id="pocPhone" type="tel" required value={formData.pocPhone} onChange={e => setFormData({...formData, pocPhone: e.target.value})} placeholder="e.g. +91 98765 43210" className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="pocDesignation" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Designation / Role <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
+                        <Input id="pocDesignation" placeholder="e.g. Head of Operations" value={formData.pocDesignation} onChange={e => setFormData({...formData, pocDesignation: e.target.value})} className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3: AGENT SETTINGS */}
+                {activeStep === 3 && (
+                  <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                    <div className="border-b border-white/5 pb-4">
+                      <h3 className="text-xl font-bold text-white">Call Routing & Logic Settings</h3>
+                      <p className="text-xs text-zinc-400 mt-1">Specify how calls flow through the agent and what objectives it must complete.</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <Label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Primary Call Path <span className="text-orange-500">*</span></Label>
+                      <RadioGroup value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <label className="flex items-center space-x-3 border border-white/10 bg-white/[0.01] p-4 rounded-xl cursor-pointer hover:bg-white/[0.03] transition-all">
+                          <RadioGroupItem value="inbound" id="inbound" className="border-white/30 text-orange-500 focus:ring-orange-500/10" />
+                          <span className="text-xs font-medium text-white">Incoming Calls (Answering / Inquiries)</span>
+                        </label>
+                        <label className="flex items-center space-x-3 border border-white/10 bg-white/[0.01] p-4 rounded-xl cursor-pointer hover:bg-white/[0.03] transition-all">
+                          <RadioGroupItem value="outbound" id="outbound" className="border-white/30 text-orange-500 focus:ring-orange-500/10" />
+                          <span className="text-xs font-medium text-white">Outgoing Calls (Outreach / Notifications)</span>
+                        </label>
+                        <label className="flex items-center space-x-3 border border-white/10 bg-white/[0.01] p-4 rounded-xl cursor-pointer hover:bg-white/[0.03] transition-all">
+                          <RadioGroupItem value="both" id="both" className="border-white/30 text-orange-500 focus:ring-orange-500/10" />
+                          <span className="text-xs font-medium text-white">Dual Path (Incoming & Outgoing)</span>
+                        </label>
+                      </RadioGroup>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="useCaseDescription" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Core Call Objective & Steps <span className="text-orange-500">*</span></Label>
+                      <Textarea
+                        id="useCaseDescription"
+                        placeholder="Detail the conversational flow (e.g. 'Greet user, request hotel check-in date, confirm suite type, update booking system, and send confirmation details via SMS.')"
+                        value={formData.useCaseDescription}
+                        onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
+                        rows={5}
+                        className="bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 p-4 transition-all resize-none leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="callVolume" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Monthly Call Capacity <span className="text-orange-500">*</span></Label>
+                        <Select value={formData.callVolume} onValueChange={val => setFormData({...formData, callVolume: val})}>
+                          <SelectTrigger className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all">
+                            <SelectValue placeholder="Select Call Volume" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
+                            <SelectItem value="<100">Less than 100 calls</SelectItem>
+                            <SelectItem value="100-500">100 – 500 calls</SelectItem>
+                            <SelectItem value="500-2000">500 – 2,000 calls</SelectItem>
+                            <SelectItem value="2000+">2,000+ calls</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="languages" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Languages Required <span className="text-orange-500">*</span></Label>
+                        <Input id="languages" placeholder="e.g. English, Hindi" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="integrations" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Connected Corporate Tools <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
+                        <Input id="integrations" placeholder="e.g. Salesforce CRM, Google Sheets, Slack hooks" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 4: INTEGRATIONS & SETUP */}
+                {activeStep === 4 && (
+                  <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                    <div className="border-b border-white/5 pb-4">
+                      <h3 className="text-xl font-bold text-white">System Integrations & Verification</h3>
+                      <p className="text-xs text-zinc-400 mt-1">Optionally connect external databases or upload verification details to bypass sandbox constraints.</p>
+                    </div>
+
+                    <div className="p-6 border border-white/5 bg-white/[0.01] rounded-2xl space-y-4">
+                      <div className="flex items-center justify-between gap-6">
+                        <div>
+                          <Label htmlFor="needsApiIntegration" className="font-bold text-sm text-white cursor-pointer">Require Custom API Infrastructure?</Label>
+                          <p className="text-xs text-zinc-400 mt-1">Select if the voice agent must read/write to proprietary endpoints, webhooks, or custom REST servers.</p>
+                        </div>
+                        <Switch 
+                          id="needsApiIntegration" 
+                          checked={formData.needsApiIntegration} 
+                          onCheckedChange={val => setFormData({...formData, needsApiIntegration: val})}
+                          className="data-[state=checked]:bg-orange-500"
+                        />
+                      </div>
+
+                      {formData.needsApiIntegration && (
+                        <div className="space-y-2 pt-4 border-t border-white/5 animate-in slide-in-from-top-2 duration-200">
+                          <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Endpoint Requirements & System Rules <span className="text-orange-500">*</span></Label>
+                          <Textarea
+                            id="apiIntegrationDetails"
+                            placeholder="Detail authorization headers, webhook event structures, or API routing details..."
+                            value={formData.apiIntegrationDetails}
+                            onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
+                            rows={3}
+                            className="bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 p-4 transition-all resize-none leading-relaxed"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
+                      <Label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Corporate Documents <span className="text-zinc-500 font-normal">(Optional — Accelerates Activation)</span></Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <label
+                          htmlFor="gst-upload"
+                          className="border border-dashed border-white/10 hover:border-white/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center bg-white/[0.01] hover:bg-white/[0.02] transition-all cursor-pointer"
+                        >
+                          <input type="file" id="gst-upload" className="hidden" onChange={() => simulateUpload("gst")} />
+                          <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
+                          <p className="text-xs font-bold text-white">GST Certificate</p>
+                          <p className="text-[10px] text-zinc-500 mt-1">Drag file or click to select</p>
+                          {uploadProgress.gst > 0 && (
+                            <div className="w-full mt-4 bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                              <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all" style={{ width: `${uploadProgress.gst}%` }} />
+                            </div>
+                          )}
+                        </label>
+
+                        <label
+                          htmlFor="reg-upload"
+                          className="border border-dashed border-white/10 hover:border-white/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center bg-white/[0.01] hover:bg-white/[0.02] transition-all cursor-pointer"
+                        >
+                          <input type="file" id="reg-upload" className="hidden" onChange={() => simulateUpload("reg")} />
+                          <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
+                          <p className="text-xs font-bold text-white">Company Incorporation Doc</p>
+                          <p className="text-[10px] text-zinc-500 mt-1">Drag file or click to select</p>
+                          {uploadProgress.reg > 0 && (
+                            <div className="w-full mt-4 bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                              <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all" style={{ width: `${uploadProgress.reg}%` }} />
+                            </div>
+                          )}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Wizard Action Footer - Spacious & Clean */}
+                <div className="flex items-center justify-between pt-8 border-t border-white/5">
+                  {activeStep > 1 ? (
+                    <Button type="button" variant="outline" onClick={handlePrevStep} className="border-white/10 text-zinc-300 hover:bg-white/5 rounded-xl h-12 px-6">
+                      <ArrowLeft className="w-4 h-4 mr-2" /> Previous
+                    </Button>
+                  ) : <div />}
+
+                  {activeStep < 4 ? (
+                    // key="next" forces React to unmount this button when we switch to Submit,
+                    // preventing the click event from bleeding into the new DOM node.
+                    <Button key="next-step-btn" type="button" onClick={handleNextStep} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-12 px-8 font-semibold shadow-lg shadow-orange-500/10">
+                      Next Step <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  ) : (
+                    // type="button" + explicit onClick so the form's onSubmit can never fire
+                    // accidentally from a click event that leaked from the previous render.
+                    <Button key="submit-btn" type="button" disabled={submitting} onClick={handleSubmit as any} className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 text-white h-12 px-8 rounded-xl font-bold shadow-lg shadow-orange-500/25 min-w-[180px]">
+                      {submitting ? "Activating Portal..." : "Submit Activation Request"}
+                    </Button>
+                  )}
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* ── 1. NEW AGENT BRIEF (Sub-org or Returning Customer) ── */}
         {(status === "new_agent_brief" || (status === "agent_building" && customerData?.is_sub_org && !customerData?.has_onboarding_form)) && (
-          <div className="bg-black/40 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl p-6 sm:p-10 space-y-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-6 gap-4">
+          <div className="max-w-4xl mx-auto space-y-12">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-6 gap-4">
               <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Bot className="w-5 h-5 text-orange-500" />
-                  Voice Agent Setup Details
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <Bot className="w-6 h-6 text-orange-500" />
+                  Voice Agent Objectives
                 </h2>
-                <p className="text-xs text-zinc-400 mt-1">
-                  Specify the purpose, call routing direction, and volume requirements for your agent.
-                </p>
+                <p className="text-sm text-zinc-400 mt-1">Specify how you want this agent configured.</p>
               </div>
-              <Badge variant="outline" className="border-orange-500/30 bg-orange-500/10 text-orange-400 font-mono text-[10px] self-start sm:self-auto">
-                STEP {briefStep} OF 2
+              <Badge variant="outline" className="border-orange-500/30 bg-orange-500/10 text-orange-400 font-mono text-[10px] px-3 py-1 rounded-full">
+                Step {briefStep} of 2
               </Badge>
             </div>
 
-            {/* Brief Progress Tracker */}
-            <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden">
-              <div 
-                className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all duration-300 rounded-full"
-                style={{ width: `${(briefStep / 2) * 100}%` }}
-              />
-            </div>
-
-            <form onSubmit={handleSubmitBrief} className="space-y-6 pt-2">
+            <form onSubmit={handleSubmitBrief} className="space-y-10">
               {briefStep === 1 ? (
-                <div className="space-y-5 animate-in fade-in-50 duration-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="useCaseType" className="text-xs font-semibold text-zinc-300">Call Flow Direction <span className="text-orange-500">*</span></Label>
+                      <Label htmlFor="useCaseType" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Call Flow Route <span className="text-orange-500">*</span></Label>
                       <Select value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})}>
-                        <SelectTrigger className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20">
+                        <SelectTrigger className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 px-4">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
-                          <SelectItem value="inbound">Incoming Calls Only (Support / Inquiries)</SelectItem>
-                          <SelectItem value="outbound">Outgoing Calls Only (Sales / Follow-ups)</SelectItem>
+                          <SelectItem value="inbound">Incoming Calls Only (Answering)</SelectItem>
+                          <SelectItem value="outbound">Outgoing Calls Only (Outreach)</SelectItem>
                           <SelectItem value="both">Both (Incoming & Outgoing)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="callVolume" className="text-xs font-semibold text-zinc-300">Estimated Monthly Volume <span className="text-orange-500">*</span></Label>
+                      <Label htmlFor="callVolume" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Expected Call Minutes <span className="text-orange-500">*</span></Label>
                       <Select value={formData.callVolume} onValueChange={val => setFormData({...formData, callVolume: val})}>
-                        <SelectTrigger className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20">
+                        <SelectTrigger className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 px-4">
                           <SelectValue placeholder="Select Volume" />
                         </SelectTrigger>
                         <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
                           <SelectItem value="<1000">Less than 1,000 minutes</SelectItem>
                           <SelectItem value="1000-5000">1,000 – 5,000 minutes</SelectItem>
                           <SelectItem value="5000-10000">5,000 – 10,000 minutes</SelectItem>
-                          <SelectItem value="10000+">10,000+ minutes (High Volume)</SelectItem>
+                          <SelectItem value="10000+">10,000+ minutes</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="languages" className="text-xs font-semibold text-zinc-300">Preferred Conversation Languages <span className="text-orange-500">*</span></Label>
-                    <Input id="languages" className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" placeholder="e.g. English, Hindi" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
+                    <Label htmlFor="languages" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Agent Languages <span className="text-orange-500">*</span></Label>
+                    <Input id="languages" className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 px-4" placeholder="e.g. English, Hindi" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="useCaseDescription" className="text-xs font-semibold text-zinc-300">Agent Flow Objective <span className="text-orange-500">*</span></Label>
+                    <Label htmlFor="useCaseDescription" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Workflow Target <span className="text-orange-500">*</span></Label>
                     <Textarea
                       id="useCaseDescription"
-                      placeholder="Describe what you want the voice agent to achieve (e.g. 'Answer patient scheduling queries, check slot availability in our system, and book appointments...')"
+                      placeholder="Outline instructions (e.g. 'Answer room booking questions, capture customer name, check availability in CRM, book slot.')"
                       value={formData.useCaseDescription}
                       onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
-                      rows={4}
-                      className="bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20 resize-none leading-relaxed"
+                      rows={5}
+                      className="bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 p-4 transition-all resize-none leading-relaxed"
                     />
                   </div>
                 </div>
               ) : (
-                <div className="space-y-5 animate-in fade-in-50 duration-200">
-                  <div className="p-5 border border-white/10 bg-white/[0.02] rounded-xl space-y-4">
-                    <div className="flex items-center justify-between gap-4">
+                <div className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                  <div className="p-6 border border-white/5 bg-white/[0.01] rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between gap-6">
                       <div>
-                        <Label htmlFor="needsApiIntegration" className="font-bold text-sm text-white cursor-pointer">CRM or Software Integration Required?</Label>
-                        <p className="text-xs text-zinc-400 mt-1">Enable this if the agent needs to fetch or post data to your database, CRM, Google Sheets, or custom backend endpoints.</p>
+                        <Label htmlFor="needsApiIntegration" className="font-bold text-sm text-white cursor-pointer">CRM / Database Connection Needed?</Label>
+                        <p className="text-xs text-zinc-400 mt-1">Check if the agent needs to read or write live details to your CRM or custom API database.</p>
                       </div>
                       <Switch
                         id="needsApiIntegration"
@@ -432,15 +739,15 @@ export default function OnboardingPage() {
                     </div>
 
                     {formData.needsApiIntegration && (
-                      <div className="space-y-2 pt-4 border-t border-white/10 animate-in slide-in-from-top-2 duration-200">
-                        <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold text-zinc-300">Integration Specs or Systems to Connect <span className="text-orange-500">*</span></Label>
+                      <div className="space-y-2 pt-4 border-t border-white/5 animate-in slide-in-from-top-2 duration-200">
+                        <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Connection specs <span className="text-orange-500">*</span></Label>
                         <Textarea
                           id="apiIntegrationDetails"
-                          placeholder="Provide any details about the systems to connect (e.g., 'Need to connect to our Salesforce CRM endpoint', or 'Integrate with custom booking REST API with API key authorization')"
+                          placeholder="Provide details about standard payloads, external tool names, or secure webhook endpoints..."
                           value={formData.apiIntegrationDetails}
                           onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
-                          rows={4}
-                          className="bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20 leading-relaxed"
+                          rows={5}
+                          className="bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 p-4 leading-relaxed"
                         />
                       </div>
                     )}
@@ -448,9 +755,9 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-6 border-t border-white/10">
+              <div className="flex items-center justify-between pt-8 border-t border-white/5">
                 {briefStep > 1 ? (
-                  <Button type="button" variant="outline" onClick={() => setBriefStep(1)} className="border-white/10 text-zinc-300 hover:bg-white/5 rounded-xl h-10 px-5">
+                  <Button type="button" variant="outline" onClick={() => setBriefStep(1)} className="border-white/10 text-zinc-300 hover:bg-white/5 rounded-xl h-12 px-6">
                     <ArrowLeft className="w-4 h-4 mr-2" /> Back
                   </Button>
                 ) : <div />}
@@ -462,12 +769,12 @@ export default function OnboardingPage() {
                       return;
                     }
                     setBriefStep(2);
-                  }} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-95 rounded-xl h-10 px-5 font-semibold">
+                  }} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-12 px-8 font-semibold">
                     Continue to Integrations <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 ) : (
-                  <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-95 rounded-xl h-10 px-6 font-semibold min-w-[140px]">
-                    {submitting ? "Submitting..." : "Submit Agent Brief"}
+                  <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-12 px-8 font-bold min-w-[160px]">
+                    {submitting ? "Submitting..." : "Submit Agent Details"}
                   </Button>
                 )}
               </div>
@@ -477,313 +784,37 @@ export default function OnboardingPage() {
 
         {/* ── 2. BRIEF SUBMITTED CONFIRMATION ── */}
         {status === "brief_submitted" && (
-          <div className="bg-black/40 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl p-8 sm:p-12 text-center space-y-5">
+          <div className="max-w-xl mx-auto text-center space-y-6 py-12">
             <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/20">
-              <CheckCircle className="w-8 h-8" />
+              <CheckCircle2 className="w-8 h-8" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-white">Agent Request Submitted</h2>
-              <p className="text-zinc-400 text-sm max-w-md mx-auto leading-relaxed">
-                Thank you! Our engineering team has received your agent setup details. We are building the configuration profile and will deploy the workspace updates shortly.
+              <h2 className="text-2xl font-bold text-white">Objective Saved</h2>
+              <p className="text-zinc-400 text-sm leading-relaxed">
+                Your voice agent objective and call structure details have been updated. Our solutions engineers are updating the routing workspace now.
               </p>
             </div>
             <div className="pt-4">
-              <Button onClick={() => router.push("/overview")} className="bg-white/10 hover:bg-white/15 text-white border border-white/10 rounded-xl h-10 px-6">
+              <Button onClick={() => router.push("/overview")} className="bg-white/10 hover:bg-white/15 text-white border border-white/10 rounded-xl h-12 px-8">
                 Return to Dashboard
               </Button>
             </div>
           </div>
         )}
 
-        {/* ── 3. PENDING APPROVAL: Multi-Step Application Wizard ── */}
-        {status === "pending_approval" && (
-          <div className="bg-black/40 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl p-6 sm:p-10 space-y-8">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-white/10 pb-6 gap-5">
-              <div>
-                <h2 className="text-xl font-bold text-white">Account Activation Setup</h2>
-                <p className="text-xs text-zinc-400 mt-1">Step {activeStep} of 4: {mainSteps[activeStep - 1].label}</p>
-              </div>
-
-              {/* Wizard Steps Indicator */}
-              <div className="flex flex-wrap items-center gap-2">
-                {mainSteps.map((s) => {
-                  const IconComp = s.icon;
-                  const isDone = activeStep > s.num;
-                  const isCurrent = activeStep === s.num;
-                  return (
-                    <div 
-                      key={s.num}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-                        isCurrent ? "bg-orange-500 border-orange-500/50 text-white shadow-md shadow-orange-500/20" :
-                        isDone ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                        "bg-zinc-900 border-white/5 text-zinc-500"
-                      }`}
-                    >
-                      {isDone ? <Check className="w-3.5 h-3.5" /> : <IconComp className="w-3.5 h-3.5" />}
-                      <span className="hidden md:inline">{s.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden">
-              <div 
-                className="bg-gradient-to-r from-orange-500 via-rose-500 to-emerald-500 h-full transition-all duration-300 rounded-full"
-                style={{ width: `${(activeStep / 4) * 100}%` }}
-              />
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6 pt-2">
-
-              {/* STEP 1: BUSINESS IDENTITY */}
-              {activeStep === 1 && (
-                <div className="space-y-5 animate-in fade-in-50 duration-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="businessName" className="text-xs font-semibold text-zinc-300">Registered Business Name <span className="text-orange-500">*</span></Label>
-                      <Input id="businessName" required value={formData.businessName} onChange={e => setFormData({...formData, businessName: e.target.value})} placeholder="e.g. Acme Hospitality Pvt Ltd" className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="industry" className="text-xs font-semibold text-zinc-300">Industry Sector <span className="text-orange-500">*</span></Label>
-                      <Select required value={formData.industry} onValueChange={val => setFormData({...formData, industry: val})}>
-                        <SelectTrigger className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20">
-                          <SelectValue placeholder="Select Industry" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
-                          <SelectItem value="Healthcare">Healthcare & Medical</SelectItem>
-                          <SelectItem value="Hospitality">Hospitality & Tourism</SelectItem>
-                          <SelectItem value="Real Estate">Real Estate & Property</SelectItem>
-                          <SelectItem value="Education">Education & Training</SelectItem>
-                          <SelectItem value="Retail">Retail & E-Commerce</SelectItem>
-                          <SelectItem value="Finance">Finance & Insurance</SelectItem>
-                          <SelectItem value="Other">Other Enterprise Business</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="gstNumber" className="text-xs font-semibold text-zinc-300">Tax Identification / GSTIN <span className="text-orange-500">*</span></Label>
-                      <Input id="gstNumber" required value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} placeholder="e.g., 27AAAAA0000A1Z5" className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="companySize" className="text-xs font-semibold text-zinc-300">Company Size <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
-                      <Select value={formData.companySize} onValueChange={val => setFormData({...formData, companySize: val})}>
-                        <SelectTrigger className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20">
-                          <SelectValue placeholder="Select Team Size" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
-                          <SelectItem value="1-10">1–10 team members</SelectItem>
-                          <SelectItem value="11-50">11–50 team members</SelectItem>
-                          <SelectItem value="51-200">51–200 team members</SelectItem>
-                          <SelectItem value="200+">200+ team members</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="websiteUrl" className="text-xs font-semibold text-zinc-300">Company Website URL <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
-                      <Input id="websiteUrl" type="url" placeholder="https://www.example.com" value={formData.websiteUrl} onChange={e => setFormData({...formData, websiteUrl: e.target.value})} className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 2: POINT OF CONTACT */}
-              {activeStep === 2 && (
-                <div className="space-y-5 animate-in fade-in-50 duration-200">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="pocName" className="text-xs font-semibold text-zinc-300">Contact Person Full Name <span className="text-orange-500">*</span></Label>
-                      <Input id="pocName" required value={formData.pocName} onChange={e => setFormData({...formData, pocName: e.target.value})} placeholder="Alex Johnson" className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="pocPhone" className="text-xs font-semibold text-zinc-300">Contact Phone Number <span className="text-orange-500">*</span></Label>
-                      <Input id="pocPhone" type="tel" required value={formData.pocPhone} onChange={e => setFormData({...formData, pocPhone: e.target.value})} placeholder="+91 98765 43210" className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="pocDesignation" className="text-xs font-semibold text-zinc-300">Corporate Designation <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
-                      <Input id="pocDesignation" placeholder="e.g., Operations Director" value={formData.pocDesignation} onChange={e => setFormData({...formData, pocDesignation: e.target.value})} className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3: AGENT REQUIREMENTS */}
-              {activeStep === 3 && (
-                <div className="space-y-5 animate-in fade-in-50 duration-200">
-                  <div className="space-y-3">
-                    <Label className="text-xs font-semibold text-zinc-300">Primary Call Direction <span className="text-orange-500">*</span></Label>
-                    <RadioGroup value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})} className="flex flex-col sm:flex-row gap-4">
-                      <label className="flex items-center space-x-3 border border-white/10 bg-zinc-950/20 p-4 rounded-xl flex-1 cursor-pointer hover:bg-white/[0.02] transition-all">
-                        <RadioGroupItem value="inbound" id="inbound" className="border-white/30 text-orange-500 focus:ring-orange-500/20" />
-                        <span className="text-xs font-medium text-white">Incoming Calls Only (Answering / Support)</span>
-                      </label>
-                      <label className="flex items-center space-x-3 border border-white/10 bg-zinc-950/20 p-4 rounded-xl flex-1 cursor-pointer hover:bg-white/[0.02] transition-all">
-                        <RadioGroupItem value="outbound" id="outbound" className="border-white/30 text-orange-500 focus:ring-orange-500/20" />
-                        <span className="text-xs font-medium text-white">Outgoing Calls Only (Outreach / Alerts)</span>
-                      </label>
-                      <label className="flex items-center space-x-3 border border-white/10 bg-zinc-950/20 p-4 rounded-xl flex-1 cursor-pointer hover:bg-white/[0.02] transition-all">
-                        <RadioGroupItem value="both" id="both" className="border-white/30 text-orange-500 focus:ring-orange-500/20" />
-                        <span className="text-xs font-medium text-white">Incoming & Outgoing (Dual Role)</span>
-                      </label>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="useCaseDescription" className="text-xs font-semibold text-zinc-300">Describe What the Agent Should Do <span className="text-orange-500">*</span></Label>
-                    <Textarea
-                      id="useCaseDescription"
-                      placeholder="Outline your call script, booking requirements, or typical customer questions (e.g. 'We need the agent to answer incoming hotel booking questions, confirm room availability, and collect the check-in details...')"
-                      value={formData.useCaseDescription}
-                      onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
-                      rows={4}
-                      className="bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20 resize-none leading-relaxed"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="callVolume" className="text-xs font-semibold text-zinc-300">Expected Monthly Volume <span className="text-orange-500">*</span></Label>
-                      <Select value={formData.callVolume} onValueChange={val => setFormData({...formData, callVolume: val})}>
-                        <SelectTrigger className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20">
-                          <SelectValue placeholder="Select Call Volume" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
-                          <SelectItem value="<100">Less than 100 calls/month</SelectItem>
-                          <SelectItem value="100-500">100 – 500 calls/month</SelectItem>
-                          <SelectItem value="500-2000">500 – 2,000 calls/month</SelectItem>
-                          <SelectItem value="2000+">2,000+ calls/month</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="languages" className="text-xs font-semibold text-zinc-300">Spoken Languages Needed <span className="text-orange-500">*</span></Label>
-                      <Input id="languages" placeholder="e.g. English, Hindi, Hinglish" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
-                    </div>
-
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="integrations" className="text-xs font-semibold text-zinc-300">Existing Software to Connect <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
-                      <Input id="integrations" placeholder="e.g. HubSpot CRM, Google Sheets, WhatsApp Business API" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 4: INTEGRATIONS & COMPLIANCE DOCS */}
-              {activeStep === 4 && (
-                <div className="space-y-6 animate-in fade-in-50 duration-200">
-                  <div className="p-5 border border-white/10 bg-white/[0.02] rounded-xl space-y-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <Label htmlFor="needsApiIntegration" className="font-bold text-sm text-white cursor-pointer">Require Custom API Setup?</Label>
-                        <p className="text-xs text-zinc-400 mt-1">Select this if your team needs us to build a custom endpoint handler, database sync, or secure webhook relays.</p>
-                      </div>
-                      <Switch 
-                        id="needsApiIntegration" 
-                        checked={formData.needsApiIntegration} 
-                        onCheckedChange={val => setFormData({...formData, needsApiIntegration: val})}
-                        className="data-[state=checked]:bg-orange-500"
-                      />
-                    </div>
-
-                    {formData.needsApiIntegration && (
-                      <div className="space-y-2 pt-4 border-t border-white/10 animate-in slide-in-from-top-2 duration-200">
-                        <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold text-zinc-300">API Details or Custom Requirements <span className="text-orange-500">*</span></Label>
-                        <Textarea
-                          id="apiIntegrationDetails"
-                          placeholder="Provide details about endpoints, headers, authentication method, or payload mapping specifications (if available)..."
-                          value={formData.apiIntegrationDetails}
-                          onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
-                          rows={3}
-                          className="bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20 leading-relaxed"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label className="text-xs font-semibold text-zinc-300">Verification & Registration Documents <span className="text-zinc-500 font-normal">(Optional — Accelerates Account Activation)</span></Label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <label
-                        htmlFor="gst-upload"
-                        className="border border-dashed border-white/15 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-zinc-950/20 hover:bg-zinc-950/40 transition-colors cursor-pointer"
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={e => { e.preventDefault(); simulateUpload("gst"); }}
-                      >
-                        <input type="file" id="gst-upload" className="hidden" onChange={() => simulateUpload("gst")} />
-                        <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
-                        <p className="text-xs font-bold text-white">GST Certificate</p>
-                        <p className="text-[10px] text-zinc-400 mt-0.5">Drag & drop or click to upload</p>
-                        {uploadProgress.gst > 0 && (
-                          <div className="w-full mt-3 bg-zinc-900 rounded-full h-1.5 overflow-hidden">
-                            <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all" style={{ width: `${uploadProgress.gst}%` }} />
-                          </div>
-                        )}
-                      </label>
-
-                      <label
-                        htmlFor="reg-upload"
-                        className="border border-dashed border-white/15 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-zinc-950/20 hover:bg-zinc-950/40 transition-colors cursor-pointer"
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={e => { e.preventDefault(); simulateUpload("reg"); }}
-                      >
-                        <input type="file" id="reg-upload" className="hidden" onChange={() => simulateUpload("reg")} />
-                        <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
-                        <p className="text-xs font-bold text-white">Company Registration</p>
-                        <p className="text-[10px] text-zinc-400 mt-0.5">Drag & drop or click to upload</p>
-                        {uploadProgress.reg > 0 && (
-                          <div className="w-full mt-3 bg-zinc-900 rounded-full h-1.5 overflow-hidden">
-                            <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all" style={{ width: `${uploadProgress.reg}%` }} />
-                          </div>
-                        )}
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Wizard Navigation Footer */}
-              <div className="flex items-center justify-between pt-6 border-t border-white/10">
-                {activeStep > 1 ? (
-                  <Button type="button" variant="outline" onClick={handlePrevStep} className="border-white/10 text-zinc-300 hover:bg-white/5 rounded-xl h-10 px-5">
-                    <ArrowLeft className="w-4 h-4 mr-2" /> Previous Step
-                  </Button>
-                ) : <div />}
-
-                {activeStep < 4 ? (
-                  <Button type="button" onClick={handleNextStep} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-95 rounded-xl h-10 px-5 font-semibold">
-                    Next Step <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                ) : (
-                  <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-95 text-white h-10 px-6 rounded-xl font-bold shadow-lg shadow-orange-500/20 min-w-[160px]">
-                    {submitting ? "Submitting Application..." : "Submit Application"}
-                  </Button>
-                )}
-              </div>
-            </form>
-          </div>
-        )}
-
         {/* ── 4. UNDER REVIEW SCREEN ── */}
         {status === "under_review" && (
-          <div className="bg-black/40 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl p-8 sm:p-12 text-center space-y-6">
+          <div className="max-w-xl mx-auto text-center space-y-6 py-12">
             <Clock className="w-16 h-16 text-orange-500 mx-auto animate-spin" />
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-white">Application Under Engineering Review</h2>
-              <p className="text-zinc-400 text-sm max-w-md mx-auto leading-relaxed mt-2">
-                Our solutions engineering team is actively setting up your call architecture and routing parameters. We will notify you via email as soon as activation is completed.
+              <h2 className="text-2xl font-bold text-white">Verification Pending</h2>
+              <p className="text-zinc-400 text-sm leading-relaxed">
+                Our solutions engineering team is currently verifying the routing endpoints and settings for your corporate voice profile. We will notify you by email as soon as activation finishes.
               </p>
             </div>
             <div className="pt-4">
-              <Button onClick={() => router.push("/overview")} className="bg-white/10 hover:bg-white/15 text-white border border-white/10 rounded-xl h-10 px-6">
-                Explore Dashboard Overview
+              <Button onClick={() => router.push("/overview")} className="bg-white/10 hover:bg-white/15 text-white border border-white/10 rounded-xl h-12 px-8">
+                Explore Dashboard
               </Button>
             </div>
           </div>
@@ -791,51 +822,51 @@ export default function OnboardingPage() {
 
         {/* ── 5. APPROVED SCREEN: Custom Integration Fee Quoted Invoice ── */}
         {status === "approved" && (
-          <div className="bg-black/40 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl p-6 sm:p-10 space-y-8 bg-gradient-to-b from-orange-500/5 to-transparent">
-            <div className="text-center pb-4 border-b border-white/10">
-              <div className="w-14 h-14 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mx-auto mb-3 border border-orange-500/20">
-                <CheckCircle className="w-8 h-8 text-orange-500" />
+          <div className="max-w-3xl mx-auto space-y-12 py-6">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mx-auto border border-orange-500/20">
+                <CheckCircle2 className="w-7 h-7 text-orange-500" />
               </div>
-              <h2 className="text-2xl font-bold text-white">Application Approved!</h2>
-              <p className="text-xs text-zinc-400 mt-1">One-time payment to deploy your custom voice agent pipeline</p>
+              <h2 className="text-2xl font-bold text-white">Application Approved</h2>
+              <p className="text-sm text-zinc-400 leading-relaxed">Please complete the setup payment to configure your live voice workspace.</p>
             </div>
 
-            <div className="p-6 rounded-xl border border-orange-500/30 bg-orange-500/10 text-center">
-              <span className="text-xs uppercase tracking-wider text-orange-400 font-mono font-semibold">Custom API Integration Quote</span>
+            <div className="p-8 rounded-2xl border border-orange-500/30 bg-orange-500/10 text-center">
+              <span className="text-xs uppercase tracking-wider text-orange-400 font-mono font-bold">Quoted Integration Fee</span>
               <div className="text-4xl font-extrabold text-white mt-2">
                 {customerData?.onboarding_form?.integration_fee_paise 
                   ? `₹${(customerData.onboarding_form.integration_fee_paise / 100).toLocaleString()}`
-                  : "Custom Quoted Fee"}
+                  : "Quoted setup fee"}
               </div>
               <p className="text-xs text-zinc-400 mt-2 leading-relaxed max-w-md mx-auto">
                 {customerData?.onboarding_form?.integration_description || "Covers custom API data-flows, Salesforce/CRM authentication, calendar hooks, and full production pipeline testing."}
               </p>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <span className="font-bold uppercase tracking-wider text-zinc-400 text-[10px]">What is Included:</span>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.01] border border-white/5">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>Custom CRM & Webhook Handlers</span>
                 </div>
-                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.01] border border-white/5">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>End-to-End Voice Flow Testing</span>
                 </div>
-                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.01] border border-white/5">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>Dedicated Integration Engineer</span>
                 </div>
-                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.01] border border-white/5">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>24-Hour Active SLA Delivery</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6 border-t border-white/10">
-              <Button size="lg" className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-95 text-white font-semibold shadow-lg shadow-orange-500/25 h-12 px-8 rounded-xl min-w-[200px]" onClick={handlePaySetupFee}>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8 border-t border-white/5">
+              <Button size="lg" className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 text-white font-semibold shadow-lg shadow-orange-500/25 h-12 px-8 rounded-xl min-w-[220px]" onClick={handlePaySetupFee}>
                 <CreditCard className="w-4 h-4 mr-2" /> Pay Integration Fee
               </Button>
               
@@ -847,7 +878,7 @@ export default function OnboardingPage() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

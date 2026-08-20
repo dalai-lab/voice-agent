@@ -8,27 +8,30 @@ import type { ComponentProps } from "react";
 
 type ThemeConfig = NonNullable<ComponentProps<typeof StackTheme>["theme"]>;
 
+const colors = {
+  background: "#121318", // cohesive dark background for the card/fields
+  foreground: "#fafafa",
+  card: "#121318",
+  cardForeground: "#fafafa",
+  popover: "#121318",
+  popoverForeground: "#fafafa",
+  primary: "#FF5500", // Talkar orange
+  primaryForeground: "#ffffff",
+  secondary: "#1f2029",
+  secondaryForeground: "#fafafa",
+  muted: "#1f2029",
+  mutedForeground: "#a1a1aa",
+  accent: "#FF5500",
+  accentForeground: "#ffffff",
+  destructive: "#ef4444",
+  destructiveForeground: "#fafafa",
+  border: "#27272a",
+  input: "#1f2029", // dark input background
+  ring: "#FF5500",
+};
+
 export const stackAuthDarkTheme: ThemeConfig = {
-  dark: {
-    background: "#090a0f",
-    foreground: "#fafafa",
-    card: "#121318",
-    cardForeground: "#fafafa",
-    popover: "#121318",
-    popoverForeground: "#fafafa",
-    primary: "#FF5500",
-    primaryForeground: "#ffffff",
-    secondary: "#1f2029",
-    secondaryForeground: "#fafafa",
-    muted: "#1f2029",
-    mutedForeground: "#a1a1aa",
-    accent: "#1f2029",
-    accentForeground: "#fafafa",
-    destructive: "#ef4444",
-    destructiveForeground: "#fafafa",
-    border: "#27272a",
-    input: "#27272a",
-    ring: "#FF5500",
-  },
+  light: colors,
+  dark: colors,
   radius: "0.75rem",
 };

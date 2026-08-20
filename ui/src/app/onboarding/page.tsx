@@ -17,12 +17,13 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useOrgConfig } from "@/context/OrgConfigContext";
+import { SidebarTeamSwitcher } from "@/components/layout/SidebarTeamSwitcher";
 
 const TALKAR_API = "/api/talkar";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { orgContext } = useOrgConfig();
   const dograhOrgId = orgContext?.organization_id;
   const email = (user as any)?.primaryEmail ?? (user as any)?.email;
@@ -358,8 +359,21 @@ export default function OnboardingPage() {
             </div>
             <span className="font-bold text-lg tracking-tight text-white">Talkar</span>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-orange-500/25 bg-orange-500/5 text-orange-400 text-[10px] font-semibold uppercase tracking-wider badge-glow">
-            <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Workspace Activation
+
+          <div className="flex items-center gap-4">
+            <div className="w-48">
+              <SidebarTeamSwitcher />
+            </div>
+            <Button 
+              variant="ghost" 
+              onClick={() => void logout()} 
+              className="text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg h-9 px-3 border border-white/5 cursor-pointer"
+            >
+              Sign Out
+            </Button>
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-orange-500/25 bg-orange-500/5 text-orange-400 text-[10px] font-semibold uppercase tracking-wider badge-glow">
+              <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Workspace Activation
+            </div>
           </div>
         </div>
       </header>

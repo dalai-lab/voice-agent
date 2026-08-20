@@ -1,6 +1,11 @@
+"use client";
+
 import React from 'react';
+import { useAuth } from '@/lib/auth';
 
 export const Navbar: React.FC = () => {
+  const { user, logout } = useAuth();
+
   return (
     <nav className="container mx-auto px-6 py-6 flex items-center justify-between z-10 relative">
       <div className="flex items-center gap-3 cursor-pointer">
@@ -34,15 +39,31 @@ export const Navbar: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-4">
-        <a href="https://talkar.in/handler/sign-in" className="text-sm font-medium text-gray-300 hover:text-white transition-colors">
-          Sign In
-        </a>
-        <a
-          className="bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:opacity-95 text-white px-5 py-2 rounded-full text-xs font-semibold transition-all duration-300 shadow-md shadow-orange-500/20"
-          href="https://talkar.in/handler/sign-up"
-        >
-          Get Started Free
-        </a>
+        {user ? (
+          <>
+            <a href="/overview" className="text-sm font-medium text-gray-300 hover:text-white transition-colors">
+              Go to Dashboard
+            </a>
+            <button
+              onClick={() => void logout()}
+              className="bg-white/10 hover:bg-white/15 text-white border border-white/15 px-5 py-2 rounded-full text-xs font-semibold transition-all duration-300 backdrop-blur-md cursor-pointer"
+            >
+              Sign Out
+            </button>
+          </>
+        ) : (
+          <>
+            <a href="/handler/sign-in" className="text-sm font-medium text-gray-300 hover:text-white transition-colors">
+              Sign In
+            </a>
+            <a
+              className="bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:opacity-95 text-white px-5 py-2 rounded-full text-xs font-semibold transition-all duration-300 shadow-md shadow-orange-500/20"
+              href="/handler/sign-up"
+            >
+              Get Started Free
+            </a>
+          </>
+        )}
       </div>
     </nav>
   );

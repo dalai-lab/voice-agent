@@ -29,17 +29,18 @@ async function proxy(request: NextRequest, method: string, path: string) {
     headers["X-Talkar-Email"] = userEmail;
   }
 
-  let body: string | undefined;
+  const fetchOptions: any = {
+    method,
+    headers,
+  };
+
   if (method !== "GET" && method !== "HEAD") {
-    try {
-      body = JSON.stringify(await request.json());
-    } catch {
-      body = undefined;
-    }
+    fetchOptions.body = request.body;
+    fetchOptions.duplex = "half";
   }
 
   try {
-    const upstream = await fetch(targetUrl, { method, headers, body });
+    const upstream = await fetch(targetUrl, fetchOptions);
     const data = await upstream.json();
     return NextResponse.json(data, { status: upstream.status });
   } catch (err) {

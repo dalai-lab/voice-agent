@@ -26,7 +26,7 @@ export function AuthShell({
   enterpriseSlot?: ReactNode;
 }) {
   return (
-    <div className="dark relative grid min-h-screen w-full bg-[#090A0F] lg:grid-cols-[50%_50%] transition-colors duration-150 text-foreground">
+    <div className="relative grid min-h-screen w-full bg-background lg:grid-cols-[50%_50%] transition-colors duration-150 text-foreground">
       {/* Sleek Theme Switcher overlay in top right */}
       <div className="absolute right-4 top-4 z-50">
         <ThemeToggle variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-xs border-border/80" />
@@ -35,13 +35,13 @@ export function AuthShell({
       {/* Form column (LEFT) */}
       <main className="hero-bg flex min-h-screen flex-col overflow-y-auto relative">
         {/* Subtle grid pattern overlay */}
-        <div className="hero-stripe-pattern" />
+        <div className="hero-stripe-pattern opacity-50 dark:opacity-100" />
         
         {/* Soft background ambient glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-cta/[0.04] rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex min-h-full items-center justify-center p-6 sm:p-10 z-10">
-          <div className="w-full max-w-[390px] space-y-6 rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl p-6 shadow-2xl sm:p-8">
+          <div className="w-full max-w-[390px] space-y-6 rounded-2xl border border-border bg-card p-6 shadow-xl sm:p-8">
             {/* Mobile-only wordmark */}
             <div className="lg:hidden flex justify-center mb-4">
               <BrandLogo className="h-6" />

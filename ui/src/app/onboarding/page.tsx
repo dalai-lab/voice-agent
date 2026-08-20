@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useOrgConfig } from "@/context/OrgConfigContext";
 import { SidebarTeamSwitcher } from "@/components/layout/SidebarTeamSwitcher";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const TALKAR_API = "/api/talkar";
 
@@ -325,10 +326,10 @@ export default function OnboardingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#090A0F] text-zinc-100 flex flex-col items-center justify-center space-y-6 relative overflow-hidden">
-        <div className="absolute inset-0 hero-bg pointer-events-none -z-10" />
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/5 border-t-orange-500" />
-        <p className="text-sm font-medium text-zinc-400">Initializing your Talkar workspace...</p>
+      <div className="min-h-screen bg-white text-zinc-900 flex flex-col items-center justify-center space-y-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-zinc-50 pointer-events-none -z-10" />
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-zinc-200 border-t-orange-500" />
+        <p className="text-sm font-medium text-zinc-500">Loading your Talkar workspace...</p>
       </div>
     );
   }
@@ -341,23 +342,19 @@ export default function OnboardingPage() {
   ];
 
   return (
-    <div className="dark min-h-screen bg-[#090A0F] text-zinc-100 flex flex-col relative overflow-x-hidden font-sans">
+    <div className="min-h-screen bg-white text-zinc-900 flex flex-col relative overflow-x-hidden font-sans">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
-      <div className="absolute inset-0 hero-bg pointer-events-none -z-10" />
-      <div className="absolute inset-0 hero-stripe-pattern pointer-events-none -z-10" />
+      <div className="absolute inset-0 bg-zinc-50 pointer-events-none -z-10" />
       
-      {/* Background ambient glows */}
-      <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-orange-500/[0.02] rounded-full blur-3xl pointer-events-none -z-10" />
-      <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-rose-500/[0.02] rounded-full blur-3xl pointer-events-none -z-10" />
+      {/* Background ambient glows - Light Mode adjusted */}
+      <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-orange-50 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-rose-50 rounded-full blur-3xl pointer-events-none -z-10" />
 
       {/* Corporate Header */}
-      <header className="w-full border-b border-white/5 bg-black/10 backdrop-blur-md sticky top-0 z-30">
+      <header className="w-full border-b border-zinc-200 bg-white/80 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
-              <span className="font-extrabold text-base font-sans">T</span>
-            </div>
-            <span className="font-bold text-lg tracking-tight text-white">Talkar</span>
+            <BrandLogo size="md" className="h-7" />
           </div>
 
           <div className="flex items-center gap-4">
@@ -367,12 +364,12 @@ export default function OnboardingPage() {
             <Button 
               variant="ghost" 
               onClick={() => void logout()} 
-              className="text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg h-9 px-3 border border-white/5 cursor-pointer"
+              className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg h-9 px-3 border border-zinc-200 cursor-pointer"
             >
               Sign Out
             </Button>
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-orange-500/25 bg-orange-500/5 text-orange-400 text-[10px] font-semibold uppercase tracking-wider badge-glow">
-              <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Workspace Activation
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-orange-200 bg-orange-50 text-orange-600 text-[10px] font-semibold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Account Setup
             </div>
           </div>
         </div>
@@ -388,17 +385,17 @@ export default function OnboardingPage() {
             {/* LEFT COLUMN: Progress & Navigation Timeline */}
             <div className="lg:col-span-4 space-y-8 lg:sticky lg:top-28">
               <div className="space-y-3">
-                <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-white">
-                  Let's activate <br />
-                  your voice network.
+                <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-zinc-900">
+                  Welcome to <br />
+                  Talkar.
                 </h1>
-                <p className="text-zinc-400 text-sm leading-relaxed max-w-md">
-                  Provide your business profile and routing parameters. We configure your automated voice channels within 24 hours.
+                <p className="text-zinc-500 text-sm leading-relaxed max-w-md">
+                  Tell us a bit about your business and how you plan to use Talkar, so we can tailor your experience.
                 </p>
               </div>
 
               {/* Vertical Custom Timeline */}
-              <div className="relative pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-zinc-800">
+              <div className="relative pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-zinc-200">
                 {mainSteps.map((s) => {
                   const IconComp = s.icon;
                   const isDone = activeStep > s.num;
@@ -408,9 +405,9 @@ export default function OnboardingPage() {
                       {/* Node circle */}
                       <div 
                         className={`absolute -left-[20px] w-6 h-6 rounded-full border flex items-center justify-center transition-all duration-300 ${
-                          isCurrent ? "bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-500/30 scale-110" :
-                          isDone ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400" :
-                          "bg-zinc-950 border-zinc-800 text-zinc-500"
+                          isCurrent ? "bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-500/20 scale-110" :
+                          isDone ? "bg-emerald-50 border-emerald-200 text-emerald-600" :
+                          "bg-white border-zinc-200 text-zinc-400"
                         }`}
                       >
                         {isDone ? <Check className="w-3.5 h-3.5" /> : <span className="text-[10px] font-bold">{s.num}</span>}
@@ -418,13 +415,13 @@ export default function OnboardingPage() {
 
                       <div className="space-y-1 pl-4">
                         <h4 className={`text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
-                          isCurrent ? "text-orange-400" : isDone ? "text-emerald-400" : "text-zinc-500"
+                          isCurrent ? "text-orange-600" : isDone ? "text-emerald-600" : "text-zinc-400"
                         }`}>
                           {s.label}
                         </h4>
                         {isCurrent && (
-                          <p className="text-[11px] text-zinc-400 max-w-xs leading-normal animate-in fade-in-50 duration-300">
-                            Currently editing company configuration parameters.
+                          <p className="text-[11px] text-zinc-500 max-w-xs leading-normal animate-in fade-in-50 duration-300">
+                            Provide details for this section to continue.
                           </p>
                         )}
                       </div>
@@ -441,47 +438,47 @@ export default function OnboardingPage() {
                 {/* STEP 1: COMPANY PROFILE */}
                 {activeStep === 1 && (
                   <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                    <div className="border-b border-white/5 pb-4">
-                      <h3 className="text-xl font-bold text-white">Company Profile Details</h3>
-                      <p className="text-xs text-zinc-400 mt-1">Specify your corporate entity and registration identifier.</p>
+                    <div className="border-b border-zinc-200 pb-4">
+                      <h3 className="text-xl font-bold text-zinc-900">Company Details</h3>
+                      <p className="text-xs text-zinc-500 mt-1">Basic information about your business.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="businessName" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Registered Company Name <span className="text-orange-500">*</span></Label>
-                        <Input id="businessName" required value={formData.businessName} onChange={e => setFormData({...formData, businessName: e.target.value})} placeholder="e.g. Acme Hospitality Pvt Ltd" className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                        <Label htmlFor="businessName" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Company Name <span className="text-orange-500">*</span></Label>
+                        <Input id="businessName" required value={formData.businessName} onChange={e => setFormData({...formData, businessName: e.target.value})} placeholder="e.g. Acme Inc." className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="industry" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Industry Segment <span className="text-orange-500">*</span></Label>
+                        <Label htmlFor="industry" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Industry <span className="text-orange-500">*</span></Label>
                         <Select required value={formData.industry} onValueChange={val => setFormData({...formData, industry: val})}>
-                          <SelectTrigger className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all">
+                          <SelectTrigger className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all">
                             <SelectValue placeholder="Select Industry" />
                           </SelectTrigger>
-                          <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
+                          <SelectContent className="bg-white border-zinc-200 text-zinc-900 rounded-xl">
                             <SelectItem value="Healthcare">Healthcare & Biotech</SelectItem>
                             <SelectItem value="Hospitality">Hospitality & Tourism</SelectItem>
-                            <SelectItem value="Real Estate">Real Estate & Assets</SelectItem>
+                            <SelectItem value="Real Estate">Real Estate</SelectItem>
                             <SelectItem value="Education">Education & E-learning</SelectItem>
                             <SelectItem value="Retail">Retail & E-commerce</SelectItem>
-                            <SelectItem value="Finance">Finance & Brokerage</SelectItem>
-                            <SelectItem value="Other">Other Business</SelectItem>
+                            <SelectItem value="Finance">Finance</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="gstNumber" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">GST Registration Identifier <span className="text-orange-500">*</span></Label>
-                        <Input id="gstNumber" required value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} placeholder="e.g., 27AAAAA0000A1Z5" className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                        <Label htmlFor="gstNumber" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Tax ID / GST <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                        <Input id="gstNumber" value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} placeholder="e.g., 27AAAAA0000A1Z5" className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="companySize" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Company Size <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
+                        <Label htmlFor="companySize" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Team Size <span className="text-zinc-400 font-normal">(optional)</span></Label>
                         <Select value={formData.companySize} onValueChange={val => setFormData({...formData, companySize: val})}>
-                          <SelectTrigger className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all">
+                          <SelectTrigger className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all">
                             <SelectValue placeholder="Select Team Size" />
                           </SelectTrigger>
-                          <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
+                          <SelectContent className="bg-white border-zinc-200 text-zinc-900 rounded-xl">
                             <SelectItem value="1-10">1–10 employees</SelectItem>
                             <SelectItem value="11-50">11–50 employees</SelectItem>
                             <SelectItem value="51-200">51–200 employees</SelectItem>
@@ -491,8 +488,8 @@ export default function OnboardingPage() {
                       </div>
 
                       <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="websiteUrl" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Corporate Website Address <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
-                        <Input id="websiteUrl" type="url" placeholder="https://www.company.com" value={formData.websiteUrl} onChange={e => setFormData({...formData, websiteUrl: e.target.value})} className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                        <Label htmlFor="websiteUrl" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Website Address <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                        <Input id="websiteUrl" type="url" placeholder="https://www.company.com" value={formData.websiteUrl} onChange={e => setFormData({...formData, websiteUrl: e.target.value})} className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
                       </div>
                     </div>
                   </div>
@@ -501,25 +498,25 @@ export default function OnboardingPage() {
                 {/* STEP 2: CONTACT DETAILS */}
                 {activeStep === 2 && (
                   <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                    <div className="border-b border-white/5 pb-4">
-                      <h3 className="text-xl font-bold text-white">Point of Contact</h3>
-                      <p className="text-xs text-zinc-400 mt-1">Provide information for the primary account administrator.</p>
+                    <div className="border-b border-zinc-200 pb-4">
+                      <h3 className="text-xl font-bold text-zinc-900">Contact Details</h3>
+                      <p className="text-xs text-zinc-500 mt-1">Who should we contact for account updates?</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="pocName" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Contact Person Name <span className="text-orange-500">*</span></Label>
-                        <Input id="pocName" required value={formData.pocName} onChange={e => setFormData({...formData, pocName: e.target.value})} placeholder="e.g. Alex Johnson" className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                        <Label htmlFor="pocName" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Your Name <span className="text-orange-500">*</span></Label>
+                        <Input id="pocName" required value={formData.pocName} onChange={e => setFormData({...formData, pocName: e.target.value})} placeholder="e.g. Alex Johnson" className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="pocPhone" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Direct Phone Number <span className="text-orange-500">*</span></Label>
-                        <Input id="pocPhone" type="tel" required value={formData.pocPhone} onChange={e => setFormData({...formData, pocPhone: e.target.value})} placeholder="e.g. +91 98765 43210" className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                        <Label htmlFor="pocPhone" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Phone Number <span className="text-orange-500">*</span></Label>
+                        <Input id="pocPhone" type="tel" required value={formData.pocPhone} onChange={e => setFormData({...formData, pocPhone: e.target.value})} placeholder="e.g. +91 98765 43210" className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="pocDesignation" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Designation / Role <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
-                        <Input id="pocDesignation" placeholder="e.g. Head of Operations" value={formData.pocDesignation} onChange={e => setFormData({...formData, pocDesignation: e.target.value})} className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                        <Label htmlFor="pocDesignation" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Role / Job Title <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                        <Input id="pocDesignation" placeholder="e.g. Founder" value={formData.pocDesignation} onChange={e => setFormData({...formData, pocDesignation: e.target.value})} className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
                       </div>
                     </div>
                   </div>
@@ -528,65 +525,65 @@ export default function OnboardingPage() {
                 {/* STEP 3: AGENT SETTINGS */}
                 {activeStep === 3 && (
                   <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                    <div className="border-b border-white/5 pb-4">
-                      <h3 className="text-xl font-bold text-white">Call Routing & Logic Settings</h3>
-                      <p className="text-xs text-zinc-400 mt-1">Specify how calls flow through the agent and what objectives it must complete.</p>
+                    <div className="border-b border-zinc-200 pb-4">
+                      <h3 className="text-xl font-bold text-zinc-900">Agent Settings</h3>
+                      <p className="text-xs text-zinc-500 mt-1">How will your AI voice agent be used?</p>
                     </div>
 
                     <div className="space-y-4">
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Primary Call Path <span className="text-orange-500">*</span></Label>
+                      <Label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Call Type <span className="text-orange-500">*</span></Label>
                       <RadioGroup value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <label className="flex items-center space-x-3 border border-white/10 bg-white/[0.01] p-4 rounded-xl cursor-pointer hover:bg-white/[0.03] transition-all">
-                          <RadioGroupItem value="inbound" id="inbound" className="border-white/30 text-orange-500 focus:ring-orange-500/10" />
-                          <span className="text-xs font-medium text-white">Incoming Calls (Answering / Inquiries)</span>
+                        <label className="flex items-center space-x-3 border border-zinc-200 bg-white p-4 rounded-xl cursor-pointer hover:bg-zinc-50 transition-all">
+                          <RadioGroupItem value="inbound" id="inbound" className="border-zinc-300 text-orange-500 focus:ring-orange-500/10" />
+                          <span className="text-xs font-medium text-zinc-900">Inbound (Answering Calls)</span>
                         </label>
-                        <label className="flex items-center space-x-3 border border-white/10 bg-white/[0.01] p-4 rounded-xl cursor-pointer hover:bg-white/[0.03] transition-all">
-                          <RadioGroupItem value="outbound" id="outbound" className="border-white/30 text-orange-500 focus:ring-orange-500/10" />
-                          <span className="text-xs font-medium text-white">Outgoing Calls (Outreach / Notifications)</span>
+                        <label className="flex items-center space-x-3 border border-zinc-200 bg-white p-4 rounded-xl cursor-pointer hover:bg-zinc-50 transition-all">
+                          <RadioGroupItem value="outbound" id="outbound" className="border-zinc-300 text-orange-500 focus:ring-orange-500/10" />
+                          <span className="text-xs font-medium text-zinc-900">Outbound (Making Calls)</span>
                         </label>
-                        <label className="flex items-center space-x-3 border border-white/10 bg-white/[0.01] p-4 rounded-xl cursor-pointer hover:bg-white/[0.03] transition-all">
-                          <RadioGroupItem value="both" id="both" className="border-white/30 text-orange-500 focus:ring-orange-500/10" />
-                          <span className="text-xs font-medium text-white">Dual Path (Incoming & Outgoing)</span>
+                        <label className="flex items-center space-x-3 border border-zinc-200 bg-white p-4 rounded-xl cursor-pointer hover:bg-zinc-50 transition-all">
+                          <RadioGroupItem value="both" id="both" className="border-zinc-300 text-orange-500 focus:ring-orange-500/10" />
+                          <span className="text-xs font-medium text-zinc-900">Both</span>
                         </label>
                       </RadioGroup>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="useCaseDescription" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Core Call Objective & Steps <span className="text-orange-500">*</span></Label>
+                      <Label htmlFor="useCaseDescription" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Describe what the agent should do <span className="text-orange-500">*</span></Label>
                       <Textarea
                         id="useCaseDescription"
-                        placeholder="Detail the conversational flow (e.g. 'Greet user, request hotel check-in date, confirm suite type, update booking system, and send confirmation details via SMS.')"
+                        placeholder="e.g. 'Answer calls, ask the customer what they need, and book an appointment for them.'"
                         value={formData.useCaseDescription}
                         onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
                         rows={5}
-                        className="bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 p-4 transition-all resize-none leading-relaxed"
+                        className="bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 p-4 transition-all resize-none leading-relaxed"
                       />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="callVolume" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Monthly Call Capacity <span className="text-orange-500">*</span></Label>
+                        <Label htmlFor="callVolume" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Expected Call Volume / Month <span className="text-orange-500">*</span></Label>
                         <Select value={formData.callVolume} onValueChange={val => setFormData({...formData, callVolume: val})}>
-                          <SelectTrigger className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all">
-                            <SelectValue placeholder="Select Call Volume" />
+                          <SelectTrigger className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all">
+                            <SelectValue placeholder="Select Volume" />
                           </SelectTrigger>
-                          <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
-                            <SelectItem value="<100">Less than 100 calls</SelectItem>
-                            <SelectItem value="100-500">100 – 500 calls</SelectItem>
-                            <SelectItem value="500-2000">500 – 2,000 calls</SelectItem>
-                            <SelectItem value="2000+">2,000+ calls</SelectItem>
+                          <SelectContent className="bg-white border-zinc-200 text-zinc-900 rounded-xl">
+                            <SelectItem value="<100">Less than 100</SelectItem>
+                            <SelectItem value="100-500">100 - 500</SelectItem>
+                            <SelectItem value="500-2000">500 - 2,000</SelectItem>
+                            <SelectItem value="2000+">2,000+</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="languages" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Languages Required <span className="text-orange-500">*</span></Label>
-                        <Input id="languages" placeholder="e.g. English, Hindi" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                        <Label htmlFor="languages" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Languages Required <span className="text-orange-500">*</span></Label>
+                        <Input id="languages" placeholder="e.g. English, Hindi" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
                       </div>
 
                       <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="integrations" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Connected Corporate Tools <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
-                        <Input id="integrations" placeholder="e.g. Salesforce CRM, Google Sheets, Slack hooks" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
+                        <Label htmlFor="integrations" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Tools you use (e.g. Salesforce, Slack) <span className="text-zinc-400 font-normal">(optional)</span></Label>
+                        <Input id="integrations" placeholder="e.g. Salesforce, Google Sheets" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-4 transition-all" />
                       </div>
                     </div>
                   </div>
@@ -595,16 +592,16 @@ export default function OnboardingPage() {
                 {/* STEP 4: INTEGRATIONS & SETUP */}
                 {activeStep === 4 && (
                   <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                    <div className="border-b border-white/5 pb-4">
-                      <h3 className="text-xl font-bold text-white">System Integrations & Verification</h3>
-                      <p className="text-xs text-zinc-400 mt-1">Optionally connect external databases or upload verification details to bypass sandbox constraints.</p>
+                    <div className="border-b border-zinc-200 pb-4">
+                      <h3 className="text-xl font-bold text-zinc-900">Integrations</h3>
+                      <p className="text-xs text-zinc-500 mt-1">Connect your existing tools to your voice agent.</p>
                     </div>
 
-                    <div className="p-6 border border-white/5 bg-white/[0.01] rounded-2xl space-y-4">
+                    <div className="p-6 border border-zinc-200 bg-white rounded-2xl space-y-4">
                       <div className="flex items-center justify-between gap-6">
                         <div>
-                          <Label htmlFor="needsApiIntegration" className="font-bold text-sm text-white cursor-pointer">Require Custom API Infrastructure?</Label>
-                          <p className="text-xs text-zinc-400 mt-1">Select if the voice agent must read/write to proprietary endpoints, webhooks, or custom REST servers.</p>
+                          <Label htmlFor="needsApiIntegration" className="font-bold text-sm text-zinc-900 cursor-pointer">Need Custom API Integration?</Label>
+                          <p className="text-xs text-zinc-500 mt-1">Check this if you need Talkar to connect to your custom software or webhooks.</p>
                         </div>
                         <Switch 
                           id="needsApiIntegration" 
@@ -615,29 +612,29 @@ export default function OnboardingPage() {
                       </div>
 
                       {formData.needsApiIntegration && (
-                        <div className="space-y-2 pt-4 border-t border-white/5 animate-in slide-in-from-top-2 duration-200">
-                          <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Endpoint Requirements & System Rules <span className="text-orange-500">*</span></Label>
+                        <div className="space-y-2 pt-4 border-t border-zinc-200 animate-in slide-in-from-top-2 duration-200">
+                          <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Provide API/Webhook Details <span className="text-orange-500">*</span></Label>
                           <Textarea
                             id="apiIntegrationDetails"
-                            placeholder="Detail authorization headers, webhook event structures, or API routing details..."
+                            placeholder="Briefly describe what systems you want to connect..."
                             value={formData.apiIntegrationDetails}
                             onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
                             rows={3}
-                            className="bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 p-4 transition-all resize-none leading-relaxed"
+                            className="bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 focus:ring-orange-500/10 p-4 transition-all resize-none leading-relaxed"
                           />
                         </div>
                       )}
                     </div>
 
                     <div className="space-y-4">
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Corporate Documents <span className="text-zinc-500 font-normal">(Optional — Accelerates Activation)</span></Label>
+                      <Label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Company Documents <span className="text-zinc-400 font-normal">(Optional)</span></Label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <label
                           htmlFor="gst-upload"
                           className={`border border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
                             uploadedFiles.gst
-                              ? "border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10"
-                              : "border-white/10 hover:border-white/20 bg-white/[0.01] hover:bg-white/[0.02]"
+                              ? "border-emerald-500 bg-emerald-50 hover:bg-emerald-100"
+                              : "border-zinc-300 hover:border-zinc-400 bg-zinc-50 hover:bg-zinc-100"
                           }`}
                         >
                           <input
@@ -649,21 +646,21 @@ export default function OnboardingPage() {
                           />
                           {uploadedFiles.gst ? (
                             <>
-                              <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
-                                <Check className="w-6 h-6 text-emerald-400" />
+                              <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
+                                <Check className="w-6 h-6 text-emerald-600" />
                               </div>
-                              <p className="text-xs font-bold text-emerald-400 max-w-full truncate px-2">{uploadedFiles.gst.name}</p>
+                              <p className="text-xs font-bold text-emerald-700 max-w-full truncate px-2">{uploadedFiles.gst.name}</p>
                               <p className="text-[10px] text-zinc-500 mt-1">{(uploadedFiles.gst.size / 1024).toFixed(1)} KB · Click to replace</p>
                             </>
                           ) : (
                             <>
                               <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
-                              <p className="text-xs font-bold text-white">GST Certificate</p>
+                              <p className="text-xs font-bold text-zinc-900">Tax Registration Doc</p>
                               <p className="text-[10px] text-zinc-500 mt-1">PDF, JPG or PNG · Click to select</p>
                             </>
                           )}
                           {uploadProgress.gst > 0 && uploadProgress.gst < 100 && (
-                            <div className="w-full mt-4 bg-zinc-900 rounded-full h-1 overflow-hidden">
+                            <div className="w-full mt-4 bg-zinc-200 rounded-full h-1 overflow-hidden">
                               <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all duration-150" style={{ width: `${uploadProgress.gst}%` }} />
                             </div>
                           )}
@@ -673,8 +670,8 @@ export default function OnboardingPage() {
                           htmlFor="reg-upload"
                           className={`border border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
                             uploadedFiles.reg
-                              ? "border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10"
-                              : "border-white/10 hover:border-white/20 bg-white/[0.01] hover:bg-white/[0.02]"
+                              ? "border-emerald-500 bg-emerald-50 hover:bg-emerald-100"
+                              : "border-zinc-300 hover:border-zinc-400 bg-zinc-50 hover:bg-zinc-100"
                           }`}
                         >
                           <input
@@ -686,21 +683,21 @@ export default function OnboardingPage() {
                           />
                           {uploadedFiles.reg ? (
                             <>
-                              <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
-                                <Check className="w-6 h-6 text-emerald-400" />
+                              <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
+                                <Check className="w-6 h-6 text-emerald-600" />
                               </div>
-                              <p className="text-xs font-bold text-emerald-400 max-w-full truncate px-2">{uploadedFiles.reg.name}</p>
+                              <p className="text-xs font-bold text-emerald-700 max-w-full truncate px-2">{uploadedFiles.reg.name}</p>
                               <p className="text-[10px] text-zinc-500 mt-1">{(uploadedFiles.reg.size / 1024).toFixed(1)} KB · Click to replace</p>
                             </>
                           ) : (
                             <>
                               <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
-                              <p className="text-xs font-bold text-white">Company Incorporation Doc</p>
+                              <p className="text-xs font-bold text-zinc-900">Company Incorporation Doc</p>
                               <p className="text-[10px] text-zinc-500 mt-1">PDF, JPG or PNG · Click to select</p>
                             </>
                           )}
                           {uploadProgress.reg > 0 && uploadProgress.reg < 100 && (
-                            <div className="w-full mt-4 bg-zinc-900 rounded-full h-1 overflow-hidden">
+                            <div className="w-full mt-4 bg-zinc-200 rounded-full h-1 overflow-hidden">
                               <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all duration-150" style={{ width: `${uploadProgress.reg}%` }} />
                             </div>
                           )}
@@ -711,9 +708,9 @@ export default function OnboardingPage() {
                 )}
 
                 {/* Wizard Action Footer - Spacious & Clean */}
-                <div className="flex items-center justify-between pt-8 border-t border-white/5">
+                <div className="flex items-center justify-between pt-8 border-t border-zinc-200">
                   {activeStep > 1 ? (
-                    <Button type="button" variant="outline" onClick={handlePrevStep} className="border-white/10 text-zinc-300 hover:bg-white/5 rounded-xl h-12 px-6">
+                    <Button type="button" variant="outline" onClick={handlePrevStep} className="border-zinc-300 text-zinc-600 hover:bg-zinc-50 rounded-xl h-12 px-6">
                       <ArrowLeft className="w-4 h-4 mr-2" /> Previous
                     </Button>
                   ) : <div />}
@@ -740,15 +737,15 @@ export default function OnboardingPage() {
         {/* ── 1. NEW AGENT BRIEF (Sub-org or Returning Customer) ── */}
         {(status === "new_agent_brief" || (status === "agent_building" && customerData?.is_sub_org && !customerData?.has_onboarding_form)) && (
           <div className="max-w-4xl mx-auto space-y-12">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-6 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-200 pb-6 gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
                   <Bot className="w-6 h-6 text-orange-500" />
                   Voice Agent Objectives
                 </h2>
-                <p className="text-sm text-zinc-400 mt-1">Specify how you want this agent configured.</p>
+                <p className="text-sm text-zinc-500 mt-1">Tell us about this voice agent.</p>
               </div>
-              <Badge variant="outline" className="border-orange-500/30 bg-orange-500/10 text-orange-400 font-mono text-[10px] px-3 py-1 rounded-full">
+              <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-600 font-mono text-[10px] px-3 py-1 rounded-full">
                 Step {briefStep} of 2
               </Badge>
             </div>
@@ -758,26 +755,26 @@ export default function OnboardingPage() {
                 <div className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="useCaseType" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Call Flow Route <span className="text-orange-500">*</span></Label>
+                      <Label htmlFor="useCaseType" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Call Type <span className="text-orange-500">*</span></Label>
                       <Select value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})}>
-                        <SelectTrigger className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 px-4">
+                        <SelectTrigger className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 px-4">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
-                          <SelectItem value="inbound">Incoming Calls Only (Answering)</SelectItem>
-                          <SelectItem value="outbound">Outgoing Calls Only (Outreach)</SelectItem>
+                        <SelectContent className="bg-white border-zinc-200 text-zinc-900 rounded-xl">
+                          <SelectItem value="inbound">Incoming Calls Only</SelectItem>
+                          <SelectItem value="outbound">Outgoing Calls Only</SelectItem>
                           <SelectItem value="both">Both (Incoming & Outgoing)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="callVolume" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Expected Call Minutes <span className="text-orange-500">*</span></Label>
+                      <Label htmlFor="callVolume" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Expected Call Minutes <span className="text-orange-500">*</span></Label>
                       <Select value={formData.callVolume} onValueChange={val => setFormData({...formData, callVolume: val})}>
-                        <SelectTrigger className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 px-4">
+                        <SelectTrigger className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 px-4">
                           <SelectValue placeholder="Select Volume" />
                         </SelectTrigger>
-                        <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
+                        <SelectContent className="bg-white border-zinc-200 text-zinc-900 rounded-xl">
                           <SelectItem value="<1000">Less than 1,000 minutes</SelectItem>
                           <SelectItem value="1000-5000">1,000 – 5,000 minutes</SelectItem>
                           <SelectItem value="5000-10000">5,000 – 10,000 minutes</SelectItem>
@@ -788,29 +785,29 @@ export default function OnboardingPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="languages" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Agent Languages <span className="text-orange-500">*</span></Label>
-                    <Input id="languages" className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 px-4" placeholder="e.g. English, Hindi" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
+                    <Label htmlFor="languages" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Agent Languages <span className="text-orange-500">*</span></Label>
+                    <Input id="languages" className="h-12 bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 px-4" placeholder="e.g. English, Hindi" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="useCaseDescription" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Workflow Target <span className="text-orange-500">*</span></Label>
+                    <Label htmlFor="useCaseDescription" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">What should this agent do? <span className="text-orange-500">*</span></Label>
                     <Textarea
                       id="useCaseDescription"
-                      placeholder="Outline instructions (e.g. 'Answer room booking questions, capture customer name, check availability in CRM, book slot.')"
+                      placeholder="e.g. 'Answer room booking questions, capture customer name, check availability, book slot.'"
                       value={formData.useCaseDescription}
                       onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
                       rows={5}
-                      className="bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 p-4 transition-all resize-none leading-relaxed"
+                      className="bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 p-4 transition-all resize-none leading-relaxed"
                     />
                   </div>
                 </div>
               ) : (
                 <div className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                  <div className="p-6 border border-white/5 bg-white/[0.01] rounded-2xl space-y-4">
+                  <div className="p-6 border border-zinc-200 bg-white rounded-2xl space-y-4">
                     <div className="flex items-center justify-between gap-6">
                       <div>
-                        <Label htmlFor="needsApiIntegration" className="font-bold text-sm text-white cursor-pointer">CRM / Database Connection Needed?</Label>
-                        <p className="text-xs text-zinc-400 mt-1">Check if the agent needs to read or write live details to your CRM or custom API database.</p>
+                        <Label htmlFor="needsApiIntegration" className="font-bold text-sm text-zinc-900 cursor-pointer">CRM / Database Connection Needed?</Label>
+                        <p className="text-xs text-zinc-500 mt-1">Check if the agent needs to read or write live details to your CRM or custom API.</p>
                       </div>
                       <Switch
                         id="needsApiIntegration"
@@ -821,15 +818,15 @@ export default function OnboardingPage() {
                     </div>
 
                     {formData.needsApiIntegration && (
-                      <div className="space-y-2 pt-4 border-t border-white/5 animate-in slide-in-from-top-2 duration-200">
-                        <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Connection specs <span className="text-orange-500">*</span></Label>
+                      <div className="space-y-2 pt-4 border-t border-zinc-200 animate-in slide-in-from-top-2 duration-200">
+                        <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">API/Webhook Details <span className="text-orange-500">*</span></Label>
                         <Textarea
                           id="apiIntegrationDetails"
-                          placeholder="Provide details about standard payloads, external tool names, or secure webhook endpoints..."
+                          placeholder="Provide details about endpoints, tools, or webhooks you need to connect..."
                           value={formData.apiIntegrationDetails}
                           onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
                           rows={5}
-                          className="bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 p-4 leading-relaxed"
+                          className="bg-white border-zinc-200 hover:border-zinc-300 text-zinc-900 rounded-xl focus:border-orange-500 p-4 leading-relaxed"
                         />
                       </div>
                     )}
@@ -837,9 +834,9 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-8 border-t border-white/5">
+              <div className="flex items-center justify-between pt-8 border-t border-zinc-200">
                 {briefStep > 1 ? (
-                  <Button type="button" variant="outline" onClick={() => setBriefStep(1)} className="border-white/10 text-zinc-300 hover:bg-white/5 rounded-xl h-12 px-6">
+                  <Button type="button" variant="outline" onClick={() => setBriefStep(1)} className="border-zinc-300 text-zinc-600 hover:bg-zinc-50 rounded-xl h-12 px-6">
                     <ArrowLeft className="w-4 h-4 mr-2" /> Back
                   </Button>
                 ) : <div />}
@@ -851,11 +848,11 @@ export default function OnboardingPage() {
                       return;
                     }
                     setBriefStep(2);
-                  }} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-12 px-8 font-semibold">
+                  }} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-12 px-8 font-semibold shadow-lg shadow-orange-500/10">
                     Continue to Integrations <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 ) : (
-                  <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-12 px-8 font-bold min-w-[160px]">
+                  <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-12 px-8 font-bold min-w-[160px] shadow-lg shadow-orange-500/25">
                     {submitting ? "Submitting..." : "Submit Agent Details"}
                   </Button>
                 )}
@@ -867,17 +864,17 @@ export default function OnboardingPage() {
         {/* ── 2. BRIEF SUBMITTED CONFIRMATION ── */}
         {status === "brief_submitted" && (
           <div className="max-w-xl mx-auto text-center space-y-6 py-12">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/20">
+            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mx-auto border border-emerald-100">
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-white">Objective Saved</h2>
-              <p className="text-zinc-400 text-sm leading-relaxed">
-                Your voice agent objective and call structure details have been updated. Our solutions engineers are updating the routing workspace now.
+              <h2 className="text-2xl font-bold text-zinc-900">Information Saved</h2>
+              <p className="text-zinc-500 text-sm leading-relaxed">
+                Your voice agent details have been updated. Our team is setting up your workspace now.
               </p>
             </div>
             <div className="pt-4">
-              <Button onClick={() => router.push("/overview")} className="bg-white/10 hover:bg-white/15 text-white border border-white/10 rounded-xl h-12 px-8">
+              <Button onClick={() => router.push("/overview")} className="bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-200 rounded-xl h-12 px-8">
                 Return to Dashboard
               </Button>
             </div>
@@ -889,13 +886,13 @@ export default function OnboardingPage() {
           <div className="max-w-xl mx-auto text-center space-y-6 py-12">
             <Clock className="w-16 h-16 text-orange-500 mx-auto animate-spin" />
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-white">Verification Pending</h2>
-              <p className="text-zinc-400 text-sm leading-relaxed">
-                Our solutions engineering team is currently verifying the routing endpoints and settings for your corporate voice profile. We will notify you by email as soon as activation finishes.
+              <h2 className="text-2xl font-bold text-zinc-900">Setting up your account</h2>
+              <p className="text-zinc-500 text-sm leading-relaxed">
+                We are currently reviewing your details and preparing your workspace. We will email you as soon as it's ready.
               </p>
             </div>
             <div className="pt-4">
-              <Button onClick={() => router.push("/overview")} className="bg-white/10 hover:bg-white/15 text-white border border-white/10 rounded-xl h-12 px-8">
+              <Button onClick={() => router.push("/overview")} className="bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-200 rounded-xl h-12 px-8">
                 Explore Dashboard
               </Button>
             </div>
@@ -906,54 +903,54 @@ export default function OnboardingPage() {
         {status === "approved" && (
           <div className="max-w-3xl mx-auto space-y-12 py-6">
             <div className="text-center space-y-2">
-              <div className="w-14 h-14 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mx-auto border border-orange-500/20">
-                <CheckCircle2 className="w-7 h-7 text-orange-500" />
+              <div className="w-14 h-14 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mx-auto border border-orange-200">
+                <CheckCircle2 className="w-7 h-7" />
               </div>
-              <h2 className="text-2xl font-bold text-white">Application Approved</h2>
-              <p className="text-sm text-zinc-400 leading-relaxed">Please complete the setup payment to configure your live voice workspace.</p>
+              <h2 className="text-2xl font-bold text-zinc-900">Application Approved</h2>
+              <p className="text-sm text-zinc-500 leading-relaxed">Please complete the setup payment to configure your live voice workspace.</p>
             </div>
 
-            <div className="p-8 rounded-2xl border border-orange-500/30 bg-orange-500/10 text-center">
-              <span className="text-xs uppercase tracking-wider text-orange-400 font-mono font-bold">Quoted Integration Fee</span>
-              <div className="text-4xl font-extrabold text-white mt-2">
+            <div className="p-8 rounded-2xl border border-orange-200 bg-orange-50 text-center">
+              <span className="text-xs uppercase tracking-wider text-orange-600 font-mono font-bold">Quoted Setup Fee</span>
+              <div className="text-4xl font-extrabold text-zinc-900 mt-2">
                 {customerData?.onboarding_form?.integration_fee_paise 
                   ? `₹${(customerData.onboarding_form.integration_fee_paise / 100).toLocaleString()}`
                   : "Quoted setup fee"}
               </div>
-              <p className="text-xs text-zinc-400 mt-2 leading-relaxed max-w-md mx-auto">
-                {customerData?.onboarding_form?.integration_description || "Covers custom API data-flows, Salesforce/CRM authentication, calendar hooks, and full production pipeline testing."}
+              <p className="text-xs text-zinc-500 mt-2 leading-relaxed max-w-md mx-auto">
+                {customerData?.onboarding_form?.integration_description || "Covers custom setup and onboarding."}
               </p>
             </div>
 
             <div className="space-y-4">
-              <span className="font-bold uppercase tracking-wider text-zinc-400 text-[10px]">What is Included:</span>
+              <span className="font-bold uppercase tracking-wider text-zinc-500 text-[10px]">What's Included:</span>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Custom CRM & Webhook Handlers</span>
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-white border border-zinc-200 shadow-sm">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span className="text-zinc-900 font-medium">Custom Configuration</span>
                 </div>
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>End-to-End Voice Flow Testing</span>
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-white border border-zinc-200 shadow-sm">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span className="text-zinc-900 font-medium">End-to-End Testing</span>
                 </div>
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Dedicated Integration Engineer</span>
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-white border border-zinc-200 shadow-sm">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span className="text-zinc-900 font-medium">Dedicated Support</span>
                 </div>
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>24-Hour Active SLA Delivery</span>
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-white border border-zinc-200 shadow-sm">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span className="text-zinc-900 font-medium">Fast Delivery</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8 border-t border-white/5">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8 border-t border-zinc-200">
               <Button size="lg" className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 text-white font-semibold shadow-lg shadow-orange-500/25 h-12 px-8 rounded-xl min-w-[220px]" onClick={handlePaySetupFee}>
-                <CreditCard className="w-4 h-4 mr-2" /> Pay Integration Fee
+                <CreditCard className="w-4 h-4 mr-2" /> Pay Setup Fee
               </Button>
               
               {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
-                <Button onClick={handleMockSetupFee} variant="outline" size="lg" className="border-white/10 text-zinc-300 hover:bg-white/5 h-12 rounded-xl">
+                <Button onClick={handleMockSetupFee} variant="outline" size="lg" className="border-zinc-300 text-zinc-700 hover:bg-zinc-50 h-12 rounded-xl">
                   Bypass Payment (Dev)
                 </Button>
               )}

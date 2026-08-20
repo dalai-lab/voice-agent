@@ -24,7 +24,7 @@ const AI_MODELS: ModelEngine[] = [
     tierKey: "starter",
     name: "Starter Engine",
     subtitle: "Standard transactional routing",
-    rateRupees: "25.00",
+    rateRupees: "6.00",
     description: "A fast, lightweight agent optimized for direct customer interactions, routing calls, and responding to common transactional questions.",
     benefits: [
       "2 parallel call channels",
@@ -37,25 +37,12 @@ const AI_MODELS: ModelEngine[] = [
     tierKey: "pro",
     name: "Pro Engine",
     subtitle: "Natural speech & emotive client interactions",
-    rateRupees: "18.00",
+    rateRupees: "4.00",
     description: "Combines deep conversational understanding with high-fidelity, emotional voice tones. Speaks with natural human cadence.",
     benefits: [
       "10 parallel active calls",
       "Near-instant response times",
       "Includes 2 premium phone lines"
-    ]
-  },
-  {
-    id: "apex-omni-prime",
-    tierKey: "elite",
-    name: "Elite Engine",
-    subtitle: "Enterprise capacity & custom hardware",
-    rateRupees: "12.00",
-    description: "Built for massive call volumes. Operates on isolated server clusters to guarantee near-zero lag and offers the lowest rates for large scale teams.",
-    benefits: [
-      "50 concurrent calls",
-      "Priority latency routing",
-      "Includes 5 premium phone lines"
     ]
   }
 ];
@@ -92,6 +79,7 @@ export default function ModelsPage() {
   const [activeTier, setActiveTier] = useState<string>("starter");
   const [activeVoiceId, setActiveVoiceId] = useState<string>("");
   const [isProvisioned, setIsProvisioned] = useState<boolean>(false);
+  const [customerStatus, setCustomerStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingVoice, setUpdatingVoice] = useState<string | null>(null);
 
@@ -108,6 +96,7 @@ export default function ModelsPage() {
           if (statusData.plan) setActiveTier(statusData.plan.toLowerCase());
           if (statusData.voice_id) setActiveVoiceId(statusData.voice_id);
           setIsProvisioned(statusData.is_provisioned === true);
+          setCustomerStatus(statusData.status || null);
         }
       })
       .catch(console.error)
@@ -137,7 +126,8 @@ export default function ModelsPage() {
     }
   };
 
-  const isPremium = activeTier === "pro" || activeTier === "elite";
+  const isPremium = activeTier === "pro";
+  const isPendingDeposit = customerStatus === "pending_deposit";
 
   const getActiveVoiceName = () => {
     const std = VOICE_CATALOG.starter.voices.find(v => v.id === activeVoiceId);
@@ -274,12 +264,21 @@ export default function ModelsPage() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {isPendingDeposit && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400 text-xs">
+            <span className="text-base">💰</span>
+            <div>
+              <span className="font-semibold">Activation pending — </span>
+              your agent is configured on the <span className="font-bold uppercase">{activeTier}</span> plan but calls are blocked until you fund your wallet.
+              <Link href="/wallet" className="ml-2 underline font-semibold">Add credits →</Link>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {AI_MODELS.map((model) => {
             const isActive = activeTier === model.tierKey;
-            const isHigherTier = 
-              (activeTier === "starter" && (model.tierKey === "pro" || model.tierKey === "elite")) ||
-              (activeTier === "pro" && model.tierKey === "elite");
+            const isHigherTier = activeTier === "starter" && model.tierKey === "pro";
 
             return (
               <div 
@@ -293,9 +292,14 @@ export default function ModelsPage() {
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       {model.subtitle}
                     </span>
-                    {isActive && (
+                    {isActive && !isPendingDeposit && (
                       <Badge className="bg-foreground/5 text-foreground hover:bg-foreground/5 border border-foreground/10 text-[10px] font-bold rounded-sm">
                         ACTIVE
+                      </Badge>
+                    )}
+                    {isActive && isPendingDeposit && (
+                      <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold rounded-sm">
+                        PENDING
                       </Badge>
                     )}
                   </div>
@@ -324,9 +328,15 @@ export default function ModelsPage() {
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-border/50">
-                  {isActive ? (
+                  {isActive && !isPendingDeposit ? (
                     <Button disabled className="w-full bg-foreground/5 text-foreground/80 border border-foreground/10 cursor-default h-9 text-xs font-medium">
                       Current Active Engine
+                    </Button>
+                  ) : isActive && isPendingDeposit ? (
+                    <Button asChild className="w-full bg-amber-500 text-white hover:bg-amber-600 h-9 text-xs font-bold shadow-xs">
+                      <Link href="/wallet" className="flex items-center justify-center gap-1">
+                        Fund Wallet to Activate <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
                     </Button>
                   ) : isHigherTier ? (
                     <Button asChild className="w-full bg-foreground text-background hover:bg-foreground/90 h-9 text-xs font-bold shadow-xs">

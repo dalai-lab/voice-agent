@@ -57,8 +57,9 @@ export default function OnboardingPage() {
   const [activeStep, setActiveStep] = useState(1); // 1..4 for main onboarding
   const [briefStep, setBriefStep] = useState(1);   // 1..2 for 2nd agent brief
 
-  // Upload Progress State
+  // Upload State
   const [uploadProgress, setUploadProgress] = useState({ gst: 0, reg: 0 });
+  const [uploadedFiles, setUploadedFiles] = useState<{ gst: File | null; reg: File | null }>({ gst: null, reg: null });
 
   useEffect(() => {
     if (!dograhOrgId && !email) {
@@ -280,22 +281,41 @@ export default function OnboardingPage() {
     }
   };
 
-  const simulateUpload = (type: "gst" | "reg") => {
-    setUploadProgress(prev => ({ ...prev, [type]: 10 }));
-    let progress = 10;
+  const handleFileSelect = (type: "gst" | "reg", e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Store file reference for display
+    setUploadedFiles(prev => ({ ...prev, [type]: file }));
+    setUploadProgress(prev => ({ ...prev, [type]: 0 }));
+
+    // Read as data URL for form submission (or just store the file name/object URL)
+    const reader = new FileReader();
+    let progress = 0;
     const interval = setInterval(() => {
-      progress += 20;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-        if (type === "gst") {
-          setFormData(prev => ({ ...prev, gstCertificateUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf" }));
-        } else {
-          setFormData(prev => ({ ...prev, businessRegistrationUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf" }));
-        }
-      }
+      progress += 25;
+      if (progress >= 90) clearInterval(interval);
       setUploadProgress(prev => ({ ...prev, [type]: progress }));
-    }, 200);
+    }, 100);
+
+    reader.onload = () => {
+      clearInterval(interval);
+      setUploadProgress(prev => ({ ...prev, [type]: 100 }));
+      const dataUrl = reader.result as string;
+      if (type === "gst") {
+        setFormData(prev => ({ ...prev, gstCertificateUrl: dataUrl }));
+      } else {
+        setFormData(prev => ({ ...prev, businessRegistrationUrl: dataUrl }));
+      }
+    };
+
+    reader.onerror = () => {
+      clearInterval(interval);
+      setUploadProgress(prev => ({ ...prev, [type]: 0 }));
+      setUploadedFiles(prev => ({ ...prev, [type]: null }));
+    };
+
+    reader.readAsDataURL(file);
   };
 
   if (loading) {
@@ -316,7 +336,7 @@ export default function OnboardingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#090A0F] text-zinc-100 flex flex-col relative overflow-x-hidden font-sans">
+    <div className="dark min-h-screen bg-[#090A0F] text-zinc-100 flex flex-col relative overflow-x-hidden font-sans">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       <div className="absolute inset-0 hero-bg pointer-events-none -z-10" />
       <div className="absolute inset-0 hero-stripe-pattern pointer-events-none -z-10" />
@@ -596,30 +616,74 @@ export default function OnboardingPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <label
                           htmlFor="gst-upload"
-                          className="border border-dashed border-white/10 hover:border-white/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center bg-white/[0.01] hover:bg-white/[0.02] transition-all cursor-pointer"
+                          className={`border border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+                            uploadedFiles.gst
+                              ? "border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10"
+                              : "border-white/10 hover:border-white/20 bg-white/[0.01] hover:bg-white/[0.02]"
+                          }`}
                         >
-                          <input type="file" id="gst-upload" className="hidden" onChange={() => simulateUpload("gst")} />
-                          <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
-                          <p className="text-xs font-bold text-white">GST Certificate</p>
-                          <p className="text-[10px] text-zinc-500 mt-1">Drag file or click to select</p>
-                          {uploadProgress.gst > 0 && (
-                            <div className="w-full mt-4 bg-zinc-900 rounded-full h-1.5 overflow-hidden">
-                              <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all" style={{ width: `${uploadProgress.gst}%` }} />
+                          <input
+                            type="file"
+                            id="gst-upload"
+                            className="hidden"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => handleFileSelect("gst", e)}
+                          />
+                          {uploadedFiles.gst ? (
+                            <>
+                              <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
+                                <Check className="w-6 h-6 text-emerald-400" />
+                              </div>
+                              <p className="text-xs font-bold text-emerald-400 max-w-full truncate px-2">{uploadedFiles.gst.name}</p>
+                              <p className="text-[10px] text-zinc-500 mt-1">{(uploadedFiles.gst.size / 1024).toFixed(1)} KB · Click to replace</p>
+                            </>
+                          ) : (
+                            <>
+                              <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
+                              <p className="text-xs font-bold text-white">GST Certificate</p>
+                              <p className="text-[10px] text-zinc-500 mt-1">PDF, JPG or PNG · Click to select</p>
+                            </>
+                          )}
+                          {uploadProgress.gst > 0 && uploadProgress.gst < 100 && (
+                            <div className="w-full mt-4 bg-zinc-900 rounded-full h-1 overflow-hidden">
+                              <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all duration-150" style={{ width: `${uploadProgress.gst}%` }} />
                             </div>
                           )}
                         </label>
 
                         <label
                           htmlFor="reg-upload"
-                          className="border border-dashed border-white/10 hover:border-white/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center bg-white/[0.01] hover:bg-white/[0.02] transition-all cursor-pointer"
+                          className={`border border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+                            uploadedFiles.reg
+                              ? "border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10"
+                              : "border-white/10 hover:border-white/20 bg-white/[0.01] hover:bg-white/[0.02]"
+                          }`}
                         >
-                          <input type="file" id="reg-upload" className="hidden" onChange={() => simulateUpload("reg")} />
-                          <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
-                          <p className="text-xs font-bold text-white">Company Incorporation Doc</p>
-                          <p className="text-[10px] text-zinc-500 mt-1">Drag file or click to select</p>
-                          {uploadProgress.reg > 0 && (
-                            <div className="w-full mt-4 bg-zinc-900 rounded-full h-1.5 overflow-hidden">
-                              <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all" style={{ width: `${uploadProgress.reg}%` }} />
+                          <input
+                            type="file"
+                            id="reg-upload"
+                            className="hidden"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => handleFileSelect("reg", e)}
+                          />
+                          {uploadedFiles.reg ? (
+                            <>
+                              <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
+                                <Check className="w-6 h-6 text-emerald-400" />
+                              </div>
+                              <p className="text-xs font-bold text-emerald-400 max-w-full truncate px-2">{uploadedFiles.reg.name}</p>
+                              <p className="text-[10px] text-zinc-500 mt-1">{(uploadedFiles.reg.size / 1024).toFixed(1)} KB · Click to replace</p>
+                            </>
+                          ) : (
+                            <>
+                              <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
+                              <p className="text-xs font-bold text-white">Company Incorporation Doc</p>
+                              <p className="text-[10px] text-zinc-500 mt-1">PDF, JPG or PNG · Click to select</p>
+                            </>
+                          )}
+                          {uploadProgress.reg > 0 && uploadProgress.reg < 100 && (
+                            <div className="w-full mt-4 bg-zinc-900 rounded-full h-1 overflow-hidden">
+                              <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all duration-150" style={{ width: `${uploadProgress.reg}%` }} />
                             </div>
                           )}
                         </label>

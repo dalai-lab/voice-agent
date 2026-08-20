@@ -26,7 +26,7 @@ export function AuthShell({
   enterpriseSlot?: ReactNode;
 }) {
   return (
-    <div className="relative grid min-h-screen w-full bg-[#090A0F] lg:grid-cols-[50%_50%] transition-colors duration-150">
+    <div className="dark relative grid min-h-screen w-full bg-[#090A0F] lg:grid-cols-[50%_50%] transition-colors duration-150 text-foreground">
       {/* Sleek Theme Switcher overlay in top right */}
       <div className="absolute right-4 top-4 z-50">
         <ThemeToggle variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-xs border-border/80" />

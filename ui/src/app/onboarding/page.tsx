@@ -384,15 +384,7 @@ export default function OnboardingPage() {
             
             {/* LEFT COLUMN: Progress & Navigation Timeline */}
             <div className="lg:col-span-4 space-y-8 lg:sticky lg:top-28">
-              <div className="space-y-3">
-                <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-zinc-900">
-                  Welcome to <br />
-                  Talkar.
-                </h1>
-                <p className="text-zinc-500 text-sm leading-relaxed max-w-md">
-                  Tell us a bit about your business and how you plan to use Talkar, so we can tailor your experience.
-                </p>
-              </div>
+              {/* Title removed per user request */}
 
               {/* Vertical Custom Timeline */}
               <div className="relative pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-zinc-200">

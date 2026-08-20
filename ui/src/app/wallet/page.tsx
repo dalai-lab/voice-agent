@@ -1,18 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { 
-  Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter 
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from "@/components/ui/table";
-import { AlertTriangle, Plus, CreditCard, ReceiptText, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Plus, CreditCard, ReceiptText, ShieldCheck, Sparkles, Check, ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import type { LocalUser } from "@/lib/auth/types";
 import { useSearchParams } from "next/navigation";
 import Script from "next/script";
 import { useOrgConfig } from "@/context/OrgConfigContext";
@@ -48,13 +44,11 @@ export default function WalletPage() {
   useEffect(() => {
     if (!user) return;
 
-    // Use the Dograh numeric org ID from OrgConfigContext (authoritative source)
     if (orgContext?.organization_id) {
       setResolvedOrgId(orgContext.organization_id);
       return;
     }
 
-    // Legacy email fallback for users without an org_id
     if (email) {
       fetch(`${TALKAR}/customers/status?contact_email=${encodeURIComponent(email)}`)
         .then(r => r.ok ? r.json() : null)
@@ -103,7 +97,6 @@ export default function WalletPage() {
     
     setIsProcessing(true);
     try {
-      // 1. Create top-up order
       const orderRes = await fetch(`${TALKAR}/billing/topup/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -115,12 +108,10 @@ export default function WalletPage() {
         throw new Error(order.detail || "Failed to create order");
       }
       
-      // 2. Get Razorpay key
       const statusRes = await fetch(`${TALKAR}/customers/status?dograh_org_id=${dograhOrgId}`);
       const statusData = await statusRes.json();
       const rzpKey = statusData.razorpay_key_id;
 
-      // MOCK MODE: Manual bypass
       if (isMock) {
         const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
           method: "POST",
@@ -135,7 +126,7 @@ export default function WalletPage() {
         });
         if (!confirmRes.ok) {
           const err = await confirmRes.json().catch(() => ({}));
-          throw new Error(err.detail || "Mock bypass failed. (Are you on production with a Razorpay Secret set?)");
+          throw new Error(err.detail || "Mock bypass failed.");
         }
         const result = await confirmRes.json();
         setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
@@ -154,7 +145,6 @@ export default function WalletPage() {
         return;
       }
 
-      // 3. Open Razorpay checkout
       const rzp = new (window as any).Razorpay({
         key: rzpKey,
         amount: order.amount_paise,
@@ -162,7 +152,6 @@ export default function WalletPage() {
         name: "Talkar Wallet Top-Up",
         order_id: order.razorpay_order_id,
         handler: async (response: any) => {
-          // 4. Confirm payment
           const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -179,13 +168,11 @@ export default function WalletPage() {
             throw new Error(err.detail || "Failed to confirm payment on server");
           }
           const result = await confirmRes.json();
-          // Update state smoothly
           setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
           setTopupAmount("");
           setIsProcessing(false);
           alert("Wallet successfully topped up!");
           
-          // Refresh transactions
           fetch(`${TALKAR}/billing/transactions/by-org/${dograhOrgId}?limit=100`)
             .then(r => r.json())
             .then(data => setTransactions(data.transactions || []));
@@ -240,7 +227,6 @@ export default function WalletPage() {
     if (!resolvedOrgId) return;
     const dograhOrgId = resolvedOrgId;
     try {
-      // 1. Create Razorpay customer
       const custRes = await fetch(`${TALKAR}/billing/razorpay-customer/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -250,64 +236,69 @@ export default function WalletPage() {
           email: (user as any)?.email || (user as any)?.primaryEmail 
         })
       });
-      const { razorpay_customer_id } = await custRes.json();
+      const customer = await custRes.json();
       
-      // 2. Get Razorpay key
+      const sessionRes = await fetch(`${TALKAR}/billing/wallet/add-card/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dograh_org_id: dograhOrgId })
+      });
+      const session = await sessionRes.json();
+
+      if (isMock) {
+        const confirmRes = await fetch(`${TALKAR}/billing/confirm-add-card`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            razorpay_payment_id: "mock_payment_id",
+            razorpay_signature: "mock_signature",
+            razorpay_order_id: session.razorpay_order_id,
+            dograh_org_id: dograhOrgId
+          })
+        });
+        if (!confirmRes.ok) throw new Error("Mock failed");
+        setHasSavedCard(true);
+        alert("Mock Card Added!");
+        return;
+      }
+
       const statusRes = await fetch(`${TALKAR}/customers/status?dograh_org_id=${dograhOrgId}`);
       const statusData = await statusRes.json();
       const rzpKey = statusData.razorpay_key_id;
 
-      // MOCK MODE: Manual bypass
-      if (isMock) {
-        const saveRes = await fetch(`${TALKAR}/billing/save-card`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            dograh_org_id: dograhOrgId,
-            razorpay_payment_method_id: "mock_payment_method_id",
-          })
-        });
-        if (saveRes.ok) {
-          setHasSavedCard(true);
-          alert("Mock Card successfully saved for auto-recharge!");
-        } else {
-          alert("Failed to save mock card token.");
-        }
-        return;
-      }
-
       if (!rzpKey) {
-        alert("Razorpay key missing. Please configure your environment or use the Dev bypass.");
+        alert("Razorpay key missing.");
         return;
       }
 
-      // 3. Open Razorpay checkout in recurring mode
       const rzp = new (window as any).Razorpay({
         key: rzpKey,
-        amount: 100,  // ₹1 authorization — Razorpay does not support amount:0 for checkout. Refundable.
+        amount: session.amount_paise,
         currency: "INR",
-        name: "Talkar — Save Card for Auto-Recharge",
-        customer_id: razorpay_customer_id,
+        name: "Save Card",
+        description: "Verify card registration (refunded automatically)",
+        order_id: session.razorpay_order_id,
+        customer_id: customer.razorpay_customer_id,
         recurring: "1",
         handler: async (response: any) => {
-          try {
-            const saveRes = await fetch(`${TALKAR}/billing/save-card`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                dograh_org_id: dograhOrgId,
-                razorpay_payment_method_id: response.razorpay_payment_id,
-              })
-            });
-            if (saveRes.ok) {
-              setHasSavedCard(true);
-              alert("Card successfully saved for auto-recharge!");
-            } else {
-              alert("Failed to save card token.");
-            }
-          } catch (e) {
-            alert("Card save failed. Please try again.");
+          const confirmRes = await fetch(`${TALKAR}/billing/confirm-add-card`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              razorpay_order_id: session.razorpay_order_id,
+              dograh_org_id: dograhOrgId
+            })
+          });
+          if (confirmRes.ok) {
+            setHasSavedCard(true);
+            alert("Card successfully registered for auto-recharge!");
           }
+        },
+        prefill: {
+          name: (user as any)?.name || "",
+          email: (user as any)?.email || "",
         }
       });
       rzp.open();
@@ -332,7 +323,6 @@ export default function WalletPage() {
 
     setIsRequestingUpgrade(true);
     try {
-      // 1. Create upgrade order
       const orderRes = await fetch(`${TALKAR}/billing/upgrade/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -340,7 +330,6 @@ export default function WalletPage() {
       });
       
       if (!orderRes.ok) {
-        // If it's starter, we just use the old instant request flow since there's no deposit
         if (requestedTier === 'starter') {
           const res = await fetch(`${TALKAR}/customers/by-org/${dograhOrgId}/request-tier-upgrade`, {
             method: "POST",
@@ -362,7 +351,6 @@ export default function WalletPage() {
       
       const order = await orderRes.json();
       
-      // If the user already had enough wallet balance, the server processed it instantly
       if (order.status === "upgraded_from_wallet") {
         alert(`Successfully upgraded to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)} using your existing wallet balance!`);
         fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
@@ -370,7 +358,6 @@ export default function WalletPage() {
         return;
       }
       
-      // MOCK MODE BYPASS
       if (isMock) {
         const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
           method: "POST",
@@ -386,7 +373,7 @@ export default function WalletPage() {
         });
         if (!confirmRes.ok) {
             const err = await confirmRes.json().catch(() => ({}));
-            throw new Error(err.detail || "Mock bypass failed. (Are you on production with a Razorpay Secret set?)");
+            throw new Error(err.detail || "Mock bypass failed.");
         }
         const result = await confirmRes.json();
         setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
@@ -396,7 +383,6 @@ export default function WalletPage() {
         return;
       }
 
-      // 2. Get Razorpay key
       const statusRes = await fetch(`${TALKAR}/customers/status?dograh_org_id=${dograhOrgId}`);
       const statusData = await statusRes.json();
       const rzpKey = statusData.razorpay_key_id;
@@ -407,7 +393,6 @@ export default function WalletPage() {
         return;
       }
 
-      // 3. Open Razorpay checkout
       const rzp = new (window as any).Razorpay({
         key: rzpKey,
         amount: order.amount_paise,
@@ -415,7 +400,6 @@ export default function WalletPage() {
         name: `Talkar Upgrade — ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}`,
         order_id: order.razorpay_order_id,
         handler: async (response: any) => {
-          // 4. Confirm payment & apply upgrade
           const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -428,16 +412,13 @@ export default function WalletPage() {
               requested_tier: requestedTier
             })
           });
-          if (!confirmRes.ok) {
-            const err = await confirmRes.json().catch(() => ({}));
-            throw new Error(err.detail || "Failed to confirm upgrade on server");
+          if (confirmRes.ok) {
+            const result = await confirmRes.json();
+            setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
+            fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
+            alert(`Upgrade successful! Your account is now in ${requestedTier.toUpperCase()} tier.`);
           }
-          const result = await confirmRes.json();
-          setWallet((prev: any) => ({ ...prev, balance_paise: result.new_balance_paise }));
-          
-          fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
           setIsRequestingUpgrade(false);
-          alert(`Successfully deposited ₹${requiredAmount} and upgraded to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}!`);
         },
         modal: {
           ondismiss: () => {
@@ -445,15 +426,14 @@ export default function WalletPage() {
           }
         },
         prefill: {
-          name: (user as any)?.name || (user as any)?.displayName,
-          email: (user as any)?.email || (user as any)?.primaryEmail,
+          name: (user as any)?.name || "",
+          email: (user as any)?.email || "",
         }
       });
       rzp.open();
-
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Failed to switch tier");
+      alert(err.message || "An error occurred during upgrade");
       setIsRequestingUpgrade(false);
     }
   };
@@ -464,376 +444,398 @@ export default function WalletPage() {
   const currentTransactions = filteredTransactions.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-6">
+    <div className="dark min-h-screen bg-[#090A0F] text-zinc-100 relative overflow-x-hidden font-sans pb-12">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Wallet & Credits</h1>
-        <p className="text-muted-foreground mt-2">Manage your Talkar balance, auto-recharge, and billing history.</p>
-      </div>
+      
+      <div className="absolute inset-0 hero-bg pointer-events-none -z-10" />
+      <div className="absolute inset-0 hero-stripe-pattern pointer-events-none -z-10" />
+      
+      {/* Background ambient glows */}
+      <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-orange-500/[0.02] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-rose-500/[0.02] rounded-full blur-3xl pointer-events-none -z-10" />
 
-      {isActivation && (
-        <div className="bg-blue-500/15 border border-blue-500/50 rounded-lg p-4 flex items-start gap-4 mb-6">
-          <ShieldCheck className="w-6 h-6 text-blue-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-blue-600 dark:text-blue-400">Activate Your Agent</h3>
-            <p className="text-sm text-blue-600/80 dark:text-blue-400/80 mt-1">
-              Add a minimum of ₹2000 to your wallet to activate your agent and select a usage tier.
-            </p>
+      <div className="max-w-6xl mx-auto px-6 pt-12 space-y-10">
+        
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-white/5">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-extrabold tracking-tight text-white">Wallet & Billing</h1>
+            <p className="text-zinc-400 text-sm">Manage call balances, configuration plan levels, and view historical deductions.</p>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-orange-500/25 bg-orange-500/5 text-orange-400 text-[10px] font-semibold uppercase tracking-wider badge-glow">
+            <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Secure Payments
           </div>
         </div>
-      )}
 
-      {isZero && !isActivation && (
-        <div className="bg-red-500/15 border border-red-500/50 rounded-lg p-4 flex items-start gap-4">
-          <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-red-600 dark:text-red-400">Zero Balance — Calls Blocked</h3>
-            <p className="text-sm text-red-600/80 dark:text-red-400/80 mt-1">
-              Your wallet balance is ₹0. All inbound and outbound calls are currently blocked. Please add credits immediately to resume service.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {isLow && !isZero && (
-        <div className="bg-yellow-500/15 border border-yellow-500/50 rounded-lg p-4 flex items-start gap-4">
-          <AlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-yellow-700 dark:text-yellow-400">Low Balance Warning</h3>
-            <p className="text-sm text-yellow-700/80 dark:text-yellow-400/80 mt-1">
-              Your wallet balance is below ₹500. We recommend topping up to avoid service interruption.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* 1. Balance Hero Card */}
-        <Card className="col-span-1 md:col-span-1 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border-indigo-500/20">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-indigo-500" />
-              Current Balance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-5xl font-bold text-foreground">
-              ₹{balanceRupees}
+        {/* Warning Alerts (Restyled to Premium Glow Callouts) */}
+        {isActivation && (
+          <div className="border border-orange-500/30 bg-orange-500/10 p-5 rounded-2xl flex items-start gap-4 animate-in slide-in-from-top-2 duration-300">
+            <ShieldCheck className="w-6 h-6 text-orange-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-bold text-white text-sm">Workspace Activation Pending</h3>
+              <p className="text-zinc-300 text-xs mt-1 leading-relaxed">
+                Add at least ₹2,000 to your wallet to activate your workspace and choose your call tier.
+              </p>
             </div>
-            {usage && (
-               <div className="mt-4 text-sm text-muted-foreground">
-                 Usage this month: {usage.total_minutes} mins (₹{(usage.total_spend_paise / 100).toFixed(2)})
-               </div>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
-        {/* 2. Top-up Panel */}
-        <Card className="col-span-1 md:col-span-2">
-          <CardHeader>
-            <CardTitle>Add Credits</CardTitle>
-            <CardDescription>Top up your wallet via UPI, Card, or Netbanking.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3 mb-4">
+        {isZero && !isActivation && (
+          <div className="border border-rose-500/30 bg-rose-500/10 p-5 rounded-2xl flex items-start gap-4 animate-in slide-in-from-top-2 duration-300">
+            <AlertTriangle className="w-6 h-6 text-rose-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-bold text-white text-sm">Zero Wallet Balance — Operations Blocked</h3>
+              <p className="text-zinc-300 text-xs mt-1 leading-relaxed">
+                Your wallet balance is empty. All call routing services are blocked. Top up immediately to reactivate your lines.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {isLow && !isZero && (
+          <div className="border border-orange-500/20 bg-orange-500/5 p-5 rounded-2xl flex items-start gap-4">
+            <AlertTriangle className="w-6 h-6 text-orange-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-bold text-white text-sm">Low Balance Warning</h3>
+              <p className="text-zinc-300 text-xs mt-1 leading-relaxed">
+                Your wallet is running low (under ₹500). Top up soon or enable auto-recharge to prevent calling service interruptions.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Top Grid: Balance Hero & Topup */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          
+          {/* Balance Display */}
+          <div className="bg-black/40 border border-white/10 rounded-3xl p-8 flex flex-col justify-between backdrop-blur-xl">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-zinc-400 text-xs uppercase tracking-wider font-semibold">
+                <CreditCard className="w-4 h-4 text-orange-500" />
+                Current Balance
+              </div>
+              <div className="text-5xl font-extrabold text-white tracking-tight pt-2">
+                ₹{balanceRupees}
+              </div>
+            </div>
+            
+            {usage && (
+              <div className="text-xs text-zinc-400 border-t border-white/5 pt-4 mt-6 leading-relaxed">
+                Current month: <span className="text-zinc-200 font-semibold">{usage.total_minutes} mins</span> spent (₹{(usage.total_spend_paise / 100).toFixed(2)})
+              </div>
+            )}
+          </div>
+
+          {/* Add Credits Panel */}
+          <div className="md:col-span-2 bg-black/40 border border-white/10 rounded-3xl p-8 backdrop-blur-xl space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-white">Add Credits</h2>
+              <p className="text-zinc-400 text-xs mt-1">Top up securely via cards, netbanking, or UPI payments.</p>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5">
               {[2000, 5000, 10000].map(amt => (
-                <Button 
-                  key={amt} 
-                  variant={topupAmount === amt.toString() ? "default" : "outline"}
+                <button 
+                  key={amt}
+                  type="button"
                   onClick={() => setTopupAmount(amt.toString())}
+                  className={`px-5 py-2.5 text-xs font-semibold rounded-xl border transition-all ${
+                    topupAmount === amt.toString() 
+                      ? "border-orange-500 bg-orange-500/10 text-orange-400 badge-glow" 
+                      : "border-white/10 hover:border-white/20 text-zinc-300 hover:bg-white/5"
+                  }`}
                 >
                   ₹{amt.toLocaleString()}
-                </Button>
+                </button>
               ))}
             </div>
-            <div className="flex gap-4 max-w-md">
+
+            <div className="flex flex-col sm:flex-row gap-4 max-w-xl">
               <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">₹</span>
                 <Input 
                   type="number" 
                   min={minTopup.toString()}
-                  className="pl-8" 
-                  placeholder={`Custom amount (min ${minTopup})`}
+                  className="h-12 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/10 px-8 text-sm transition-all" 
+                  placeholder={`Custom amount (minimum ₹${minTopup})`}
                   value={topupAmount}
                   onChange={(e) => setTopupAmount(e.target.value)}
                 />
               </div>
-              <div className="flex gap-2 w-full sm:w-auto">
-                <Button onClick={() => handleTopup(false)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing}>
-                  <Plus className="w-4 h-4 mr-2" />
+              <div className="flex gap-2 shrink-0">
+                <Button onClick={() => handleTopup(false)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-12 px-6 font-bold shadow-lg shadow-orange-500/10">
                   {isProcessing ? "Processing..." : "Add Credits"}
                 </Button>
-                <Button variant="secondary" onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing}>
-                  Bypass (Dev)
-                </Button>
+                {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
+                  <Button variant="outline" onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} className="border-white/10 hover:bg-white/5 text-zinc-300 rounded-xl h-12">
+                    Bypass (Dev)
+                  </Button>
+                )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 3. Auto-recharge Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5" />
-              Auto-Recharge
-            </CardTitle>
-            <CardDescription>Never run out of balance unexpectedly.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        {/* Middle Grid: Auto-Recharge & Active Plan */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          
+          {/* Auto Recharge Card */}
+          <div className="bg-black/40 border border-white/10 rounded-3xl p-8 backdrop-blur-xl space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium">Enable Auto-Recharge</p>
-                <p className="text-sm text-muted-foreground">Automatically add credits when balance drops.</p>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-orange-500 animate-pulse" />
+                  Auto-Recharge
+                </h2>
+                <p className="text-zinc-400 text-xs mt-1">Keep calling services active when credits are low.</p>
               </div>
-              <Switch checked={autoRechargeEnabled} onCheckedChange={setAutoRechargeEnabled} />
+              <Switch checked={autoRechargeEnabled} onCheckedChange={setAutoRechargeEnabled} className="data-[state=checked]:bg-orange-500" />
             </div>
 
             {autoRechargeEnabled && (
-              <div className="space-y-4 pt-4 border-t">
+              <div className="space-y-6 pt-6 border-t border-white/5 animate-in fade-in duration-200">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Recharge when below</label>
+                    <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Trigger threshold</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
-                      <Input type="number" className="pl-8" value={threshold} onChange={e => setThreshold(e.target.value)} />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">₹</span>
+                      <Input type="number" className="h-10 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 px-6 text-xs" value={threshold} onChange={e => setThreshold(e.target.value)} />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Add amount</label>
+                    <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Top-up size</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
-                      <Input type="number" className="pl-8" value={rechargeAmount} onChange={e => setRechargeAmount(e.target.value)} />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">₹</span>
+                      <Input type="number" className="h-10 bg-white/[0.02] border-white/10 hover:border-white/20 text-white rounded-xl focus:border-orange-500 px-6 text-xs" value={rechargeAmount} onChange={e => setRechargeAmount(e.target.value)} />
                     </div>
                   </div>
                 </div>
+
                 {hasSavedCard ? (
-                  <div className="bg-muted p-3 rounded-md flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <CreditCard className="w-5 h-5 text-green-600" />
-                      <span className="text-sm font-medium">Card on File (Active)</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleAddCard(false)}>Update Card</Button>
-                      {process.env.NODE_ENV !== 'production' && (
-                        <Button variant="ghost" size="sm" onClick={() => handleAddCard(true)}>Bypass (Dev)</Button>
-                      )}
-                    </div>
+                  <div className="p-4 border border-emerald-500/20 bg-emerald-500/5 rounded-2xl flex items-center justify-between text-xs">
+                    <span className="font-semibold text-emerald-400 flex items-center gap-2">
+                      <Check className="w-4 h-4" /> Card on File Enabled
+                    </span>
+                    <button type="button" onClick={() => handleAddCard(false)} className="text-[10px] text-zinc-400 hover:text-white uppercase tracking-wider font-bold">Update</button>
                   </div>
                 ) : (
-                  <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-md flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-amber-700 dark:text-amber-400">
-                      <AlertTriangle className="w-5 h-5" />
-                      <span className="text-sm font-medium">No card saved</span>
-                    </div>
+                  <div className="p-4 border border-orange-500/25 bg-orange-500/5 rounded-2xl flex items-center justify-between text-xs gap-4">
+                    <span className="text-orange-400 font-semibold">Payment method required</span>
                     <div className="flex gap-2">
-                      <Button variant="default" size="sm" onClick={() => handleAddCard(false)}>Add Card</Button>
-                      {process.env.NODE_ENV !== 'production' && (
-                        <Button variant="secondary" size="sm" onClick={() => handleAddCard(true)}>Bypass (Dev)</Button>
+                      <Button size="sm" onClick={() => handleAddCard(false)} className="bg-orange-500/20 border border-orange-500/30 text-orange-400 hover:bg-orange-500/30 text-[10px] font-bold rounded-lg px-3 py-1">Save Card</Button>
+                      {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
+                        <Button size="sm" variant="ghost" onClick={() => handleAddCard(true)} className="text-zinc-500 text-[10px]">Dev Bypass</Button>
                       )}
                     </div>
                   </div>
                 )}
-                <Button className="w-full" onClick={handleSaveAutoRecharge} disabled={isSavingRecharge}>
-                   {isSavingRecharge ? "Saving..." : "Save Settings"}
+                
+                <Button className="w-full bg-white/10 hover:bg-white/15 border border-white/10 text-white rounded-xl h-11 text-xs font-semibold" onClick={handleSaveAutoRecharge} disabled={isSavingRecharge}>
+                   {isSavingRecharge ? "Saving Parameters..." : "Save Settings"}
                 </Button>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* 5. Current Tier Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ReceiptText className="w-5 h-5 text-purple-400" />
-              Active AI Voice Engine
-            </CardTitle>
-            <CardDescription>Your account's assigned neural model architecture.</CardDescription>
-          </CardHeader>
-          <CardContent>
+          {/* Current Tier Info */}
+          <div className="bg-black/40 border border-white/10 rounded-3xl p-8 backdrop-blur-xl flex flex-col justify-between">
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <ReceiptText className="w-5 h-5 text-orange-500" />
+                Active Voice Tier
+              </h2>
+              <p className="text-zinc-400 text-xs">The current usage configuration plan active on your workspace.</p>
+            </div>
+
             {subscription && subscription.status !== "not_provisioned" ? (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center pb-4 border-b border-border/50">
+              <div className="space-y-4 border-t border-white/5 pt-6 mt-6">
+                <div className="flex justify-between items-center pb-4 border-b border-white/5">
                   <div>
-                    <p className="text-xs text-muted-foreground uppercase font-mono tracking-wider">Current Engine</p>
-                    <p className="text-xl font-bold text-foreground mt-0.5">
-                      {subscription.tier === "pro" ? "Talkar NeuralVocal Pro v2" :
-                       subscription.tier === "elite" ? "Talkar Apex Omni Prime" :
-                       "Talkar Echo-Lite 1.0"}
+                    <span className="text-[10px] text-zinc-500 block uppercase font-mono tracking-wider">Active Engine</span>
+                    <p className="text-lg font-bold text-white mt-0.5">
+                      {subscription.tier === "pro" ? "NeuralVocal Pro" :
+                       subscription.tier === "elite" ? "Apex Omni Prime" :
+                       "Echo-Lite Engine"}
                     </p>
                   </div>
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30 uppercase tracking-wider">
+                  <span className="text-[10px] font-bold px-3 py-1 rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-400 uppercase tracking-wider badge-glow">
                     {subscription.tier || "Starter"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-1 text-sm">
+                <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
-                    <p className="text-xs text-muted-foreground">Per-Minute Rate</p>
-                    <p className="font-semibold text-foreground">₹{subscription.per_minute_rate_paise ? (subscription.per_minute_rate_paise / 100).toFixed(2) : "25.00"}</p>
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider block font-semibold">Usage Rate</span>
+                    <p className="font-bold text-zinc-200 mt-0.5">₹{subscription.per_minute_rate_paise ? (subscription.per_minute_rate_paise / 100).toFixed(2) : "25.00"} / min</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Max Concurrency</p>
-                    <p className="font-semibold text-foreground">
-                      {subscription.tier === "pro" ? "10 Calls" : subscription.tier === "elite" ? "50 Calls" : "2 Calls"}
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider block font-semibold">Active Channels</span>
+                    <p className="font-bold text-zinc-200 mt-0.5">
+                      {subscription.tier === "pro" ? "10 call lines" : subscription.tier === "elite" ? "50 call lines" : "2 call lines"}
                     </p>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="py-8 text-center text-muted-foreground">
-                <p>Tier information unavailable or setup in progress.</p>
+              <div className="py-8 text-center text-zinc-500 text-xs">
+                Plan routing credentials loaded.
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
 
-      {/* 6. Upgrade Tier Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ReceiptText className="w-5 h-5" />
-            Upgrade Tier
-          </CardTitle>
-          <CardDescription>Request an upgrade to access better rates.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        {/* Upgrade Plan Options */}
+        <div className="bg-black/40 border border-white/10 rounded-3xl p-8 backdrop-blur-xl space-y-8">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <ReceiptText className="w-5 h-5 text-orange-500" />
+              Change Call Tier
+            </h2>
+            <p className="text-zinc-400 text-xs mt-1">Upgrade your call rate and capacity configurations.</p>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="p-4 border border-purple-500/30 bg-purple-500/5 rounded-lg space-y-3 relative">
+            <div className="p-6 border border-white/10 bg-white/[0.01] rounded-2xl space-y-4">
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="font-bold text-lg text-foreground">Talkar NeuralVocal Pro v2</h3>
-                  <p className="text-xs text-purple-400 font-medium">Pro Tier Engine</p>
+                  <h3 className="font-bold text-white text-base">NeuralVocal Pro Engine</h3>
+                  <p className="text-xs text-orange-400 font-semibold mt-0.5">Recommended Engine</p>
                 </div>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                <span className="text-xs font-bold px-3 py-1 rounded-full border border-orange-500/25 bg-orange-500/10 text-orange-400 font-mono">
                   ₹18 / min
                 </span>
               </div>
-              <p className="text-muted-foreground text-xs leading-relaxed">Human-grade emotive voice synthesis with ~250ms latency & 10 channels.</p>
-              <ul className="space-y-1.5 text-xs text-foreground/90">
-                <li>• <b>ElevenLabs Flash v2.5</b> + GPT-4o</li>
-                <li>• 10 Concurrent Call Channels</li>
-                <li>• 2 Free Phone Numbers Included</li>
+              <p className="text-zinc-400 text-xs leading-relaxed">Emotive vocal structures designed for client calls, clinical routes, and outbound campaigns.</p>
+              <ul className="space-y-2 text-xs text-zinc-300">
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>10 active concurrent call lines</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Includes 2 phone lines</span>
+                </li>
               </ul>
             </div>
-            <div className="p-4 border border-amber-500/30 bg-amber-500/5 rounded-lg space-y-3 relative">
+
+            <div className="p-6 border border-white/10 bg-white/[0.01] rounded-2xl space-y-4">
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="font-bold text-lg text-foreground">Talkar Apex Omni Prime</h3>
-                  <p className="text-xs text-amber-400 font-medium">Elite Tier Engine</p>
+                  <h3 className="font-bold text-white text-base">Apex Omni Prime Engine</h3>
+                  <p className="text-xs text-rose-400 font-semibold mt-0.5">Enterprise Tier</p>
                 </div>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                <span className="text-xs font-bold px-3 py-1 rounded-full border border-rose-500/25 bg-rose-500/10 text-rose-400 font-mono">
                   ₹12 / min
                 </span>
               </div>
-              <p className="text-muted-foreground text-xs leading-relaxed">Enterprise low-latency cluster with custom voice clone & 50 channels.</p>
-              <ul className="space-y-1.5 text-xs text-foreground/90">
-                <li>• <b>Dedicated Compute Instance</b> (~180ms latency)</li>
-                <li>• 50 Concurrent Call Capacity</li>
-                <li>• 5 Free Phone Numbers + Voice Cloning</li>
+              <p className="text-zinc-400 text-xs leading-relaxed">Maximum call volumes running on isolated dedicated virtual compute clusters.</p>
+              <ul className="space-y-2 text-xs text-zinc-300">
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>50 active concurrent call lines</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Custom brand voice cloning support</span>
+                </li>
               </ul>
             </div>
           </div>
-        </CardContent>
-        <CardFooter className="bg-muted/50 flex flex-col items-end gap-2">
-          <div className="flex gap-2">
+
+          <div className="flex flex-wrap gap-3 justify-end pt-6 border-t border-white/5">
             {subscription?.tier !== 'starter' && (
-              <Button onClick={() => handleUpgradeRequest('starter')} disabled={isRequestingUpgrade} variant="outline">
+              <Button onClick={() => handleUpgradeRequest('starter')} disabled={isRequestingUpgrade} variant="outline" className="border-white/10 hover:bg-white/5 text-zinc-300 rounded-xl h-11 px-5 text-xs font-semibold">
                 Switch to Starter
               </Button>
             )}
             {subscription?.tier !== 'pro' && (
               <>
-                <Button onClick={() => handleUpgradeRequest('pro')} disabled={isRequestingUpgrade} variant={subscription?.tier === 'elite' ? "outline" : "secondary"}>
+                <Button onClick={() => handleUpgradeRequest('pro')} disabled={isRequestingUpgrade} className="bg-white/10 hover:bg-white/15 border border-white/10 text-white rounded-xl h-11 px-5 text-xs font-semibold">
                   Switch to Pro
                 </Button>
-                {process.env.NODE_ENV !== 'production' && (
-                  <Button onClick={() => handleUpgradeRequest('pro', true)} variant="ghost" size="sm" disabled={isRequestingUpgrade}>
-                    Dev Bypass (Pro)
+                {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
+                  <Button onClick={() => handleUpgradeRequest('pro', true)} variant="ghost" size="sm" disabled={isRequestingUpgrade} className="text-zinc-500 text-[10px]">
+                    Bypass Pro (Dev)
                   </Button>
                 )}
               </>
             )}
             {subscription?.tier !== 'elite' && (
               <>
-                <Button onClick={() => handleUpgradeRequest('elite')} disabled={isRequestingUpgrade}>
+                <Button onClick={() => handleUpgradeRequest('elite')} disabled={isRequestingUpgrade} className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 text-white rounded-xl h-11 px-6 text-xs font-bold shadow-lg shadow-orange-500/10">
                   Switch to Elite
                 </Button>
-                {process.env.NODE_ENV !== 'production' && (
-                  <Button onClick={() => handleUpgradeRequest('elite', true)} variant="ghost" size="sm" disabled={isRequestingUpgrade}>
-                    Dev Bypass (Elite)
+                {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
+                  <Button onClick={() => handleUpgradeRequest('elite', true)} variant="ghost" size="sm" disabled={isRequestingUpgrade} className="text-zinc-500 text-[10px]">
+                    Bypass Elite (Dev)
                   </Button>
                 )}
               </>
             )}
           </div>
-        </CardFooter>
-      </Card>
+        </div>
 
-      {/* 4. Transaction History */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Transaction History</CardTitle>
-            <CardDescription>Recent wallet activity and call deductions.</CardDescription>
-          </div>
-          <div className="flex gap-2">
+        {/* Transaction History Card */}
+        <div className="bg-black/40 border border-white/10 rounded-3xl p-8 backdrop-blur-xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-white">Deduction Ledger</h2>
+              <p className="text-zinc-400 text-xs mt-1">Audit log of payments, deposits, and call deductions.</p>
+            </div>
             <select 
-              className="h-9 w-[180px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="h-10 w-[200px] rounded-xl border border-white/10 bg-zinc-950/80 px-4 text-xs shadow-sm text-zinc-300 focus:outline-none focus:border-orange-500 transition-colors"
               value={filter}
               onChange={(e) => { setFilter(e.target.value); setPage(1); }}
             >
-              <option value="all">All Transactions</option>
-              <option value="top_up">Top-ups</option>
-              <option value="call_deduction">Call Deductions</option>
+              <option value="all">All Ledgers</option>
+              <option value="top_up">Deposits</option>
+              <option value="call_deduction">Call Usage</option>
               <option value="refund">Refunds</option>
               <option value="grant">Grants</option>
             </select>
           </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {currentTransactions.map(tx => (
-                <TableRow key={tx.id}>
-                  <TableCell className="font-medium">{new Date(tx.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell>{tx.description}</TableCell>
-                  <TableCell className={`text-right ${tx.amount_paise > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                    {tx.amount_paise > 0 ? "+" : ""}₹{(Math.abs(tx.amount_paise) / 100).toLocaleString()}
-                  </TableCell>
+
+          <div className="overflow-hidden border border-white/5 rounded-2xl bg-black/20">
+            <Table>
+              <TableHeader className="bg-white/[0.02]">
+                <TableRow className="border-b border-white/5 hover:bg-transparent">
+                  <TableHead className="text-zinc-400 text-[10px] font-bold uppercase tracking-wider py-4 px-6">Timestamp</TableHead>
+                  <TableHead className="text-zinc-400 text-[10px] font-bold uppercase tracking-wider py-4 px-6">Description</TableHead>
+                  <TableHead className="text-zinc-400 text-[10px] font-bold uppercase tracking-wider py-4 px-6 text-right">Transaction Size</TableHead>
                 </TableRow>
-              ))}
-              {currentTransactions.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground h-24">
-                    No transactions found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-          
+              </TableHeader>
+              <TableBody>
+                {currentTransactions.map(tx => (
+                  <TableRow key={tx.id} className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <TableCell className="text-zinc-300 text-xs py-4 px-6">{new Date(tx.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-zinc-300 text-xs py-4 px-6">{tx.description}</TableCell>
+                    <TableCell className={`text-right font-bold text-xs py-4 px-6 ${tx.amount_paise > 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {tx.amount_paise > 0 ? "+" : ""}₹{(Math.abs(tx.amount_paise) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {currentTransactions.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-zinc-500 text-xs py-10">
+                      No records found matching the selection.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
           {totalPages > 1 && (
-            <div className="flex items-center justify-end space-x-2 py-4">
+            <div className="flex items-center justify-end space-x-2 pt-4">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
+                className="border-white/10 text-zinc-300 hover:bg-white/5 rounded-lg text-xs"
               >
                 Previous
               </Button>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-xs text-zinc-400 px-2">
                 Page {page} of {totalPages}
               </div>
               <Button
@@ -841,13 +843,14 @@ export default function WalletPage() {
                 size="sm"
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
+                className="border-white/10 text-zinc-300 hover:bg-white/5 rounded-lg text-xs"
               >
                 Next
               </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

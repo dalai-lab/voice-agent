@@ -88,6 +88,10 @@ export default function OnboardingPage() {
 
           if (data.status === "active") {
             router.push("/overview");
+          } else if (data.status === "pending_plan_selection") {
+            router.push("/onboarding/select-plan");
+          } else if (data.status === "pending_deposit") {
+            router.push("/wallet");
           } else if (data.status === "agent_building" && !data.has_onboarding_form) {
             setStatus("new_agent_brief");
           }

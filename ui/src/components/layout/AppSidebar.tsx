@@ -259,13 +259,11 @@ export function AppSidebar() {
             }
             return item;
           }).filter(item => {
-            if (item.type === "single") {
-              return !(item as SidebarSingleItem).url || !TALKAR_CUSTOMER_HIDDEN_URLS.includes((item as SidebarSingleItem).url);
-            }
             if (item.type === "group") {
               return (item as SidebarGroupItem).items.length > 0;
             }
-            return false;
+            // Treat items without type="group" as single items (type can be "single" or undefined)
+            return !(item as SidebarSingleItem).url || !TALKAR_CUSTOMER_HIDDEN_URLS.includes((item as SidebarSingleItem).url);
           }),
         })).filter(section => section.items.length > 0)
       : NAV_SECTIONS.map(section => ({ ...section, items: [...section.items] }));

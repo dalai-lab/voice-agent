@@ -82,7 +82,12 @@ export default function OnboardingPage() {
           const data = await res.json();
           if (cancelled) return;
           setCustomerData(data);
-          setStatus(data.status);
+          
+          if (data.is_sub_org && data.status === "pending_approval" && !data.has_onboarding_form) {
+            setStatus("new_agent_brief");
+          } else {
+            setStatus(data.status);
+          }
 
           if (data.onboarding_form) {
             setFormData(prev => ({ ...prev, ...data.onboarding_form }));

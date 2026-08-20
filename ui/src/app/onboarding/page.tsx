@@ -164,6 +164,13 @@ export default function OnboardingPage() {
   // Submission Handler for Main Application
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent accidental enter-key submission on earlier steps
+    if (activeStep < 4) {
+      handleNextStep();
+      return;
+    }
+
     if (!validateStep(1) || !validateStep(2) || !validateStep(3)) return;
 
     if (formData.needsApiIntegration && !formData.apiIntegrationDetails.trim()) {
@@ -199,6 +206,12 @@ export default function OnboardingPage() {
   // Submission Handler for 2nd Agent Brief
   const handleSubmitBrief = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevent accidental enter-key submission on step 1
+    if (briefStep < 2) {
+      setBriefStep(2);
+      return;
+    }
 
     if (!formData.useCaseDescription.trim() || !formData.callVolume || !formData.languages.trim()) {
       alert("Please fill in all use case fields so we can configure your agent correctly.");

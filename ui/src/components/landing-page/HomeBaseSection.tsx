@@ -110,7 +110,7 @@ export const HomeBaseSection: React.FC = () => {
       status: 'Completed',
       disposition: 'Appointment Booked',
       phone: '+1 (555) 881-4492',
-      summary: 'Inbound call processed by Dograh Engine. High-intent commercial lead qualified.',
+      summary: 'Inbound call processed by Talkar Engine. High-intent commercial lead qualified.',
       actionTaken: 'Calendar slot created & instant SMS dispatched to technician.'
     };
 
@@ -126,24 +126,24 @@ export const HomeBaseSection: React.FC = () => {
         <div className="text-center space-y-3 max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-xs font-semibold text-orange-400">
             <Zap className="w-3.5 h-3.5 text-orange-500" />
-            Dograh OS Dashboard
+            Talkar Dashboard
           </div>
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-white">
             Operational Summary & Call Analytics
           </h2>
           <p className="text-sm md:text-base text-zinc-400 font-normal">
-            Dograh OS Dashboard — real-time KPI metrics, daily volume trends, call history, and automated workflow dispatches.
+            Talkar Console — real-time KPI metrics, daily volume trends, call history, and automated workflow dispatches.
           </p>
         </div>
 
-        {/* DOGRAH OS DASHBOARD SCREENSHOT-STYLE CROPPED MOCKUP */}
+        {/* TALKAR OS DASHBOARD SCREENSHOT-STYLE CROPPED MOCKUP */}
         <div className="w-full bg-white border border-slate-200/90 rounded-t-2xl rounded-b-none border-b-0 shadow-2xl overflow-hidden font-sans text-slate-900 grid grid-cols-1 lg:grid-cols-12 max-h-[460px] relative">
           
-          {/* DOGRAH LIGHT SIDEBAR */}
+          {/* TALKAR LIGHT SIDEBAR */}
           <div className="lg:col-span-3 bg-slate-50 border-r border-slate-200 p-5 flex flex-col justify-between hidden md:flex">
             <div className="space-y-5">
               
-              {/* Dograh Brand Logo & Workspace */}
+              {/* Talkar Brand Logo & Workspace */}
               <div className="space-y-3 pb-3 border-b border-slate-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -152,7 +152,7 @@ export const HomeBaseSection: React.FC = () => {
                         <path d="M133.14653,14.92471l84.39741,0.00718l-3.65771,10.74336l-34.2627,-0.01142l-0.00146,10.01591c6.9624,-5.50195 17.95166,-3.3237 23.07715,3.55759c7.88672,10.58987 4.30078,24.5818 -5.50488,32.40026c4.13965,5.82269 8.53857,11.52647 12.6709,17.34316l-14.64844,0.06283l-11.18848,-15.45049c-1.04443,-1.44934 -2.06689,-2.91362 -3.07031,-4.39254c6.19775,-3.76614 13.05762,-8.2656 13.43994,-16.33934c0.47168,-9.99657 -12.62842,-11.39158 -14.55029,-2.11425c-0.55518,2.67958 -0.24023,7.79254 -0.24023,10.71553l-0.00586,21.10959l-12.52734,0.00249c-0.06299,-4.32532 0.0293,-8.65679 0.02637,-12.98986c-2.95166,2.50193 -5.67773,4.01468 -9.57275,4.51908c-5.10059,0.69055 -10.26562,-0.70182 -14.32896,-3.86281c-9.46245,-7.3107 -10.16411,-21.33704 -3.12158,-30.53938c6.37544,-8.33063 18.45981,-10.99102 27.00278,-4.29529c-0.1084,-3.14971 0.00439,-6.54575 -0.03369,-9.75053l-33.85605,-0.00161z" fill="currentColor"/>
                       </svg>
                     </div>
-                    <span className="font-extrabold text-base text-slate-900 tracking-tight">dograh</span>
+                    <span className="font-extrabold text-base text-slate-900 tracking-tight">talkar</span>
                   </div>
                   <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
                     Live
@@ -227,7 +227,7 @@ export const HomeBaseSection: React.FC = () => {
             </div>
           </div>
 
-          {/* DOGRAH WORKSPACE MAIN PANEL */}
+          {/* TALKAR WORKSPACE MAIN PANEL */}
           <div className="lg:col-span-9 p-6 space-y-5 bg-white">
             
             {/* Action Bar Header */}

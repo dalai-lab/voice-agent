@@ -3,9 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
-import { 
-  Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter 
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,7 +106,7 @@ export default function OnboardingPage() {
   const validateStep = (step: number) => {
     if (step === 1) {
       if (!formData.businessName.trim() || !formData.industry || !formData.gstNumber.trim()) {
-        alert("Please fill in all required fields in Step 1 (Business Name, Industry, GST Number).");
+        alert("Please fill in all required fields in Step 1 (Company Name, Industry, Tax Registration Number).");
         return false;
       }
     } else if (step === 2) {
@@ -119,7 +116,7 @@ export default function OnboardingPage() {
       }
     } else if (step === 3) {
       if (!formData.useCaseDescription.trim() || !formData.callVolume || !formData.languages.trim()) {
-        alert("Please fill in all required fields in Step 3 (Use Case Description, Volume, Languages).");
+        alert("Please fill in all required fields in Step 3 (Describe Objective, Volume, Languages).");
         return false;
       }
     }
@@ -142,7 +139,7 @@ export default function OnboardingPage() {
     if (!validateStep(1) || !validateStep(2) || !validateStep(3)) return;
 
     if (formData.needsApiIntegration && !formData.apiIntegrationDetails.trim()) {
-      alert("Please provide details for your custom API integration in Step 4.");
+      alert("Please provide details for your custom CRM/API integration in Step 4.");
       return;
     }
 
@@ -176,11 +173,11 @@ export default function OnboardingPage() {
     e.preventDefault();
 
     if (!formData.useCaseDescription.trim() || !formData.callVolume || !formData.languages.trim()) {
-      alert("Please fill in all use case fields so we can build your agent correctly.");
+      alert("Please fill in all use case fields so we can configure your agent correctly.");
       return;
     }
     if (formData.needsApiIntegration && !formData.apiIntegrationDetails.trim()) {
-      alert("Please provide details for your custom API integration.");
+      alert("Please provide integration details for custom systems.");
       return;
     }
 
@@ -200,7 +197,7 @@ export default function OnboardingPage() {
         setStatus("brief_submitted");
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(`Failed to submit brief: ${err.detail || res.statusText}`);
+        alert(`Failed to submit: ${err.detail || res.statusText}`);
       }
     } catch (err) {
       alert("Failed to submit brief. Please try again.");
@@ -212,7 +209,7 @@ export default function OnboardingPage() {
   // Payment Handlers
   const handlePaySetupFee = async () => {
     if (!customerData?.setup_fee_order_id || !customerData?.razorpay_key_id) {
-      alert("Missing Razorpay order details. Please contact support.");
+      alert("Missing payment order details. Please contact support.");
       return;
     }
 
@@ -253,7 +250,7 @@ export default function OnboardingPage() {
         name: formData.pocName || "Talkar Customer",
         contact: formData.pocPhone || "",
       },
-      theme: { color: "#8b5cf6" },
+      theme: { color: "#fe6905" },
     };
 
     const rzp = new (window as any).Razorpay(options);
@@ -303,135 +300,147 @@ export default function OnboardingPage() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[50vh] space-y-4">
-        <div className="w-8 h-8 rounded-full border-3 border-purple-500 border-t-transparent animate-spin" />
-        <p className="text-sm text-muted-foreground">Loading Talkar workspace initialization...</p>
+      <div className="min-h-screen bg-[#090A0F] text-zinc-100 flex flex-col items-center justify-center space-y-6 relative overflow-hidden">
+        <div className="absolute inset-0 hero-bg pointer-events-none -z-10" />
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/5 border-t-orange-500" />
+        <p className="text-sm font-medium text-zinc-400">Initializing your Talkar workspace...</p>
       </div>
     );
   }
 
   const mainSteps = [
-    { num: 1, label: "Business Identity", icon: Building2 },
-    { num: 2, label: "Point of Contact", icon: User },
-    { num: 3, label: "Agent Requirements", icon: Bot },
+    { num: 1, label: "Company Details", icon: Building2 },
+    { num: 2, label: "Contact Person", icon: User },
+    { num: 3, label: "Call Objectives", icon: Bot },
     { num: 4, label: "Integrations & Docs", icon: Wrench },
   ];
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8 min-h-[85vh] flex flex-col justify-center">
+    <div className="min-h-screen bg-[#090A0F] text-zinc-100 flex flex-col justify-center py-12 px-4 relative overflow-x-hidden font-sans">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+      <div className="absolute inset-0 hero-bg pointer-events-none -z-10" />
+      <div className="absolute inset-0 hero-stripe-pattern pointer-events-none -z-10" />
+      
+      {/* Background ambient glows */}
+      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-orange-500/[0.02] rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-rose-500/[0.02] rounded-full blur-3xl pointer-events-none -z-10" />
 
-      {/* ── HEADER BRANDING ── */}
-      <div className="text-center space-y-2">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs font-semibold uppercase tracking-wider">
-          <Sparkles className="w-3.5 h-3.5" /> Talkar Platform Onboarding
+      <div className="w-full max-w-3xl mx-auto space-y-8 z-10">
+        
+        {/* ── HEADER BRANDING ── */}
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-400 text-xs font-semibold uppercase tracking-wider badge-glow">
+            <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Talkar Platform Configuration
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white font-sans">AI Call Agent Deployment Setup</h1>
+          <p className="text-zinc-400 text-sm max-w-lg mx-auto leading-relaxed">
+            Provide details about your business and communication requirements below. Our solutions engineering team will configure and deploy your custom voice agent within 24 hours.
+          </p>
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight">AI Agent Deployment Brief</h1>
-        <p className="text-muted-foreground text-sm max-w-lg mx-auto">
-          Complete your application details below. Our conversational AI engineering team builds and deploys your workspace's agent within 24 hours.
-        </p>
-      </div>
 
-      {/* ── 1. NEW AGENT BRIEF (Sub-org or Returning Customer) ── */}
-      {(status === "new_agent_brief" || (status === "agent_building" && customerData?.is_sub_org && !customerData?.has_onboarding_form)) && (
-        <Card className="border-purple-500/30 shadow-lg shadow-purple-500/5 bg-card">
-          <CardHeader className="border-b border-border/40 pb-6">
-            <div className="flex items-center justify-between">
+        {/* ── 1. NEW AGENT BRIEF (Sub-org or Returning Customer) ── */}
+        {(status === "new_agent_brief" || (status === "agent_building" && customerData?.is_sub_org && !customerData?.has_onboarding_form)) && (
+          <div className="bg-black/40 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl p-6 sm:p-10 space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-6 gap-4">
               <div>
-                <CardTitle className="text-xl font-bold flex items-center gap-2">
-                  <Bot className="w-5 h-5 text-purple-400" />
-                  Workspace Agent Brief
-                </CardTitle>
-                <CardDescription className="text-xs mt-1">
-                  Specify the voice persona, objective, and volume requirements for this new workspace agent.
-                </CardDescription>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Bot className="w-5 h-5 text-orange-500" />
+                  Voice Agent Setup Details
+                </h2>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Specify the purpose, call routing direction, and volume requirements for your agent.
+                </p>
               </div>
-              <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30 font-mono text-[10px]">
+              <Badge variant="outline" className="border-orange-500/30 bg-orange-500/10 text-orange-400 font-mono text-[10px] self-start sm:self-auto">
                 STEP {briefStep} OF 2
               </Badge>
             </div>
 
             {/* Brief Progress Tracker */}
-            <div className="w-full bg-secondary h-1.5 rounded-full mt-4 overflow-hidden">
+            <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden">
               <div 
-                className="bg-gradient-to-r from-purple-500 to-indigo-500 h-full transition-all duration-300 rounded-full"
+                className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all duration-300 rounded-full"
                 style={{ width: `${(briefStep / 2) * 100}%` }}
               />
             </div>
-          </CardHeader>
 
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmitBrief} className="space-y-6">
+            <form onSubmit={handleSubmitBrief} className="space-y-6 pt-2">
               {briefStep === 1 ? (
                 <div className="space-y-5 animate-in fade-in-50 duration-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-2">
-                      <Label htmlFor="useCaseType" className="text-xs font-semibold">Primary Direction <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="useCaseType" className="text-xs font-semibold text-zinc-300">Call Flow Direction <span className="text-orange-500">*</span></Label>
                       <Select value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})}>
-                        <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="inbound">Inbound (Support & Inquiries)</SelectItem>
-                          <SelectItem value="outbound">Outbound (Sales & Follow-ups)</SelectItem>
-                          <SelectItem value="both">Inbound + Outbound (Dual Role)</SelectItem>
+                        <SelectTrigger className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
+                          <SelectItem value="inbound">Incoming Calls Only (Support / Inquiries)</SelectItem>
+                          <SelectItem value="outbound">Outgoing Calls Only (Sales / Follow-ups)</SelectItem>
+                          <SelectItem value="both">Both (Incoming & Outgoing)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="callVolume" className="text-xs font-semibold">Monthly Call Volume <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="callVolume" className="text-xs font-semibold text-zinc-300">Estimated Monthly Volume <span className="text-orange-500">*</span></Label>
                       <Select value={formData.callVolume} onValueChange={val => setFormData({...formData, callVolume: val})}>
-                        <SelectTrigger className="h-10"><SelectValue placeholder="Select Volume" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="<1000">Less than 1,000 mins</SelectItem>
-                          <SelectItem value="1000-5000">1,000 – 5,000 mins</SelectItem>
-                          <SelectItem value="5000-10000">5,000 – 10,000 mins</SelectItem>
-                          <SelectItem value="10000+">10,000+ mins (High Volume)</SelectItem>
+                        <SelectTrigger className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20">
+                          <SelectValue placeholder="Select Volume" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
+                          <SelectItem value="<1000">Less than 1,000 minutes</SelectItem>
+                          <SelectItem value="1000-5000">1,000 – 5,000 minutes</SelectItem>
+                          <SelectItem value="5000-10000">5,000 – 10,000 minutes</SelectItem>
+                          <SelectItem value="10000+">10,000+ minutes (High Volume)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="languages" className="text-xs font-semibold">Required Languages <span className="text-red-500">*</span></Label>
-                    <Input id="languages" className="h-10" placeholder="e.g. English, Hindi, Hinglish" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
+                    <Label htmlFor="languages" className="text-xs font-semibold text-zinc-300">Preferred Conversation Languages <span className="text-orange-500">*</span></Label>
+                    <Input id="languages" className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" placeholder="e.g. English, Hindi" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="useCaseDescription" className="text-xs font-semibold">Agent Workflow Objective <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="useCaseDescription" className="text-xs font-semibold text-zinc-300">Agent Flow Objective <span className="text-orange-500">*</span></Label>
                     <Textarea
                       id="useCaseDescription"
-                      placeholder="Describe what this specific agent should execute (e.g. 'Answer hotel availability questions and capture guest name, check-in date, and room type...')"
+                      placeholder="Describe what you want the voice agent to achieve (e.g. 'Answer patient scheduling queries, check slot availability in our system, and book appointments...')"
                       value={formData.useCaseDescription}
                       onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
                       rows={4}
-                      className="resize-none"
+                      className="bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20 resize-none leading-relaxed"
                     />
                   </div>
                 </div>
               ) : (
                 <div className="space-y-5 animate-in fade-in-50 duration-200">
-                  <div className="p-4 border border-purple-500/20 bg-purple-500/5 rounded-lg space-y-4">
-                    <div className="flex items-center justify-between">
+                  <div className="p-5 border border-white/10 bg-white/[0.02] rounded-xl space-y-4">
+                    <div className="flex items-center justify-between gap-4">
                       <div>
-                        <Label htmlFor="needsApiIntegration" className="font-semibold text-sm cursor-pointer">Custom API Integration Needed?</Label>
-                        <p className="text-xs text-muted-foreground mt-0.5">Check this if the agent must call external REST endpoints, proprietary CRMs, or custom webhooks during calls.</p>
+                        <Label htmlFor="needsApiIntegration" className="font-bold text-sm text-white cursor-pointer">CRM or Software Integration Required?</Label>
+                        <p className="text-xs text-zinc-400 mt-1">Enable this if the agent needs to fetch or post data to your database, CRM, Google Sheets, or custom backend endpoints.</p>
                       </div>
                       <Switch
                         id="needsApiIntegration"
                         checked={formData.needsApiIntegration}
                         onCheckedChange={(checked) => setFormData({...formData, needsApiIntegration: checked})}
+                        className="data-[state=checked]:bg-orange-500"
                       />
                     </div>
 
                     {formData.needsApiIntegration && (
-                      <div className="space-y-2 pt-3 border-t border-purple-500/20">
-                        <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold">API Details & System Specs <span className="text-red-500">*</span></Label>
+                      <div className="space-y-2 pt-4 border-t border-white/10 animate-in slide-in-from-top-2 duration-200">
+                        <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold text-zinc-300">Integration Specs or Systems to Connect <span className="text-orange-500">*</span></Label>
                         <Textarea
                           id="apiIntegrationDetails"
-                          placeholder="Detail your API authentication scheme, endpoint URLs, and required payload fields..."
+                          placeholder="Provide any details about the systems to connect (e.g., 'Need to connect to our Salesforce CRM endpoint', or 'Integrate with custom booking REST API with API key authorization')"
                           value={formData.apiIntegrationDetails}
                           onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
                           rows={4}
+                          className="bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20 leading-relaxed"
                         />
                       </div>
                     )}
@@ -439,9 +448,9 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-4 border-t border-border/40">
+              <div className="flex items-center justify-between pt-6 border-t border-white/10">
                 {briefStep > 1 ? (
-                  <Button type="button" variant="outline" onClick={() => setBriefStep(1)}>
+                  <Button type="button" variant="outline" onClick={() => setBriefStep(1)} className="border-white/10 text-zinc-300 hover:bg-white/5 rounded-xl h-10 px-5">
                     <ArrowLeft className="w-4 h-4 mr-2" /> Back
                   </Button>
                 ) : <div />}
@@ -453,50 +462,50 @@ export default function OnboardingPage() {
                       return;
                     }
                     setBriefStep(2);
-                  }} className="bg-purple-600 hover:bg-purple-700 text-white">
+                  }} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-95 rounded-xl h-10 px-5 font-semibold">
                     Continue to Integrations <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 ) : (
-                  <Button type="submit" disabled={submitting} className="bg-purple-600 hover:bg-purple-700 text-white min-w-[140px]">
+                  <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-95 rounded-xl h-10 px-6 font-semibold min-w-[140px]">
                     {submitting ? "Submitting..." : "Submit Agent Brief"}
                   </Button>
                 )}
               </div>
             </form>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {/* ── 2. BRIEF SUBMITTED CONFIRMATION ── */}
-      {status === "brief_submitted" && (
-        <Card className="border-green-500/30 bg-green-500/5 text-center py-10">
-          <CardContent className="space-y-4">
-            <CheckCircle className="w-14 h-14 text-green-500 mx-auto animate-bounce" />
-            <h2 className="text-2xl font-bold">Agent Request Submitted!</h2>
-            <p className="text-muted-foreground text-sm max-w-md mx-auto">
-              Our engineering team has received your workspace brief and is reviewing your workflow specifications.
-            </p>
-            <div className="pt-2">
-              <Button onClick={() => router.push("/overview")} variant="outline">
+        {/* ── 2. BRIEF SUBMITTED CONFIRMATION ── */}
+        {status === "brief_submitted" && (
+          <div className="bg-black/40 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl p-8 sm:p-12 text-center space-y-5">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/20">
+              <CheckCircle className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-white">Agent Request Submitted</h2>
+              <p className="text-zinc-400 text-sm max-w-md mx-auto leading-relaxed">
+                Thank you! Our engineering team has received your agent setup details. We are building the configuration profile and will deploy the workspace updates shortly.
+              </p>
+            </div>
+            <div className="pt-4">
+              <Button onClick={() => router.push("/overview")} className="bg-white/10 hover:bg-white/15 text-white border border-white/10 rounded-xl h-10 px-6">
                 Return to Dashboard
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {/* ── 3. PENDING APPROVAL: Multi-Step Application Wizard ── */}
-      {status === "pending_approval" && (
-        <Card className="border-border/80 shadow-xl bg-card">
-          <CardHeader className="border-b border-border/40 pb-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* ── 3. PENDING APPROVAL: Multi-Step Application Wizard ── */}
+        {status === "pending_approval" && (
+          <div className="bg-black/40 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl p-6 sm:p-10 space-y-8">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-white/10 pb-6 gap-5">
               <div>
-                <CardTitle className="text-xl font-bold">Client Onboarding Application</CardTitle>
-                <CardDescription className="text-xs mt-0.5">Step {activeStep} of 4: {mainSteps[activeStep - 1].label}</CardDescription>
+                <h2 className="text-xl font-bold text-white">Account Activation Setup</h2>
+                <p className="text-xs text-zinc-400 mt-1">Step {activeStep} of 4: {mainSteps[activeStep - 1].label}</p>
               </div>
 
               {/* Wizard Steps Indicator */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {mainSteps.map((s) => {
                   const IconComp = s.icon;
                   const isDone = activeStep > s.num;
@@ -504,14 +513,14 @@ export default function OnboardingPage() {
                   return (
                     <div 
                       key={s.num}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                        isCurrent ? "bg-purple-600 text-white shadow-md" :
-                        isDone ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" :
-                        "bg-secondary text-muted-foreground"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                        isCurrent ? "bg-orange-500 border-orange-500/50 text-white shadow-md shadow-orange-500/20" :
+                        isDone ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                        "bg-zinc-900 border-white/5 text-zinc-500"
                       }`}
                     >
                       {isDone ? <Check className="w-3.5 h-3.5" /> : <IconComp className="w-3.5 h-3.5" />}
-                      <span className="hidden sm:inline">{s.label}</span>
+                      <span className="hidden md:inline">{s.label}</span>
                     </div>
                   );
                 })}
@@ -519,63 +528,65 @@ export default function OnboardingPage() {
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full bg-secondary h-1.5 rounded-full mt-4 overflow-hidden">
+            <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden">
               <div 
-                className="bg-gradient-to-r from-purple-600 via-indigo-500 to-emerald-500 h-full transition-all duration-300 rounded-full"
+                className="bg-gradient-to-r from-orange-500 via-rose-500 to-emerald-500 h-full transition-all duration-300 rounded-full"
                 style={{ width: `${(activeStep / 4) * 100}%` }}
               />
             </div>
-          </CardHeader>
 
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6 pt-2">
 
               {/* STEP 1: BUSINESS IDENTITY */}
               {activeStep === 1 && (
                 <div className="space-y-5 animate-in fade-in-50 duration-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-2">
-                      <Label htmlFor="businessName" className="text-xs font-semibold">Registered Business Name <span className="text-red-500">*</span></Label>
-                      <Input id="businessName" required value={formData.businessName} onChange={e => setFormData({...formData, businessName: e.target.value})} placeholder="e.g. Acme Health Tech Pvt Ltd" />
+                      <Label htmlFor="businessName" className="text-xs font-semibold text-zinc-300">Registered Business Name <span className="text-orange-500">*</span></Label>
+                      <Input id="businessName" required value={formData.businessName} onChange={e => setFormData({...formData, businessName: e.target.value})} placeholder="e.g. Acme Hospitality Pvt Ltd" className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="industry" className="text-xs font-semibold">Industry Sector <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="industry" className="text-xs font-semibold text-zinc-300">Industry Sector <span className="text-orange-500">*</span></Label>
                       <Select required value={formData.industry} onValueChange={val => setFormData({...formData, industry: val})}>
-                        <SelectTrigger><SelectValue placeholder="Select Industry" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Healthcare">Healthcare & Wellness</SelectItem>
+                        <SelectTrigger className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20">
+                          <SelectValue placeholder="Select Industry" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
+                          <SelectItem value="Healthcare">Healthcare & Medical</SelectItem>
                           <SelectItem value="Hospitality">Hospitality & Tourism</SelectItem>
-                          <SelectItem value="Real Estate">Real Estate & Construction</SelectItem>
-                          <SelectItem value="Education">Education & E-Learning</SelectItem>
+                          <SelectItem value="Real Estate">Real Estate & Property</SelectItem>
+                          <SelectItem value="Education">Education & Training</SelectItem>
                           <SelectItem value="Retail">Retail & E-Commerce</SelectItem>
                           <SelectItem value="Finance">Finance & Insurance</SelectItem>
-                          <SelectItem value="Other">Other Industry</SelectItem>
+                          <SelectItem value="Other">Other Enterprise Business</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="gstNumber" className="text-xs font-semibold">GST Identification Number (GSTIN) <span className="text-red-500">*</span></Label>
-                      <Input id="gstNumber" required value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} placeholder="27AAAAA0000A1Z5" />
+                      <Label htmlFor="gstNumber" className="text-xs font-semibold text-zinc-300">Tax Identification / GSTIN <span className="text-orange-500">*</span></Label>
+                      <Input id="gstNumber" required value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} placeholder="e.g., 27AAAAA0000A1Z5" className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="companySize" className="text-xs font-semibold">Company Size <span className="text-muted-foreground text-[10px]">(optional)</span></Label>
+                      <Label htmlFor="companySize" className="text-xs font-semibold text-zinc-300">Company Size <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
                       <Select value={formData.companySize} onValueChange={val => setFormData({...formData, companySize: val})}>
-                        <SelectTrigger><SelectValue placeholder="Select Team Size" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1-10">1–10 employees</SelectItem>
-                          <SelectItem value="11-50">11–50 employees</SelectItem>
-                          <SelectItem value="51-200">51–200 employees</SelectItem>
-                          <SelectItem value="200+">200+ employees</SelectItem>
+                        <SelectTrigger className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20">
+                          <SelectValue placeholder="Select Team Size" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
+                          <SelectItem value="1-10">1–10 team members</SelectItem>
+                          <SelectItem value="11-50">11–50 team members</SelectItem>
+                          <SelectItem value="51-200">51–200 team members</SelectItem>
+                          <SelectItem value="200+">200+ team members</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="websiteUrl" className="text-xs font-semibold">Company Website URL <span className="text-muted-foreground text-[10px]">(optional)</span></Label>
-                      <Input id="websiteUrl" type="url" placeholder="https://www.example.com" value={formData.websiteUrl} onChange={e => setFormData({...formData, websiteUrl: e.target.value})} />
+                      <Label htmlFor="websiteUrl" className="text-xs font-semibold text-zinc-300">Company Website URL <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
+                      <Input id="websiteUrl" type="url" placeholder="https://www.example.com" value={formData.websiteUrl} onChange={e => setFormData({...formData, websiteUrl: e.target.value})} className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
                     </div>
                   </div>
                 </div>
@@ -584,20 +595,20 @@ export default function OnboardingPage() {
               {/* STEP 2: POINT OF CONTACT */}
               {activeStep === 2 && (
                 <div className="space-y-5 animate-in fade-in-50 duration-200">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div className="space-y-2">
-                      <Label htmlFor="pocName" className="text-xs font-semibold">Primary Contact Name <span className="text-red-500">*</span></Label>
-                      <Input id="pocName" required value={formData.pocName} onChange={e => setFormData({...formData, pocName: e.target.value})} placeholder="Alex Johnson" />
+                      <Label htmlFor="pocName" className="text-xs font-semibold text-zinc-300">Contact Person Full Name <span className="text-orange-500">*</span></Label>
+                      <Input id="pocName" required value={formData.pocName} onChange={e => setFormData({...formData, pocName: e.target.value})} placeholder="Alex Johnson" className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="pocPhone" className="text-xs font-semibold">Phone Number <span className="text-red-500">*</span></Label>
-                      <Input id="pocPhone" type="tel" required value={formData.pocPhone} onChange={e => setFormData({...formData, pocPhone: e.target.value})} placeholder="+91 98765 43210" />
+                      <Label htmlFor="pocPhone" className="text-xs font-semibold text-zinc-300">Contact Phone Number <span className="text-orange-500">*</span></Label>
+                      <Input id="pocPhone" type="tel" required value={formData.pocPhone} onChange={e => setFormData({...formData, pocPhone: e.target.value})} placeholder="+91 98765 43210" className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="pocDesignation" className="text-xs font-semibold">Designation / Role <span className="text-muted-foreground text-[10px]">(optional)</span></Label>
-                      <Input id="pocDesignation" placeholder="e.g. Head of Operations" value={formData.pocDesignation} onChange={e => setFormData({...formData, pocDesignation: e.target.value})} />
+                      <Label htmlFor="pocDesignation" className="text-xs font-semibold text-zinc-300">Corporate Designation <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
+                      <Input id="pocDesignation" placeholder="e.g., Operations Director" value={formData.pocDesignation} onChange={e => setFormData({...formData, pocDesignation: e.target.value})} className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
                     </div>
                   </div>
                 </div>
@@ -607,57 +618,59 @@ export default function OnboardingPage() {
               {activeStep === 3 && (
                 <div className="space-y-5 animate-in fade-in-50 duration-200">
                   <div className="space-y-3">
-                    <Label className="text-xs font-semibold">Agent Direction <span className="text-red-500">*</span></Label>
-                    <RadioGroup value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})} className="flex gap-4">
-                      <div className="flex items-center space-x-2 border border-border/60 p-3 rounded-lg flex-1 cursor-pointer">
-                        <RadioGroupItem value="inbound" id="inbound" />
-                        <Label htmlFor="inbound" className="cursor-pointer text-xs font-medium">Inbound Only</Label>
-                      </div>
-                      <div className="flex items-center space-x-2 border border-border/60 p-3 rounded-lg flex-1 cursor-pointer">
-                        <RadioGroupItem value="outbound" id="outbound" />
-                        <Label htmlFor="outbound" className="cursor-pointer text-xs font-medium">Outbound Only</Label>
-                      </div>
-                      <div className="flex items-center space-x-2 border border-border/60 p-3 rounded-lg flex-1 cursor-pointer">
-                        <RadioGroupItem value="both" id="both" />
-                        <Label htmlFor="both" className="cursor-pointer text-xs font-medium">Inbound & Outbound</Label>
-                      </div>
+                    <Label className="text-xs font-semibold text-zinc-300">Primary Call Direction <span className="text-orange-500">*</span></Label>
+                    <RadioGroup value={formData.useCaseType} onValueChange={val => setFormData({...formData, useCaseType: val})} className="flex flex-col sm:flex-row gap-4">
+                      <label className="flex items-center space-x-3 border border-white/10 bg-zinc-950/20 p-4 rounded-xl flex-1 cursor-pointer hover:bg-white/[0.02] transition-all">
+                        <RadioGroupItem value="inbound" id="inbound" className="border-white/30 text-orange-500 focus:ring-orange-500/20" />
+                        <span className="text-xs font-medium text-white">Incoming Calls Only (Answering / Support)</span>
+                      </label>
+                      <label className="flex items-center space-x-3 border border-white/10 bg-zinc-950/20 p-4 rounded-xl flex-1 cursor-pointer hover:bg-white/[0.02] transition-all">
+                        <RadioGroupItem value="outbound" id="outbound" className="border-white/30 text-orange-500 focus:ring-orange-500/20" />
+                        <span className="text-xs font-medium text-white">Outgoing Calls Only (Outreach / Alerts)</span>
+                      </label>
+                      <label className="flex items-center space-x-3 border border-white/10 bg-zinc-950/20 p-4 rounded-xl flex-1 cursor-pointer hover:bg-white/[0.02] transition-all">
+                        <RadioGroupItem value="both" id="both" className="border-white/30 text-orange-500 focus:ring-orange-500/20" />
+                        <span className="text-xs font-medium text-white">Incoming & Outgoing (Dual Role)</span>
+                      </label>
                     </RadioGroup>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="useCaseDescription" className="text-xs font-semibold">Detailed Use Case Description <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="useCaseDescription" className="text-xs font-semibold text-zinc-300">Describe What the Agent Should Do <span className="text-orange-500">*</span></Label>
                     <Textarea
                       id="useCaseDescription"
-                      placeholder="Describe what conversation flow you need (e.g., Answer customer queries about order status, collect delivery address, and send SMS confirmation...)"
+                      placeholder="Outline your call script, booking requirements, or typical customer questions (e.g. 'We need the agent to answer incoming hotel booking questions, confirm room availability, and collect the check-in details...')"
                       value={formData.useCaseDescription}
                       onChange={e => setFormData({...formData, useCaseDescription: e.target.value})}
                       rows={4}
-                      className="resize-none"
+                      className="bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20 resize-none leading-relaxed"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-2">
-                      <Label htmlFor="callVolume" className="text-xs font-semibold">Expected Monthly Volume <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="callVolume" className="text-xs font-semibold text-zinc-300">Expected Monthly Volume <span className="text-orange-500">*</span></Label>
                       <Select value={formData.callVolume} onValueChange={val => setFormData({...formData, callVolume: val})}>
-                        <SelectTrigger><SelectValue placeholder="Select Call Volume" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="<100">Less than 100 calls</SelectItem>
-                          <SelectItem value="100-500">100 – 500 calls</SelectItem>
-                          <SelectItem value="500-2000">500 – 2,000 calls</SelectItem>
-                          <SelectItem value="2000+">2,000+ calls</SelectItem>
+                        <SelectTrigger className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20">
+                          <SelectValue placeholder="Select Call Volume" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-xl">
+                          <SelectItem value="<100">Less than 100 calls/month</SelectItem>
+                          <SelectItem value="100-500">100 – 500 calls/month</SelectItem>
+                          <SelectItem value="500-2000">500 – 2,000 calls/month</SelectItem>
+                          <SelectItem value="2000+">2,000+ calls/month</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="languages" className="text-xs font-semibold">Spoken Languages Needed <span className="text-red-500">*</span></Label>
-                      <Input id="languages" placeholder="e.g. English, Hindi, Tamil" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} />
+                      <Label htmlFor="languages" className="text-xs font-semibold text-zinc-300">Spoken Languages Needed <span className="text-orange-500">*</span></Label>
+                      <Input id="languages" placeholder="e.g. English, Hindi, Hinglish" value={formData.languages} onChange={e => setFormData({...formData, languages: e.target.value})} className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="integrations" className="text-xs font-semibold">Existing Tools & Software <span className="text-muted-foreground text-[10px]">(optional)</span></Label>
-                      <Input id="integrations" placeholder="e.g. HubSpot, Google Sheets, WhatsApp Business API" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} />
+                      <Label htmlFor="integrations" className="text-xs font-semibold text-zinc-300">Existing Software to Connect <span className="text-zinc-500 text-[10px]">(optional)</span></Label>
+                      <Input id="integrations" placeholder="e.g. HubSpot CRM, Google Sheets, WhatsApp Business API" value={formData.integrations} onChange={e => setFormData({...formData, integrations: e.target.value})} className="h-10 bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20" />
                     </div>
                   </div>
                 </div>
@@ -666,66 +679,68 @@ export default function OnboardingPage() {
               {/* STEP 4: INTEGRATIONS & COMPLIANCE DOCS */}
               {activeStep === 4 && (
                 <div className="space-y-6 animate-in fade-in-50 duration-200">
-                  <div className="p-4 border border-purple-500/20 bg-purple-500/5 rounded-lg space-y-4">
-                    <div className="flex items-center justify-between">
+                  <div className="p-5 border border-white/10 bg-white/[0.02] rounded-xl space-y-4">
+                    <div className="flex items-center justify-between gap-4">
                       <div>
-                        <Label htmlFor="needsApiIntegration" className="font-semibold text-sm cursor-pointer">Custom API Integration Required?</Label>
-                        <p className="text-xs text-muted-foreground">Select if your agent requires proprietary CRM endpoints or real-time webhook triggers.</p>
+                        <Label htmlFor="needsApiIntegration" className="font-bold text-sm text-white cursor-pointer">Require Custom API Setup?</Label>
+                        <p className="text-xs text-zinc-400 mt-1">Select this if your team needs us to build a custom endpoint handler, database sync, or secure webhook relays.</p>
                       </div>
                       <Switch 
                         id="needsApiIntegration" 
                         checked={formData.needsApiIntegration} 
                         onCheckedChange={val => setFormData({...formData, needsApiIntegration: val})}
+                        className="data-[state=checked]:bg-orange-500"
                       />
                     </div>
 
                     {formData.needsApiIntegration && (
-                      <div className="space-y-2 pt-3 border-t border-purple-500/20">
-                        <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold">API Details & Authentication Specs <span className="text-red-500">*</span></Label>
+                      <div className="space-y-2 pt-4 border-t border-white/10 animate-in slide-in-from-top-2 duration-200">
+                        <Label htmlFor="apiIntegrationDetails" className="text-xs font-semibold text-zinc-300">API Details or Custom Requirements <span className="text-orange-500">*</span></Label>
                         <Textarea
                           id="apiIntegrationDetails"
-                          placeholder="Describe the REST endpoints, headers, authentication method, or webhook payloads..."
+                          placeholder="Provide details about endpoints, headers, authentication method, or payload mapping specifications (if available)..."
                           value={formData.apiIntegrationDetails}
                           onChange={e => setFormData({...formData, apiIntegrationDetails: e.target.value})}
                           rows={3}
+                          className="bg-zinc-950/50 border-white/10 text-white rounded-xl focus:border-orange-500 focus:ring-orange-500/20 leading-relaxed"
                         />
                       </div>
                     )}
                   </div>
 
                   <div className="space-y-3">
-                    <Label className="text-xs font-semibold">Verification Documents <span className="text-muted-foreground font-normal">(Optional — Accelerates Approval)</span></Label>
+                    <Label className="text-xs font-semibold text-zinc-300">Verification & Registration Documents <span className="text-zinc-500 font-normal">(Optional — Accelerates Account Activation)</span></Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <label
                         htmlFor="gst-upload"
-                        className="border-2 border-dashed border-border/80 rounded-xl p-5 flex flex-col items-center justify-center text-center bg-secondary/30 hover:bg-secondary/60 transition-colors cursor-pointer"
+                        className="border border-dashed border-white/15 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-zinc-950/20 hover:bg-zinc-950/40 transition-colors cursor-pointer"
                         onDragOver={e => e.preventDefault()}
                         onDrop={e => { e.preventDefault(); simulateUpload("gst"); }}
                       >
                         <input type="file" id="gst-upload" className="hidden" onChange={() => simulateUpload("gst")} />
-                        <UploadCloud className="w-7 h-7 text-purple-400 mb-2" />
-                        <p className="text-xs font-semibold">GST Certificate</p>
-                        <p className="text-[10px] text-muted-foreground">Drag & drop or click to upload</p>
+                        <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
+                        <p className="text-xs font-bold text-white">GST Certificate</p>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">Drag & drop or click to upload</p>
                         {uploadProgress.gst > 0 && (
-                          <div className="w-full mt-3 bg-secondary rounded-full h-1.5">
-                            <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${uploadProgress.gst}%` }} />
+                          <div className="w-full mt-3 bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all" style={{ width: `${uploadProgress.gst}%` }} />
                           </div>
                         )}
                       </label>
 
                       <label
                         htmlFor="reg-upload"
-                        className="border-2 border-dashed border-border/80 rounded-xl p-5 flex flex-col items-center justify-center text-center bg-secondary/30 hover:bg-secondary/60 transition-colors cursor-pointer"
+                        className="border border-dashed border-white/15 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-zinc-950/20 hover:bg-zinc-950/40 transition-colors cursor-pointer"
                         onDragOver={e => e.preventDefault()}
                         onDrop={e => { e.preventDefault(); simulateUpload("reg"); }}
                       >
                         <input type="file" id="reg-upload" className="hidden" onChange={() => simulateUpload("reg")} />
-                        <UploadCloud className="w-7 h-7 text-purple-400 mb-2" />
-                        <p className="text-xs font-semibold">Business Registration</p>
-                        <p className="text-[10px] text-muted-foreground">Drag & drop or click to upload</p>
+                        <UploadCloud className="w-8 h-8 text-orange-500 mb-2" />
+                        <p className="text-xs font-bold text-white">Company Registration</p>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">Drag & drop or click to upload</p>
                         {uploadProgress.reg > 0 && (
-                          <div className="w-full mt-3 bg-secondary rounded-full h-1.5">
-                            <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${uploadProgress.reg}%` }} />
+                          <div className="w-full mt-3 bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all" style={{ width: `${uploadProgress.reg}%` }} />
                           </div>
                         )}
                       </label>
@@ -735,109 +750,104 @@ export default function OnboardingPage() {
               )}
 
               {/* Wizard Navigation Footer */}
-              <div className="flex items-center justify-between pt-6 border-t border-border/40">
+              <div className="flex items-center justify-between pt-6 border-t border-white/10">
                 {activeStep > 1 ? (
-                  <Button type="button" variant="outline" onClick={handlePrevStep}>
+                  <Button type="button" variant="outline" onClick={handlePrevStep} className="border-white/10 text-zinc-300 hover:bg-white/5 rounded-xl h-10 px-5">
                     <ArrowLeft className="w-4 h-4 mr-2" /> Previous Step
                   </Button>
                 ) : <div />}
 
                 {activeStep < 4 ? (
-                  <Button type="button" onClick={handleNextStep} className="bg-purple-600 hover:bg-purple-700 text-white">
+                  <Button type="button" onClick={handleNextStep} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-95 rounded-xl h-10 px-5 font-semibold">
                     Next Step <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 ) : (
-                  <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white min-w-[160px] shadow-lg">
+                  <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-95 text-white h-10 px-6 rounded-xl font-bold shadow-lg shadow-orange-500/20 min-w-[160px]">
                     {submitting ? "Submitting Application..." : "Submit Application"}
                   </Button>
                 )}
               </div>
             </form>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {/* ── 4. UNDER REVIEW SCREEN ── */}
-      {status === "under_review" && (
-        <Card className="text-center py-12 border-blue-500/30 bg-blue-500/5">
-          <CardContent className="space-y-6">
-            <Clock className="w-16 h-16 text-blue-500 mx-auto animate-spin" />
-            <div>
-              <h2 className="text-2xl font-bold">Application Under Engineering Review</h2>
-              <p className="text-muted-foreground text-sm max-w-md mx-auto mt-2">
-                Our solutions architecture team is reviewing your use case details. We will notify you via email once approved.
+        {/* ── 4. UNDER REVIEW SCREEN ── */}
+        {status === "under_review" && (
+          <div className="bg-black/40 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl p-8 sm:p-12 text-center space-y-6">
+            <Clock className="w-16 h-16 text-orange-500 mx-auto animate-spin" />
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-white">Application Under Engineering Review</h2>
+              <p className="text-zinc-400 text-sm max-w-md mx-auto leading-relaxed mt-2">
+                Our solutions engineering team is actively setting up your call architecture and routing parameters. We will notify you via email as soon as activation is completed.
               </p>
             </div>
-            <div className="pt-2">
-              <Button onClick={() => router.push("/overview")} variant="outline">
+            <div className="pt-4">
+              <Button onClick={() => router.push("/overview")} className="bg-white/10 hover:bg-white/15 text-white border border-white/10 rounded-xl h-10 px-6">
                 Explore Dashboard Overview
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {/* ── 5. APPROVED SCREEN: Custom Integration Fee Quoted Invoice ── */}
-      {status === "approved" && (
-        <Card className="border-emerald-500/40 bg-gradient-to-b from-emerald-500/5 via-card to-card shadow-2xl">
-          <CardHeader className="text-center pb-4 border-b border-border/40">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-2">
-              <CheckCircle className="w-7 h-7" />
+        {/* ── 5. APPROVED SCREEN: Custom Integration Fee Quoted Invoice ── */}
+        {status === "approved" && (
+          <div className="bg-black/40 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl p-6 sm:p-10 space-y-8 bg-gradient-to-b from-orange-500/5 to-transparent">
+            <div className="text-center pb-4 border-b border-white/10">
+              <div className="w-14 h-14 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mx-auto mb-3 border border-orange-500/20">
+                <CheckCircle className="w-8 h-8 text-orange-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-white">Application Approved!</h2>
+              <p className="text-xs text-zinc-400 mt-1">One-time payment to deploy your custom voice agent pipeline</p>
             </div>
-            <CardTitle className="text-2xl font-extrabold">Application Approved!</CardTitle>
-            <CardDescription className="text-xs">
-              Custom API Integration Fee Quoted
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-6">
-            <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-center">
-              <span className="text-xs uppercase tracking-wider text-emerald-400 font-mono font-semibold">One-Time Integration Quote</span>
-              <div className="text-4xl font-extrabold text-foreground mt-1">
+
+            <div className="p-6 rounded-xl border border-orange-500/30 bg-orange-500/10 text-center">
+              <span className="text-xs uppercase tracking-wider text-orange-400 font-mono font-semibold">Custom API Integration Quote</span>
+              <div className="text-4xl font-extrabold text-white mt-2">
                 {customerData?.onboarding_form?.integration_fee_paise 
                   ? `₹${(customerData.onboarding_form.integration_fee_paise / 100).toLocaleString()}`
                   : "Custom Quoted Fee"}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {customerData?.onboarding_form?.integration_description || "Covers proprietary REST API bindings, custom webhooks, and sandbox testing."}
+              <p className="text-xs text-zinc-400 mt-2 leading-relaxed max-w-md mx-auto">
+                {customerData?.onboarding_form?.integration_description || "Covers custom API data-flows, Salesforce/CRM authentication, calendar hooks, and full production pipeline testing."}
               </p>
             </div>
 
-            <div className="space-y-2 text-xs">
-              <span className="font-semibold uppercase tracking-wider text-muted-foreground text-[10px]">What's Included:</span>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div className="flex items-center gap-2 p-2 rounded bg-secondary/40">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Custom REST & Webhook Handlers</span>
+            <div className="space-y-3">
+              <span className="font-bold uppercase tracking-wider text-zinc-400 text-[10px]">What is Included:</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Custom CRM & Webhook Handlers</span>
                 </div>
-                <div className="flex items-center gap-2 p-2 rounded bg-secondary/40">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>End-to-End Pipeline Testing</span>
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>End-to-End Voice Flow Testing</span>
                 </div>
-                <div className="flex items-center gap-2 p-2 rounded bg-secondary/40">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>Dedicated Integration Engineer</span>
                 </div>
-                <div className="flex items-center gap-2 p-2 rounded bg-secondary/40">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>24-Hour Agent Delivery SLA</span>
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-950/40 border border-white/5">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>24-Hour Active SLA Delivery</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4 border-t border-border/40">
-              <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-lg min-w-[200px]" onClick={handlePaySetupFee}>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6 border-t border-white/10">
+              <Button size="lg" className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-95 text-white font-semibold shadow-lg shadow-orange-500/25 h-12 px-8 rounded-xl min-w-[200px]" onClick={handlePaySetupFee}>
                 <CreditCard className="w-4 h-4 mr-2" /> Pay Integration Fee
               </Button>
               
               {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
-                <Button onClick={handleMockSetupFee} variant="secondary" size="lg">
+                <Button onClick={handleMockSetupFee} variant="outline" size="lg" className="border-white/10 text-zinc-300 hover:bg-white/5 h-12 rounded-xl">
                   Bypass Payment (Dev)
                 </Button>
               )}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

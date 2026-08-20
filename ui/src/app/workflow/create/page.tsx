@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { PhoneCall, HelpCircle, Sparkles, CheckCircle2, PhoneIncoming, PhoneOutgoing, ArrowRight } from 'lucide-react';
 
 import { createWorkflowFromTemplateApiV1WorkflowCreateTemplatePost } from '@/client/sdk.gen';
 import { Button } from '@/components/ui/button';
@@ -79,66 +80,78 @@ export default function CreateWorkflowPage() {
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground flex items-center justify-center py-12 px-6">
-            <div className="w-full max-w-lg space-y-8">
+        <div className="flex-1 flex items-center justify-center py-12 px-6 bg-background text-foreground relative overflow-hidden">
+            {/* Subtle background glow */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-orange-500/[0.02] rounded-full blur-3xl pointer-events-none" />
+
+            <div className="w-full max-w-xl space-y-8 z-10">
                 {/* Header */}
-                <div className="space-y-2 text-center sm:text-left">
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Create Voice Agent</h1>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                        Tell us about your use case and we&apos;ll configure a customized voice agent for you.
+                <div className="space-y-3 text-center sm:text-left">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-orange-500/20 bg-orange-500/5 text-orange-500 text-xs font-semibold uppercase tracking-wider">
+                        <Sparkles className="w-3.5 h-3.5" /> Configure Voice Agent
+                    </div>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Create New Agent</h1>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        Define your agent's communication direction, key objectives, and steps it should follow during customer calls.
                     </p>
                 </div>
 
                 {/* Form Body */}
-                <div className="space-y-6 bg-card border border-border rounded-xl p-6 shadow-sm">
+                <div className="space-y-6 bg-card/60 border border-border/80 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-md">
                     {/* Call Type Selector */}
                     <div className="space-y-2">
-                        <Label htmlFor="call-type" className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80">Call Type</Label>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="call-type" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Direction of Calls</Label>
+                            <span className="text-[10px] text-zinc-500">Determines call routing</span>
+                        </div>
                         <Select value={callType} onValueChange={(value) => setCallType(value as 'inbound' | 'outbound')}>
-                            <SelectTrigger id="call-type" className="h-9 rounded-lg border-border bg-background text-sm">
-                                <SelectValue placeholder="Select type" />
+                            <SelectTrigger id="call-type" className="h-10 rounded-xl border-border bg-background text-sm focus:ring-orange-500/20 focus:border-orange-500">
+                                <SelectValue placeholder="Select direction" />
                             </SelectTrigger>
-                            <SelectContent className="rounded-lg">
-                                <SelectItem value="inbound" className="text-xs font-medium">
-                                    Inbound (Users call AI)
+                            <SelectContent className="rounded-xl bg-card border-border">
+                                <SelectItem value="inbound" className="text-sm font-medium focus:bg-orange-500/10 focus:text-orange-500">
+                                    <div className="flex items-center gap-2 py-0.5">
+                                        <PhoneIncoming className="w-4 h-4 text-orange-500" />
+                                        <span>Incoming (Customers call the AI)</span>
+                                    </div>
                                 </SelectItem>
-                                <SelectItem value="outbound" className="text-xs font-medium">
-                                    Outbound (AI calls users)
+                                <SelectItem value="outbound" className="text-sm font-medium focus:bg-orange-500/10 focus:text-orange-500">
+                                    <div className="flex items-center gap-2 py-0.5">
+                                        <PhoneOutgoing className="w-4 h-4 text-orange-500" />
+                                        <span>Outgoing (AI initiates calls to customers)</span>
+                                    </div>
                                 </SelectItem>
                             </SelectContent>
                         </Select>
-                        <p className="text-[10px] text-muted-foreground/60">
-                            Choose whether users will call your AI or your AI will call users.
-                        </p>
                     </div>
 
                     {/* Use Case input */}
                     <div className="space-y-2">
-                        <Label htmlFor="use-case" className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80">Use Case</Label>
+                        <Label htmlFor="use-case" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Agent Objective</Label>
                         <Input
                             id="use-case"
-                            placeholder="e.g., Lead Qualification, HR Screening, Customer Support"
+                            placeholder="e.g. Booking Reservations, Customer Support, Lead Screening"
                             value={useCase}
                             onChange={(e) => setUseCase(e.target.value)}
-                            className="h-9 rounded-lg border-border bg-background text-sm"
+                            className="h-10 rounded-xl border-border bg-background text-sm focus:ring-orange-500/20 focus:border-orange-500"
                         />
-                        <p className="text-[10px] text-muted-foreground/60">
-                            Describe the primary purpose of your voice agent.
+                        <p className="text-[10px] text-zinc-500 leading-normal">
+                            Give your agent a clear, high-level business objective.
                         </p>
                     </div>
 
                     {/* Activity Description textarea */}
                     <div className="space-y-2">
-                        <Label htmlFor="activity-description" className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80">Activity Description</Label>
+                        <Label htmlFor="activity-description" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Detailed Agent Instructions / Script</Label>
                         <Textarea
                             id="activity-description"
-                            placeholder="Describe briefly what your voice agent will do (e.g., Qualify leads for real estate, Screen candidates for roles, Handle customer support). This will be a prompt to an LLM."
+                            placeholder="Detail what the agent should talk about. For example:&#10;1. Greet the customer and ask for their reservation date.&#10;2. Check available suites and read options.&#10;3. Collect guest name and send confirmation SMS."
                             value={activityDescription}
                             onChange={(e) => setActivityDescription(e.target.value)}
-                            className="min-h-[120px] rounded-lg border-border bg-background text-sm leading-relaxed"
+                            className="min-h-[140px] rounded-xl border-border bg-background text-sm leading-relaxed focus:ring-orange-500/20 focus:border-orange-500 resize-none"
                         />
-                        <p className="text-[10px] text-muted-foreground/60">
-                            This description will be used to generate the initial system prompt for your agent.
+                        <p className="text-[10px] text-zinc-500 leading-normal">
+                            Our platform uses these steps to configure the voice agent's conversational guide.
                         </p>
                     </div>
 
@@ -151,9 +164,9 @@ export default function CreateWorkflowPage() {
                         <Button
                             onClick={handleCreateWorkflow}
                             disabled={isLoading || !useCase || !activityDescription}
-                            className="w-full h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs transition-all cursor-pointer"
+                            className="w-full h-11 rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-95 text-white shadow-md shadow-orange-500/10 font-bold text-xs transition-all cursor-pointer"
                         >
-                            {isLoading ? 'Creating Agent...' : 'Create Agent'}
+                            {isLoading ? 'Configuring Agent...' : 'Generate Voice Agent'}
                         </Button>
                     </div>
                 </div>
@@ -161,14 +174,14 @@ export default function CreateWorkflowPage() {
 
             {/* Loading Overlay */}
             {isLoading && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
                     <div className="flex flex-col items-center space-y-4">
                         {/* Animated clean spinner */}
-                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-cta" />
+                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/5 border-t-orange-500" />
                         <div className="text-center space-y-1">
-                            <h3 className="text-sm font-bold text-foreground">Creating Your Agent</h3>
-                            <p className="text-xs text-muted-foreground max-w-xs">
-                                Designing and configuring your workspace. Just a moment...
+                            <h3 className="text-sm font-bold text-foreground">Generating Your Agent</h3>
+                            <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+                                Designing and configuring your customized workspace setup...
                             </p>
                         </div>
                     </div>
@@ -177,26 +190,24 @@ export default function CreateWorkflowPage() {
 
             {/* Success Modal */}
             <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
-                <DialogContent className="sm:max-w-md rounded-xl bg-background border border-border shadow-lg p-6">
-                    <DialogHeader className="space-y-2">
-                        <DialogTitle className="flex items-center gap-2 text-base font-bold text-foreground">
-                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                </svg>
+                <DialogContent className="sm:max-w-md rounded-2xl bg-card border border-border shadow-2xl p-6">
+                    <DialogHeader className="space-y-3">
+                        <DialogTitle className="flex items-center gap-2.5 text-base font-bold text-foreground border-b border-border/60 pb-3">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                <CheckCircle2 className="w-4 h-4" />
                             </div>
                             Agent Created Successfully
                         </DialogTitle>
                         <DialogDescription asChild>
-                            <div className="mt-4 space-y-3 text-xs text-muted-foreground leading-relaxed">
+                            <div className="space-y-3 text-xs text-muted-foreground leading-relaxed">
                                 <p>
-                                    A customized voice agent workflow has been successfully generated for your use case with sample nodes.
+                                    A customized voice agent has been generated based on your business instructions.
                                 </p>
                                 <p>
-                                    The agent is pre-set with default settings to communicate in English with a natural voice profile.
+                                    The agent is configured to speak in English with a natural voice profile.
                                 </p>
                                 <p>
-                                    Next, you can test the agent in the browser editor and modify prompts to suit your goals.
+                                    Next, you can test call the agent in the browser editor and refine its instructions.
                                 </p>
                             </div>
                         </DialogDescription>
@@ -204,9 +215,10 @@ export default function CreateWorkflowPage() {
                     <DialogFooter className="mt-6">
                         <Button
                             onClick={handleModalContinue}
-                            className="w-full h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer"
+                            className="w-full h-10 rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-95 text-white font-bold text-xs cursor-pointer shadow-md shadow-orange-500/10 flex items-center justify-center gap-1.5"
                         >
                             Open and Test Agent
+                            <ArrowRight className="w-3.5 h-3.5" />
                         </Button>
                     </DialogFooter>
                 </DialogContent>

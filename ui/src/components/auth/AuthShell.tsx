@@ -13,9 +13,9 @@ import { BrandLogo } from "@/components/BrandLogo";
 import ThemeToggle from "@/components/ThemeSwitcher";
 
 const HIGHLIGHTS = [
-  "Speech-to-speech",
-  "MCP-native",
-  "BYOK - any model",
+  "24/7 Autopilot Answering",
+  "Instant First-Ring Pickup",
+  "Zero-Latency Conversation",
 ];
 
 export function AuthShell({
@@ -26,19 +26,22 @@ export function AuthShell({
   enterpriseSlot?: ReactNode;
 }) {
   return (
-    <div className="relative grid min-h-screen w-full bg-background lg:grid-cols-[50%_50%] transition-colors duration-150">
+    <div className="relative grid min-h-screen w-full bg-[#090A0F] lg:grid-cols-[50%_50%] transition-colors duration-150">
       {/* Sleek Theme Switcher overlay in top right */}
       <div className="absolute right-4 top-4 z-50">
         <ThemeToggle variant="outline" size="sm" className="rounded-full bg-background/50 backdrop-blur-xs border-border/80" />
       </div>
 
       {/* Form column (LEFT) */}
-      <main className="auth-imprint flex min-h-screen flex-col overflow-y-auto relative bg-background/30">
+      <main className="hero-bg flex min-h-screen flex-col overflow-y-auto relative">
+        {/* Subtle grid pattern overlay */}
+        <div className="hero-stripe-pattern" />
+        
         {/* Soft background ambient glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-cta/[0.02] dark:bg-cta/[0.03] rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-cta/[0.04] rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex min-h-full items-center justify-center p-6 sm:p-10 z-10">
-          <div className="w-full max-w-[390px] space-y-6 rounded-2xl border border-border/50 bg-card/60 backdrop-blur-md p-6 shadow-xl dark:shadow-black/40 sm:p-8">
+          <div className="w-full max-w-[390px] space-y-6 rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl p-6 shadow-2xl sm:p-8">
             {/* Mobile-only wordmark */}
             <div className="lg:hidden flex justify-center mb-4">
               <BrandLogo className="h-6" />
@@ -72,11 +75,11 @@ export function AuthShell({
         <div className="relative max-w-md space-y-8 my-auto">
           <div className="space-y-4">
             <h1 className="text-4xl font-bold leading-tight tracking-tight text-white xl:text-5xl font-sans">
-              The open-source <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-orange-500">voice AI platform</span>.
+              Your 24/7 AI <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-rose-500 to-amber-400 font-light italic">voice operations</span>.
             </h1>
             <p className="text-zinc-400 text-sm max-w-sm leading-relaxed">
-              Build, run, and scale voice agents with state-of-the-art speech-to-speech models and MCP tools.
+              Build and deploy conversational AI agents with phone lines, custom APIs, and calendar scheduling.
             </p>
           </div>
 

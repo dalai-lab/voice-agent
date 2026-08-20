@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { 
-  Brain, Sparkles, Check, ArrowRight, Volume2, Users, Play, Pause, Mic2, Lock
+  Brain, Sparkles, Check, ArrowRight, Volume2, Users, Play, Pause, Mic2, Lock, ShieldCheck, Activity, Cpu, Sliders
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ interface ModelEngine {
   badgeColor: string;
   rateRupees: string;
   latencyLevel: string;
+  latencyValue: number; // For progress bar/meter
   voiceNaturalness: string;
   concurrencyLimit: number;
   cognitiveLevel: string;
@@ -34,11 +35,12 @@ const AI_MODELS: ModelEngine[] = [
     id: "echo-lite",
     tierKey: "starter",
     name: "Echo-Lite Engine",
-    subtitle: "Ideal for basic transactional queries & standard workflows",
+    subtitle: "Transactional routing & standard workflows",
     badge: "Starter Tier",
     badgeColor: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
     rateRupees: "25.00",
     latencyLevel: "Ultra-Responsive (~400ms)",
+    latencyValue: 60,
     voiceNaturalness: "Professional & Clear",
     concurrencyLimit: 2,
     cognitiveLevel: "Standard Reasoning",
@@ -56,11 +58,12 @@ const AI_MODELS: ModelEngine[] = [
     id: "neural-vocal-pro",
     tierKey: "pro",
     name: "NeuralVocal Pro Engine",
-    subtitle: "Emotive, natural speech for high-end client interactions",
+    subtitle: "Emotive speech for premium client interactions",
     badge: "Recommended Engine",
     badgeColor: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
     rateRupees: "18.00",
     latencyLevel: "Near-Instantaneous (~250ms)",
+    latencyValue: 85,
     voiceNaturalness: "Studio-Grade Emotive Inflection",
     concurrencyLimit: 10,
     cognitiveLevel: "Advanced Conceptual Reasoning",
@@ -85,6 +88,7 @@ const AI_MODELS: ModelEngine[] = [
     badgeColor: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
     rateRupees: "12.00",
     latencyLevel: "Instant response (~180ms)",
+    latencyValue: 98,
     voiceNaturalness: "Indistinguishable from Human",
     concurrencyLimit: 50,
     cognitiveLevel: "Elite Reasoning & Analysis",
@@ -144,8 +148,6 @@ export default function ModelsPage() {
       return;
     }
 
-    // GET /status now returns plan, voice_id, and is_provisioned in one call.
-    // The old /billing/subscription/by-org endpoint doesn't exist and always returned null.
     fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
       .then(r => r.ok ? r.json() : null)
       .then(statusData => {
@@ -187,27 +189,222 @@ export default function ModelsPage() {
   };
 
   const isPremiumUnlocked = activeTier === "pro" || activeTier === "elite";
+  const isStandardUnlocked = activeTier === "starter";
+
+  const getActiveVoiceName = () => {
+    const std = VOICE_CATALOG.starter.voices.find(v => v.id === activeVoiceId);
+    if (std) return `${std.name} (${std.gender})`;
+    const prem = VOICE_CATALOG.premium.voices.find(v => v.id === activeVoiceId);
+    if (prem) return `${prem.name} (${prem.gender})`;
+    return activeVoiceId ? "Custom Voice" : "Not Set";
+  };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 space-y-12 bg-background text-foreground">
+    <div className="max-w-7xl mx-auto px-6 py-8 space-y-12 bg-background text-foreground transition-all duration-300">
       
-      {/* ── SECTION 1: ENGINES ── */}
-      <section className="space-y-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-border/40">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-orange-500/30 bg-orange-500/5 text-orange-600 dark:text-orange-400 text-[10px] font-semibold uppercase tracking-wider mb-2">
-              <Sparkles className="w-3 h-3 text-orange-500" /> Talkar Intelligence Suite
+      {/* ── HEADER & INTEGRATED CONTROL MODULE ── */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-card/80 to-card/30 backdrop-blur-xl p-8 shadow-xs">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 w-60 h-60 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-emerald-500/20 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 text-xs font-semibold tracking-wide uppercase">
+              <Sliders className="w-3.5 h-3.5 animate-pulse" /> Voice Engine Workspace
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground">
-              Conversational Voice Engines
+            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-muted-foreground bg-clip-text text-transparent">
+              Vocal Identity Suite
             </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Choose the neural configuration that matches your brand voice. All engines integrate real-time hearing, cognitive reasoning, and vocal articulation.
+            <p className="text-sm text-muted-foreground max-w-xl">
+              Control the linguistic cognition, tone fidelity, and latency configurations of your AI Agent in real-time.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-4 items-center w-full md:w-auto">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-background/50 backdrop-blur-md">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+              <div>
+                <span className="text-[10px] text-muted-foreground block uppercase font-bold tracking-wider">Active System Voice</span>
+                <span className="text-sm font-semibold text-foreground">{getActiveVoiceName()}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-background/50 backdrop-blur-md">
+              <Cpu className="w-5 h-5 text-primary" />
+              <div>
+                <span className="text-[10px] text-muted-foreground block uppercase font-bold tracking-wider">Current Engine Tier</span>
+                <span className="text-sm font-semibold text-foreground uppercase">{activeTier}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── SECTION 1: IDENTITY PERSONALIZATION (CUSTOMIZE YOUR VOICE) ── */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between pb-3 border-b border-border/40">
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Mic2 className="w-5 h-5 text-primary" /> 1. Vocal Customization
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Select standard or premium high-fidelity voices to align with your brand persona.
             </p>
           </div>
         </div>
 
-        {/* Model Cards Grid */}
+        {/* Pending state — agent config not yet injected */}
+        {!isProvisioned ? (
+          <div className="flex flex-col items-center justify-center py-20 rounded-2xl border border-dashed border-border/80 bg-muted/10 text-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center border border-border/50 animate-pulse">
+              <Mic2 className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <div className="space-y-2 max-w-sm">
+              <h3 className="text-base font-bold text-foreground">Awaiting Agent Configuration</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Your voice identity module will unlock as soon as our integration team finishes building your agent.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            {/* Standard Catalog */}
+            <div className={`relative flex flex-col justify-between rounded-xl border p-6 bg-card/40 backdrop-blur-xs transition-all duration-300 ${
+              isStandardUnlocked ? "border-border/50" : "border-transparent bg-muted/10 opacity-70"
+            }`}>
+              <div className="space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-base font-bold flex items-center gap-2">
+                      {VOICE_CATALOG.starter.label}
+                      {!isStandardUnlocked && <Badge variant="outline" className="text-[10px] bg-muted/60 text-muted-foreground">Starter Tier Only</Badge>}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">{VOICE_CATALOG.starter.description}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative">
+                  {VOICE_CATALOG.starter.voices.map(voice => {
+                    const isActive = activeVoiceId === voice.id;
+                    return (
+                      <div 
+                        key={voice.id}
+                        onClick={() => isStandardUnlocked && handleVoiceChange(voice.id, VOICE_CATALOG.starter.provider)}
+                        className={`group relative flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 cursor-pointer ${
+                          !isStandardUnlocked 
+                            ? "cursor-not-allowed opacity-50 bg-muted/20 border-transparent" 
+                            : isActive 
+                              ? "bg-emerald-500/10 border-emerald-500/40 ring-1 ring-emerald-500/40" 
+                              : "bg-card border-border/60 hover:border-border hover:shadow-xs"
+                        }`}
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
+                            {voice.name}
+                            {!isStandardUnlocked && <Lock className="w-3 h-3 text-muted-foreground" />}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">{voice.gender}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isActive ? (
+                            <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">
+                              <Check className="w-3.5 h-3.5" />
+                            </div>
+                          ) : (
+                            isStandardUnlocked && (
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-semibold text-primary">
+                                Apply
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Premium Catalog */}
+            <div className={`relative flex flex-col justify-between rounded-xl border p-6 bg-card/40 backdrop-blur-xs transition-all duration-300 ${
+              isPremiumUnlocked ? "border-border/50" : "border-transparent bg-muted/10 opacity-70"
+            }`}>
+              <div className="space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-base font-bold flex items-center gap-2">
+                      {VOICE_CATALOG.premium.label}
+                      {!isPremiumUnlocked && <Badge variant="outline" className="text-[10px] bg-muted/60 text-muted-foreground">Pro / Elite Required</Badge>}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">{VOICE_CATALOG.premium.description}</p>
+                  </div>
+                  {!isPremiumUnlocked && (
+                    <Button asChild size="sm" className="h-8 text-xs font-semibold bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-95 text-white border-0">
+                      <Link href="/wallet">Unlock Premium</Link>
+                    </Button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative">
+                  {VOICE_CATALOG.premium.voices.map(voice => {
+                    const isActive = activeVoiceId === voice.id;
+                    return (
+                      <div 
+                        key={voice.id}
+                        onClick={() => isPremiumUnlocked && handleVoiceChange(voice.id, VOICE_CATALOG.premium.provider)}
+                        className={`group relative flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 cursor-pointer ${
+                          !isPremiumUnlocked 
+                            ? "cursor-not-allowed opacity-50 bg-muted/20 border-transparent" 
+                            : isActive 
+                              ? "bg-orange-500/10 border-orange-500/40 ring-1 ring-orange-500/40" 
+                              : "bg-card border-border/60 hover:border-border hover:shadow-xs"
+                        }`}
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
+                            {voice.name}
+                            {!isPremiumUnlocked && <Lock className="w-3 h-3 text-muted-foreground" />}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">{voice.gender}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isActive ? (
+                            <div className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-xs">
+                              <Check className="w-3.5 h-3.5" />
+                            </div>
+                          ) : (
+                            isPremiumUnlocked && (
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-semibold text-primary">
+                                Apply
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
+      </section>
+
+      {/* ── SECTION 2: CONVERSATIONAL ENGINE TIERS (MODELS SHOWCASE) ── */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between pb-3 border-b border-border/40">
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Brain className="w-5 h-5 text-primary" /> 2. Computational Engines
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Evaluate hardware configuration modules, latency scores, and subscription plans.
+            </p>
+          </div>
+        </div>
+
+        {/* Engine Modules Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {AI_MODELS.map((model) => {
             const isActive = activeTier === model.tierKey;
@@ -218,11 +415,11 @@ export default function ModelsPage() {
             return (
               <div 
                 key={model.id}
-                className={`relative flex flex-col justify-between rounded-lg border p-6 bg-card transition-all duration-300 ${
+                className={`relative flex flex-col justify-between rounded-xl border p-6 bg-gradient-to-b from-card to-card/50 transition-all duration-300 hover:shadow-md ${
                   model.isPopular 
-                    ? "border-orange-500/40 shadow-xs ring-1 ring-orange-500/20" 
+                    ? "border-orange-500/30 shadow-xs" 
                     : "border-border/50 hover:border-border"
-                } ${isActive ? "ring-2 ring-emerald-500/50 border-emerald-500/40" : ""}`}
+                } ${isActive ? "border-emerald-500/40 ring-1 ring-emerald-500/20 bg-emerald-500/[0.01]" : ""}`}
               >
                 {model.isPopular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-orange-500 to-rose-500 text-white text-[9px] font-bold px-3 py-1 rounded-full tracking-wider uppercase shadow-xs">
@@ -231,14 +428,13 @@ export default function ModelsPage() {
                 )}
 
                 <div className="space-y-5">
-                  {/* Header info */}
                   <div className="flex items-center justify-between">
-                    <Badge variant="outline" className={`text-[9px] font-mono tracking-wider uppercase rounded-full px-2 py-0.5 ${model.badgeColor}`}>
+                    <Badge variant="outline" className={`text-[10px] font-mono tracking-wider uppercase rounded-full px-2.5 py-0.5 ${model.badgeColor}`}>
                       {model.badge}
                     </Badge>
                     {isActive && (
-                      <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[9px] font-semibold flex items-center gap-1 rounded-full px-2">
-                        <Check className="w-3 h-3" /> ACTIVE
+                      <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold flex items-center gap-1 rounded-full px-2 py-0.5">
+                        <Check className="w-3 h-3" /> ACTIVE ENGINE
                       </Badge>
                     )}
                   </div>
@@ -248,52 +444,47 @@ export default function ModelsPage() {
                     <p className="text-muted-foreground text-xs mt-1 leading-relaxed">{model.subtitle}</p>
                   </div>
 
-                  {/* Price */}
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-extrabold text-foreground tracking-tight">₹{model.rateRupees}</span>
+                  {/* Price Block */}
+                  <div className="flex items-baseline gap-1 bg-muted/20 p-3 rounded-lg border border-border/40">
+                    <span className="text-2xl font-extrabold text-foreground tracking-tight">₹{model.rateRupees}</span>
                     <span className="text-xs text-muted-foreground font-medium">/ billing minute</span>
                   </div>
 
-                  <p className="text-muted-foreground text-xs leading-relaxed border-t border-border/30 pt-4">
+                  {/* Description */}
+                  <p className="text-muted-foreground text-xs leading-relaxed">
                     {model.description}
                   </p>
 
-                  {/* Core Experience Benchmarks */}
-                  <div className="space-y-3 pt-3 border-t border-border/30">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0">
-                        <Brain className="w-3.5 h-3.5 text-primary" />
+                  {/* Dynamic Hardware & Latency Meter metrics */}
+                  <div className="space-y-4 pt-3 border-t border-border/30">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center text-[10px] uppercase font-semibold text-muted-foreground">
+                        <span>Latency Benchmark</span>
+                        <span className="text-foreground">{model.latencyLevel}</span>
                       </div>
-                      <div>
-                        <span className="text-[9px] text-muted-foreground block uppercase font-semibold">Comprehension</span>
-                        <span className="text-xs font-semibold text-foreground">{model.cognitiveLevel}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0">
-                        <Volume2 className="w-3.5 h-3.5 text-primary" />
-                      </div>
-                      <div>
-                        <span className="text-[9px] text-muted-foreground block uppercase font-semibold">Articulation</span>
-                        <span className="text-xs font-semibold text-foreground">{model.voiceNaturalness}</span>
+                      <div className="w-full h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-primary to-emerald-500 transition-all duration-500" 
+                          style={{ width: `${model.latencyValue}%` }} 
+                        />
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0">
-                        <Users className="w-3.5 h-3.5 text-primary" />
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="p-2.5 rounded-lg bg-muted/20 border border-border/30">
+                        <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">Cognition</span>
+                        <span className="font-semibold text-foreground block mt-0.5 truncate">{model.cognitiveLevel}</span>
                       </div>
-                      <div>
-                        <span className="text-[9px] text-muted-foreground block uppercase font-semibold">Channels Capacity</span>
-                        <span className="text-xs font-semibold text-foreground">{model.concurrencyLimit} active lines</span>
+                      <div className="p-2.5 rounded-lg bg-muted/20 border border-border/30">
+                        <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">Capacity</span>
+                        <span className="font-semibold text-foreground block mt-0.5 truncate">{model.concurrencyLimit} Lines</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Benefits checklist */}
+                  {/* Feature check list */}
                   <div className="space-y-2 pt-3 border-t border-border/30">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Key Features</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Included System Limits</span>
                     <ul className="space-y-1.5">
                       {model.benefits.map((feat, idx) => (
                         <li key={idx} className="flex items-center gap-2 text-xs text-foreground/90">
@@ -308,18 +499,18 @@ export default function ModelsPage() {
                 <div className="mt-6 pt-4 border-t border-border/30">
                   {isActive ? (
                     <Button disabled className="w-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 opacity-100 cursor-default rounded-md h-9 text-xs font-semibold">
-                      Current Live Engine
+                      Currently Running Engine
                     </Button>
                   ) : isHigherTier ? (
                     <Button asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-md h-9 text-xs font-bold shadow-xs">
                       <Link href="/wallet" className="flex items-center justify-center gap-1.5">
-                        Upgrade Engine <ArrowRight className="w-3.5 h-3.5" />
+                        Upgrade Workspace <ArrowRight className="w-3.5 h-3.5" />
                       </Link>
                     </Button>
                   ) : (
                     <Button asChild variant="outline" className="w-full border-border/80 hover:bg-accent rounded-md h-9 text-xs font-semibold text-foreground">
                       <Link href="/wallet" className="flex items-center justify-center gap-1.5">
-                        Switch Engine Tier
+                        Switch Tier Tones
                       </Link>
                     </Button>
                   )}
@@ -330,139 +521,6 @@ export default function ModelsPage() {
         </div>
       </section>
 
-      {/* ── SECTION 2: VOICES ── */}
-      <section className="space-y-8 pt-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-border/40">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 text-[10px] font-semibold uppercase tracking-wider mb-2">
-              <Mic2 className="w-3 h-3 text-emerald-500" /> Identity Personalization
-            </div>
-            <h2 className="text-xl font-bold tracking-tight text-foreground">
-              Customize Your Voice
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Select the vocal identity that best represents your brand. Changes apply instantly to your next call.
-            </p>
-          </div>
-        </div>
-
-        {/* Pending state — agent config not yet injected */}
-        {!isProvisioned ? (
-          <div className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed border-border/60 bg-muted/20 text-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-              <Mic2 className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div className="space-y-1 max-w-xs">
-              <p className="text-sm font-semibold text-foreground">Voice selection isn't available yet</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Your agent is still being configured by our team. Once it goes live, you'll be able to pick your voice here.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Starter Catalog */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold">{VOICE_CATALOG.starter.label}</h3>
-                  <p className="text-xs text-muted-foreground">{VOICE_CATALOG.starter.description}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {VOICE_CATALOG.starter.voices.map(voice => (
-                  <div 
-                    key={voice.id}
-                    className={`relative flex items-center justify-between p-3 rounded-lg border transition-all ${
-                      activeVoiceId === voice.id 
-                        ? "bg-emerald-500/5 border-emerald-500/40 ring-1 ring-emerald-500/40" 
-                        : "bg-card border-border hover:border-foreground/20"
-                    }`}
-                  >
-                    <div className="flex flex-col">
-                      <span className="text-sm font-semibold">{voice.name}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{voice.gender}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {activeVoiceId === voice.id ? (
-                        <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 text-[9px] px-1.5 py-0 shadow-none">Active</Badge>
-                      ) : (
-                        <Button 
-                          size="sm" 
-                          variant="secondary" 
-                          className="h-7 text-xs px-3"
-                          disabled={updatingVoice !== null}
-                          onClick={() => handleVoiceChange(voice.id, VOICE_CATALOG.starter.provider)}
-                        >
-                          {updatingVoice === voice.id ? "Applying..." : "Select"}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Premium Catalog */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold flex items-center gap-2">
-                    {VOICE_CATALOG.premium.label}
-                    {!isPremiumUnlocked && <Badge variant="outline" className="text-[9px] bg-muted/50">Pro Required</Badge>}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">{VOICE_CATALOG.premium.description}</p>
-                </div>
-                {!isPremiumUnlocked && (
-                  <Button asChild size="sm" className="h-7 text-xs px-3 bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 border-0 text-white">
-                    <Link href="/wallet">Upgrade to Unlock</Link>
-                  </Button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {VOICE_CATALOG.premium.voices.map(voice => (
-                  <div 
-                    key={voice.id}
-                    className={`relative flex items-center justify-between p-3 rounded-lg border transition-all ${
-                      !isPremiumUnlocked 
-                        ? "opacity-50 grayscale bg-muted/30 border-transparent" 
-                        : activeVoiceId === voice.id 
-                          ? "bg-orange-500/5 border-orange-500/40 ring-1 ring-orange-500/40" 
-                          : "bg-card border-border hover:border-foreground/20"
-                    }`}
-                  >
-                    <div className="flex flex-col">
-                      <span className="text-sm font-semibold flex items-center gap-1.5">
-                        {voice.name}
-                        {!isPremiumUnlocked && <Lock className="w-3 h-3 text-muted-foreground" />}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{voice.gender}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {activeVoiceId === voice.id ? (
-                        <Badge className="bg-orange-500 text-white hover:bg-orange-600 text-[9px] px-1.5 py-0 shadow-none">Active</Badge>
-                      ) : (
-                        <Button 
-                          size="sm" 
-                          variant="secondary" 
-                          className="h-7 text-xs px-3"
-                          disabled={!isPremiumUnlocked || updatingVoice !== null}
-                          onClick={() => handleVoiceChange(voice.id, VOICE_CATALOG.premium.provider)}
-                        >
-                          {updatingVoice === voice.id ? "Applying..." : "Select"}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
-
     </div>
   );
 }
-
-

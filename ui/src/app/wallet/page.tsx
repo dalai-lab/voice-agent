@@ -21,7 +21,6 @@ export default function WalletPage() {
   const isActivation = searchParams.get("activation") === "true";
   const plan = searchParams.get("plan") || "starter";
   const PLAN_MINIMUMS: Record<string, number> = { starter: 6000, pro: 8000 };
-  const minTopup = isActivation ? (PLAN_MINIMUMS[plan] ?? 6000) : 500;
   const TALKAR = "/api/talkar";
 
   const [wallet, setWallet] = useState<any>(null);
@@ -31,7 +30,7 @@ export default function WalletPage() {
   const [subscription, setSubscription] = useState<any>(null);
   const [usage, setUsage] = useState<any>(null);
   
-  const [topupAmount, setTopupAmount] = useState<string>(isActivation ? String(PLAN_MINIMUMS[plan] ?? 6000) : "");
+  const [topupAmount, setTopupAmount] = useState<string>(String(PLAN_MINIMUMS[plan] ?? 6000));
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [autoRechargeEnabled, setAutoRechargeEnabled] = useState(false);
@@ -40,6 +39,7 @@ export default function WalletPage() {
   const [isSavingRecharge, setIsSavingRecharge] = useState(false);
   const [hasSavedCard, setHasSavedCard] = useState(false);
   const [isRequestingUpgrade, setIsRequestingUpgrade] = useState(false);
+  const [selectedTierToSwitch, setSelectedTierToSwitch] = useState<string | null>(null);
 
   const [resolvedOrgId, setResolvedOrgId] = useState<number | null>(null);
 
@@ -84,9 +84,22 @@ export default function WalletPage() {
     }).catch(console.error);
   }, [resolvedOrgId]);
 
+  useEffect(() => {
+    if (subscription) {
+      const p = subscription.plan || "starter";
+      const min = PLAN_MINIMUMS[p] ?? 6000;
+      if (parseInt(topupAmount || "0") < min) {
+        setTopupAmount(String(min));
+      }
+    }
+  }, [subscription]);
+
   const balanceRupees = wallet && typeof wallet.balance_paise === 'number' ? (wallet.balance_paise / 100).toFixed(2) : "0.00";
   const isZero = !wallet || wallet.balance_paise === 0 || wallet.balance_paise === undefined;
   const isLow = wallet?.balance_paise > 0 && wallet?.balance_paise < 50000;
+
+  const currentPlan = subscription?.plan || plan || "starter";
+  const minTopup = PLAN_MINIMUMS[currentPlan] ?? 6000;
 
   const handleTopup = async (isMock = false) => {
     if (!resolvedOrgId) return;
@@ -597,49 +610,163 @@ export default function WalletPage() {
             <ReceiptText className="w-4 h-4 text-primary" />
             Change Call Tier
           </h2>
-          <p className="text-muted-foreground text-xs">Upgrade your call rate and capacity configurations.</p>
+          <p className="text-muted-foreground text-xs">Switch your call rate and capacity configurations.</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="p-4 border border-border/50 bg-background rounded-lg space-y-3">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-bold text-foreground text-sm">NeuralVocal Pro Engine</h3>
-                <p className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold">Recommended Engine</p>
+          {/* Starter Plan Card */}
+          <div 
+            onClick={() => {
+              if (subscription?.tier !== 'starter') {
+                setSelectedTierToSwitch('starter');
+              }
+            }}
+            className={`p-4 border rounded-lg space-y-3 transition-all flex flex-col justify-between ${
+              subscription?.tier === 'starter' 
+                ? 'border-foreground bg-foreground/[0.02] cursor-default' 
+                : 'border-border/50 bg-background hover:border-foreground/30 cursor-pointer'
+            }`}
+          >
+            <div className="space-y-3">
+              <div className="flex justify-between items-start gap-2">
+                <div>
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
+                    Starter Engine
+                    {subscription?.tier === 'starter' && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        Current
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground">Standard transactional routing</p>
+                </div>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/20 text-muted-foreground font-mono shrink-0">
+                  ₹6 / min
+                </span>
               </div>
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-orange-500/20 bg-orange-500/5 text-orange-600 dark:text-orange-400 font-mono">
-                ₹4 / min
-              </span>
+              <p className="text-muted-foreground text-xs leading-relaxed">A fast, lightweight agent optimized for direct customer interactions, routing calls, and responding to common questions.</p>
+              <ul className="space-y-1 text-xs text-foreground/90 pt-3 border-t border-border/30">
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>2 active concurrent call channels</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>Includes 1 phone line</span>
+                </li>
+              </ul>
             </div>
-            <p className="text-muted-foreground text-xs leading-relaxed">Emotive vocal structures designed for client calls, clinical routes, and outbound campaigns.</p>
-            <ul className="space-y-1 text-xs text-foreground/90">
-              <li className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>10 active concurrent call lines</span>
-              </li>
-              <li className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>Includes 2 phone lines</span>
-              </li>
-            </ul>
+            {subscription?.tier !== 'starter' && (
+              <div className="pt-3">
+                <Button variant="outline" className="w-full text-xs font-semibold h-8 rounded-md pointer-events-none">
+                  Switch to Starter
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Pro Plan Card */}
+          <div 
+            onClick={() => {
+              if (subscription?.tier !== 'pro') {
+                setSelectedTierToSwitch('pro');
+              }
+            }}
+            className={`p-4 border rounded-lg space-y-3 transition-all flex flex-col justify-between ${
+              subscription?.tier === 'pro' 
+                ? 'border-foreground bg-foreground/[0.02] cursor-default' 
+                : 'border-border/50 bg-background hover:border-foreground/30 cursor-pointer'
+            }`}
+          >
+            <div className="space-y-3">
+              <div className="flex justify-between items-start gap-2">
+                <div>
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
+                    NeuralVocal Pro Engine
+                    {subscription?.tier === 'pro' && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        Current
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold">Recommended Engine</p>
+                </div>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-orange-500/20 bg-orange-500/5 text-orange-600 dark:text-orange-400 font-mono shrink-0">
+                  ₹4 / min
+                </span>
+              </div>
+              <p className="text-muted-foreground text-xs leading-relaxed">Combines deep conversational understanding with high-fidelity, emotional voice tones. Speaks with natural human cadence.</p>
+              <ul className="space-y-1 text-xs text-foreground/90 pt-3 border-t border-border/30">
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>10 active concurrent call lines</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>Includes 2 premium phone lines</span>
+                </li>
+              </ul>
+            </div>
+            {subscription?.tier !== 'pro' && (
+              <div className="pt-3">
+                <Button variant="secondary" className="w-full text-xs font-semibold h-8 rounded-md pointer-events-none">
+                  Switch to Pro
+                </Button>
+              </div>
+            )}
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-2.5 justify-end pt-4 border-t border-border/30">
-          {subscription?.tier !== 'starter' && (
-            <Button onClick={() => handleUpgradeRequest('starter')} disabled={isRequestingUpgrade} variant="outline" className="border-border/80 hover:bg-accent text-foreground rounded-md h-9 px-4 text-xs font-semibold">
-              Switch to Starter
-            </Button>
-          )}
-          {subscription?.tier !== 'pro' && (
-            <>
-              <Button onClick={() => handleUpgradeRequest('pro')} disabled={isRequestingUpgrade} variant="secondary" className="rounded-md h-9 px-4 text-xs font-semibold">
-                Switch to Pro
-              </Button>
-            </>
-          )}
-        </div>
       </div>
+
+      {/* Switch Plan Confirmation Modal */}
+      {selectedTierToSwitch && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-card border border-border/80 rounded-lg max-w-sm w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="space-y-1.5">
+              <h3 className="text-sm font-bold text-foreground">Confirm Plan Switch</h3>
+              <p className="text-muted-foreground text-xs">
+                Are you sure you want to switch your plan from <span className="font-semibold text-foreground uppercase">{subscription?.tier || "starter"}</span> to <span className="font-semibold text-foreground uppercase text-primary">{selectedTierToSwitch}</span>?
+              </p>
+            </div>
+            
+            <div className="bg-muted/30 p-3 rounded-lg text-xs space-y-2 border border-border/30 text-muted-foreground">
+              <div className="flex justify-between">
+                <span>New Call Rate:</span>
+                <span className="font-semibold text-foreground">₹{selectedTierToSwitch === "pro" ? "4.00" : "6.00"} / min</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Required Wallet Balance:</span>
+                <span className="font-semibold text-foreground">₹{selectedTierToSwitch === "pro" ? "8,000" : "6,000"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Current Wallet Balance:</span>
+                <span className="font-semibold text-foreground">₹{balanceRupees}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button 
+                onClick={() => setSelectedTierToSwitch(null)} 
+                variant="outline" 
+                className="h-8 text-xs font-semibold rounded-md"
+                disabled={isRequestingUpgrade}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={async () => {
+                  await handleUpgradeRequest(selectedTierToSwitch);
+                  setSelectedTierToSwitch(null);
+                }} 
+                className="h-8 text-xs font-bold rounded-md bg-foreground text-background hover:bg-foreground/90"
+                disabled={isRequestingUpgrade}
+              >
+                {isRequestingUpgrade ? "Switching..." : "Confirm & Switch"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transaction History Card */}
       <div className="bg-card border border-border/50 rounded-lg p-5 shadow-2xs space-y-4">

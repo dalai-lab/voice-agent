@@ -97,6 +97,22 @@ export default function OnboardingPage() {
           } else if (data.status === "agent_building" && !data.has_onboarding_form) {
             setStatus("new_agent_brief");
           }
+        } else if (res.status === 404 && dograhOrgId && email) {
+          // New org in Dograh; check if this user already has a master account
+          const existingRes = await fetch(`${TALKAR_API}/customers/existing?contact_email=${encodeURIComponent(email)}`);
+          if (existingRes.ok) {
+            const existingData = await existingRes.json();
+            if (cancelled) return;
+            // Link to existing master account and skip full business onboarding
+            setCustomerData({ master_customer_id: existingData.customer_id });
+            setStatus("new_agent_brief");
+          } else {
+            // Completely new user
+            if (!cancelled) setStatus("new");
+          }
+        } else {
+          // Unknown error or no dograhOrgId
+          if (!cancelled) setStatus("new");
         }
       } catch (err) {
         console.error("Failed to fetch onboarding status", err);

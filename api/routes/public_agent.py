@@ -506,8 +506,13 @@ async def get_run_extraction(
     )
     if not run:
         raise HTTPException(status_code=404, detail="Workflow run not found")
+        
+    extracted = run.extracted_data
+    if not extracted and run.gathered_context and isinstance(run.gathered_context, dict):
+        extracted = run.gathered_context.get("extracted_variables", {})
+
     return RunExtractionResponse(
         run_id=run.id,
         is_completed=run.is_completed,
-        extracted_data=run.extracted_data,
+        extracted_data=extracted,
     )

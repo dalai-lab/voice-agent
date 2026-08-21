@@ -187,6 +187,8 @@ export function DemoCallForm() {
     // Safety cap: stop polling after 10 minutes
     const pollStartRef = useRef<number>(0);
     const MAX_POLL_MS = 10 * 60 * 1000;
+    // Guard so the polling effect only fires once per run — not every re-render
+    const hasStartedPollingRef = useRef(false);
 
     // Stop polling on unmount to avoid memory leaks
     useEffect(() => {
@@ -195,10 +197,14 @@ export function DemoCallForm() {
         };
     }, []);
 
-    // Start polling whenever workflowRunId is set and we are in "connected" state
+    // Start polling whenever a new workflowRunId arrives.
+    // Depends ONLY on workflowRunId — not on callingState — so the cleanup
+    // that fires when we call setCallingState("polling") inside here doesn't
+    // immediately destroy the interval we just created.
     useEffect(() => {
-        if (!workflowRunId || callingState !== "connected") return;
+        if (!workflowRunId || hasStartedPollingRef.current) return;
 
+        hasStartedPollingRef.current = true;
         setCallingState("polling");
         pollStartRef.current = Date.now();
 
@@ -223,7 +229,7 @@ export function DemoCallForm() {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workflowRunId, callingState === "connected"]);
+    }, [workflowRunId]);
 
     const handleInitiateCall = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -253,6 +259,7 @@ export function DemoCallForm() {
 
     const handleReset = () => {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        hasStartedPollingRef.current = false;
         setCallingState("idle");
         setErrorMessage("");
         setWorkflowRunId(null);

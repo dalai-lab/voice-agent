@@ -47,6 +47,14 @@ class TriggerCallResponse(BaseModel):
     workflow_run_name: str
 
 
+class RunExtractionResponse(BaseModel):
+    """Lightweight response for demo polling: completion flag + extracted variables."""
+
+    run_id: int
+    is_completed: bool
+    extracted_data: dict | None = None
+
+
 @dataclass
 class ResolvedAgentTarget:
     workflow: object
@@ -479,4 +487,27 @@ async def initiate_call_test_by_workflow_uuid(
         x_api_key,
         use_draft=True,
         target_resolver=_resolve_workflow_uuid_target,
+    )
+
+
+@router.get("/run/{run_id}", response_model=RunExtractionResponse)
+async def get_run_extraction(
+    run_id: int,
+    x_api_key: str = Header(..., alias="X-API-Key"),
+):
+    """Poll a workflow run for completion and extracted variables.
+
+    Intended for the demo landing page to fetch AI-extracted call data
+    after a phone call ends. Scoped to the API key's organisation.
+    """
+    api_key = await _validate_api_key(x_api_key)
+    run = await db_client.get_workflow_run(
+        run_id, organization_id=api_key.organization_id
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+    return RunExtractionResponse(
+        run_id=run.id,
+        is_completed=run.is_completed,
+        extracted_data=run.extracted_data,
     )

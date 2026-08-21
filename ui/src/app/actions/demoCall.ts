@@ -14,7 +14,7 @@ const DOGRAH_API_KEY = "dgr_Cx8vqaOxg1GsJ-Anyo0Nj-H5bfTkNTre1S_nPdmMwsY";
 
 // Workflow mapping: Add more workflows here as they are built!
 const WORKFLOW_MAP: Record<string, string> = {
-    hotel: "4f78be88-ed7b-4158-bd67-0dfda37737e7",
+    hotel: "60708cc2-6818-4f0f-a26e-546d24c4e9c5",
     medical: "aff893d1-0f12-4d13-a1d4-de2752913ad1",
     sales: "4a558359-9221-4d8b-a6c9-e54349811f49",
     service: "7b5b8865-eec6-4b4c-8a53-fdf2ba1c17bb",
@@ -147,10 +147,50 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
             };
         }
 
-        return { success: true, message: "Call initiated successfully." };
+        const data = await response.json();
+        return { success: true, message: "Call initiated successfully.", workflowRunId: data.workflow_run_id as number };
 
     } catch (error) {
         console.error("[DemoCall] Server Action Exception:", error);
         return { success: false, error: "An unexpected error occurred. Please try again." };
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Poll a completed run for AI-extracted demo data.
+// Uses the same org API key – no auth-gated routes touched.
+// ---------------------------------------------------------------------------
+export async function pollDemoCallResult(
+    runId: number
+): Promise<{
+    ready: boolean;
+    extractedData?: Record<string, unknown>;
+    error?: string;
+}> {
+    try {
+        const url = `https://talkar.in/api/v1/public/agent/run/${runId}`;
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-API-Key": DOGRAH_API_KEY,
+            },
+            // Always bypass Next.js cache so we get a fresh value each poll
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            return { ready: false, error: `API error ${response.status}` };
+        }
+
+        const data = await response.json();
+
+        if (!data.is_completed) {
+            return { ready: false };
+        }
+
+        return { ready: true, extractedData: data.extracted_data ?? {} };
+    } catch (error) {
+        console.error("[DemoCall] pollDemoCallResult error:", error);
+        return { ready: false, error: "Unexpected error while polling." };
     }
 }

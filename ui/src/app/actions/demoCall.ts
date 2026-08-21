@@ -3,13 +3,103 @@
 import { headers } from "next/headers";
 import fs from "fs/promises";
 import path from "path";
+import zlib from "zlib";
 import * as mammoth from "mammoth";
 
-// Polyfill DOM globals required by pdf-parse / pdf.js in Next.js 15 Server Actions
-if (typeof global !== "undefined") {
-    if (!global.DOMMatrix) (global as any).DOMMatrix = function DOMMatrix() { return {}; };
-    if (!global.ImageData) (global as any).ImageData = function ImageData() { return {}; };
-    if (!global.Path2D) (global as any).Path2D = function Path2D() { return {}; };
+// Pure Node.js zero-dependency PDF text extractor (avoids all @napi-rs/canvas / DOMMatrix issues)
+function extractTextFromPdf(buffer: Buffer): string {
+    const textChunks: string[] = [];
+    const bufferStr = buffer.toString("binary");
+
+    // Match all streams in the PDF
+    const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = streamRegex.exec(bufferStr)) !== null) {
+        const streamStart = match.index + match[0].indexOf("\n") + 1;
+        const rawData = buffer.subarray(streamStart, streamStart + Buffer.byteLength(match[1], "binary"));
+
+        let decompressed: Buffer | null = null;
+        try {
+            decompressed = zlib.inflateSync(rawData);
+        } catch {
+            try {
+                decompressed = zlib.unzipSync(rawData);
+            } catch {
+                decompressed = rawData;
+            }
+        }
+
+        if (decompressed) {
+            const content = decompressed.toString("latin1");
+
+            // Extract text from text blocks (BT ... ET)
+            const textBlockRegex = /BT([\s\S]*?)ET/g;
+            let tbMatch: RegExpExecArray | null;
+            while ((tbMatch = textBlockRegex.exec(content)) !== null) {
+                const blockContent = tbMatch[1];
+
+                // 1. Single string: (Text) Tj
+                const tjRegex = /\((.*?)\)\s*Tj/g;
+                let tjMatch: RegExpExecArray | null;
+                while ((tjMatch = tjRegex.exec(blockContent)) !== null) {
+                    textChunks.push(decodePdfString(tjMatch[1]));
+                }
+
+                // 2. Array of strings: [(Text1) 20 (Text2)] TJ
+                const arrayRegex = /\[(.*?)\]\s*TJ/g;
+                let arrMatch: RegExpExecArray | null;
+                while ((arrMatch = arrayRegex.exec(blockContent)) !== null) {
+                    const inner = arrMatch[1];
+                    const innerStrRegex = /\((.*?)\)/g;
+                    let innerMatch: RegExpExecArray | null;
+                    while ((innerMatch = innerStrRegex.exec(inner)) !== null) {
+                        textChunks.push(decodePdfString(innerMatch[1]));
+                    }
+                }
+
+                // 3. Hex strings: <48656c6c6f> Tj
+                const hexRegex = /<([0-9a-fA-F\s]+)>\s*Tj/g;
+                let hexMatch: RegExpExecArray | null;
+                while ((hexMatch = hexRegex.exec(blockContent)) !== null) {
+                    const hexClean = hexMatch[1].replace(/\s+/g, "");
+                    if (hexClean.length % 2 === 0) {
+                        textChunks.push(Buffer.from(hexClean, "hex").toString("utf-8"));
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: If no structured text found, search for plain printable sequences in buffer
+    if (textChunks.length === 0) {
+        const rawStrings = bufferStr.match(/[\x20-\x7E\s]{4,}/g) || [];
+        // Filter out PDF internal syntax keywords
+        const filtered = rawStrings.filter(s => 
+            !s.includes("/Filter") && 
+            !s.includes("/Length") && 
+            !s.includes("/Type") && 
+            !s.includes("endobj") && 
+            !s.includes("xref") && 
+            !s.includes("trailer")
+        );
+        return filtered.join(" ").slice(0, 4000);
+    }
+
+    return textChunks.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function decodePdfString(str: string): string {
+    return str
+        .replace(/\\([0-7]{1,3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)))
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "\r")
+        .replace(/\\t/g, "\t")
+        .replace(/\\b/g, "\b")
+        .replace(/\\f/g, "\f")
+        .replace(/\\\(/g, "(")
+        .replace(/\\\)/g, ")")
+        .replace(/\\\\/g, "\\");
 }
 
 // Rate limit configuration
@@ -125,16 +215,15 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
                 let resumeText = "";
                 const buffer = Buffer.from(await resumeFile.arrayBuffer());
                 if (resumeFile.name.toLowerCase().endsWith(".pdf")) {
-                    const pdfParse = require("pdf-parse");
-                    const parseFunc = pdfParse.default || pdfParse;
-                    const data = await parseFunc(buffer);
-                    resumeText = data.text;
+                    resumeText = extractTextFromPdf(buffer);
                 } else if (resumeFile.name.toLowerCase().endsWith(".docx")) {
                     const result = await mammoth.extractRawText({ buffer });
                     resumeText = result.value;
                 } else {
                     resumeText = await resumeFile.text();
                 }
+
+                console.log(`[DemoCall] Extracted ${resumeText.trim().length} chars from resume (${resumeFile.name})`);
 
                 if (resumeText.trim().length > 0) {
                     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {

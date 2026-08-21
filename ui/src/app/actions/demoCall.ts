@@ -3,21 +3,26 @@
 import { headers } from "next/headers";
 import fs from "fs/promises";
 import path from "path";
+import * as mammoth from "mammoth";
+const pdf = require("pdf-parse");
 
 // Rate limit configuration
 // Using /tmp/ because Docker containers often have read-only filesystems in /app
 const RATE_LIMIT_FILE = "/tmp/demo_rate_limits.json";
 const RATE_LIMIT_HOURS = 24;
 
-// Hardcoded Dograh API configuration
-const DOGRAH_API_KEY = "dgr_Cx8vqaOxg1GsJ-Anyo0Nj-H5bfTkNTre1S_nPdmMwsY";
+// API configuration from environment variables
+const DOGRAH_API_KEY = process.env.DOGRAH_API_KEY || "dgr_Cx8vqaOxg1GsJ-Anyo0Nj-H5bfTkNTre1S_nPdmMwsY";
+const OPENAI_API_DEMO_KEY = process.env.OPENAI_API_DEMO_KEY || process.env.OPENAI_API_KEY;
 
 // Workflow mapping: Add more workflows here as they are built!
 const WORKFLOW_MAP: Record<string, string> = {
     hotel: "60708cc2-6818-4f0f-a26e-546d24c4e9c5",
-    medical: "aff893d1-0f12-4d13-a1d4-de2752913ad1",
-    sales: "4a558359-9221-4d8b-a6c9-e54349811f49",
-    service: "7b5b8865-eec6-4b4c-8a53-fdf2ba1c17bb",
+    medical: "0fdf213b-9f96-4000-a2a0-8b64392d8f5b",
+    sales: "8f1b5a75-ee5b-47eb-9d2e-f22dad2c3157",
+    service: "cb75c339-e0de-46a5-a3b8-843fe5189241",
+    real_estate: "6b92b43d-8251-4b48-97f8-8a0bc643ac31",
+    recruiter: "4bb689a2-f139-4b40-af2a-e0eb8c9c502f"
 };
 
 interface RateLimitData {
@@ -65,6 +70,8 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
         const name = formData.get("name") as string;
         const phone = formData.get("phone") as string;
         const useCase = formData.get("useCase") as string;
+        const jobDescription = formData.get("jobDescription") as string | null;
+        const resumeFile = formData.get("resumeFile") as File | null;
 
         if (!name || !phone || !useCase) {
             return { success: false, error: "Please fill in all fields." };
@@ -105,6 +112,49 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
             formattedPhone = "+" + formattedPhone;
         }
 
+        // Parse and Summarize Resume if Recruiter
+        let resumeSummary = "";
+        if (useCase === "recruiter" && resumeFile) {
+            try {
+                let resumeText = "";
+                const buffer = Buffer.from(await resumeFile.arrayBuffer());
+                if (resumeFile.name.toLowerCase().endsWith(".pdf")) {
+                    const data = await pdf(buffer);
+                    resumeText = data.text;
+                } else if (resumeFile.name.toLowerCase().endsWith(".docx")) {
+                    const result = await mammoth.extractRawText({ buffer });
+                    resumeText = result.value;
+                } else {
+                    resumeText = await resumeFile.text();
+                }
+
+                if (resumeText.trim().length > 0) {
+                    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${OPENAI_API_DEMO_KEY}`
+                        },
+                        body: JSON.stringify({
+                            model: "gpt-4o-mini",
+                            messages: [
+                                { role: "system", content: "You are an expert HR assistant. Summarize the following resume in exactly 100-150 words, focusing only on their primary skills, years of experience, and key roles. Output only the summary." },
+                                { role: "user", content: resumeText }
+                            ]
+                        })
+                    });
+                    if (openaiRes.ok) {
+                        const openaiData = await openaiRes.json();
+                        resumeSummary = openaiData.choices[0].message.content;
+                    } else {
+                        console.error("[DemoCall] OpenAI API failed:", await openaiRes.text());
+                    }
+                }
+            } catch (err) {
+                console.error("[DemoCall] Failed to parse/summarize resume:", err);
+            }
+        }
+
         // Make the API request to the Dograh backend
         // We use the public URL because 127.0.0.1 inside a Docker container points to the container itself, not the host!
         const url = `https://talkar.in/api/v1/public/agent/workflow/${workflowId}`;
@@ -122,7 +172,9 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
                 initial_context: {
                     first_name: firstName,
                     customer_name: name,
-                    source: "landing_page_demo"
+                    source: "landing_page_demo",
+                    ...(useCase === "recruiter" && jobDescription ? { job_description: jobDescription } : {}),
+                    ...(useCase === "recruiter" && resumeSummary ? { resume: resumeSummary } : {})
                 }
             })
         });

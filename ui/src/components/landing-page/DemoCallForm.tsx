@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Check, X, PhoneCall, ArrowRight, Hotel, Stethoscope, Briefcase, Wrench, Star, BedDouble, Users, Calendar, Smile, Meh, Frown } from "lucide-react";
+import { Check, X, PhoneCall, ArrowRight, Hotel, Stethoscope, Briefcase, Wrench, Star, BedDouble, Users, Calendar, Smile, Meh, Frown, Home } from "lucide-react";
 import Link from "next/link";
 import { initiateDemoCall, pollDemoCallResult } from "@/app/actions/demoCall";
 
@@ -20,150 +20,693 @@ interface HotelExtractedData {
     interest_score?: number;
 }
 
+interface SalesExtractedData {
+    prospect_name?: string;
+    company_size?: string;
+    primary_pain_point?: string;
+    timeline?: string;
+    demo_booked?: boolean;
+    lead_score?: number;
+    sentiment?: string;
+}
+
+interface RecruiterExtractedData {
+    candidate_name?: string;
+    experience_level?: string;
+    key_skills?: string;
+    salary_expectations?: string;
+    notice_period?: string;
+    communication_skills?: string;
+    candidate_score?: number;
+}
+
+interface MedicalExtractedData {
+    patient_name?: string;
+    patient_type?: string;
+    call_reason?: string;
+    symptoms_mentioned?: string;
+    preferred_date_time?: string;
+    action_taken?: string;
+    urgency_level?: string;
+}
+
+interface ServiceExtractedData {
+    customer_name?: string;
+    service_category?: string;
+    issue_description?: string;
+    service_address?: string;
+    preferred_schedule?: string;
+    urgency_level?: string;
+    job_status?: string;
+}
+
+interface RealEstateExtractedData {
+    client_name?: string;
+    client_intent?: string;
+    property_preference?: string;
+    budget_range?: string;
+    timeline?: string;
+    pre_approved_status?: string;
+    lead_outcome?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Hotel Demo Result Card
 // ---------------------------------------------------------------------------
 
-function SentimentBadge({ sentiment }: { sentiment?: string }) {
-    if (!sentiment) return null;
-    const map: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
-        Positive: { icon: <Smile className="w-3.5 h-3.5" />, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/30" },
-        Neutral:  { icon: <Meh  className="w-3.5 h-3.5" />, color: "text-amber-400",   bg: "bg-amber-500/10  border-amber-500/30"  },
-        Negative: { icon: <Frown className="w-3.5 h-3.5" />, color: "text-rose-400",   bg: "bg-rose-500/10   border-rose-500/30"   },
-    };
-    const s = map[sentiment] ?? map["Neutral"];
-    return (
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold ${s.color} ${s.bg}`}>
-            {s.icon} {sentiment}
-        </span>
-    );
-}
-
-function InterestMeter({ score }: { score?: number }) {
-    const pct = score != null ? Math.round((score / 10) * 100) : 0;
-    const label = score == null ? "–" : score >= 8 ? "🔥 Very Interested" : score >= 5 ? "👀 Somewhat Interested" : "😐 Low Interest";
-    const barColor = score == null ? "bg-gray-600" : score >= 8 ? "bg-gradient-to-r from-orange-500 to-rose-500" : score >= 5 ? "bg-gradient-to-r from-amber-400 to-orange-400" : "bg-gray-500";
-
-    return (
-        <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[10px]">
-                <span className="text-gray-400 font-medium">Interest Level</span>
-                <span className="text-white font-semibold">{score != null ? `${score}/10` : "–"}</span>
-            </div>
-            <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-                <div
-                    className={`h-full rounded-full transition-all duration-1000 ease-out ${barColor}`}
-                    style={{ width: `${pct}%` }}
-                />
-            </div>
-            <p className="text-[10px] text-gray-400">{label}</p>
-        </div>
-    );
-}
-
-function DataRow({ icon, label, value }: { icon: React.ReactNode; label: string; value?: string | number | boolean | null }) {
-    if (value == null || value === "" || value === false) return null;
-    const display = typeof value === "boolean" ? (value ? "Yes" : "No") : String(value);
-    return (
-        <div className="flex items-start gap-2.5 py-2 border-b border-white/5 last:border-0">
-            <span className="text-orange-400 mt-0.5 shrink-0">{icon}</span>
-            <div className="min-w-0">
-                <p className="text-[10px] text-gray-500 font-medium leading-none mb-0.5">{label}</p>
-                <p className="text-xs text-white font-semibold truncate">{display}</p>
-            </div>
-        </div>
-    );
-}
-
 function HotelResultCard({
     data,
     phone,
-    onReset,
 }: {
     data: HotelExtractedData;
     phone: string;
-    onReset: () => void;
 }) {
+    // Generate hospitality-themed status and intent summaries
+    const hasHighIntent = data.wants_to_book && (data.interest_score ?? 0) >= 7;
+    
+    const engagementLabel = 
+        (data.interest_score ?? 0) >= 8 ? "Highly Committed" :
+        (data.interest_score ?? 0) >= 5 ? "Inquisitive & Warm" : "General Inquiry";
+        
+    const sentimentLabel = 
+        data.sentiment === "Positive" ? "Warm & Receptive" :
+        data.sentiment === "Negative" ? "Hesitant / Neutral" : "Neutral & Polite";
+
     return (
-        <div className="w-full max-w-md animate-in fade-in zoom-in-95 duration-500 space-y-0">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-[#FF5500]/20 to-[#E11D48]/10 border border-orange-500/20 rounded-t-2xl p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF5500] to-[#E11D48] flex items-center justify-center shadow-lg shadow-orange-600/30 shrink-0">
-                    <Hotel className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-white leading-tight">The Grand Horizon</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Sarah · Virtual Receptionist · +91 {phone}</p>
-                </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                    <Check className="w-3 h-3 text-emerald-400" />
-                    <span className="text-[10px] text-emerald-400 font-semibold">Call Complete</span>
-                </div>
-            </div>
-
-            {/* Body */}
-            <div className="bg-[#16151E]/95 border-x border-white/10 p-4 space-y-3">
-                {/* Caller + sentiment row */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-[10px] text-gray-500 font-medium">Caller</p>
-                        <p className="text-sm text-white font-bold">{data.caller_name || "Guest"}</p>
+        <div className="w-full max-w-md bg-[#0C0B0F] border border-neutral-850 rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
+            {/* Header / Branding */}
+            <div className="border-b border-neutral-900 px-6 py-4 flex items-center justify-between bg-[#111014]">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                        <Hotel className="w-4 h-4 text-amber-400" />
                     </div>
-                    <SentimentBadge sentiment={data.sentiment} />
+                    <div>
+                        <h4 className="text-xs font-semibold tracking-wider text-neutral-300 uppercase leading-none">THE GRAND HORIZON</h4>
+                        <span className="text-[10px] text-neutral-500 font-medium">Guest Assistant Log</span>
+                    </div>
                 </div>
-
-                <div className="h-px bg-white/5" />
-
-                {/* Details */}
-                <div>
-                    <DataRow
-                        icon={<Star className="w-3.5 h-3.5" />}
-                        label="Reason for Call"
-                        value={data.inquiry_type}
-                    />
-                    <DataRow
-                        icon={<Check className="w-3.5 h-3.5" />}
-                        label="Wants to Book"
-                        value={data.wants_to_book}
-                    />
-                    <DataRow
-                        icon={<Calendar className="w-3.5 h-3.5" />}
-                        label="Check-in Date"
-                        value={data.check_in_date}
-                    />
-                    <DataRow
-                        icon={<Users className="w-3.5 h-3.5" />}
-                        label="Number of Guests"
-                        value={data.guests_count}
-                    />
-                    <DataRow
-                        icon={<BedDouble className="w-3.5 h-3.5" />}
-                        label="Room Preference"
-                        value={data.room_preference}
-                    />
-                </div>
-
-                <div className="h-px bg-white/5" />
-
-                {/* Interest meter */}
-                <InterestMeter score={data.interest_score} />
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-medium text-emerald-400 tracking-wider uppercase">
+                    Processed
+                </span>
             </div>
 
-            {/* Footer */}
-            <div className="bg-[#16151E]/95 border border-white/10 rounded-b-2xl p-4 flex gap-2">
+            {/* AI Summary Highlight */}
+            <div className="px-6 py-4.5 bg-[#141318]/50 border-b border-neutral-900/60">
+                <span className="text-[9px] font-bold text-amber-400/80 uppercase tracking-wider block mb-1">CONVERSATION OVERVIEW</span>
+                <p className="text-xs text-neutral-400 italic leading-relaxed">
+                    "{data.caller_name || "Guest"} initiated an inquiry. {
+                        hasHighIntent 
+                            ? "They demonstrated clear booking intent and would like to finalize room arrangements." 
+                            : "They reviewed property details and availability with no active booking requested yet."
+                    }"
+                </p>
+            </div>
+
+            {/* Industrial Grid Details */}
+            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-neutral-900/60">
+                <div>
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">GUEST</span>
+                    <span className="text-xs font-semibold text-neutral-200">{data.caller_name || "Anonymous Guest"}</span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">INTENT STATUS</span>
+                    <span className={`text-xs font-semibold ${data.wants_to_book ? "text-amber-400" : "text-neutral-400"}`}>
+                        {data.wants_to_book ? "Reservation Requested" : "Inquiry Only"}
+                    </span>
+                </div>
+
+                {data.check_in_date && (
+                    <div>
+                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">CHECK-IN</span>
+                        <span className="text-xs font-semibold text-neutral-200">{data.check_in_date}</span>
+                    </div>
+                )}
+                {data.guests_count != null && data.guests_count > 0 && (
+                    <div>
+                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">PARTY SIZE</span>
+                        <span className="text-xs font-semibold text-neutral-200">{data.guests_count} {data.guests_count === 1 ? "Guest" : "Guests"}</span>
+                    </div>
+                )}
+                
+                {data.room_preference && (
+                    <div className="col-span-2">
+                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">ROOM PREFERENCE</span>
+                        <span className="text-xs font-semibold text-neutral-300">{data.room_preference}</span>
+                    </div>
+                )}
+            </div>
+
+            {/* Hospitality Engagement Insights */}
+            <div className="px-6 py-4 bg-[#111014]/80 grid grid-cols-2 gap-4 border-b border-neutral-900/60">
+                <div>
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">GUEST SENTIMENT</span>
+                    <span className="text-xs font-semibold text-neutral-200">{sentimentLabel}</span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">ENGAGEMENT INDEX</span>
+                    <span className="text-xs font-semibold text-amber-400">{engagementLabel}</span>
+                </div>
+            </div>
+
+            {/* Action Footer */}
+            <div className="p-4 bg-[#111014] flex items-center justify-between gap-3">
                 <Link
                     href="/auth/signup"
-                    className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-[#FF5500] to-[#E11D48] text-white hover:opacity-90 transition-all shadow-sm flex items-center justify-center gap-1.5"
+                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-amber-500 text-neutral-950 hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/10 flex items-center justify-center gap-1.5"
                 >
                     Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
-                <button
-                    onClick={onReset}
-                    type="button"
-                    className="py-2.5 px-3 rounded-xl text-xs font-semibold border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-gray-400"
+            </div>
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sales Demo Result Card
+// ---------------------------------------------------------------------------
+
+function SalesResultCard({
+    data,
+}: {
+    data: SalesExtractedData;
+    phone: string;
+}) {
+    // Generate SaaS CRM-themed status and intent summaries
+    const isHotLead = data.demo_booked || (data.lead_score ?? 0) >= 8;
+    
+    const pipelineStatus = data.demo_booked ? "Demo Scheduled (SQL)" : isHotLead ? "Priority Nurture (MQL)" : "Lead Nurture";
+    const pipelineColor = data.demo_booked ? "text-emerald-400" : isHotLead ? "text-amber-400" : "text-indigo-400";
+    const badgeColor = data.demo_booked ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-amber-500/10 border-amber-500/20 text-amber-400";
+        
+    const scoreLabel = 
+        (data.lead_score ?? 0) >= 8 ? "🔥 Hot Lead (High Intent)" :
+        (data.lead_score ?? 0) >= 5 ? "Warm Lead" : "❄️ Cold Lead (Low Intent)";
+
+    return (
+        <div className="w-full max-w-md bg-[#0A0F1C] border border-[#1E293B] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
+            {/* Header / Branding */}
+            <div className="border-b border-[#1E293B] px-6 py-4 flex items-center justify-between bg-[#0F172A]">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                        <Briefcase className="w-4 h-4 text-indigo-400" />
+                    </div>
+                    <div>
+                        <h4 className="text-xs font-semibold tracking-wider text-slate-300 uppercase leading-none">NORTHWIND SOFTWARE</h4>
+                        <span className="text-[10px] text-slate-500 font-medium">Lead Intelligence Brief</span>
+                    </div>
+                </div>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
+                    {data.demo_booked ? "Meeting Booked" : "Processed"}
+                </span>
+            </div>
+
+            {/* AI Summary Highlight */}
+            <div className="px-6 py-4.5 bg-[#0F172A]/50 border-b border-[#1E293B]/60">
+                <span className="text-[9px] font-bold text-indigo-400/80 uppercase tracking-wider block mb-1">DEAL BRIEF</span>
+                <p className="text-xs text-slate-400 italic leading-relaxed">
+                    "Prospect initiated an inbound sales inquiry. {
+                        data.demo_booked 
+                            ? "They are actively evaluating solutions and scheduled a product demo." 
+                            : "They are currently exploring options and gathering initial information."
+                    }"
+                </p>
+            </div>
+
+            {/* Industrial CRM Grid Details */}
+            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#1E293B]/60">
+                <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">LEAD NAME</span>
+                    <span className="text-xs font-semibold text-slate-200">{data.prospect_name || "Anonymous Prospect"}</span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PIPELINE STATUS</span>
+                    <span className={`text-xs font-semibold ${pipelineColor}`}>
+                        {pipelineStatus}
+                    </span>
+                </div>
+
+                {data.company_size && (
+                    <div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">COMPANY SIZE</span>
+                        <span className="text-xs font-semibold text-slate-200">{data.company_size}</span>
+                    </div>
+                )}
+                {data.timeline && (
+                    <div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">TIMELINE</span>
+                        <span className="text-xs font-semibold text-slate-200">{data.timeline}</span>
+                    </div>
+                )}
+                
+                {data.primary_pain_point && (
+                    <div className="col-span-2">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PRIMARY USE CASE / PAIN POINT</span>
+                        <span className="text-xs font-semibold text-slate-300">{data.primary_pain_point}</span>
+                    </div>
+                )}
+            </div>
+
+            {/* Call Metrics */}
+            <div className="px-6 py-4 bg-[#0F172A]/80 grid grid-cols-2 gap-4 border-b border-[#1E293B]/60">
+                <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PROSPECT VIBE</span>
+                    <span className="text-xs font-semibold text-slate-200">{data.sentiment || "Neutral"}</span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">LEAD QUALIFICATION</span>
+                    <span className="text-xs font-semibold text-indigo-400">{scoreLabel}</span>
+                </div>
+            </div>
+
+            {/* Action Footer */}
+            <div className="p-4 bg-[#0F172A] flex items-center justify-between gap-3">
+                <Link
+                    href="/auth/signup"
+                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-indigo-500 text-white hover:bg-indigo-400 transition-colors shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-1.5"
                 >
-                    Try Again
-                </button>
+                    Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+            </div>
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Recruiter Demo Result Card
+// ---------------------------------------------------------------------------
+
+function RecruiterResultCard({
+    data,
+}: {
+    data: RecruiterExtractedData;
+    phone: string;
+}) {
+    const isStrongFit = (data.candidate_score ?? 0) >= 7;
+    const stageStatus = isStrongFit ? "Move to Technical Round" : "Rejected / Keep in Pool";
+    const stageColor = isStrongFit ? "text-emerald-400" : "text-rose-400";
+    const badgeColor = isStrongFit ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-neutral-800 border-neutral-700 text-neutral-400";
+
+    return (
+        <div className="w-full max-w-md bg-[#0F0E14] border border-[#27272A] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
+            {/* Header / Branding */}
+            <div className="border-b border-[#27272A] px-6 py-4 flex items-center justify-between bg-[#18181B]">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                        <Users className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div>
+                        <h4 className="text-xs font-semibold tracking-wider text-neutral-300 uppercase leading-none">NORTHWIND HR</h4>
+                        <span className="text-[10px] text-neutral-500 font-medium">Applicant Tracking System</span>
+                    </div>
+                </div>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
+                    Screening Complete
+                </span>
+            </div>
+
+            {/* AI Summary Highlight */}
+            <div className="px-6 py-4.5 bg-[#18181B]/50 border-b border-[#27272A]/60">
+                <span className="text-[9px] font-bold text-blue-400/80 uppercase tracking-wider block mb-1">CANDIDATE BRIEF</span>
+                <p className="text-xs text-neutral-400 italic leading-relaxed">
+                    "Completed initial screening with {data.candidate_name || 'Candidate'}. {
+                        isStrongFit 
+                            ? "Candidate demonstrated strong alignment with the job description and communicated effectively." 
+                            : "Candidate may require further review or lacks some key qualifications at this time."
+                    }"
+                </p>
+            </div>
+
+            {/* ATS Grid Details */}
+            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#27272A]/60">
+                <div>
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">CANDIDATE NAME</span>
+                    <span className="text-xs font-semibold text-neutral-200">{data.candidate_name || "Unknown"}</span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">RECOMMENDED ACTION</span>
+                    <span className={`text-xs font-semibold ${stageColor}`}>
+                        {stageStatus}
+                    </span>
+                </div>
+
+                {data.experience_level && (
+                    <div>
+                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">EXPERIENCE</span>
+                        <span className="text-xs font-semibold text-neutral-200">{data.experience_level}</span>
+                    </div>
+                )}
+                {data.notice_period && (
+                    <div>
+                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">AVAILABILITY</span>
+                        <span className="text-xs font-semibold text-neutral-200">{data.notice_period}</span>
+                    </div>
+                )}
+                
+                {data.key_skills && (
+                    <div className="col-span-2">
+                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">KEY SKILLS EXTRACTED</span>
+                        <span className="text-xs font-semibold text-neutral-300">{data.key_skills}</span>
+                    </div>
+                )}
+            </div>
+
+            {/* Metrics */}
+            <div className="px-6 py-4 bg-[#18181B]/80 grid grid-cols-2 gap-4 border-b border-[#27272A]/60">
+                <div>
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">COMMUNICATION</span>
+                    <span className="text-xs font-semibold text-neutral-200">{data.communication_skills || "N/A"}</span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">JD ALIGNMENT SCORE</span>
+                    <span className="text-xs font-semibold text-blue-400">{data.candidate_score ?? 0} / 10</span>
+                </div>
+            </div>
+
+            {/* Action Footer */}
+            <div className="p-4 bg-[#18181B] flex items-center justify-between gap-3">
+                <Link
+                    href="/auth/signup"
+                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/10 flex items-center justify-center gap-1.5"
+                >
+                    Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+            </div>
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Medical Demo Result Card
+// ---------------------------------------------------------------------------
+
+function MedicalResultCard({
+    data,
+}: {
+    data: MedicalExtractedData;
+    phone: string;
+}) {
+    const isUrgent = data.urgency_level === "High";
+    const urgencyColor = isUrgent ? "text-rose-400" : data.urgency_level === "Medium" ? "text-amber-400" : "text-emerald-400";
+    const badgeColor = isUrgent ? "bg-rose-500/10 border-rose-500/20 text-rose-400" : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400";
+
+    return (
+        <div className="w-full max-w-md bg-[#0F172A] border border-[#1E293B] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
+            {/* Header / Branding */}
+            <div className="border-b border-[#1E293B] px-6 py-4 flex items-center justify-between bg-[#0B1120]">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
+                        <Stethoscope className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <div>
+                        <h4 className="text-xs font-semibold tracking-wider text-slate-300 uppercase leading-none">RIVERSIDE CLINIC</h4>
+                        <span className="text-[10px] text-slate-500 font-medium">Patient Triage System</span>
+                    </div>
+                </div>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
+                    Triage Complete
+                </span>
+            </div>
+
+            {/* AI Summary Highlight */}
+            <div className="px-6 py-4.5 bg-[#0B1120]/50 border-b border-[#1E293B]/60">
+                <span className="text-[9px] font-bold text-cyan-400/80 uppercase tracking-wider block mb-1">CLINICAL SUMMARY</span>
+                <p className="text-xs text-slate-400 italic leading-relaxed">
+                    "Completed triage for {data.patient_name || 'Patient'}. {
+                        data.action_taken ? `Outcome: ${data.action_taken}.` : "Request logged for provider review."
+                    }"
+                </p>
+            </div>
+
+            {/* Medical Grid Details */}
+            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#1E293B]/60">
+                <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PATIENT NAME</span>
+                    <span className="text-xs font-semibold text-slate-200">{data.patient_name || "Unknown"}</span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">URGENCY LEVEL</span>
+                    <span className={`text-xs font-semibold ${urgencyColor}`}>
+                        {data.urgency_level || "Standard"}
+                    </span>
+                </div>
+
+                {data.patient_type && (
+                    <div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PATIENT TYPE</span>
+                        <span className="text-xs font-semibold text-slate-200">{data.patient_type}</span>
+                    </div>
+                )}
+                {data.call_reason && (
+                    <div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">REASON FOR CALL</span>
+                        <span className="text-xs font-semibold text-slate-200">{data.call_reason}</span>
+                    </div>
+                )}
+                
+                {data.symptoms_mentioned && (
+                    <div className="col-span-2">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">SYMPTOMS / NOTES</span>
+                        <span className="text-xs font-semibold text-slate-300">{data.symptoms_mentioned}</span>
+                    </div>
+                )}
+            </div>
+
+            {/* Metrics */}
+            <div className="px-6 py-4 bg-[#0B1120]/80 grid grid-cols-2 gap-4 border-b border-[#1E293B]/60">
+                <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">ACTION TAKEN</span>
+                    <span className="text-xs font-semibold text-cyan-400">{data.action_taken || "Pending"}</span>
+                </div>
+                {data.preferred_date_time && (
+                    <div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PREFERRED TIME</span>
+                        <span className="text-xs font-semibold text-slate-200">{data.preferred_date_time}</span>
+                    </div>
+                )}
+            </div>
+
+            {/* Action Footer */}
+            <div className="p-4 bg-[#0B1120] flex items-center justify-between gap-3">
+                <Link
+                    href="/auth/signup"
+                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-cyan-600 text-white hover:bg-cyan-500 transition-colors shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-1.5"
+                >
+                    Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+            </div>
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Home Services Demo Result Card
+// ---------------------------------------------------------------------------
+
+function ServiceResultCard({
+    data,
+}: {
+    data: ServiceExtractedData;
+    phone: string;
+}) {
+    const isUrgent = data.urgency_level === "Emergency";
+    const statusColor = data.job_status === "Booked" ? "text-emerald-400" : data.job_status === "Quote Requested" ? "text-amber-400" : "text-orange-400";
+    const badgeColor = isUrgent ? "bg-rose-500/10 border-rose-500/20 text-rose-400 animate-pulse" : "bg-orange-500/10 border-orange-500/20 text-orange-400";
+
+    return (
+        <div className="w-full max-w-md bg-[#18181B] border border-[#27272A] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
+            {/* Header / Branding */}
+            <div className="border-b border-[#27272A] px-6 py-4 flex items-center justify-between bg-[#09090B]">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                        <Wrench className="w-4 h-4 text-orange-400" />
+                    </div>
+                    <div>
+                        <h4 className="text-xs font-bold tracking-wider text-neutral-300 uppercase leading-none">BLUEFIELD DISPATCH</h4>
+                        <span className="text-[10px] text-neutral-500 font-medium">Field Service Management</span>
+                    </div>
+                </div>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
+                    {isUrgent ? "EMERGENCY" : "DISPATCH LOG"}
+                </span>
+            </div>
+
+            {/* AI Summary Highlight */}
+            <div className="px-6 py-4.5 bg-[#09090B]/50 border-b border-[#27272A]/60">
+                <span className="text-[9px] font-bold text-orange-400/80 uppercase tracking-wider block mb-1">CALL SUMMARY</span>
+                <p className="text-xs text-neutral-400 italic leading-relaxed">
+                    "Field agent intake complete for {data.customer_name || 'Customer'}. {
+                        data.job_status === "Booked" 
+                            ? "Service appointment successfully scheduled." 
+                            : data.job_status === "Quote Requested"
+                            ? "Estimate requested, dispatching field assessor."
+                            : "Issue documented for follow-up."
+                    }"
+                </p>
+            </div>
+
+            {/* Service Grid Details */}
+            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#27272A]/60">
+                <div>
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">CUSTOMER NAME</span>
+                    <span className="text-xs font-semibold text-neutral-200">{data.customer_name || "Unknown"}</span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">JOB STATUS</span>
+                    <span className={`text-xs font-semibold ${statusColor}`}>
+                        {data.job_status || "Pending"}
+                    </span>
+                </div>
+
+                {data.service_category && (
+                    <div>
+                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">SERVICE TYPE</span>
+                        <span className="text-xs font-semibold text-neutral-200">{data.service_category}</span>
+                    </div>
+                )}
+                {data.urgency_level && (
+                    <div>
+                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">URGENCY</span>
+                        <span className={`text-xs font-semibold ${isUrgent ? 'text-rose-400' : 'text-neutral-200'}`}>
+                            {data.urgency_level}
+                        </span>
+                    </div>
+                )}
+                
+                {data.issue_description && (
+                    <div className="col-span-2">
+                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">ISSUE DESCRIPTION</span>
+                        <span className="text-xs font-semibold text-neutral-300">{data.issue_description}</span>
+                    </div>
+                )}
+                {data.service_address && (
+                    <div className="col-span-2">
+                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">SERVICE ADDRESS</span>
+                        <span className="text-xs font-semibold text-neutral-300">{data.service_address}</span>
+                    </div>
+                )}
+            </div>
+
+            {/* Metrics */}
+            <div className="px-6 py-4 bg-[#09090B]/80 grid grid-cols-2 gap-4 border-b border-[#27272A]/60">
+                <div className="col-span-2">
+                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">PREFERRED SCHEDULE</span>
+                    <span className="text-xs font-semibold text-orange-400">{data.preferred_schedule || "ASAP"}</span>
+                </div>
+            </div>
+
+            {/* Action Footer */}
+            <div className="p-4 bg-[#09090B] flex items-center justify-between gap-3">
+                <Link
+                    href="/auth/signup"
+                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-orange-600 text-white hover:bg-orange-500 transition-colors shadow-lg shadow-orange-500/10 flex items-center justify-center gap-1.5"
+                >
+                    Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+            </div>
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Real Estate Demo Result Card
+// ---------------------------------------------------------------------------
+
+function RealEstateResultCard({
+    data,
+}: {
+    data: RealEstateExtractedData;
+    phone: string;
+}) {
+    const isHotLead = data.lead_outcome === "Showing Scheduled" || data.lead_outcome === "Consultation Booked" || data.lead_outcome === "Valuation Requested";
+    const statusColor = isHotLead ? "text-amber-400" : "text-blue-400";
+    const badgeColor = isHotLead ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : "bg-blue-500/10 border-blue-500/20 text-blue-400";
+
+    return (
+        <div className="w-full max-w-md bg-[#0F172A] border border-[#1E293B] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
+            {/* Header / Branding */}
+            <div className="border-b border-[#1E293B] px-6 py-4 flex items-center justify-between bg-[#0B1120]">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                        <Home className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div>
+                        <h4 className="text-xs font-bold tracking-wider text-slate-200 uppercase leading-none">MAPLE & CO REALTY</h4>
+                        <span className="text-[10px] text-slate-500 font-medium">Lead Management CRM</span>
+                    </div>
+                </div>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
+                    Lead Captured
+                </span>
+            </div>
+
+            {/* AI Summary Highlight */}
+            <div className="px-6 py-4.5 bg-[#0B1120]/50 border-b border-[#1E293B]/60">
+                <span className="text-[9px] font-bold text-amber-400/80 uppercase tracking-wider block mb-1">CALL SUMMARY</span>
+                <p className="text-xs text-slate-400 italic leading-relaxed">
+                    "Incoming inquiry captured for {data.client_name || 'Client'}. {
+                        isHotLead 
+                            ? "Action required: Lead successfully booked for next steps." 
+                            : "Lead logged into CRM for future nurturing."
+                    }"
+                </p>
+            </div>
+
+            {/* Real Estate Grid Details */}
+            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#1E293B]/60">
+                <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">CLIENT NAME</span>
+                    <span className="text-xs font-semibold text-slate-200">{data.client_name || "Unknown"}</span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">INTENT</span>
+                    <span className={`text-xs font-semibold text-slate-200`}>
+                        {data.client_intent || "Inquiry"}
+                    </span>
+                </div>
+
+                {data.budget_range && (
+                    <div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">BUDGET RANGE</span>
+                        <span className="text-xs font-semibold text-emerald-400">{data.budget_range}</span>
+                    </div>
+                )}
+                {data.timeline && (
+                    <div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">TIMELINE</span>
+                        <span className="text-xs font-semibold text-slate-200">{data.timeline}</span>
+                    </div>
+                )}
+                
+                {data.property_preference && (
+                    <div className="col-span-2">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PROPERTY INTEREST / AREA</span>
+                        <span className="text-xs font-semibold text-slate-300">{data.property_preference}</span>
+                    </div>
+                )}
+            </div>
+
+            {/* Metrics */}
+            <div className="px-6 py-4 bg-[#0B1120]/80 grid grid-cols-2 gap-4 border-b border-[#1E293B]/60">
+                <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PRE-APPROVED</span>
+                    <span className={`text-xs font-semibold ${data.pre_approved_status === 'Yes' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                        {data.pre_approved_status || "Not Discussed"}
+                    </span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">LEAD OUTCOME</span>
+                    <span className={`text-xs font-bold ${statusColor}`}>{data.lead_outcome || "Pending"}</span>
+                </div>
+            </div>
+
+            {/* Action Footer */}
+            <div className="p-4 bg-[#0B1120] flex items-center justify-between gap-3">
+                <Link
+                    href="/auth/signup"
+                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-amber-600 text-slate-900 hover:bg-amber-500 transition-colors shadow-lg shadow-amber-500/10 flex items-center justify-center gap-1.5"
+                >
+                    Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
             </div>
         </div>
     );
@@ -180,7 +723,7 @@ export function DemoCallForm() {
     const [callingState, setCallingState] = useState<"idle" | "calling" | "connected" | "polling" | "done" | "error">("idle");
     const [errorMessage, setErrorMessage] = useState("");
     const [workflowRunId, setWorkflowRunId] = useState<number | null>(null);
-    const [extractedData, setExtractedData] = useState<HotelExtractedData | null>(null);
+    const [extractedData, setExtractedData] = useState<any | null>(null);
 
     // Keep a ref to the interval so we can clear it safely
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -219,7 +762,7 @@ export function DemoCallForm() {
 
             if (result.ready) {
                 clearInterval(pollIntervalRef.current!);
-                setExtractedData((result.extractedData ?? {}) as HotelExtractedData);
+                setExtractedData(result.extractedData ?? {});
                 setCallingState("done");
             }
             // If error on individual poll, just keep polling — don't surface noise
@@ -288,34 +831,47 @@ export function DemoCallForm() {
         );
     }
 
-    // ── Hotel result card (hotel only for now) ───────────────────────────────
-    if (callingState === "done" && useCase === "hotel" && extractedData) {
-        return <HotelResultCard data={extractedData} phone={phone} onReset={handleReset} />;
+    // ── Result cards ───────────────────────────────
+    if (callingState === "done" && extractedData) {
+        if (useCase === "hotel") {
+            return <HotelResultCard data={extractedData} phone={phone} />;
+        }
+        if (useCase === "sales") {
+            return <SalesResultCard data={extractedData} phone={phone} />;
+        }
+        if (useCase === "recruiter") {
+            return <RecruiterResultCard data={extractedData} phone={phone} />;
+        }
+        if (useCase === "medical") {
+            return <MedicalResultCard data={extractedData} phone={phone} />;
+        }
+        if (useCase === "service") {
+            return <ServiceResultCard data={extractedData} phone={phone} />;
+        }
+        if (useCase === "real_estate") {
+            return <RealEstateResultCard data={extractedData} phone={phone} />;
+        }
     }
 
     // ── Calling / connected / polling ────────────────────────────────────────
     if (callingState === "calling" || callingState === "connected" || callingState === "polling") {
         const isPolling = callingState === "polling";
         return (
-            <div className="py-6 px-4 space-y-4 text-center flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300 w-full max-w-md bg-[#16151E]/95 border border-white/10 p-6 sm:p-8 rounded-2xl shadow-2xl backdrop-blur-xl">
+            <div className="py-6 px-4 space-y-4 text-center flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300 w-full max-w-md bg-[#0C0B0F] border border-neutral-800 p-6 sm:p-8 rounded-xl shadow-2xl">
                 <div className="relative flex items-center justify-center my-2">
                     {callingState === "calling" ? (
-                        <>
-                            <div className="w-14 h-14 rounded-full bg-orange-500/20 border-2 border-orange-500 flex items-center justify-center animate-ping absolute inset-0 opacity-75" />
-                            <div className="w-14 h-14 rounded-full bg-gradient-to-r from-[#FF5500] to-[#E11D48] text-white flex items-center justify-center relative shadow-lg">
-                                <PhoneCall className="w-6 h-6 animate-pulse" />
-                            </div>
-                        </>
+                        <div className="w-14 h-14 rounded-full border border-neutral-800 flex items-center justify-center relative bg-neutral-900/30">
+                            <span className="absolute inset-0 rounded-full border border-t-amber-500/60 border-neutral-800 animate-spin" />
+                            <PhoneCall className="w-5 h-5 text-neutral-400" />
+                        </div>
                     ) : isPolling ? (
-                        <>
-                            <div className="w-14 h-14 rounded-full bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center animate-pulse absolute inset-0 opacity-75" />
-                            <div className="w-14 h-14 rounded-full bg-[#1a1923] border-2 border-amber-500 text-amber-400 flex items-center justify-center relative shadow-lg">
-                                <PhoneCall className="w-6 h-6" />
-                            </div>
-                        </>
+                        <div className="w-14 h-14 rounded-full border border-neutral-800 flex items-center justify-center relative bg-neutral-900/30">
+                            <span className="absolute inset-0 rounded-full border border-t-amber-500/60 border-neutral-800 animate-spin" />
+                            <PhoneCall className="w-5 h-5 text-amber-400" />
+                        </div>
                     ) : (
-                        <div className="w-14 h-14 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center relative shadow-lg text-emerald-500">
-                            <Check className="w-6 h-6" />
+                        <div className="w-14 h-14 rounded-full border border-emerald-800/30 bg-emerald-950/10 flex items-center justify-center relative text-emerald-400 animate-pulse">
+                            <Check className="w-5 h-5" />
                         </div>
                     )}
                 </div>
@@ -344,9 +900,9 @@ export function DemoCallForm() {
                 {(callingState === "connected" || isPolling) && (
                     <Link
                         href="/auth/signup"
-                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold border border-white/10 bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:opacity-90 transition-all text-white shadow-sm flex items-center justify-center gap-2 mt-2"
+                        className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-amber-500 text-neutral-950 hover:bg-amber-400 transition-colors shadow-lg flex items-center justify-center gap-2 mt-2"
                     >
-                        Get Started <ArrowRight className="w-3.5 h-3.5" />
+                        Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                 )}
             </div>
@@ -355,10 +911,12 @@ export function DemoCallForm() {
 
     // ── Idle form ────────────────────────────────────────────────────────────
     const businessOptions = [
-        { id: "hotel",   label: "Hotels & Stays",  icon: Hotel,       available: true },
-        { id: "medical", label: "Healthcare",       icon: Stethoscope, available: true },
-        { id: "sales",   label: "Sales & Leads",   icon: Briefcase,   available: true },
-        { id: "service", label: "Home Services",   icon: Wrench,      available: true },
+        { id: "hotel",       label: "Hotels & Stays",  icon: Hotel,       available: true },
+        { id: "medical",     label: "Healthcare",       icon: Stethoscope, available: true },
+        { id: "sales",       label: "Sales & Leads",   icon: Briefcase,   available: true },
+        { id: "service",     label: "Home Services",   icon: Wrench,      available: true },
+        { id: "real_estate", label: "Real Estate",     icon: Home,        available: true },
+        { id: "recruiter",   label: "Recruiter AI",    icon: Users,       available: true },
     ];
 
     return (
@@ -440,6 +998,28 @@ export function DemoCallForm() {
                         })}
                     </div>
                 </div>
+
+                {useCase === "recruiter" && (
+                    <>
+                        <div className="space-y-1 text-left mt-2 animate-in fade-in zoom-in-95 duration-300">
+                            <label className="text-[11px] font-semibold text-white/90 block">Job Description</label>
+                            <textarea
+                                name="jobDescription"
+                                placeholder="Paste the JD here..."
+                                className="w-full h-20 px-3 py-2 rounded-lg border border-white/10 bg-[#0F0E14] text-white text-xs placeholder:text-gray-500 focus:outline-none focus:border-indigo-500 transition-all resize-none"
+                            />
+                        </div>
+                        <div className="space-y-1 text-left animate-in fade-in zoom-in-95 duration-300">
+                            <label className="text-[11px] font-semibold text-white/90 block">Upload Resume (PDF/DOCX/TXT)</label>
+                            <input
+                                type="file"
+                                name="resumeFile"
+                                accept=".pdf,.docx,.txt"
+                                className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-500 file:text-white hover:file:bg-indigo-600 transition-all border border-white/10 bg-[#0F0E14] rounded-lg p-1.5 focus:outline-none cursor-pointer"
+                            />
+                        </div>
+                    </>
+                )}
 
                 <button
                     type="submit"

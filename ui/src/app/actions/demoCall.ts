@@ -7,9 +7,9 @@ import * as mammoth from "mammoth";
 
 // Polyfill DOM globals required by pdf-parse / pdf.js in Next.js 15 Server Actions
 if (typeof global !== "undefined") {
-    if (!global.DOMMatrix) (global as any).DOMMatrix = class DOMMatrix {};
-    if (!global.ImageData) (global as any).ImageData = class ImageData {};
-    if (!global.Path2D) (global as any).Path2D = class Path2D {};
+    if (!global.DOMMatrix) (global as any).DOMMatrix = function DOMMatrix() { return {}; };
+    if (!global.ImageData) (global as any).ImageData = function ImageData() { return {}; };
+    if (!global.Path2D) (global as any).Path2D = function Path2D() { return {}; };
 }
 
 // Rate limit configuration
@@ -125,8 +125,9 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
                 let resumeText = "";
                 const buffer = Buffer.from(await resumeFile.arrayBuffer());
                 if (resumeFile.name.toLowerCase().endsWith(".pdf")) {
-                    const pdf = require("pdf-parse");
-                    const data = await pdf(buffer);
+                    const pdfParse = require("pdf-parse");
+                    const parseFunc = pdfParse.default || pdfParse;
+                    const data = await parseFunc(buffer);
                     resumeText = data.text;
                 } else if (resumeFile.name.toLowerCase().endsWith(".docx")) {
                     const result = await mammoth.extractRawText({ buffer });

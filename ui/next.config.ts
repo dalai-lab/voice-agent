@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverSourceMaps: true,
   },
+  serverExternalPackages: ["pdf-parse"],
   async rewrites() {
     return [
       {

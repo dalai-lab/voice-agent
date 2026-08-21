@@ -4,7 +4,6 @@ import { headers } from "next/headers";
 import fs from "fs/promises";
 import path from "path";
 import * as mammoth from "mammoth";
-const pdf = require("pdf-parse");
 
 // Rate limit configuration
 // Using /tmp/ because Docker containers often have read-only filesystems in /app
@@ -119,6 +118,7 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
                 let resumeText = "";
                 const buffer = Buffer.from(await resumeFile.arrayBuffer());
                 if (resumeFile.name.toLowerCase().endsWith(".pdf")) {
+                    const pdf = require("pdf-parse");
                     const data = await pdf(buffer);
                     resumeText = data.text;
                 } else if (resumeFile.name.toLowerCase().endsWith(".docx")) {

@@ -13,9 +13,9 @@ import { BrandLogo } from "@/components/BrandLogo";
 import ThemeToggle from "@/components/ThemeSwitcher";
 
 const HIGHLIGHTS = [
-  "24/7 Autopilot Answering",
-  "Instant First-Ring Pickup",
-  "Zero-Latency Conversation",
+  "Never Misses a Call",
+  "24/7 AI Voice Agent",
+  "Zero Setup — Fully Managed",
 ];
 
 export function AuthShell({
@@ -75,11 +75,11 @@ export function AuthShell({
         <div className="relative max-w-md space-y-8 my-auto">
           <div className="space-y-4">
             <h1 className="text-4xl font-bold leading-tight tracking-tight text-white xl:text-5xl font-sans">
-              Your 24/7 AI <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-rose-500 to-amber-400 font-light italic">voice operations</span>.
+              Your Best Agent <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-rose-500 to-amber-400 font-light italic">Never Sleeps.</span>
             </h1>
             <p className="text-zinc-400 text-sm max-w-sm leading-relaxed">
-              Build and deploy conversational AI agents with phone lines, custom APIs, and calendar scheduling.
+              From phone numbers to production — Talkar builds, configures, and manages your AI voice operations.
             </p>
           </div>
 

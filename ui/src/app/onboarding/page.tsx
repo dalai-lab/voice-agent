@@ -133,8 +133,8 @@ export default function OnboardingPage() {
   // Step Validation Handlers
   const validateStep = (step: number) => {
     if (step === 1) {
-      if (!formData.businessName.trim() || !formData.industry || !formData.gstNumber.trim()) {
-        alert("Please fill in all required fields in Step 1 (Company Name, Industry, Tax Registration Number).");
+      if (!formData.businessName.trim() || !formData.industry) {
+        alert("Please fill in all required fields in Step 1 (Company Name, Industry).");
         return false;
       }
     } else if (step === 2) {
@@ -277,7 +277,7 @@ export default function OnboardingPage() {
               }),
             });
             if (res.ok) {
-              window.location.href = "/";
+              window.location.href = "/overview";
             } else {
               const err = await res.json().catch(() => ({}));
               alert(`Payment confirmed but setup failed: ${err.detail || "Please contact support."}`);
@@ -751,7 +751,7 @@ export default function OnboardingPage() {
                     // type="button" + explicit onClick so the form's onSubmit can never fire
                     // accidentally from a click event that leaked from the previous render.
                     <Button key="submit-btn" type="button" disabled={submitting} onClick={handleSubmit as any} className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 text-white h-12 px-8 rounded-xl font-bold shadow-lg shadow-orange-500/25 min-w-[180px]">
-                      {submitting ? "Activating Portal..." : "Submit Activation Request"}
+                      {submitting ? "Submitting Application..." : "Submit Activation Request"}
                     </Button>
                   )}
                 </div>
@@ -917,11 +917,7 @@ export default function OnboardingPage() {
                 We are currently reviewing your details and preparing your workspace. We will email you as soon as it's ready.
               </p>
             </div>
-            <div className="pt-4">
-              <Button onClick={() => router.push("/overview")} className="bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-200 rounded-xl h-12 px-8">
-                Explore Dashboard
-              </Button>
-            </div>
+
           </div>
         )}
 

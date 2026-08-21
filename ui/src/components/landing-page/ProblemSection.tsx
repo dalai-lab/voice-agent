@@ -125,7 +125,7 @@ export const ProblemSection: React.FC = () => {
                         <span className="text-[9px] text-gray-200 font-medium">12m ago</span>
                       </div>
                       <div className="text-xs font-extrabold text-white">Missed Call (2)</div>
-                      <div className="text-[10px] text-gray-100 truncate font-medium">+1 (555) 019-2834</div>
+                      <div className="text-[10px] text-gray-100 truncate font-medium">+91 98765 43210</div>
                       <div className="text-[9.5px] text-rose-300 font-bold pt-0.5">
                         Unanswered — Customer Called Competitor
                       </div>

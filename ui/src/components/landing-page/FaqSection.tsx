@@ -14,7 +14,7 @@ export const FaqSection: React.FC = () => {
     },
     {
       q: 'How long does deployment take?',
-      a: 'We deploy your complete custom voice agent in under 24 hours. Talkar handles number provisioning, call flow logic, and system integration for you.',
+      a: 'You can be live in under 24 hours after activation. Talkar handles number provisioning, call flow logic, and system integration for you.',
     },
     {
       q: 'Does Talkar integrate with our existing tools?',
@@ -22,7 +22,7 @@ export const FaqSection: React.FC = () => {
     },
     {
       q: 'Is Talkar secure and enterprise-ready?',
-      a: 'Yes. Talkar features carrier-grade infrastructure with SOC-2 compliance standards, HIPAA compliance readiness, and end-to-end encrypted audio streams.',
+      a: 'Yes. Talkar features carrier-grade infrastructure with SOC-2 aligned architecture, healthcare compatible workflows, and end-to-end encrypted audio streams.',
     },
   ];
 

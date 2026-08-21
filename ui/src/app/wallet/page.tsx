@@ -439,11 +439,19 @@ export default function WalletPage() {
             </div>
           </div>
           
-          {usage && (
-            <div className="text-xs text-muted-foreground border-t border-border/30 pt-3 mt-4 leading-relaxed">
-              Current month: <span className="text-foreground font-semibold">{usage.total_minutes} mins</span> spent (₹{(usage.total_spend_paise / 100).toFixed(2)})
+          <div className="text-xs text-muted-foreground border-t border-border/30 pt-3 mt-4 leading-relaxed space-y-1">
+            {usage && (
+              <div>
+                Current month: <span className="text-foreground font-semibold">{usage.total_minutes} mins</span> spent (₹{(usage.total_spend_paise / 100).toFixed(2)})
+              </div>
+            )}
+            <div>
+              <span className="text-orange-500 font-semibold">Reserve Policy:</span> A ₹500 minimum balance is required to keep your account active. Below this, calls are blocked. Additionally, a dynamic reserve (5 mins of your active tier's per-minute rate) is held per concurrent call.
             </div>
-          )}
+            <div>
+              <span className="text-emerald-500 font-semibold">Effective Capacity:</span> Based on your current balance and active tier rate, you can support a maximum of <span className="font-bold text-foreground">{Math.floor((Number(balanceRupees) - 500) > 0 ? (Number(balanceRupees) - 500) / (subscription?.tier === "pro" ? 120 : 90) : 0)} concurrent calls</span>.
+            </div>
+          </div>
         </div>
 
         {/* Add Credits Panel */}
@@ -576,7 +584,7 @@ export default function WalletPage() {
                 <div>
                   <span className="text-[9px] text-muted-foreground block uppercase font-mono tracking-wider">Active Engine</span>
                   <p className="text-base font-bold text-foreground mt-0.5">
-                    {subscription.tier === "pro" ? "NeuralVocal Pro" :
+                    {subscription.tier === "pro" ? "Pro Engine" :
                      subscription.tier === "elite" ? "Apex Omni Prime" :
                      "Echo-Lite Engine"}
                   </p>
@@ -640,8 +648,7 @@ export default function WalletPage() {
                         Current
                       </span>
                     )}
-                  </h3>
-                  <p className="text-[10px] text-muted-foreground">Standard transactional routing</p>
+                  <p className="text-[10px] text-muted-foreground">Ideal for getting started — answer calls, book appointments, and qualify leads.</p>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/20 text-muted-foreground font-mono shrink-0">
                   ₹6 / min
@@ -685,7 +692,7 @@ export default function WalletPage() {
               <div className="flex justify-between items-start gap-2">
                 <div>
                   <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
-                    NeuralVocal Pro Engine
+                    Pro Engine
                     {subscription?.tier === 'pro' && (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                         Current
@@ -698,7 +705,7 @@ export default function WalletPage() {
                   ₹4 / min
                 </span>
               </div>
-              <p className="text-muted-foreground text-xs leading-relaxed">Combines deep conversational understanding with high-fidelity, emotional voice tones. Speaks with natural human cadence.</p>
+              <p className="text-muted-foreground text-xs leading-relaxed">Higher deposit unlocks lower per-minute rates and more concurrent channels. Combines deep conversational understanding with high-fidelity, emotional voice tones.</p>
               <ul className="space-y-1 text-xs text-foreground/90 pt-3 border-t border-border/30">
                 <li className="flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />

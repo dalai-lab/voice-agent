@@ -46,7 +46,7 @@ const initialActivities: LeadActivity[] = [
     qualification: 'Emergency AC Failure Intake',
     status: 'Completed',
     disposition: 'Appointment Booked',
-    phone: '+1 (555) 019-2834',
+    phone: '+91 98765 43210',
     summary: 'Caller requested emergency technician for commercial AC failure at 440 Industrial Pkwy.',
     actionTaken: 'Google Calendar booking confirmed & SMS dispatched to Tech Mike R.'
   },
@@ -61,7 +61,7 @@ const initialActivities: LeadActivity[] = [
     qualification: 'Commercial Maintenance Quote',
     status: 'Completed',
     disposition: 'Lead Dispatched',
-    phone: '+1 (555) 389-1029',
+    phone: '+91 98765 43211',
     summary: 'Inquired about annual commercial maintenance terms and tier pricing structure.',
     actionTaken: 'Emailed quote PDF to lead & assigned follow-up task to AE Account Exec.'
   },
@@ -76,7 +76,7 @@ const initialActivities: LeadActivity[] = [
     qualification: 'Quarterly Inspection Booking',
     status: 'Completed',
     disposition: 'Appointment Booked',
-    phone: '+1 (555) 902-1144',
+    phone: '+91 98765 43212',
     summary: 'Scheduled quarterly HVAC inspection for retail store location.',
     actionTaken: 'Synced appointment slot with calendar system & logged lead in CRM.'
   }
@@ -109,7 +109,7 @@ export const HomeBaseSection: React.FC = () => {
       qualification: 'Urgent Commercial Intake',
       status: 'Completed',
       disposition: 'Appointment Booked',
-      phone: '+1 (555) 881-4492',
+      phone: '+91 98765 43213',
       summary: 'Inbound call processed by Talkar Engine. High-intent commercial lead qualified.',
       actionTaken: 'Calendar slot created & instant SMS dispatched to technician.'
     };
@@ -220,8 +220,7 @@ export const HomeBaseSection: React.FC = () => {
                   TK
                 </div>
                 <div>
-                  <div className="font-bold text-slate-900 text-[11px] leading-tight">Talkar Admin</div>
-                  <div className="text-[10px] text-slate-400 font-mono">admin@talkar.ai</div>
+                  <div className="text-[10px] text-slate-400 font-mono">hi@yourcompany.in</div>
                 </div>
               </div>
             </div>
@@ -271,8 +270,7 @@ export const HomeBaseSection: React.FC = () => {
 
               <div className="p-4 rounded-xl border border-slate-200 bg-white flex items-center justify-between shadow-2xs">
                 <div className="space-y-1">
-                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Talk Time</p>
-                  <p className="text-2xl font-bold tracking-tight text-slate-900">4.8h</p>
+                  <p className="text-2xl font-bold tracking-tight text-slate-900">18h</p>
                 </div>
                 <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
                   <Clock className="w-4 h-4" />

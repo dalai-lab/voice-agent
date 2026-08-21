@@ -453,7 +453,7 @@ export default function IntegrationsPage() {
     "check_in": "2026-02-06",
     "pms_reservation_id": "GH-9042"
   },
-  "recording_url": "https://s3.talkar.ai/recordings/call_9042.mp3"
+  "recording_url": "https://s3.talkar.in/recordings/call_9042.mp3"
 }`}
                             </pre>
                         </div>

@@ -6,7 +6,7 @@ interface NodePos {
 }
 
 export const BrainSection: React.FC = () => {
-  // Initial positions for Vapi flow nodes on canvas (exact canvas pixel coordinates)
+  // Initial positions for workflow node canvas (exact canvas pixel coordinates)
   const [positions, setPositions] = useState<Record<string, NodePos>>({
     start: { x: 50, y: 140 },
     agent: { x: 330, y: 110 },
@@ -204,7 +204,7 @@ export const BrainSection: React.FC = () => {
               <div className="space-y-2 text-xs">
                 <div className="bg-[#0F172A] p-2.5 rounded-lg border border-slate-700 space-y-1">
                   <div className="text-[10px] text-slate-400">Inbound Channel</div>
-                  <div className="text-white font-mono font-semibold text-[11px]">+1 (800) TALKAR</div>
+                  <div className="text-white font-mono font-semibold text-[11px]">+91 98765 TALKAR</div>
                 </div>
                 <div className="flex justify-between text-[11px] text-slate-400 px-1">
                   <span>Channel Type:</span>

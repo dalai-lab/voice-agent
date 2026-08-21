@@ -25,17 +25,17 @@ export const FooterCtaSection: React.FC = () => {
 
         {/* Subtitle */}
         <p className="text-base md:text-lg text-gray-300 max-w-xl mx-auto leading-relaxed font-light">
-          Set up your AI phone agent in minutes. No credit card required.
+          Set up your AI phone agent in minutes. Activation starts from ₹6,000.
         </p>
 
         {/* CTA Button */}
         <div className="pt-4 flex flex-col items-center gap-3">
-          <a href="https://talkar.in/handler/sign-up" className="px-9 py-4 bg-gradient-to-r from-orange-600 to-rose-600 hover:from-orange-500 hover:to-rose-500 text-white font-semibold text-sm rounded-2xl shadow-lg shadow-orange-600/25 transition-all duration-300 cursor-pointer text-center inline-block">
-            Start Free Trial
+          <a href="/handler/sign-up" className="px-9 py-4 bg-gradient-to-r from-orange-600 to-rose-600 hover:from-orange-500 hover:to-rose-500 text-white font-semibold text-sm rounded-2xl shadow-lg shadow-orange-600/25 transition-all duration-300 cursor-pointer text-center inline-block">
+            Get Started
           </a>
           
           <p className="text-xs text-gray-400 font-mono">
-            talkar.ai — 100% no credit card required
+            talkar.in — Activation starts from ₹6,000
           </p>
         </div>
 
@@ -43,9 +43,6 @@ export const FooterCtaSection: React.FC = () => {
         <div className="pt-16 border-t border-white/10 w-full flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 gap-4">
           <div>© {new Date().getFullYear()} Talkar Voice AI Engine. All rights reserved.</div>
           <div className="flex gap-6 text-gray-400">
-            <a href="#home" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#home" className="hover:text-white transition-colors">Terms of Service</a>
-            <a href="#home" className="hover:text-white transition-colors">Security</a>
           </div>
         </div>
 

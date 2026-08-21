@@ -107,9 +107,9 @@ export function DemoCallForm() {
 
     const businessOptions = [
         { id: "hotel", label: "Hotels & Stays", icon: Hotel, available: true },
-        { id: "medical", label: "Healthcare", icon: Stethoscope, available: false },
-        { id: "sales", label: "Sales & Leads", icon: Briefcase, available: false },
-        { id: "service", label: "Home Services", icon: Wrench, available: false },
+        { id: "medical", label: "Healthcare", icon: Stethoscope, available: true },
+        { id: "sales", label: "Sales & Leads", icon: Briefcase, available: true },
+        { id: "service", label: "Home Services", icon: Wrench, available: true },
     ];
 
     return (

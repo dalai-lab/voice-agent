@@ -31,9 +31,9 @@ export const Navbar: React.FC = () => {
       </div>
 
       <div className="hidden md:flex items-center space-x-8 text-sm font-medium text-gray-300">
-        <a className="hover:text-white transition-colors" href="#problem">The Problem</a>
-        <a className="hover:text-white transition-colors" href="#solution">Solution</a>
-        <a className="hover:text-white transition-colors" href="#enterprise">Enterprise</a>
+        <a className="hover:text-white transition-colors" href="#how-it-works">The Problem</a>
+        <a className="hover:text-white transition-colors" href="#capabilities">Solution</a>
+        <a className="hover:text-white transition-colors" href="#homebase">Enterprise</a>
         <a className="hover:text-white transition-colors" href="#results">Results</a>
         <a className="hover:text-white transition-colors" href="#faq">FAQ's</a>
       </div>

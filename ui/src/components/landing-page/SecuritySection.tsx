@@ -30,9 +30,9 @@ export const SecuritySection: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-sm">
               SOC-2
             </div>
-            <h3 className="text-lg font-bold text-white leading-snug">SOC-2 Type II Ready</h3>
+            <h3 className="text-lg font-bold text-white leading-snug">SOC-2 Aligned Architecture</h3>
             <p className="text-xs text-gray-400 leading-relaxed font-light">
-              Audited operational protocols and data access controls guaranteeing strict data isolation.
+              Built with operational protocols and data access controls designed for strict data isolation.
             </p>
           </div>
 
@@ -41,9 +41,9 @@ export const SecuritySection: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-sm">
               HIPAA
             </div>
-            <h3 className="text-lg font-bold text-white leading-snug">HIPAA Compliance Ready</h3>
+            <h3 className="text-lg font-bold text-white leading-snug">Healthcare Compatible</h3>
             <p className="text-xs text-gray-400 leading-relaxed font-light">
-              Full BAA agreement support with encrypted patient intake handling for medical practices.
+              Designed for healthcare-compatible workflows with encrypted patient intake handling.
             </p>
           </div>
 
@@ -61,11 +61,11 @@ export const SecuritySection: React.FC = () => {
           {/* Pillar 4 */}
           <div className="bg-[#13121C] border border-white/5 rounded-2xl p-6 space-y-3 hover:border-white/10 transition-all duration-300">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
-              99.99%
+              HA
             </div>
-            <h3 className="text-lg font-bold text-white leading-snug">Multi-Region Redundancy</h3>
+            <h3 className="text-lg font-bold text-white leading-snug">Built for High Availability</h3>
             <p className="text-xs text-gray-400 leading-relaxed font-light">
-              High-availability carrier trunks and redundant cloud infrastructure ensuring zero dropped calls.
+              Reliable carrier trunks and cloud infrastructure designed to keep your business online.
             </p>
           </div>
 

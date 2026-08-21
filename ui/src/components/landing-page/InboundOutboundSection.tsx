@@ -10,7 +10,7 @@ export const InboundOutboundSection: React.FC = () => {
         {/* Header Tag */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-orange-400 font-medium mb-6">
           <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-          05 • Dual Voice Capabilities
+          Dual Voice Capabilities
         </div>
 
         {/* Section Headline */}
@@ -93,7 +93,7 @@ export const InboundOutboundSection: React.FC = () => {
                   Turn Web Form Leads Into Phone Conversations
                 </h3>
                 <p className="text-sm md:text-base text-gray-300 leading-relaxed font-light">
-                  When a prospect submits a contact form or requests a quote, Talkar initiates an outbound call within 15 seconds while their interest is fresh, securing the booking before competitors respond.
+                  When a prospect submits a contact form or requests a quote, Talkar initiates an outbound call within seconds while their interest is fresh, securing the booking before competitors respond.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-300 pt-2 font-medium">
                   <div className="flex items-center gap-2">

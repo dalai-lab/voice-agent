@@ -186,7 +186,7 @@ export const HowItWorksSection: React.FC = () => {
                           +91 98100 12345
                         </td>
                         <td className="py-3 px-4 font-sans text-slate-500 text-xs text-center whitespace-nowrap font-semibold">
-                          ₹149 / mo
+                          Standard Rate
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
                           <button className="px-3.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-100 cursor-pointer whitespace-nowrap">
@@ -201,7 +201,7 @@ export const HowItWorksSection: React.FC = () => {
                           +91 80 4920 1920
                         </td>
                         <td className="py-3 px-4 font-sans text-slate-500 text-xs text-center whitespace-nowrap font-semibold">
-                          ₹149 / mo
+                          Standard Rate
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
                           <button className="px-3.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-100 cursor-pointer whitespace-nowrap">
@@ -272,7 +272,7 @@ export const HowItWorksSection: React.FC = () => {
                     <div className="text-[9px] text-slate-400 font-sans mt-0.5 leading-tight">Prompt: Emergency AC</div>
                   </div>
                   <div className="text-[9px] text-orange-400 font-bold bg-orange-500/10 border border-orange-500/20 p-1 rounded text-center">
-                    GPT-4o Engine
+                    AI LLM Engine
                   </div>
                 </div>
 

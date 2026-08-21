@@ -79,7 +79,7 @@ export const WhyNowSection: React.FC = () => {
                       <span className="text-[9px] text-gray-200 font-medium">12m ago</span>
                     </div>
                     <div className="text-xs font-extrabold text-white">Missed Call (3)</div>
-                    <div className="text-[10px] text-gray-100 truncate font-medium">+1 (555) 019-2834 • Commercial HVAC</div>
+                    <div className="text-[10px] text-gray-100 truncate font-medium">+91 98765 43210 • Commercial HVAC</div>
                     <div className="text-[9.5px] text-rose-300 font-bold pt-0.5">
                       Status: Unanswered — Called Competitor
                     </div>
@@ -195,7 +195,7 @@ export const WhyNowSection: React.FC = () => {
                 <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex items-center justify-between text-[11px]">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span className="text-slate-700 font-medium">Business Line (+1 888)</span>
+                    <span className="text-slate-700 font-medium">Business Line (+91 9876)</span>
                   </div>
                   <span className="text-emerald-600 font-bold font-mono">Connected</span>
                 </div>

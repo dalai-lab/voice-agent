@@ -48,13 +48,13 @@ export const HeroSection: React.FC = () => {
             <div className="flex flex-wrap items-center gap-4 mb-10">
               <a
                 className="bg-gradient-to-r from-[#FF5500] to-[#E11D48] text-white hover:opacity-95 px-7 py-3.5 rounded-full text-sm font-semibold transition-all duration-300 shadow-md shadow-orange-600/25 hover:-translate-y-0.5"
-                href="https://talkar.in/handler/sign-up"
+                href="/handler/sign-up"
               >
                 Get Started Free
               </a>
               <a
                 className="bg-white/10 hover:bg-white/15 text-white border border-white/15 px-7 py-3.5 rounded-full text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-2"
-                href="#demo"
+                href="#home"
               >
                 <Play className="w-4 h-4 fill-white text-white" />
                 Watch Demo Call
@@ -80,7 +80,7 @@ export const HeroSection: React.FC = () => {
                 </div>
               </div>
               <div className="text-xs text-gray-300 mt-1 w-full">
-                <span className="text-gray-400 font-medium">Built to integrate with your existing revenue stack.</span>
+                <span className="text-gray-400 font-medium">Designed to work with your existing tools.</span>
               </div>
             </div>
           </div>

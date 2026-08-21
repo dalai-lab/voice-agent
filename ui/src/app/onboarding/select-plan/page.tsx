@@ -123,11 +123,11 @@ export default function SelectPlanPage() {
         <div className="text-center space-y-4 max-w-2xl">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Choose Your Plan</h1>
           <p className="text-lg text-zinc-400">
-            Your wallet is funded and your agent is ready. Select a usage tier to go live instantly.
+            Choose your usage tier. You'll fund your wallet in the next step.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full pt-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto gap-6 w-full pt-8">
           {TIERS.map((tier) => (
             <Card 
               key={tier.id} 

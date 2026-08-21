@@ -73,7 +73,7 @@ export const NoCrmSection: React.FC = () => {
                     </div>
                     <div>
                       <div className="font-bold text-white text-xs">Sarah Jenkins</div>
-                      <div className="text-[10px] text-slate-400 font-mono">+1 (555) 019-2834</div>
+                      <div className="text-[10px] text-slate-400 font-mono">+91 98765 43210</div>
                     </div>
                   </div>
                   <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold">

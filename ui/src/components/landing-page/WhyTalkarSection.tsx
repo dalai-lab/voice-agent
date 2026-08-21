@@ -50,7 +50,7 @@ export const WhyTalkarSection: React.FC = () => {
                           </g>
                         </svg>
                       </div>
-                      <span className="text-[10px] bg-white/20 backdrop-blur-md text-white font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider border border-white/20 shrink-0">Managed Partner</span>
+                      <span className="text-[10px] bg-white/20 backdrop-blur-md text-white font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider border border-white/20 shrink-0">Full-Stack Platform</span>
                     </div>
                   </th>
                 </tr>
@@ -69,7 +69,7 @@ export const WhyTalkarSection: React.FC = () => {
                   <td className="py-4 px-6 bg-orange-50/50 font-bold text-xs text-slate-900">
                     <div className="flex items-center gap-2 text-emerald-600 font-bold">
                       <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-extrabold">✓</span>
-                      <span>Talkar Handles Everything</span>
+                      <span>Platform Handles Everything</span>
                     </div>
                   </td>
                 </tr>
@@ -86,7 +86,7 @@ export const WhyTalkarSection: React.FC = () => {
                   <td className="py-4 px-6 bg-orange-50/50 font-bold text-xs text-slate-900">
                     <div className="flex items-center gap-2 text-emerald-600 font-bold">
                       <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-extrabold">✓</span>
-                      <span>Talkar Architects & Manages</span>
+                      <span>Configure & Manage via Dashboard</span>
                     </div>
                   </td>
                 </tr>

@@ -5,6 +5,13 @@ import fs from "fs/promises";
 import path from "path";
 import * as mammoth from "mammoth";
 
+// Polyfill DOM globals required by pdf-parse / pdf.js in Next.js 15 Server Actions
+if (typeof global !== "undefined") {
+    if (!global.DOMMatrix) (global as any).DOMMatrix = class DOMMatrix {};
+    if (!global.ImageData) (global as any).ImageData = class ImageData {};
+    if (!global.Path2D) (global as any).Path2D = class Path2D {};
+}
+
 // Rate limit configuration
 // Using /tmp/ because Docker containers often have read-only filesystems in /app
 const RATE_LIMIT_FILE = "/tmp/demo_rate_limits.json";

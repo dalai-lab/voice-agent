@@ -648,6 +648,7 @@ export default function WalletPage() {
                         Current
                       </span>
                     )}
+                  </h3>
                   <p className="text-[10px] text-muted-foreground">Ideal for getting started — answer calls, book appointments, and qualify leads.</p>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/20 text-muted-foreground font-mono shrink-0">

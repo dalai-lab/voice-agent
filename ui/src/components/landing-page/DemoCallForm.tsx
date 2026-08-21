@@ -71,6 +71,75 @@ interface RealEstateExtractedData {
 }
 
 // ---------------------------------------------------------------------------
+// Agent Personas & Configuration
+// ---------------------------------------------------------------------------
+
+const AGENT_PERSONAS: Record<string, {
+    personaName: string;
+    company: string;
+    roleTitle: string;
+    greetingPreview: string;
+    inCallMessage: string;
+    ctaLabel: string;
+    brandColorClass: string;
+}> = {
+    hotel: {
+        personaName: "Sarah",
+        company: "The Grand Horizon",
+        roleTitle: "Guest Concierge",
+        greetingPreview: "Hi, this is Sarah from The Grand Horizon. How can I help you today?",
+        inCallMessage: "Talk to Sarah (The Grand Horizon) — your live reservation brief will appear here when the call ends!",
+        ctaLabel: "Automate Hotel Reservations",
+        brandColorClass: "bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-amber-500/20",
+    },
+    medical: {
+        personaName: "Emma",
+        company: "Riverside Family Clinic",
+        roleTitle: "Patient Intake AI",
+        greetingPreview: "Hi, this is Emma from Riverside Family Clinic. How can I help you today?",
+        inCallMessage: "Talk to Emma (Riverside Family Clinic) — your clinical intake report will appear here when the call ends!",
+        ctaLabel: "Automate Patient Triage",
+        brandColorClass: "bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20",
+    },
+    sales: {
+        personaName: "Jordan",
+        company: "Northwind Software",
+        roleTitle: "Inbound Sales AI",
+        greetingPreview: "Hey, Jordan here with Northwind Software. I saw you were looking into our platform...",
+        inCallMessage: "Talk to Jordan (Northwind Software) — your deal intelligence brief will appear here when the call ends!",
+        ctaLabel: "Get Your 24/7 Sales Agent",
+        brandColorClass: "bg-indigo-500 hover:bg-indigo-400 text-white shadow-indigo-500/20",
+    },
+    service: {
+        personaName: "Casey",
+        company: "Bluefield Home Services",
+        roleTitle: "Field Dispatch AI",
+        greetingPreview: "Hi, this is Casey from Bluefield Home Services. How can I help you today?",
+        inCallMessage: "Talk to Casey (Bluefield Home Services) — your dispatch ticket will appear here when the call ends!",
+        ctaLabel: "Automate Service Dispatch",
+        brandColorClass: "bg-orange-500 hover:bg-orange-400 text-white shadow-orange-500/20",
+    },
+    real_estate: {
+        personaName: "Riley",
+        company: "Maple & Co Realty",
+        roleTitle: "Real Estate Assistant",
+        greetingPreview: "Hi, this is Riley from Maple & Co Realty. How can I help you today?",
+        inCallMessage: "Talk to Riley (Maple & Co Realty) — your buyer/seller lead report will appear here when the call ends!",
+        ctaLabel: "Capture Real Estate Leads",
+        brandColorClass: "bg-amber-600 hover:bg-amber-500 text-slate-900 shadow-amber-500/20",
+    },
+    recruiter: {
+        personaName: "Alex",
+        company: "Recruitment Team",
+        roleTitle: "Candidate Screening AI",
+        greetingPreview: "Hi, this is Alex from the recruitment team calling about your recent application...",
+        inCallMessage: "Talk to Alex (Recruitment Team) — your ATS candidate assessment will appear here when the call ends!",
+        ctaLabel: "Automate Candidate Screening",
+        brandColorClass: "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20",
+    },
+};
+
+// ---------------------------------------------------------------------------
 // Hotel Demo Result Card
 // ---------------------------------------------------------------------------
 
@@ -81,7 +150,14 @@ function HotelResultCard({
     data: HotelExtractedData;
     phone: string;
 }) {
-    // Generate hospitality-themed status and intent summaries
+    const isBooking = data.wants_to_book === true;
+    const isSupport = data.inquiry_type?.toLowerCase().includes("complaint") || data.inquiry_type?.toLowerCase().includes("support");
+    
+    const headerText = isBooking ? "VIP RESERVATION INTAKE" : isSupport ? "GUEST CONCIERGE SUPPORT" : "RATES & AVAILABILITY INQUIRY";
+    
+    const badgeText = isBooking ? "Booking Requested" : isSupport ? "Support Ticket" : "Inquiry Logged";
+    const badgeColor = isBooking ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : isSupport ? "bg-rose-500/10 border-rose-500/20 text-rose-400" : "bg-slate-500/10 border-slate-500/20 text-slate-400";
+
     const hasHighIntent = data.wants_to_book && (data.interest_score ?? 0) >= 7;
     
     const engagementLabel = 
@@ -102,11 +178,11 @@ function HotelResultCard({
                     </div>
                     <div>
                         <h4 className="text-xs font-semibold tracking-wider text-neutral-300 uppercase leading-none">THE GRAND HORIZON</h4>
-                        <span className="text-[10px] text-neutral-500 font-medium">Guest Assistant Log</span>
+                        <span className="text-[10px] text-neutral-500 font-medium">{headerText}</span>
                     </div>
                 </div>
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-medium text-emerald-400 tracking-wider uppercase">
-                    Processed
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
+                    {badgeText}
                 </span>
             </div>
 
@@ -115,8 +191,10 @@ function HotelResultCard({
                 <span className="text-[9px] font-bold text-amber-400/80 uppercase tracking-wider block mb-1">CONVERSATION OVERVIEW</span>
                 <p className="text-xs text-neutral-400 italic leading-relaxed">
                     "{data.caller_name || "Guest"} initiated an inquiry. {
-                        hasHighIntent 
+                        isBooking 
                             ? "They demonstrated clear booking intent and would like to finalize room arrangements." 
+                            : isSupport
+                            ? "They required assistance and support regarding their stay experience."
                             : "They reviewed property details and availability with no active booking requested yet."
                     }"
                 </p>
@@ -174,7 +252,7 @@ function HotelResultCard({
                     href="/auth/signup"
                     className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-amber-500 text-neutral-950 hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/10 flex items-center justify-center gap-1.5"
                 >
-                    Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                    Automate Hotel Reservations <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
             </div>
         </div>
@@ -192,15 +270,19 @@ function SalesResultCard({
     phone: string;
 }) {
     // Generate SaaS CRM-themed status and intent summaries
-    const isHotLead = data.demo_booked || (data.lead_score ?? 0) >= 8;
+    const isHotLead = (data.lead_score ?? 0) >= 8;
+    const isWarmLead = (data.lead_score ?? 0) >= 5;
     
-    const pipelineStatus = data.demo_booked ? "Demo Scheduled (SQL)" : isHotLead ? "Priority Nurture (MQL)" : "Lead Nurture";
+    const headerText = data.demo_booked ? "HIGH-VALUE DEMO BOOKED" : isHotLead ? "PRIORITY OPPORTUNITY BRIEF" : isWarmLead ? "PROSPECT DISCOVERY BRIEF" : "INBOUND LEAD QUALIFICATION";
+    const badgeText = data.demo_booked ? "Meeting Confirmed" : isHotLead ? "Hot Lead" : "Pipeline Nurture";
+    const badgeColor = data.demo_booked ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : isHotLead ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : "bg-indigo-500/10 border-indigo-500/20 text-indigo-400";
+    
+    const pipelineStatus = data.demo_booked ? "Product Demo Scheduled" : isHotLead ? "High-Intent Qualified Lead" : "Lead Nurture";
     const pipelineColor = data.demo_booked ? "text-emerald-400" : isHotLead ? "text-amber-400" : "text-indigo-400";
-    const badgeColor = data.demo_booked ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-amber-500/10 border-amber-500/20 text-amber-400";
         
     const scoreLabel = 
-        (data.lead_score ?? 0) >= 8 ? "🔥 Hot Lead (High Intent)" :
-        (data.lead_score ?? 0) >= 5 ? "Warm Lead" : "❄️ Cold Lead (Low Intent)";
+        (data.lead_score ?? 0) >= 8 ? "High Interest (Ready to Buy)" :
+        (data.lead_score ?? 0) >= 5 ? "Moderate Interest (Exploring)" : "Low Engagement";
 
     return (
         <div className="w-full max-w-md bg-[#0A0F1C] border border-[#1E293B] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
@@ -212,11 +294,11 @@ function SalesResultCard({
                     </div>
                     <div>
                         <h4 className="text-xs font-semibold tracking-wider text-slate-300 uppercase leading-none">NORTHWIND SOFTWARE</h4>
-                        <span className="text-[10px] text-slate-500 font-medium">Lead Intelligence Brief</span>
+                        <span className="text-[10px] text-slate-500 font-medium">{headerText}</span>
                     </div>
                 </div>
                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
-                    {data.demo_booked ? "Meeting Booked" : "Processed"}
+                    {badgeText}
                 </span>
             </div>
 
@@ -284,7 +366,7 @@ function SalesResultCard({
                     href="/auth/signup"
                     className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-indigo-500 text-white hover:bg-indigo-400 transition-colors shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-1.5"
                 >
-                    Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                    Get Your 24/7 Sales Agent <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
             </div>
         </div>
@@ -301,10 +383,16 @@ function RecruiterResultCard({
     data: RecruiterExtractedData;
     phone: string;
 }) {
-    const isStrongFit = (data.candidate_score ?? 0) >= 7;
-    const stageStatus = isStrongFit ? "Move to Technical Round" : "Rejected / Keep in Pool";
-    const stageColor = isStrongFit ? "text-emerald-400" : "text-rose-400";
-    const badgeColor = isStrongFit ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-neutral-800 border-neutral-700 text-neutral-400";
+    const score = data.candidate_score ?? 0;
+    const isStrongFit = score >= 8;
+    const isModFit = score >= 5;
+    
+    const headerText = isStrongFit ? "TOP-TIER CANDIDATE ASSESSMENT" : isModFit ? "CANDIDATE SCREENING SUMMARY" : "APPLICANT EVALUATION REPORT";
+    const badgeText = isStrongFit ? "Fast-Track to Interview" : isModFit ? "Secondary Review" : "Kept in Talent Pool";
+    const badgeColor = isStrongFit ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : isModFit ? "bg-blue-500/10 border-blue-500/20 text-blue-400" : "bg-neutral-800 border-neutral-700 text-neutral-400";
+
+    const stageStatus = isStrongFit ? "Move to Next Interview" : "Reviewed & Saved to Talent Pool";
+    const stageColor = isStrongFit ? "text-emerald-400" : "text-neutral-400";
 
     return (
         <div className="w-full max-w-md bg-[#0F0E14] border border-[#27272A] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
@@ -316,11 +404,11 @@ function RecruiterResultCard({
                     </div>
                     <div>
                         <h4 className="text-xs font-semibold tracking-wider text-neutral-300 uppercase leading-none">NORTHWIND HR</h4>
-                        <span className="text-[10px] text-neutral-500 font-medium">Applicant Tracking System</span>
+                        <span className="text-[10px] text-neutral-500 font-medium">{headerText}</span>
                     </div>
                 </div>
                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
-                    Screening Complete
+                    {badgeText}
                 </span>
             </div>
 
@@ -386,9 +474,9 @@ function RecruiterResultCard({
             <div className="p-4 bg-[#18181B] flex items-center justify-between gap-3">
                 <Link
                     href="/auth/signup"
-                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/10 flex items-center justify-center gap-1.5"
+                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-emerald-600 text-slate-950 hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-1.5 font-semibold"
                 >
-                    Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                    Automate Candidate Screening <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
             </div>
         </div>
@@ -405,9 +493,14 @@ function MedicalResultCard({
     data: MedicalExtractedData;
     phone: string;
 }) {
-    const isUrgent = data.urgency_level === "High";
+    const isUrgent = data.urgency_level?.toLowerCase() === "high" || data.urgency_level?.toLowerCase() === "emergency";
+    const isService = data.call_reason?.toLowerCase().includes("refill") || data.call_reason?.toLowerCase().includes("billing");
+    
+    const headerText = isUrgent ? "PRIORITY CLINICAL TRIAGE" : isService ? "CLINIC SERVICE REQUEST" : "PATIENT INTAKE & SCHEDULING";
+    const badgeText = isUrgent ? "Urgent Attention" : isService ? "Provider Review" : "Visit Requested";
+    const badgeColor = isUrgent ? "bg-rose-500/10 border-rose-500/20 text-rose-400 animate-pulse" : isService ? "bg-teal-500/10 border-teal-500/20 text-teal-400" : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400";
+    
     const urgencyColor = isUrgent ? "text-rose-400" : data.urgency_level === "Medium" ? "text-amber-400" : "text-emerald-400";
-    const badgeColor = isUrgent ? "bg-rose-500/10 border-rose-500/20 text-rose-400" : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400";
 
     return (
         <div className="w-full max-w-md bg-[#0F172A] border border-[#1E293B] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
@@ -419,11 +512,11 @@ function MedicalResultCard({
                     </div>
                     <div>
                         <h4 className="text-xs font-semibold tracking-wider text-slate-300 uppercase leading-none">RIVERSIDE CLINIC</h4>
-                        <span className="text-[10px] text-slate-500 font-medium">Patient Triage System</span>
+                        <span className="text-[10px] text-slate-500 font-medium">{headerText}</span>
                     </div>
                 </div>
                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
-                    Triage Complete
+                    {badgeText}
                 </span>
             </div>
 
@@ -489,9 +582,9 @@ function MedicalResultCard({
             <div className="p-4 bg-[#0B1120] flex items-center justify-between gap-3">
                 <Link
                     href="/auth/signup"
-                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-cyan-600 text-white hover:bg-cyan-500 transition-colors shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-1.5"
+                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition-colors shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-1.5"
                 >
-                    Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                    Automate Patient Triage <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
             </div>
         </div>
@@ -508,9 +601,15 @@ function ServiceResultCard({
     data: ServiceExtractedData;
     phone: string;
 }) {
-    const isUrgent = data.urgency_level === "Emergency";
-    const statusColor = data.job_status === "Booked" ? "text-emerald-400" : data.job_status === "Quote Requested" ? "text-amber-400" : "text-orange-400";
-    const badgeColor = isUrgent ? "bg-rose-500/10 border-rose-500/20 text-rose-400 animate-pulse" : "bg-orange-500/10 border-orange-500/20 text-orange-400";
+    const isUrgent = data.urgency_level?.toLowerCase() === "emergency";
+    const isBooked = data.job_status?.toLowerCase() === "booked";
+    const isQuote = data.job_status?.toLowerCase() === "quote requested";
+    
+    const headerText = isUrgent ? "EMERGENCY WORK ORDER" : isBooked ? "CONFIRMED SERVICE TICKET" : isQuote ? "ON-SITE ESTIMATE REQUEST" : "SERVICE DISPATCH INQUIRY";
+    const badgeText = isUrgent ? "Priority Dispatch" : isBooked ? "Technician Scheduled" : isQuote ? "Quote Follow-up" : "Log Created";
+    const badgeColor = isUrgent ? "bg-rose-500/10 border-rose-500/20 text-rose-400 animate-pulse" : isBooked ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : isQuote ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : "bg-orange-500/10 border-orange-500/20 text-orange-400";
+    
+    const statusColor = isBooked ? "text-emerald-400" : isQuote ? "text-amber-400" : "text-orange-400";
 
     return (
         <div className="w-full max-w-md bg-[#18181B] border border-[#27272A] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
@@ -522,11 +621,11 @@ function ServiceResultCard({
                     </div>
                     <div>
                         <h4 className="text-xs font-bold tracking-wider text-neutral-300 uppercase leading-none">BLUEFIELD DISPATCH</h4>
-                        <span className="text-[10px] text-neutral-500 font-medium">Field Service Management</span>
+                        <span className="text-[10px] text-neutral-500 font-medium">{headerText}</span>
                     </div>
                 </div>
                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
-                    {isUrgent ? "EMERGENCY" : "DISPATCH LOG"}
+                    {badgeText}
                 </span>
             </div>
 
@@ -598,9 +697,9 @@ function ServiceResultCard({
             <div className="p-4 bg-[#09090B] flex items-center justify-between gap-3">
                 <Link
                     href="/auth/signup"
-                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-orange-600 text-white hover:bg-orange-500 transition-colors shadow-lg shadow-orange-500/10 flex items-center justify-center gap-1.5"
+                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-orange-500 text-white hover:bg-orange-400 transition-colors shadow-lg shadow-orange-500/10 flex items-center justify-center gap-1.5"
                 >
-                    Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                    Automate Service Dispatch <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
             </div>
         </div>
@@ -617,9 +716,16 @@ function RealEstateResultCard({
     data: RealEstateExtractedData;
     phone: string;
 }) {
-    const isHotLead = data.lead_outcome === "Showing Scheduled" || data.lead_outcome === "Consultation Booked" || data.lead_outcome === "Valuation Requested";
+    const isShowing = data.lead_outcome?.toLowerCase() === "showing scheduled";
+    const isSeller = data.client_intent?.toLowerCase().includes("sell") || data.lead_outcome?.toLowerCase() === "valuation requested";
+    const isBuyer = data.client_intent?.toLowerCase().includes("buy") || data.client_intent?.toLowerCase().includes("rent");
+    
+    const headerText = isShowing ? "PRIVATE PROPERTY TOUR REQUEST" : isSeller ? "SELLER LEAD & VALUATION INTAKE" : isBuyer ? "BUYER PROFILE & PREFERENCE BRIEF" : "REAL ESTATE LEAD LOG";
+    const badgeText = isShowing ? "Showing Booked" : isSeller ? "Valuation Requested" : isBuyer ? "Active Searcher" : "Lead Captured";
+    const badgeColor = isShowing ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : isSeller ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : isBuyer ? "bg-blue-500/10 border-blue-500/20 text-blue-400" : "bg-slate-500/10 border-slate-500/20 text-slate-400";
+
+    const isHotLead = isShowing || isSeller;
     const statusColor = isHotLead ? "text-amber-400" : "text-blue-400";
-    const badgeColor = isHotLead ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : "bg-blue-500/10 border-blue-500/20 text-blue-400";
 
     return (
         <div className="w-full max-w-md bg-[#0F172A] border border-[#1E293B] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
@@ -631,11 +737,11 @@ function RealEstateResultCard({
                     </div>
                     <div>
                         <h4 className="text-xs font-bold tracking-wider text-slate-200 uppercase leading-none">MAPLE & CO REALTY</h4>
-                        <span className="text-[10px] text-slate-500 font-medium">Lead Management CRM</span>
+                        <span className="text-[10px] text-slate-500 font-medium">{headerText}</span>
                     </div>
                 </div>
                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
-                    Lead Captured
+                    {badgeText}
                 </span>
             </div>
 
@@ -703,9 +809,9 @@ function RealEstateResultCard({
             <div className="p-4 bg-[#0B1120] flex items-center justify-between gap-3">
                 <Link
                     href="/auth/signup"
-                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-amber-600 text-slate-900 hover:bg-amber-500 transition-colors shadow-lg shadow-amber-500/10 flex items-center justify-center gap-1.5"
+                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/10 flex items-center justify-center gap-1.5"
                 >
-                    Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                    Capture Real Estate Leads <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
             </div>
         </div>
@@ -890,9 +996,9 @@ export function DemoCallForm() {
                 <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-400 w-full space-y-1">
                     <p className="font-semibold text-white">
                         {callingState === "calling"
-                            ? "Connecting call to your mobile..."
+                            ? `Connecting call from ${AGENT_PERSONAS[useCase]?.personaName || "Agent"} to your mobile...`
                             : isPolling
-                            ? "Talk to Sarah — we'll show your results when the call ends!"
+                            ? (AGENT_PERSONAS[useCase]?.inCallMessage || "Talk to the agent — your live brief will appear when the call ends!")
                             : "Your phone should be ringing!"}
                     </p>
                 </div>
@@ -900,9 +1006,9 @@ export function DemoCallForm() {
                 {(callingState === "connected" || isPolling) && (
                     <Link
                         href="/auth/signup"
-                        className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-amber-500 text-neutral-950 hover:bg-amber-400 transition-colors shadow-lg flex items-center justify-center gap-2 mt-2"
+                        className={`w-full py-3 px-4 rounded-lg text-xs font-bold transition-all shadow-lg flex items-center justify-center gap-2 mt-2 ${AGENT_PERSONAS[useCase]?.brandColorClass || "bg-amber-500 text-neutral-950 hover:bg-amber-400"}`}
                     >
-                        Build Your Agent <ArrowRight className="w-3.5 h-3.5" />
+                        {AGENT_PERSONAS[useCase]?.ctaLabel || "Get Started"} <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                 )}
             </div>
@@ -997,6 +1103,11 @@ export function DemoCallForm() {
                             );
                         })}
                     </div>
+                </div>
+
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5 text-[11px] text-gray-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+                    <span className="truncate">Agent: <strong className="text-white font-semibold">{AGENT_PERSONAS[useCase]?.personaName}</strong> from <span className="text-gray-300">{AGENT_PERSONAS[useCase]?.company}</span></span>
                 </div>
 
                 {useCase === "recruiter" && (

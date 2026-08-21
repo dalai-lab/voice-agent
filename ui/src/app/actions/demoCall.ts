@@ -10,11 +10,11 @@ const RATE_LIMIT_FILE = "/tmp/demo_rate_limits.json";
 const RATE_LIMIT_HOURS = 24;
 
 // Hardcoded Dograh API configuration
-const DOGRAH_API_KEY = "dgr_vcgoAOH9gYU-uBbR7XvhVeySPWQBVGSTzM6vxyPRj9c";
+const DOGRAH_API_KEY = "dgr_Cx8vqaOxg1GsJ-Anyo0Nj-H5bfTkNTre1S_nPdmMwsY";
 
 // Workflow mapping: Add more workflows here as they are built!
 const WORKFLOW_MAP: Record<string, string> = {
-    hotel: "99b1e003-3332-46c9-a8dd-0ea8a4ec0f08",
+    hotel: "f9c75958-436b-4a20-9498-9d51e0276f36",
     // medical: "uuid-here",
     // sales: "uuid-here",
     // service: "uuid-here",

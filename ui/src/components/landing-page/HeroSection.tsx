@@ -1,7 +1,9 @@
 import React from 'react';
 import { VoiceWaveCanvas } from './VoiceWaveCanvas';
 import { Navbar } from './Navbar';
-import { Play, Calendar, Share2, Cloud } from 'lucide-react';
+import { Play, Calendar, Share2, Cloud, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
+import Link from 'next/link';
+import { DemoCallForm } from './DemoCallForm';
 
 export const HeroSection: React.FC = () => {
   return (
@@ -85,53 +87,7 @@ export const HeroSection: React.FC = () => {
 
           {/* Right Column: Demo Call Form Placeholder */}
           <div className="lg:col-span-5 flex items-center justify-center w-full">
-            <div className="w-full max-w-md bg-[#16151E]/95 border border-white/10 p-6 sm:p-8 flex flex-col gap-5 rounded-2xl shadow-2xl backdrop-blur-xl hover:border-orange-500/30 transition-all">
-              
-              {/* Card Header */}
-              <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <div>
-                  <div className="text-sm text-white font-bold tracking-tight">Try Live AI Demo</div>
-                  <div className="text-xs text-gray-400 font-light mt-0.5">Receive an instant test call from Talkar</div>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-xs text-emerald-400 font-medium">Ready</span>
-                </div>
-              </div>
-
-              {/* Form Inputs */}
-              <div className="flex flex-col gap-1.5 text-left">
-                <label className="text-xs text-gray-300 font-medium">Select Voice Agent</label>
-                <select className="bg-[#0F0E14] border border-white/10 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-orange-500 text-xs w-full transition-colors cursor-pointer">
-                  <option value="atlas">Atlas — Commercial Specialist (Warm)</option>
-                  <option value="aurora">Aurora — Female Executive (Empathetic)</option>
-                  <option value="cortex">Cortex — Concise Technical (Male)</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1.5 text-left">
-                <label className="text-xs text-gray-300 font-medium">Full Name</label>
-                <input
-                  className="bg-[#0F0E14] border border-white/10 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-orange-500 text-xs w-full transition-colors placeholder:text-gray-500"
-                  placeholder="Your Full Name"
-                  type="text"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5 text-left">
-                <label className="text-xs text-gray-300 font-medium">Phone Number</label>
-                <input
-                  className="bg-[#0F0E14] border border-white/10 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-orange-500 text-xs w-full transition-colors placeholder:text-gray-500"
-                  placeholder="+1 (555) 000-0000"
-                  type="tel"
-                />
-              </div>
-
-              {/* Action Button */}
-              <button className="bg-gradient-to-r from-[#FF5500] to-[#E11D48] text-white px-4 py-3.5 rounded-xl font-bold text-xs w-full hover:opacity-95 transition-all shadow-lg shadow-orange-600/25 mt-1">
-                Receive Demo Call
-              </button>
-            </div>
+            <DemoCallForm />
           </div>
 
         </div>

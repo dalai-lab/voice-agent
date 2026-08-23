@@ -177,7 +177,13 @@ function extractUsage(
 
     // ── Standard pipeline ─────────────────────────────────────────────────────
     
-    // Parse nested dicts from usage_info
+    // Helper to extract clean provider name from Pipecat processor name (e.g. "OpenAILLMService#3" -> "OpenAILLM")
+    const cleanProvider = (key: string) => {
+        const parts = key.split("|||");
+        if (parts.length === 2) return parts[0];
+        return key.replace(/Service#.*/, "").replace(/#.*/, "");
+    };
+
     let uiLlmPrompt = 0, uiLlmCompletion = 0, uiLlmCached = 0, uiLlmProvider = "";
     if (ui?.llm) {
         Object.entries(ui.llm).forEach(([key, val]: [string, any]) => {
@@ -185,26 +191,23 @@ function extractUsage(
             uiLlmPrompt += num(val?.prompt_tokens);
             uiLlmCompletion += num(val?.completion_tokens);
             uiLlmCached += num(val?.cache_read_input_tokens) + num(val?.cache_creation_input_tokens) + num(val?.cached_tokens);
-            const parts = key.split("|||");
-            if (parts.length === 2 && !uiLlmProvider) uiLlmProvider = parts[0];
+            if (!uiLlmProvider) uiLlmProvider = cleanProvider(key);
         });
     }
     
     let uiSttSecs = 0, uiSttProvider = "";
     if (ui?.stt) {
         Object.entries(ui.stt).forEach(([key, val]: [string, any]) => {
-            uiSttSecs += num(val);
-            const parts = key.split("|||");
-            if (parts.length === 2 && !uiSttProvider) uiSttProvider = parts[0];
+            uiSttSecs += typeof val === "object" ? num(val?.audio_seconds) : num(val);
+            if (!uiSttProvider) uiSttProvider = cleanProvider(key);
         });
     }
 
     let uiTtsChars = 0, uiTtsProvider = "";
     if (ui?.tts) {
         Object.entries(ui.tts).forEach(([key, val]: [string, any]) => {
-            uiTtsChars += num(val);
-            const parts = key.split("|||");
-            if (parts.length === 2 && !uiTtsProvider) uiTtsProvider = parts[0];
+            uiTtsChars += typeof val === "object" ? num(val?.characters) : num(val);
+            if (!uiTtsProvider) uiTtsProvider = cleanProvider(key);
         });
     }
 

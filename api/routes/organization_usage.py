@@ -117,6 +117,7 @@ class WorkflowRunUsageResponse(BaseModel):
     # Usage breakdown for token/STT/TTS display
     usage_info: dict[str, Any] | None = None
     cost_info: dict[str, Any] | None = None
+    logs: dict[str, Any] | None = None
 
 
 class UsageHistoryResponse(BaseModel):

@@ -236,6 +236,7 @@ class OrganizationUsageClient(BaseDBClient):
                     "gathered_context": run.gathered_context,
                     "usage_info": run.usage_info,
                     "cost_info": run.cost_info,
+                    "logs": run.logs,
                 }
 
                 # Add USD cost if available in cost_info

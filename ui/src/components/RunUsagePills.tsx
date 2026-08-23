@@ -138,13 +138,15 @@ function sectionTokens(s: StsSection | undefined): {
 function extractUsage(
     usageInfo: Record<string, unknown> | null | undefined,
     costInfo: Record<string, unknown> | null | undefined,
+    logs: Record<string, unknown> | null | undefined,
 ): Extracted {
-    const ui = usageInfo as UsageInfo | null | undefined;
-    const ci = costInfo as CostInfo | null | undefined;
+    const ui = usageInfo as any;
+    const ci = costInfo as any;
+    const snap = logs?.paygent_snapshot as any;
 
     // ── Realtime / STS check ──────────────────────────────────────────────────
-    const stsRaw = ci?.sts_usage_metadata ?? (ui?.sts_usage_metadata as StsMetadata | undefined);
-    const isRealtime = !!(ci?.is_realtime ?? (stsRaw && Object.keys(stsRaw).length > 1));
+    const stsRaw = snap?.sts_usage_metadata ?? ci?.sts_usage_metadata ?? ui?.sts_usage_metadata;
+    const isRealtime = !!(snap?.is_realtime ?? ci?.is_realtime ?? (stsRaw && Object.keys(stsRaw).length > 1));
 
     if (isRealtime && stsRaw) {
         const inp = sectionTokens(stsRaw.input);
@@ -157,7 +159,7 @@ function extractUsage(
         const audioOut = out.audio;
         const thinking = out.thinking;
         const cached = cch.text + cch.audio + cch.flat;
-        const provider = ci?.sts_provider ?? ci?.llm_provider ?? (ui?.sts_provider as string) ?? "";
+        const provider = snap?.sts_provider ?? ci?.sts_provider ?? ci?.llm_provider ?? ui?.sts_provider ?? "";
 
         const hasAny = !!(textIn || audioIn || textOut || audioOut || thinking || cached);
         return {
@@ -174,36 +176,48 @@ function extractUsage(
     }
 
     // ── Standard pipeline ─────────────────────────────────────────────────────
-    // Try usage_info.llm / stt / tts first (structured), then fall back to
-    // the Paygent collector snapshot fields on cost_info / usage_info.
-    const sttSecs =
-        num(ui?.stt?.audio_seconds) ||
-        num(ci?.stt_audio_seconds) ||
-        num((ui as CostInfo)?.stt_audio_seconds);
+    
+    // Parse nested dicts from usage_info
+    let uiLlmPrompt = 0, uiLlmCompletion = 0, uiLlmCached = 0, uiLlmProvider = "";
+    if (ui?.llm) {
+        Object.entries(ui.llm).forEach(([key, val]: [string, any]) => {
+            if (key.startsWith("QAAnalysis")) return;
+            uiLlmPrompt += num(val?.prompt_tokens);
+            uiLlmCompletion += num(val?.completion_tokens);
+            uiLlmCached += num(val?.cache_read_input_tokens) + num(val?.cache_creation_input_tokens) + num(val?.cached_tokens);
+            const parts = key.split("|||");
+            if (parts.length === 2 && !uiLlmProvider) uiLlmProvider = parts[0];
+        });
+    }
+    
+    let uiSttSecs = 0, uiSttProvider = "";
+    if (ui?.stt) {
+        Object.entries(ui.stt).forEach(([key, val]: [string, any]) => {
+            uiSttSecs += num(val);
+            const parts = key.split("|||");
+            if (parts.length === 2 && !uiSttProvider) uiSttProvider = parts[0];
+        });
+    }
 
-    const llmPrompt =
-        num(ui?.llm?.prompt_tokens) ||
-        num(ci?.llm_prompt_tokens) ||
-        num((ui as CostInfo)?.llm_prompt_tokens);
+    let uiTtsChars = 0, uiTtsProvider = "";
+    if (ui?.tts) {
+        Object.entries(ui.tts).forEach(([key, val]: [string, any]) => {
+            uiTtsChars += num(val);
+            const parts = key.split("|||");
+            if (parts.length === 2 && !uiTtsProvider) uiTtsProvider = parts[0];
+        });
+    }
 
-    const llmCompletion =
-        num(ui?.llm?.completion_tokens) ||
-        num(ci?.llm_completion_tokens) ||
-        num((ui as CostInfo)?.llm_completion_tokens);
+    // Try snap first, then ui, then ci
+    const sttSecs = num(snap?.stt_audio_seconds) || uiSttSecs || num(ci?.stt_audio_seconds);
+    const llmPrompt = num(snap?.llm_prompt_tokens) || uiLlmPrompt || num(ci?.llm_prompt_tokens);
+    const llmCompletion = num(snap?.llm_completion_tokens) || uiLlmCompletion || num(ci?.llm_completion_tokens);
+    const llmCached = num(snap?.llm_cached_tokens) || uiLlmCached || num(ci?.llm_cached_tokens);
+    const ttsChars = num(snap?.tts_characters) || uiTtsChars || num(ci?.tts_characters);
 
-    const llmCached =
-        num(ui?.llm?.cached_tokens) ||
-        num(ci?.llm_cached_tokens) ||
-        num((ui as CostInfo)?.llm_cached_tokens);
-
-    const ttsChars =
-        num(ui?.tts?.characters) ||
-        num(ci?.tts_characters) ||
-        num((ui as CostInfo)?.tts_characters);
-
-    const llmProvider = (ui?.llm?.provider ?? ui?.llm?.model ?? ci?.llm_provider ?? ci?.llm_model ?? "") as string;
-    const sttProvider = (ui?.stt?.provider ?? ui?.stt?.model ?? ci?.stt_provider ?? ci?.stt_model ?? "") as string;
-    const ttsProvider = (ui?.tts?.provider ?? ui?.tts?.model ?? ci?.tts_provider ?? ci?.tts_model ?? "") as string;
+    const llmProvider = (snap?.llm_provider || uiLlmProvider || ci?.llm_provider || "") as string;
+    const sttProvider = (snap?.stt_provider || uiSttProvider || ci?.stt_provider || "") as string;
+    const ttsProvider = (snap?.tts_provider || uiTtsProvider || ci?.tts_provider || "") as string;
 
     const hasAny = !!(sttSecs || llmPrompt || llmCompletion || ttsChars);
     return {
@@ -255,6 +269,7 @@ function Pill({
 export interface RunUsagePillsProps {
     usageInfo?: Record<string, unknown> | null;
     costInfo?: Record<string, unknown> | null;
+    logs?: Record<string, unknown> | null;
     /** If true, show "—" instead of nothing when no data is available */
     showEmpty?: boolean;
     className?: string;
@@ -263,10 +278,11 @@ export interface RunUsagePillsProps {
 export function RunUsagePills({
     usageInfo,
     costInfo,
+    logs,
     showEmpty = false,
     className,
 }: RunUsagePillsProps) {
-    const d = extractUsage(usageInfo, costInfo);
+    const d = extractUsage(usageInfo, costInfo, logs);
 
     if (!d.hasAny) {
         if (showEmpty) return <span className="text-[10px] text-muted-foreground/40 font-mono">—</span>;

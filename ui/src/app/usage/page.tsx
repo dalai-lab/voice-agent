@@ -633,6 +633,7 @@ export default function UsagePage() {
                                                     <RunUsagePills
                                                         usageInfo={(run as any).usage_info}
                                                         costInfo={(run as any).cost_info}
+                                                        logs={(run as any).logs}
                                                         showEmpty
                                                     />
                                                 </TableCell>
@@ -664,6 +665,7 @@ export default function UsagePage() {
                                                                     <RunUsagePills
                                                                         usageInfo={(run as any).usage_info}
                                                                         costInfo={(run as any).cost_info}
+                                                                        logs={(run as any).logs}
                                                                         showEmpty
                                                                     />
                                                                 </div>

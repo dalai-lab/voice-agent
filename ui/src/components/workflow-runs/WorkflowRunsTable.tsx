@@ -368,6 +368,7 @@ export function WorkflowRunsTable({
                                                         <RunUsagePills
                                                             usageInfo={run.usage_info}
                                                             costInfo={run.cost_info}
+                                                            logs={(run as any).logs}
                                                             showEmpty
                                                         />
                                                     </TableCell>

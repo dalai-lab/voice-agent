@@ -587,6 +587,7 @@ export default function UsagePage() {
                                         <TableHead className="font-bold text-xs text-foreground py-3">Disposition</TableHead>
                                         <TableHead className="font-bold text-xs text-foreground py-3">Date</TableHead>
                                         <TableHead className="font-bold text-xs text-foreground py-3 text-right">Duration</TableHead>
+                                        <TableHead className="font-bold text-xs text-foreground py-3 whitespace-nowrap">Usage</TableHead>
                                         {organizationPricing?.price_per_second_usd && (
                                             <TableHead className="font-bold text-xs text-foreground py-3 text-right">Cost (USD)</TableHead>
                                         )}
@@ -628,6 +629,13 @@ export default function UsagePage() {
                                                 <TableCell className="text-xs text-right font-medium text-foreground">
                                                     {formatDuration(run.call_duration_seconds)}
                                                 </TableCell>
+                                                <TableCell className="px-2 py-2.5">
+                                                    <RunUsagePills
+                                                        usageInfo={(run as any).usage_info}
+                                                        costInfo={(run as any).cost_info}
+                                                        showEmpty
+                                                    />
+                                                </TableCell>
                                                 {organizationPricing?.price_per_second_usd && (
                                                     <TableCell className="text-xs text-right font-bold text-foreground">
                                                         {run.charge_usd !== undefined && run.charge_usd !== null
@@ -647,7 +655,7 @@ export default function UsagePage() {
                                             </TableRow>
                                             {expandedRunId === run.id && (
                                                 <TableRow className="bg-muted/10 border-b border-border/50">
-                                                    <TableCell colSpan={9} className="p-4">
+                                                    <TableCell colSpan={10} className="p-4">
                                                         <div className="space-y-4">
                                                             {/* Usage Breakdown */}
                                                             {((run as any).usage_info || (run as any).cost_info) && (

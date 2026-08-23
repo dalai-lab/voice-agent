@@ -234,6 +234,8 @@ class OrganizationUsageClient(BaseDBClient):
                     "disposition": disposition,
                     "initial_context": run.initial_context,
                     "gathered_context": run.gathered_context,
+                    "usage_info": run.usage_info,
+                    "cost_info": run.cost_info,
                 }
 
                 # Add USD cost if available in cost_info

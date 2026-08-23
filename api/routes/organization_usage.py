@@ -114,6 +114,9 @@ class WorkflowRunUsageResponse(BaseModel):
     gathered_context: dict[str, Any] | None = None
     # New USD field
     charge_usd: float | None = None
+    # Usage breakdown for token/STT/TTS display
+    usage_info: dict[str, Any] | None = None
+    cost_info: dict[str, Any] | None = None
 
 
 class UsageHistoryResponse(BaseModel):

@@ -22,6 +22,8 @@ import { getDispositionBadge, formatContactOrigin } from "@/lib/dispositionLabel
 import { useOrganizationTimezone } from "@/hooks/useOrganizationTimezone";
 import { formatDateTime } from "@/lib/dateTime";
 import { ActiveFilter, FilterAttribute } from "@/types/filters";
+import { RunUsagePills } from "@/components/RunUsagePills";
+
 
 export interface WorkflowRunsTableProps {
     // Data
@@ -280,6 +282,7 @@ export function WorkflowRunsTable({
                                         </div>
                                     </TableHead>
                                     <TableHead className="font-semibold text-xs text-muted-foreground py-3 px-3 whitespace-nowrap min-w-[140px]">Disposition</TableHead>
+                                    <TableHead className="font-semibold text-xs text-muted-foreground py-3 px-3 whitespace-nowrap min-w-[180px]">Usage</TableHead>
 
                                     {dynamicGatheredColumns.map(col => (
                                         <TableHead key={col} className="font-semibold text-xs text-muted-foreground py-3 px-3 uppercase whitespace-nowrap min-w-[140px]" title={col.replace(/_/g, ' ')}>
@@ -359,6 +362,14 @@ export function WorkflowRunsTable({
                                                         })() : (
                                                             <span className="text-xs text-muted-foreground/50">-</span>
                                                         )}
+                                                    </TableCell>
+
+                                                    <TableCell className="py-3 px-4">
+                                                        <RunUsagePills
+                                                            usageInfo={run.usage_info}
+                                                            costInfo={run.cost_info}
+                                                            showEmpty
+                                                        />
                                                     </TableCell>
 
                                                     {dynamicGatheredColumns.map(col => (

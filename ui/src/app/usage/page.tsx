@@ -29,6 +29,8 @@ import { formatDateTime, getLocalTimezone } from '@/lib/dateTime';
 import { usageFilterAttributes } from '@/lib/filterAttributes';
 import { decodeFiltersFromURL, encodeFiltersToURL } from '@/lib/filters';
 import type { ActiveFilter, DateRangeValue, FilterAttribute, NumberFilterOption } from '@/types/filters';
+import { RunUsagePills } from '@/components/RunUsagePills';
+
 
 const buildAgentFilterAttributes = (
     agentOptions: NumberFilterOption[] | null,
@@ -646,7 +648,19 @@ export default function UsagePage() {
                                             {expandedRunId === run.id && (
                                                 <TableRow className="bg-muted/10 border-b border-border/50">
                                                     <TableCell colSpan={9} className="p-4">
-                                                        <div className="grid grid-cols-2 gap-6">
+                                                        <div className="space-y-4">
+                                                            {/* Usage Breakdown */}
+                                                            {((run as any).usage_info || (run as any).cost_info) && (
+                                                                <div className="space-y-1.5">
+                                                                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Usage</h4>
+                                                                    <RunUsagePills
+                                                                        usageInfo={(run as any).usage_info}
+                                                                        costInfo={(run as any).cost_info}
+                                                                        showEmpty
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                            <div className="grid grid-cols-2 gap-6">
                                                             {/* Initial Context */}
                                                             <div className="space-y-2">
                                                                 <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Initial Context</h4>
@@ -676,6 +690,7 @@ export default function UsagePage() {
                                                                 ) : (
                                                                     <span className="text-xs text-muted-foreground/60">No gathered context</span>
                                                                 )}
+                                                            </div>
                                                             </div>
                                                         </div>
                                                     </TableCell>

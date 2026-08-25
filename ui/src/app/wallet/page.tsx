@@ -20,7 +20,7 @@ export default function WalletPage() {
   const searchParams = useSearchParams();
   const isActivation = searchParams.get("activation") === "true";
   const plan = searchParams.get("plan") || "starter";
-  const PLAN_MINIMUMS: Record<string, number> = { starter: 6000, pro: 8000 };
+  const PLAN_MINIMUMS: Record<string, number> = { starter: 6000, growth: 6000, pro: 8000 };
   const TALKAR = "/api/talkar";
 
   const [wallet, setWallet] = useState<any>(null);
@@ -585,6 +585,7 @@ export default function WalletPage() {
                   <span className="text-[9px] text-muted-foreground block uppercase font-mono tracking-wider">Active Engine</span>
                   <p className="text-base font-bold text-foreground mt-0.5">
                     {subscription.tier === "pro" ? "Pro Engine" :
+                     subscription.tier === "growth" ? "Growth Engine" :
                      subscription.tier === "elite" ? "Apex Omni Prime" :
                      "Echo-Lite Engine"}
                   </p>
@@ -624,7 +625,7 @@ export default function WalletPage() {
           <p className="text-muted-foreground text-xs">Switch your call rate and capacity configurations.</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid md:grid-cols-3 gap-4">
           {/* Starter Plan Card */}
           <div 
             onClick={() => {
@@ -671,6 +672,57 @@ export default function WalletPage() {
               <div className="pt-3">
                 <Button variant="outline" className="w-full text-xs font-semibold h-8 rounded-md pointer-events-none">
                   Switch to Starter
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Growth Plan Card */}
+          <div 
+            onClick={() => {
+              if (subscription?.tier !== 'growth') {
+                setSelectedTierToSwitch('growth');
+              }
+            }}
+            className={`p-4 border rounded-lg space-y-3 transition-all flex flex-col justify-between ${
+              subscription?.tier === 'growth' 
+                ? 'border-foreground bg-foreground/[0.02] cursor-default' 
+                : 'border-border/50 bg-background hover:border-foreground/30 cursor-pointer'
+            }`}
+          >
+            <div className="space-y-3">
+              <div className="flex justify-between items-start gap-2">
+                <div>
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
+                    Growth Engine
+                    {subscription?.tier === 'growth' && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        Current
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground">Indian-optimised multilingual voice.</p>
+                </div>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/20 text-muted-foreground font-mono shrink-0">
+                  ₹6 / min
+                </span>
+              </div>
+              <p className="text-muted-foreground text-xs leading-relaxed">Same speed and LLM as Starter but powered by Smallest AI — ultra-low-latency TTS with 100+ Indian language voices.</p>
+              <ul className="space-y-1 text-xs text-foreground/90 pt-3 border-t border-border/30">
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>2 active concurrent call channels</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>100+ Indian language voices</span>
+                </li>
+              </ul>
+            </div>
+            {subscription?.tier !== 'growth' && (
+              <div className="pt-3">
+                <Button variant="outline" className="w-full text-xs font-semibold h-8 rounded-md pointer-events-none">
+                  Switch to Growth
                 </Button>
               </div>
             )}

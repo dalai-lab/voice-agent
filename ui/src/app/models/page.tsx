@@ -33,6 +33,19 @@ const AI_MODELS: ModelEngine[] = [
     ]
   },
   {
+    id: "growth-vocal",
+    tierKey: "growth",
+    name: "Growth Engine",
+    subtitle: "Indian-optimised multilingual voice",
+    rateRupees: "6.00",
+    description: "Same speed and LLM as Starter but powered by Smallest AI — ultra-low-latency TTS with 100+ Indian language voices including Hindi, Tamil, Telugu, Marathi and more.",
+    benefits: [
+      "2 parallel call channels",
+      "100+ Indian language voices",
+      "Includes 1 phone line"
+    ]
+  },
+  {
     id: "neural-vocal-pro",
     tierKey: "pro",
     name: "Pro Engine",
@@ -57,6 +70,24 @@ const VOICE_CATALOG = {
       { id: "aura-stella-en", name: "Stella", gender: "Female" },
       { id: "aura-orion-en", name: "Orion", gender: "Male" },
       { id: "aura-arcas-en", name: "Arcas", gender: "Male" },
+    ]
+  },
+  growth: {
+    provider: "smallest_ai",
+    label: "Indian Language Voices (Smallest AI)",
+    voices: [
+      { id: "meera",    name: "Meera",    gender: "Female", accent: "Indian" },
+      { id: "sanjay",   name: "Sanjay",   gender: "Male",   accent: "Indian" },
+      { id: "aditi",    name: "Aditi",    gender: "Female", accent: "Indian" },
+      { id: "karan",    name: "Karan",    gender: "Male",   accent: "Indian" },
+      { id: "radhika",  name: "Radhika",  gender: "Female", accent: "Indian" },
+      { id: "vikram",   name: "Vikram",   gender: "Male",   accent: "Indian" },
+      { id: "tanvi",    name: "Tanvi",    gender: "Female", accent: "Indian" },
+      { id: "dhruv",    name: "Dhruv",    gender: "Male",   accent: "Indian" },
+      { id: "nikita",   name: "Nikita",   gender: "Female", accent: "Indian" },
+      { id: "chirag",   name: "Chirag",   gender: "Male",   accent: "Indian" },
+      { id: "kiara",    name: "Kiara",    gender: "Female", accent: "Indian" },
+      { id: "lakshya",  name: "Lakshya",  gender: "Male",   accent: "Indian" },
     ]
   },
   premium: {
@@ -127,11 +158,14 @@ export default function ModelsPage() {
   };
 
   const isPremium = activeTier === "pro";
+  const isGrowth = activeTier === "growth";
   const isPendingDeposit = customerStatus === "pending_deposit";
 
   const getActiveVoiceName = () => {
     const std = VOICE_CATALOG.starter.voices.find(v => v.id === activeVoiceId);
     if (std) return `${std.name} (${std.gender})`;
+    const growth = VOICE_CATALOG.growth.voices.find(v => v.id === activeVoiceId);
+    if (growth) return `${growth.name} (${growth.gender})`;
     const prem = VOICE_CATALOG.premium.voices.find(v => v.id === activeVoiceId);
     if (prem) return `${prem.name} (${prem.gender})`;
     return activeVoiceId ? "Custom Voice" : "Default";
@@ -185,8 +219,8 @@ export default function ModelsPage() {
         ) : (
           <div className="space-y-4">
             
-            {/* Show Starter Catalog ONLY if not on Premium plan */}
-            {!isPremium && (
+            {/* Show Starter Catalog ONLY on starter plan */}
+            {!isPremium && !isGrowth && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium text-foreground">
@@ -221,7 +255,44 @@ export default function ModelsPage() {
               </div>
             )}
 
-            {/* Show Premium Catalog ONLY if on Premium plan */}
+            {/* Show Smallest AI voices for Growth plan */}
+            {isGrowth && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-foreground">
+                    {VOICE_CATALOG.growth.label}
+                  </h3>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 py-1 rounded-md bg-muted">
+                    Smallest AI · Lightning v3.1
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {VOICE_CATALOG.growth.voices.map(voice => {
+                    const isActive = activeVoiceId === voice.id;
+                    const v = voice as { id: string; name: string; gender: string; accent?: string };
+                    return (
+                      <div 
+                        key={v.id}
+                        onClick={() => handleVoiceChange(v.id, VOICE_CATALOG.growth.provider)}
+                        className={`relative flex items-center justify-between p-4 rounded-lg border transition-all cursor-pointer ${
+                          isActive 
+                            ? "bg-foreground/[0.02] border-foreground/80 shadow-xs" 
+                            : "bg-card border-border/70 hover:border-foreground/30"
+                        }`}
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-foreground">{v.name}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">{v.gender} · {v.accent}</span>
+                        </div>
+                        {isActive && <Check className="w-4 h-4 text-foreground shrink-0" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Show ElevenLabs Premium voices for Pro plan */}
             {isPremium && (
               <div className="space-y-3">
                 <h3 className="text-sm font-medium text-foreground">

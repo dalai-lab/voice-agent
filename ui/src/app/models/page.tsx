@@ -38,7 +38,7 @@ const AI_MODELS: ModelEngine[] = [
     name: "Growth Engine",
     subtitle: "Indian-optimised multilingual voice",
     rateRupees: "6.00",
-    description: "Same speed and LLM as Starter but powered by Smallest AI — ultra-low-latency TTS with 100+ Indian language voices including Hindi, Tamil, Telugu, Marathi and more.",
+    description: "Same speed and LLM as Starter but powered by Talkar Voice Engine — ultra-low-latency TTS with 100+ Indian language voices including Hindi, Tamil, Telugu, Marathi and more.",
     benefits: [
       "2 parallel call channels",
       "100+ Indian language voices",
@@ -74,7 +74,7 @@ const VOICE_CATALOG = {
   },
   growth: {
     provider: "smallest_ai",
-    label: "Indian Language Voices (Smallest AI)",
+    label: "Indian Language Voices (Talkar)",
     voices: [
       { id: "meera",    name: "Meera",    gender: "Female", accent: "Indian" },
       { id: "sanjay",   name: "Sanjay",   gender: "Male",   accent: "Indian" },
@@ -255,7 +255,7 @@ export default function ModelsPage() {
               </div>
             )}
 
-            {/* Show Smallest AI voices for Growth plan */}
+            {/* Show Talkar voices for Growth plan */}
             {isGrowth && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -263,7 +263,7 @@ export default function ModelsPage() {
                     {VOICE_CATALOG.growth.label}
                   </h3>
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 py-1 rounded-md bg-muted">
-                    Smallest AI · Lightning v3.1
+                    Talkar · Lightning v3.1
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -292,7 +292,7 @@ export default function ModelsPage() {
               </div>
             )}
 
-            {/* Show ElevenLabs Premium voices for Pro plan */}
+            {/* Show Premium voices for Pro plan */}
             {isPremium && (
               <div className="space-y-3">
                 <h3 className="text-sm font-medium text-foreground">

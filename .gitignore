@@ -33,3 +33,7 @@ admissions_dashboard.html
 crm_dashboard.html
 worflow.json
 ui/openapi-ts-error-*.log
+Demo_Workflow_Interviewer.json
+non_tech_interviewer_dashboard.html
+recruitment_crm_dashboard.html
+run_crm.py

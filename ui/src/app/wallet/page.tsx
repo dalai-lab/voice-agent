@@ -707,7 +707,7 @@ export default function WalletPage() {
                   ₹6 / min
                 </span>
               </div>
-              <p className="text-muted-foreground text-xs leading-relaxed">Same speed and LLM as Starter but powered by Smallest AI — ultra-low-latency TTS with 100+ Indian language voices.</p>
+              <p className="text-muted-foreground text-xs leading-relaxed">Same speed and LLM as Starter but powered by Talkar Voice Engine — ultra-low-latency TTS with 100+ Indian language voices.</p>
               <ul className="space-y-1 text-xs text-foreground/90 pt-3 border-t border-border/30">
                 <li className="flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />

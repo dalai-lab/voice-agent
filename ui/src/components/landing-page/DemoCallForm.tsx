@@ -549,7 +549,7 @@ export function DemoCallForm() {
         setErrorMessage(result?.error || "Failed to initiate call.");
         return;
       }
-      const runId = result.workflowRunId;
+      const runId = result.workflowRunId as number;
 
       // SSE connection for live transcription
       const sseUrl = `https://talkar.in/api/v1/public/agent/run/${runId}/stream?use_case=${useCase}`;
@@ -734,30 +734,8 @@ export function DemoCallForm() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#090A0F] text-slate-100 flex flex-col items-center justify-between p-4 sm:p-6 md:p-10 font-sans selection:bg-orange-500 selection:text-white">
-      {/* Top Brand Bar */}
-      <header className="w-full max-w-5xl flex items-center justify-between py-2 mb-6 sm:mb-8">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400 shadow-sm">
-            <Mic className="w-4 h-4" />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-sm sm:text-base text-white tracking-tight">Dograh</span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-400 hidden sm:inline-block">
-              Voice Telephony Platform
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 text-xs">
-          <span className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" /> Live Demo Engine
-          </span>
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      <main className="w-full max-w-5xl flex flex-col items-center justify-center flex-1 my-auto">
+    <div className="w-full bg-transparent text-slate-100 flex flex-col items-center justify-center font-sans selection:bg-orange-500 selection:text-white p-0">
+      <main className="w-full flex flex-col items-center justify-center">
         {/* COMPLETED STATE */}
         {callingState === "done" && extractedData && (
           <CallCompletedCard
@@ -891,30 +869,9 @@ export function DemoCallForm() {
           </div>
         )}
 
-        {/* IDLE / SETUP FORM STATE (Exact Design & Color Language from Screenshot) */}
+        {/* IDLE / SETUP FORM STATE */}
         {callingState === "idle" && (
-          <div className="w-full max-w-[540px] space-y-4 animate-turn-in">
-            {/* Hero Header */}
-            <div className="text-center space-y-1.5">
-              <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-[11px] text-slate-300 font-medium">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Live Interactive Demo</span>
-              </div>
-
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                Conversational{" "}
-                <span className="bg-gradient-to-r from-orange-400 via-amber-300 to-orange-500 bg-clip-text text-transparent">
-                  Voice AI
-                </span>
-              </h1>
-
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                Choose an agent, enter your number, and test live AI calling.
-              </p>
-            </div>
-
-            {/* Main Form Card (Completely Transparent Placeholder, No Background, No Border) */}
-            <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden">
+          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
               {/* Card Header */}
               <div className="flex justify-between items-center border-b border-white/[0.08] pb-3 shrink-0">
                 <div>
@@ -925,10 +882,7 @@ export function DemoCallForm() {
                     Receive an instant test call from Dograh
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-xs text-emerald-400 font-semibold">Ready</span>
-                </div>
+                
               </div>
 
               <form onSubmit={handleInitiateCall} className="flex-1 min-h-0 flex flex-col justify-between mt-3">
@@ -985,7 +939,7 @@ export function DemoCallForm() {
                             onClick={() => setUseCase(item.id)}
                             className={`h-11 px-3.5 rounded-xl text-xs sm:text-sm font-medium border text-left flex items-center gap-2.5 transition-all cursor-pointer backdrop-blur-md ${
                               isSelected
-                                ? "bg-[#28150a]/80 border-2 border-[#ea580c] text-[#f97316] font-bold shadow-[0_0_15px_rgba(234,88,12,0.2)]"
+                                ? "bg-orange-500/[0.08] border border-orange-500/35 text-[#f97316] font-bold shadow-[0_0_12px_rgba(234,88,12,0.1)]"
                                 : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.12] text-gray-300"
                             }`}
                           >
@@ -1081,7 +1035,7 @@ export function DemoCallForm() {
                 <div className="pt-3 border-t border-white/[0.08] shrink-0">
                   <button
                     type="submit"
-                    className="w-full h-14 min-h-[56px] rounded-2xl text-base sm:text-lg font-extrabold bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:from-[#ff6414] hover:to-[#f43f5e] text-white shadow-xl shadow-orange-600/30 ring-2 ring-orange-500/30 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer tracking-wide shrink-0"
+                    className="w-full h-14 min-h-[56px] rounded-2xl text-base sm:text-lg font-extrabold bg-gradient-to-r from-orange-500/15 to-rose-500/15 hover:from-orange-500/25 hover:to-rose-500/25 border border-orange-500/30 text-orange-400 hover:border-orange-500/50 shadow-lg shadow-orange-500/5 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer tracking-wide shrink-0"
                   >
                     <PhoneCall className="w-5 h-5 fill-current shrink-0" />
                     <span>Receive Demo Call</span>
@@ -1090,7 +1044,6 @@ export function DemoCallForm() {
                 </div>
               </form>
             </div>
-          </div>
         )}
 
         {/* ERROR STATE */}
@@ -1113,12 +1066,6 @@ export function DemoCallForm() {
           </div>
         )}
       </main>
-
-      {/* Clean Bottom Footer */}
-      <footer className="w-full max-w-5xl py-4 mt-6 text-center text-xs sm:text-sm text-slate-500 border-t border-white/[0.04] flex items-center justify-between">
-        <span>Powered by Dograh Telephony Engine</span>
-        <span className="font-mono text-xs text-slate-600">v1.2 · Real-Time Extraction</span>
-      </footer>
     </div>
   );
 }

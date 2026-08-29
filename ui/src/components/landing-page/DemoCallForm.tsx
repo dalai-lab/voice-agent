@@ -276,7 +276,7 @@ function CallCompletedCard({
   };
 
   return (
-    <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
+    <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-[#0a0b10]/95 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between overflow-hidden animate-turn-in">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] pb-3 shrink-0">
         <div className="flex items-center gap-3">
@@ -293,18 +293,18 @@ function CallCompletedCard({
               </span>
             </div>
             <h2 className="text-sm sm:text-base font-bold text-white mt-0.5">
-              Call Summary & Extracted Data
+              Call Summary & Notes
             </h2>
           </div>
         </div>
 
         {/* Quick Stats Pill Strip */}
         <div className="flex items-center gap-2">
-          <div className="px-3 py-1 rounded-xl bg-white/[0.03] border border-white/[0.08] text-right">
+          <div className="px-3 py-1 rounded-xl bg-[#13141f] border border-white/10 text-right">
             <div className="text-[10px] uppercase font-semibold text-slate-400">Time</div>
             <div className="text-xs font-bold text-white tabular-nums">{formatTime(durationSec || 30)}</div>
           </div>
-          <div className="px-3 py-1 rounded-xl bg-white/[0.03] border border-white/[0.08] text-right">
+          <div className="px-3 py-1 rounded-xl bg-[#13141f] border border-white/10 text-right">
             <div className="text-[10px] uppercase font-semibold text-slate-400">Turns</div>
             <div className="text-xs font-bold text-orange-400 tabular-nums">{turnCount || 6}</div>
           </div>
@@ -316,11 +316,11 @@ function CallCompletedCard({
         <div className="flex items-center justify-between shrink-0 px-0.5">
           <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-orange-400" />
-            Extracted Fields ({capturedCount}/{allEntries.length})
+            Details Captured ({capturedCount}/{allEntries.length})
           </span>
           <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Synchronized
+            Live Sync
           </span>
         </div>
 
@@ -329,10 +329,10 @@ function CallCompletedCard({
           {allEntries.map(({ key, label, val, hasValue }) => (
             <div
               key={key}
-              className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between ${
+              className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between backdrop-blur-md ${
                 hasValue
-                  ? "bg-gradient-to-br from-orange-500/[0.08] to-transparent border-orange-500/25 hover:border-orange-500/40 shadow-xs"
-                  : "bg-white/[0.015] border-white/[0.05] opacity-55"
+                  ? "bg-[#161826] border border-orange-500/30 hover:border-orange-500/50 shadow-sm"
+                  : "bg-[#13141f] border border-white/10 opacity-70"
               }`}
             >
               <div className="flex items-center justify-between text-[11px] font-medium mb-1">
@@ -358,16 +358,16 @@ function CallCompletedCard({
         <button
           type="button"
           onClick={onReset}
-          className="h-12 px-4 rounded-2xl text-xs sm:text-sm font-semibold bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-200 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+          className="h-12 px-4 rounded-2xl text-xs sm:text-sm font-semibold bg-[#13141f] hover:bg-[#1a1b2a] border border-white/10 text-slate-200 transition-all flex items-center gap-2 cursor-pointer shrink-0"
         >
-          <RotateCcw className="w-4 h-4 text-slate-400" /> Start Over
+          <RotateCcw className="w-4 h-4 text-slate-400" /> Try Another Call
         </button>
 
         <a
           href="https://dograh.com"
           target="_blank"
           rel="noreferrer"
-          className="flex-1 h-12 rounded-2xl text-xs sm:text-sm font-extrabold bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:from-[#ff6414] hover:to-[#f43f5e] text-white shadow-xl shadow-orange-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer truncate"
+          className="flex-1 h-12 rounded-2xl text-xs sm:text-sm font-bold bg-gradient-to-r from-orange-500/20 via-orange-500/30 to-rose-500/20 hover:from-orange-500/30 hover:to-rose-500/30 backdrop-blur-xl border border-orange-500/40 hover:border-orange-500/60 text-orange-400 hover:text-orange-300 shadow-lg shadow-orange-500/10 flex items-center justify-center gap-2 transition-all cursor-pointer truncate"
         >
           <span className="truncate">{persona.ctaText}</span>
           <ArrowRight className="w-4 h-4 shrink-0" />
@@ -513,7 +513,7 @@ export function DemoCallForm() {
   // Auto-scroll transcript
   useEffect(() => {
     if (transcriptBottomRef.current) {
-      transcriptBottomRef.current.scrollIntoView({ behavior: "smooth" });
+      transcriptBottomRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [liveTurns]);
 
@@ -725,12 +725,12 @@ export function DemoCallForm() {
   ).length;
 
   const industryOptions = [
-    { id: "hotel", label: "Hotels & Stays", persona: "Sarah · Front Desk", icon: Hotel },
-    { id: "medical", label: "Healthcare", persona: "Emma · Patient Intake", icon: Stethoscope },
-    { id: "sales", label: "Sales & Leads", persona: "Jordan · Qualifying AI", icon: Briefcase },
-    { id: "service", label: "Home Services", persona: "Casey · Dispatcher", icon: Wrench },
+    { id: "hotel", label: "Hotel Bookings", persona: "Sarah · Front Desk", icon: Hotel },
+    { id: "medical", label: "Clinic Appointments", persona: "Emma · Intake", icon: Stethoscope },
+    { id: "sales", label: "Inbound Sales", persona: "Jordan · Sales", icon: Briefcase },
+    { id: "service", label: "Service Dispatch", persona: "Casey · Dispatch", icon: Wrench },
     { id: "real_estate", label: "Real Estate", persona: "Riley · Advisor", icon: Home },
-    { id: "recruiter", label: "Recruiter AI", persona: "Alex · HR Specialist", icon: Users },
+    { id: "recruiter", label: "Hiring & Screening", persona: "Alex · Recruiter", icon: Users },
   ];
 
   return (
@@ -749,7 +749,7 @@ export function DemoCallForm() {
 
         {/* IN-CALL / STREAMING STATE (Completely Transparent 540x540 Placeholder, No Background, No Border, Pure Full-Height Split) */}
         {(callingState === "calling" || callingState === "connected") && (
-          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
+          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-[#0a0b10]/95 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between overflow-hidden animate-turn-in">
             {/* 60/40 Split: Transcript (7/12) & Captured Data (5/12) - Pure Full Height */}
             <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 h-full items-stretch">
               {/* Left Column: Live Transcript (60%) Completely Backgroundless with Upper Mask Fade */}
@@ -761,11 +761,11 @@ export function DemoCallForm() {
                         <PhoneCall className="w-5 h-5 animate-pulse text-amber-400" />
                       </div>
                       <p className="text-sm font-bold text-slate-200">
-                        {callingState === "calling" ? "Calling your phone..." : "Connected · Speak now"}
+                        {callingState === "calling" ? "Calling your phone..." : "Connected · Say hello to start"}
                       </p>
                       <p className="text-xs text-slate-400 max-w-[200px] leading-relaxed">
                         {callingState === "calling"
-                          ? "Answer call to start."
+                          ? "Pick up when your phone rings and start talking!"
                           : currentPersona.inCallHint}
                       </p>
                     </div>
@@ -790,10 +790,10 @@ export function DemoCallForm() {
                             </div>
 
                             <div
-                              className={`max-w-[94%] p-3 rounded-2xl text-[13px] sm:text-sm font-medium leading-relaxed shadow-sm smooth-bubble-expand ${
+                              className={`max-w-[94%] p-3 rounded-2xl text-[13px] sm:text-sm font-medium leading-relaxed shadow-sm smooth-bubble-expand backdrop-blur-md ${
                                 isAgent
-                                  ? "bg-gradient-to-br from-[#241710] to-[#15131a] border border-[#ea580c]/30 text-slate-100 rounded-tl-xs"
-                                  : "bg-gradient-to-br from-[#1b1f30] to-[#111320] border border-indigo-500/25 text-white rounded-tr-xs"
+                                  ? "bg-[#1a1410] border border-[#ea580c]/40 text-slate-100 rounded-tl-xs shadow-md"
+                                  : "bg-[#121422] border border-indigo-500/40 text-white rounded-tr-xs shadow-md"
                               }`}
                             >
                               {renderTranscriptText(rawText, isLatest)}
@@ -811,15 +811,15 @@ export function DemoCallForm() {
               <div className="col-span-5 bg-transparent border-0 p-0 flex flex-col h-full overflow-hidden">
                 <div className="flex items-center justify-between pb-2 mb-1 shrink-0">
                   <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block truncate">
-                    Fields
+                    Live Notes
                   </span>
-                  <div className="px-2.5 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-xs font-bold text-orange-400 tabular-nums">
+                  <div className="px-2.5 py-0.5 rounded-full bg-[#13141f] border border-white/10 text-xs font-bold text-orange-400 tabular-nums">
                     {capturedFieldsCount}/{allFieldKeys.length}
                   </div>
                 </div>
 
                 {/* Progress bar */}
-                <div className="w-full bg-white/[0.04] h-1.5 rounded-full overflow-hidden mb-2 shrink-0">
+                <div className="w-full bg-[#13141f] border border-white/5 h-1.5 rounded-full overflow-hidden mb-2 shrink-0">
                   <div
                     className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-500"
                     style={{
@@ -842,10 +842,10 @@ export function DemoCallForm() {
                         ref={(el) => { fieldRefs.current[key] = el; }}
                         className={`p-2.5 rounded-xl border backdrop-blur-md transition-all duration-500 flex items-center justify-between ${
                           isRecentlyUpdated
-                            ? "bg-orange-500/[0.12] border-orange-500/60 field-unlock-card shadow-sm shadow-orange-500/10"
+                            ? "bg-orange-950/70 border border-orange-500/70 field-unlock-card shadow-md shadow-orange-500/20"
                             : hasValue
-                            ? "bg-white/[0.03] border-white/[0.10] hover:bg-white/[0.05]"
-                            : "bg-white/[0.01] border-white/[0.04] opacity-50"
+                            ? "bg-[#171926] border border-white/15 hover:border-orange-500/40 shadow-sm"
+                            : "bg-[#13141f] border border-white/8 opacity-70"
                         }`}
                       >
                         <div className="min-w-0 flex-1 pr-1.5">
@@ -871,15 +871,15 @@ export function DemoCallForm() {
 
         {/* IDLE / SETUP FORM STATE */}
         {callingState === "idle" && (
-          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
+          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-[#0a0b10]/95 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between overflow-hidden animate-turn-in">
               {/* Card Header */}
               <div className="flex justify-between items-center border-b border-white/[0.08] pb-3 shrink-0">
                 <div>
                   <h2 className="text-sm sm:text-base text-white font-bold tracking-tight">
-                    Try Live AI Demo
+                    Test a Live AI Phone Call
                   </h2>
                   <p className="text-xs text-gray-400 font-normal mt-0.5">
-                    Receive an instant test call from Dograh
+                    Enter your number and pick a scenario to get an instant test call.
                   </p>
                 </div>
                 
@@ -898,8 +898,8 @@ export function DemoCallForm() {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Rahul Sharma"
-                      className="w-full h-11 px-4 rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500 focus:bg-white/[0.06] transition-all font-medium"
+                      placeholder="Alex Morgan"
+                      className="w-full h-11 px-4 rounded-xl border border-white/[0.08] bg-[#13141f] text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500 focus:bg-[#181926] transition-all font-medium"
                     />
                   </div>
 
@@ -909,7 +909,7 @@ export function DemoCallForm() {
                       Mobile Number
                     </label>
                     <div className="flex gap-2">
-                      <div className="h-11 px-3.5 rounded-xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-md text-white text-sm font-semibold flex items-center shrink-0 select-none">
+                      <div className="h-11 px-3.5 rounded-xl border border-white/10 bg-[#181926] text-white text-sm font-semibold flex items-center shrink-0 select-none">
                         IN +91
                       </div>
                       <input
@@ -918,15 +918,15 @@ export function DemoCallForm() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="98765 43210"
-                        className="flex-1 h-11 px-4 rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500 focus:bg-white/[0.06] transition-all font-medium tabular-nums"
+                        className="flex-1 h-11 px-4 rounded-xl border border-white/[0.08] bg-[#13141f] text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500 focus:bg-[#181926] transition-all font-medium tabular-nums"
                       />
                     </div>
                   </div>
 
-                  {/* Select Business Type */}
+                  {/* Choose a Scenario */}
                   <div className="space-y-1.5 text-left">
                     <label className="text-xs sm:text-sm font-semibold text-white/90 block">
-                      Select Business Type
+                      Choose a Scenario
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {industryOptions.map((item) => {
@@ -939,8 +939,8 @@ export function DemoCallForm() {
                             onClick={() => setUseCase(item.id)}
                             className={`h-11 px-3.5 rounded-xl text-xs sm:text-sm font-medium border text-left flex items-center gap-2.5 transition-all cursor-pointer backdrop-blur-md ${
                               isSelected
-                                ? "bg-orange-500/[0.08] border border-orange-500/35 text-[#f97316] font-bold shadow-[0_0_12px_rgba(234,88,12,0.1)]"
-                                : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.12] text-gray-300"
+                                ? "bg-orange-950/70 border border-orange-500/60 text-[#f97316] font-bold shadow-[0_0_15px_rgba(234,88,12,0.15)]"
+                                : "border-white/10 bg-[#13141f] hover:bg-[#1a1b28] hover:border-white/20 text-gray-300"
                             }`}
                           >
                             <Icon
@@ -963,7 +963,7 @@ export function DemoCallForm() {
                           <FileText className="w-3.5 h-3.5" />
                         </div>
                         <span className="text-xs sm:text-sm font-bold text-slate-200">
-                          Screening Context (Optional)
+                          Role & Company Context (Optional)
                         </span>
                       </div>
 
@@ -983,7 +983,7 @@ export function DemoCallForm() {
                       {/* Resume Upload / Text */}
                       <div className="space-y-1">
                         <label className="text-xs font-semibold text-slate-300 block">
-                          Candidate Resume
+                          Resume or Candidate Notes
                         </label>
                         <div className="grid grid-cols-2 gap-2">
                           <div className="relative">
@@ -1035,10 +1035,10 @@ export function DemoCallForm() {
                 <div className="pt-3 border-t border-white/[0.08] shrink-0">
                   <button
                     type="submit"
-                    className="w-full h-14 min-h-[56px] rounded-2xl text-base sm:text-lg font-extrabold bg-gradient-to-r from-orange-500/15 to-rose-500/15 hover:from-orange-500/25 hover:to-rose-500/25 border border-orange-500/30 text-orange-400 hover:border-orange-500/50 shadow-lg shadow-orange-500/5 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer tracking-wide shrink-0"
+                    className="w-full h-14 min-h-[56px] rounded-2xl text-base sm:text-lg font-bold bg-gradient-to-r from-orange-500/20 via-orange-500/30 to-rose-500/20 hover:from-orange-500/30 hover:to-rose-500/30 backdrop-blur-xl border border-orange-500/40 hover:border-orange-500/60 text-orange-400 hover:text-orange-300 shadow-lg shadow-orange-500/10 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer tracking-wide shrink-0"
                   >
                     <PhoneCall className="w-5 h-5 fill-current shrink-0" />
-                    <span>Receive Demo Call</span>
+                    <span>Call My Phone</span>
                     <ArrowRight className="w-5 h-5 shrink-0" />
                   </button>
                 </div>

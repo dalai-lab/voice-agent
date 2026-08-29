@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   req: NextRequest,
-  { params }: { params: { runId: string } }
+  context: { params: Promise<{ runId: string }> }
 ) {
-  const { runId } = params;
+  const { runId } = await context.params;
 
   if (!runId) {
     return new Response("Missing runId", { status: 400 });
@@ -35,6 +37,7 @@ export async function GET(
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
       },
     });
   } catch (error: any) {

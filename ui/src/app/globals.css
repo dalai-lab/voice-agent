@@ -475,3 +475,76 @@
     transform: translateY(0) scale(1);
   }
 }
+
+/* Entity temporary highlight animation */
+@keyframes entityFlash {
+  0% {
+    background-color: rgba(249, 115, 22, 0.35);
+    color: #ffedd5;
+    border-radius: 4px;
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.35);
+  }
+  60% {
+    background-color: rgba(249, 115, 22, 0.22);
+    color: #ffedd5;
+  }
+  100% {
+    background-color: transparent;
+    color: inherit;
+    box-shadow: none;
+  }
+}
+
+.entity-temporary-highlight {
+  display: inline;
+  padding: 1px 4px;
+  margin: 0 -1px;
+  border-radius: 4px;
+  animation: entityFlash 2.6s ease-out forwards;
+}
+
+/* Glass shimmer for extracted fields */
+@keyframes glassShimmer {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(250%) skewX(-20deg);
+  }
+}
+
+@keyframes cardGlow {
+  0% {
+    border-color: rgba(249, 115, 22, 0.85);
+    box-shadow: 0 0 14px rgba(249, 115, 22, 0.2);
+  }
+  100% {
+    border-color: rgba(249, 115, 22, 0.4);
+    box-shadow: none;
+  }
+}
+
+.field-unlock-card {
+  position: relative;
+  overflow: hidden;
+  animation: cardGlow 1s ease-out forwards;
+}
+
+.field-unlock-card::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: 0;
+  width: 60%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    rgba(249, 115, 22, 0.3),
+    transparent
+  );
+  pointer-events: none;
+  animation: glassShimmer 0.9s ease-in-out forwards;
+}
+

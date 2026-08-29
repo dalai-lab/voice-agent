@@ -552,7 +552,7 @@ export function DemoCallForm() {
       const runId = result.workflowRunId as number;
 
       // SSE connection for live transcription
-      const sseUrl = `https://talkar.in/api/v1/public/agent/run/${runId}/stream?use_case=${useCase}`;
+      const sseUrl = `/api/demo-stream/${runId}`;
       const es = new EventSource(sseUrl);
       sseRef.current = es;
 

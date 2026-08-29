@@ -66,6 +66,7 @@ from api.services.pipecat.transcript_log_coordinator import TranscriptLogCoordin
 from api.services.pipecat.transport_setup import create_webrtc_transport
 from api.services.pipecat.worker_runner import run_pipeline_worker
 from api.services.pipecat.ws_sender_registry import get_ws_sender
+from api.services.pipecat.live_buffer_registry import register_live_buffer, unregister_live_buffer
 from api.services.telephony import registry as telephony_registry
 from api.services.workflow.dto import ReactFlowDTO
 from api.services.workflow.initial_context import merge_external_initial_context
@@ -776,6 +777,8 @@ async def _run_pipeline_impl(
 
     # Create in-memory logs buffer early so it can be used by engine callbacks
     in_memory_logs_buffer = InMemoryLogsBuffer(workflow_run_id)
+    # DEMO-ONLY: expose buffer for read-only live transcript endpoint (no call impact)
+    register_live_buffer(workflow_run_id, in_memory_logs_buffer)
 
     # Create node transition callback (always logs to buffer, optionally streams to WS)
     ws_sender = get_ws_sender(workflow_run_id)
@@ -1197,4 +1200,6 @@ async def _run_pipeline_impl(
         # whereas engine.cleanup() runs in a pipecat event-handler task.
         await engine.close_mcp_sessions()
         await feedback_observer.cleanup()
+        # DEMO-ONLY cleanup: remove from live buffer registry
+        unregister_live_buffer(workflow_run_id)
         logger.debug(f"Cleaned up context providers for workflow run {workflow_run_id}")

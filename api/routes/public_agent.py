@@ -516,3 +516,74 @@ async def get_run_extraction(
         is_completed=run.is_completed,
         extracted_data=extracted,
     )
+
+
+# ---------------------------------------------------------------------------
+# DEMO-ONLY: Live transcript stream from in-process InMemoryLogsBuffer
+# ---------------------------------------------------------------------------
+
+from api.services.pipecat.live_buffer_registry import get_live_buffer  # noqa: E402
+
+
+class LiveTranscriptResponse(BaseModel):
+    """Real-time transcript events read directly from the in-memory buffer."""
+
+    run_id: int
+    is_live: bool  # True while the pipeline is still running
+    turns: list[dict]  # {role: "agent"|"user", text: str, timestamp: str}
+
+
+@router.get("/run/{run_id}/live-transcript", response_model=LiveTranscriptResponse)
+async def get_live_transcript(
+    run_id: int,
+    x_api_key: str = Header(..., alias="X-API-Key"),
+):
+    """[DEMO ONLY] Return live transcript turns from the in-process buffer.
+
+    Reads directly from InMemoryLogsBuffer while the pipeline is running so
+    the demo frontend can show turns in real-time without waiting for the call
+    to complete. Pure read — no side effects, no call impact.
+    """
+    api_key = await _validate_api_key(x_api_key)
+
+    buffer = get_live_buffer(run_id)
+    if buffer is None:
+        # Call is not live (not yet started or already finished).
+        # Fall back to persisted DB events so the demo can still replay.
+        run = await db_client.get_workflow_run(
+            run_id, organization_id=api_key.organization_id
+        )
+        if not run:
+            raise HTTPException(status_code=404, detail="Workflow run not found")
+
+        events: list[dict] = run.logs.get("realtime_feedback_events", []) if run.logs else []
+        turns = _events_to_turns(events)
+        return LiveTranscriptResponse(run_id=run_id, is_live=False, turns=turns)
+
+    # Call is live — read directly from in-memory buffer (no DB hit)
+    events = buffer.get_events()
+    turns = _events_to_turns(events)
+    return LiveTranscriptResponse(run_id=run_id, is_live=True, turns=turns)
+
+
+def _events_to_turns(events: list[dict]) -> list[dict]:
+    """Convert raw realtime_feedback_events to simple {role, text, timestamp} dicts."""
+    turns = []
+    for ev in events:
+        ev_type = ev.get("type", "")
+        payload = ev.get("payload", {})
+        ts = ev.get("timestamp") or payload.get("timestamp", "")
+
+        if ev_type == "rtf-user-transcription" and payload.get("final") and payload.get("text"):
+            turns.append({
+                "role": "user",
+                "text": payload["text"],
+                "timestamp": ts,
+            })
+        elif ev_type == "rtf-bot-text" and payload.get("text"):
+            turns.append({
+                "role": "agent",
+                "text": payload["text"],
+                "timestamp": ts,
+            })
+    return turns

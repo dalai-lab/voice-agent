@@ -621,7 +621,10 @@ async def stream_live_transcript(
     async def event_generator():
         sent_event_idx = 0  # index into the raw events list we've already streamed
         partial_text_sent = ""  # last partial text we emitted so we don't spam repeats
-        POLL_MS = 0.1  # 100 ms — tight loop but cheap (in-process list read)
+        POLL_MS = 0.1  # 100 ms
+        seen_buffer = False  # have we EVER seen the buffer? distinguishes "not started" vs "finished"
+        startup_elapsed = 0.0
+        STARTUP_TIMEOUT = 30.0  # wait up to 30s for pipeline to start before giving up
 
         yield "data: " + json.dumps({"type": "connected", "run_id": run_id}) + "\n\n"
 
@@ -629,10 +632,22 @@ async def stream_live_transcript(
             buf = get_live_buffer(run_id)
 
             if buf is None:
-                # Pipeline finished — signal the frontend and stop
-                yield "data: " + json.dumps({"type": "ended"}) + "\n\n"
-                break
+                if seen_buffer:
+                    # We had the buffer before → pipeline has now finished
+                    yield "data: " + json.dumps({"type": "ended"}) + "\n\n"
+                    break
+                else:
+                    # Pipeline hasn't started yet (telephony handshake in progress)
+                    # Keep waiting — don't emit "ended"
+                    startup_elapsed += POLL_MS
+                    if startup_elapsed > STARTUP_TIMEOUT:
+                        yield "data: " + json.dumps({"type": "timeout"}) + "\n\n"
+                        break
+                    await asyncio.sleep(POLL_MS)
+                    continue
 
+            # Buffer exists — pipeline is live
+            seen_buffer = True
             events = buf.get_events()
 
             # Emit any new events since our last send

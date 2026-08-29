@@ -276,7 +276,7 @@ function CallCompletedCard({
   };
 
   return (
-    <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-[#0a0b10]/95 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between overflow-hidden animate-turn-in">
+    <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] pb-3 shrink-0">
         <div className="flex items-center gap-3">
@@ -331,8 +331,8 @@ function CallCompletedCard({
               key={key}
               className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between backdrop-blur-md ${
                 hasValue
-                  ? "bg-[#161826] border border-orange-500/30 hover:border-orange-500/50 shadow-sm"
-                  : "bg-[#13141f] border border-white/10 opacity-70"
+                  ? "bg-[#141729] border border-orange-500/40 hover:border-orange-500/60 shadow-md backdrop-blur-md"
+                  : "bg-[#0c0e17] border border-white/15 backdrop-blur-md opacity-85"
               }`}
             >
               <div className="flex items-center justify-between text-[11px] font-medium mb-1">
@@ -367,7 +367,7 @@ function CallCompletedCard({
           href="https://dograh.com"
           target="_blank"
           rel="noreferrer"
-          className="flex-1 h-12 rounded-2xl text-xs sm:text-sm font-bold bg-gradient-to-r from-orange-500/20 via-orange-500/30 to-rose-500/20 hover:from-orange-500/30 hover:to-rose-500/30 backdrop-blur-xl border border-orange-500/40 hover:border-orange-500/60 text-orange-400 hover:text-orange-300 shadow-lg shadow-orange-500/10 flex items-center justify-center gap-2 transition-all cursor-pointer truncate"
+          className="flex-1 h-12 rounded-2xl text-xs sm:text-sm font-bold bg-gradient-to-r from-orange-500/30 via-orange-500/40 to-rose-500/30 hover:from-orange-500/40 hover:to-rose-500/40 backdrop-blur-xl border border-orange-500/60 hover:border-orange-500/80 text-orange-300 hover:text-white shadow-xl shadow-orange-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer truncate"
         >
           <span className="truncate">{persona.ctaText}</span>
           <ArrowRight className="w-4 h-4 shrink-0" />
@@ -749,7 +749,7 @@ export function DemoCallForm() {
 
         {/* IN-CALL / STREAMING STATE (Completely Transparent 540x540 Placeholder, No Background, No Border, Pure Full-Height Split) */}
         {(callingState === "calling" || callingState === "connected") && (
-          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-[#0a0b10]/95 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between overflow-hidden animate-turn-in">
+          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
             {/* 60/40 Split: Transcript (7/12) & Captured Data (5/12) - Pure Full Height */}
             <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 h-full items-stretch">
               {/* Left Column: Live Transcript (60%) Completely Backgroundless with Upper Mask Fade */}
@@ -792,8 +792,8 @@ export function DemoCallForm() {
                             <div
                               className={`max-w-[94%] p-3 rounded-2xl text-[13px] sm:text-sm font-medium leading-relaxed shadow-sm smooth-bubble-expand backdrop-blur-md ${
                                 isAgent
-                                  ? "bg-[#1a1410] border border-[#ea580c]/40 text-slate-100 rounded-tl-xs shadow-md"
-                                  : "bg-[#121422] border border-indigo-500/40 text-white rounded-tr-xs shadow-md"
+                                  ? "bg-[#181310] border border-[#ea580c]/50 text-slate-100 rounded-tl-xs shadow-md backdrop-blur-md"
+                                  : "bg-[#101222] border border-indigo-500/50 text-white rounded-tr-xs shadow-md backdrop-blur-md"
                               }`}
                             >
                               {renderTranscriptText(rawText, isLatest)}
@@ -842,10 +842,10 @@ export function DemoCallForm() {
                         ref={(el) => { fieldRefs.current[key] = el; }}
                         className={`p-2.5 rounded-xl border backdrop-blur-md transition-all duration-500 flex items-center justify-between ${
                           isRecentlyUpdated
-                            ? "bg-orange-950/70 border border-orange-500/70 field-unlock-card shadow-md shadow-orange-500/20"
+                            ? "bg-orange-950/80 border border-orange-500/80 field-unlock-card shadow-md shadow-orange-500/20"
                             : hasValue
-                            ? "bg-[#171926] border border-white/15 hover:border-orange-500/40 shadow-sm"
-                            : "bg-[#13141f] border border-white/8 opacity-70"
+                            ? "bg-[#141729] border border-white/25 hover:border-orange-500/50 shadow-md backdrop-blur-md"
+                            : "bg-[#0c0e17] border border-white/15 backdrop-blur-md opacity-85"
                         }`}
                       >
                         <div className="min-w-0 flex-1 pr-1.5">
@@ -871,7 +871,7 @@ export function DemoCallForm() {
 
         {/* IDLE / SETUP FORM STATE */}
         {callingState === "idle" && (
-          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-[#0a0b10]/95 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-[2rem] p-5 sm:p-6 flex flex-col justify-between overflow-hidden animate-turn-in">
+          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
               {/* Card Header */}
               <div className="flex justify-between items-center border-b border-white/[0.08] pb-3 shrink-0">
                 <div>
@@ -899,7 +899,7 @@ export function DemoCallForm() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Alex Morgan"
-                      className="w-full h-11 px-4 rounded-xl border border-white/[0.08] bg-[#13141f] text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500 focus:bg-[#181926] transition-all font-medium"
+                      className="w-full h-11 px-4 rounded-xl border border-white/15 bg-[#0c0e17] backdrop-blur-md text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500 focus:bg-[#181926] transition-all font-medium"
                     />
                   </div>
 
@@ -909,7 +909,7 @@ export function DemoCallForm() {
                       Mobile Number
                     </label>
                     <div className="flex gap-2">
-                      <div className="h-11 px-3.5 rounded-xl border border-white/10 bg-[#181926] text-white text-sm font-semibold flex items-center shrink-0 select-none">
+                      <div className="h-11 px-3.5 rounded-xl border border-white/15 bg-[#141624] backdrop-blur-md text-white text-sm font-semibold flex items-center shrink-0 select-none">
                         IN +91
                       </div>
                       <input
@@ -918,7 +918,7 @@ export function DemoCallForm() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="98765 43210"
-                        className="flex-1 h-11 px-4 rounded-xl border border-white/[0.08] bg-[#13141f] text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500 focus:bg-[#181926] transition-all font-medium tabular-nums"
+                        className="flex-1 h-11 px-4 rounded-xl border border-white/15 bg-[#0c0e17] backdrop-blur-md text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500 focus:bg-[#181926] transition-all font-medium tabular-nums"
                       />
                     </div>
                   </div>
@@ -939,8 +939,8 @@ export function DemoCallForm() {
                             onClick={() => setUseCase(item.id)}
                             className={`h-11 px-3.5 rounded-xl text-xs sm:text-sm font-medium border text-left flex items-center gap-2.5 transition-all cursor-pointer backdrop-blur-md ${
                               isSelected
-                                ? "bg-orange-950/70 border border-orange-500/60 text-[#f97316] font-bold shadow-[0_0_15px_rgba(234,88,12,0.15)]"
-                                : "border-white/10 bg-[#13141f] hover:bg-[#1a1b28] hover:border-white/20 text-gray-300"
+                                ? "bg-orange-950/80 border border-orange-500/70 text-[#f97316] font-bold shadow-[0_0_15px_rgba(234,88,12,0.15)]"
+                                : "border-white/15 bg-[#0c0e17] hover:bg-[#151726] hover:border-white/25 text-gray-200"
                             }`}
                           >
                             <Icon
@@ -1035,7 +1035,7 @@ export function DemoCallForm() {
                 <div className="pt-3 border-t border-white/[0.08] shrink-0">
                   <button
                     type="submit"
-                    className="w-full h-14 min-h-[56px] rounded-2xl text-base sm:text-lg font-bold bg-gradient-to-r from-orange-500/20 via-orange-500/30 to-rose-500/20 hover:from-orange-500/30 hover:to-rose-500/30 backdrop-blur-xl border border-orange-500/40 hover:border-orange-500/60 text-orange-400 hover:text-orange-300 shadow-lg shadow-orange-500/10 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer tracking-wide shrink-0"
+                    className="w-full h-14 min-h-[56px] rounded-2xl text-base sm:text-lg font-bold bg-gradient-to-r from-orange-500/30 via-orange-500/40 to-rose-500/30 hover:from-orange-500/40 hover:to-rose-500/40 backdrop-blur-xl border border-orange-500/60 hover:border-orange-500/80 text-orange-300 hover:text-white shadow-xl shadow-orange-500/20 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer tracking-wide shrink-0"
                   >
                     <PhoneCall className="w-5 h-5 fill-current shrink-0" />
                     <span>Call My Phone</span>

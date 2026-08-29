@@ -599,19 +599,20 @@ import json
 
 from fastapi.responses import StreamingResponse
 
+from api.services.pipecat.live_event_bus import subscribe, unsubscribe
+
 
 @router.get("/run/{run_id}/stream")
 async def stream_live_transcript(
     run_id: int,
-    api_key: str,  # query param — EventSource can't send headers
+    api_key: str,  # query param — EventSource can't send custom headers
 ):
     """[DEMO ONLY] Server-Sent Events stream of live transcript turns.
 
-    Pushes each turn the instant it appears in InMemoryLogsBuffer (100 ms
-    check cadence). Also emits partial user transcriptions so words appear
-    as they're being spoken. Pure read — zero call impact.
+    Taps the existing ws_sender fan-out so events are pushed the INSTANT
+    the pipeline fires them — including interim (partial) user speech words
+    and bot TTS text fragments. Pure read — zero call impact.
     """
-    # Validate the API key (same helper, just sourced from query)
     key_obj = await db_client.validate_api_key(api_key)
     if not key_obj:
         async def _deny():
@@ -619,69 +620,55 @@ async def stream_live_transcript(
         return StreamingResponse(_deny(), media_type="text/event-stream")
 
     async def event_generator():
-        sent_event_idx = 0  # index into the raw events list we've already streamed
-        partial_text_sent = ""  # last partial text we emitted so we don't spam repeats
-        POLL_MS = 0.1  # 100 ms
-        seen_buffer = False  # have we EVER seen the buffer? distinguishes "not started" vs "finished"
-        startup_elapsed = 0.0
-        STARTUP_TIMEOUT = 30.0  # wait up to 30s for pipeline to start before giving up
-
+        # Subscribe to the live event bus for this run
+        q = subscribe(run_id)
         yield "data: " + json.dumps({"type": "connected", "run_id": run_id}) + "\n\n"
 
-        while True:
-            buf = get_live_buffer(run_id)
+        # Wait up to 30s for the pipeline to start (telephony handshake takes ~4s)
+        STARTUP_TIMEOUT = 30.0
+        startup_elapsed = 0.0
+        seen_any_event = False
 
-            if buf is None:
-                if seen_buffer:
-                    # We had the buffer before → pipeline has now finished
-                    yield "data: " + json.dumps({"type": "ended"}) + "\n\n"
-                    break
-                else:
-                    # Pipeline hasn't started yet (telephony handshake in progress)
-                    # Keep waiting — don't emit "ended"
-                    startup_elapsed += POLL_MS
-                    if startup_elapsed > STARTUP_TIMEOUT:
-                        yield "data: " + json.dumps({"type": "timeout"}) + "\n\n"
-                        break
-                    await asyncio.sleep(POLL_MS)
+        try:
+            while True:
+                try:
+                    # Block until an event arrives or timeout
+                    event = await asyncio.wait_for(q.get(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    if not seen_any_event:
+                        startup_elapsed += 1.0
+                        if startup_elapsed > STARTUP_TIMEOUT:
+                            yield "data: " + json.dumps({"type": "timeout"}) + "\n\n"
+                            break
+                    # Keep-alive heartbeat so nginx/browsers don't time out the connection
+                    yield ": heartbeat\n\n"
                     continue
 
-            # Buffer exists — pipeline is live
-            seen_buffer = True
-            events = buf.get_events()
+                seen_any_event = True
+                ev_type = event.get("type", "")
 
-            # Emit any new events since our last send
-            for ev in events[sent_event_idx:]:
-                sent_event_idx += 1
-                ev_type = ev.get("type", "")
-                payload = ev.get("payload", {})
-                ts = ev.get("timestamp") or payload.get("timestamp", "")
+                # Sentinel from close_run() — pipeline finished
+                if ev_type == "ended":
+                    yield "data: " + json.dumps({"type": "ended"}) + "\n\n"
+                    break
+
+                payload = event.get("payload", {})
                 text = payload.get("text", "")
 
                 if not text:
                     continue
 
+                ts = event.get("timestamp") or payload.get("timestamp", "")
+
                 if ev_type == "rtf-user-transcription":
-                    if payload.get("final"):
-                        # Final turn — clear partial
-                        partial_text_sent = ""
-                        yield "data: " + json.dumps({
-                            "type": "turn",
-                            "role": "user",
-                            "text": text,
-                            "final": True,
-                            "timestamp": ts,
-                        }) + "\n\n"
-                    elif text != partial_text_sent:
-                        # Interim/partial — stream word-by-word feel
-                        partial_text_sent = text
-                        yield "data: " + json.dumps({
-                            "type": "turn",
-                            "role": "user",
-                            "text": text,
-                            "final": False,
-                            "timestamp": ts,
-                        }) + "\n\n"
+                    final = bool(payload.get("final"))
+                    yield "data: " + json.dumps({
+                        "type": "turn",
+                        "role": "user",
+                        "text": text,
+                        "final": final,
+                        "timestamp": ts,
+                    }) + "\n\n"
 
                 elif ev_type == "rtf-bot-text":
                     yield "data: " + json.dumps({
@@ -692,7 +679,8 @@ async def stream_live_transcript(
                         "timestamp": ts,
                     }) + "\n\n"
 
-            await asyncio.sleep(POLL_MS)
+        finally:
+            unsubscribe(run_id, q)
 
     return StreamingResponse(
         event_generator(),

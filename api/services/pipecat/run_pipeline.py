@@ -67,6 +67,7 @@ from api.services.pipecat.transport_setup import create_webrtc_transport
 from api.services.pipecat.worker_runner import run_pipeline_worker
 from api.services.pipecat.ws_sender_registry import get_ws_sender
 from api.services.pipecat.live_buffer_registry import register_live_buffer, unregister_live_buffer
+from api.services.pipecat.live_event_bus import make_tapping_sender, close_run as close_live_event_bus
 from api.services.telephony import registry as telephony_registry
 from api.services.workflow.dto import ReactFlowDTO
 from api.services.workflow.initial_context import merge_external_initial_context
@@ -782,6 +783,8 @@ async def _run_pipeline_impl(
 
     # Create node transition callback (always logs to buffer, optionally streams to WS)
     ws_sender = get_ws_sender(workflow_run_id)
+    # DEMO-ONLY: wrap ws_sender to also fan-out events to SSE subscribers (no call impact)
+    ws_sender = make_tapping_sender(workflow_run_id, ws_sender)
 
     async def send_node_transition(
         node_id: str,
@@ -1200,6 +1203,7 @@ async def _run_pipeline_impl(
         # whereas engine.cleanup() runs in a pipecat event-handler task.
         await engine.close_mcp_sessions()
         await feedback_observer.cleanup()
-        # DEMO-ONLY cleanup: remove from live buffer registry
+        # DEMO-ONLY cleanup: remove from live buffer registry and close SSE fan-out
         unregister_live_buffer(workflow_run_id)
+        close_live_event_bus(workflow_run_id)
         logger.debug(f"Cleaned up context providers for workflow run {workflow_run_id}")

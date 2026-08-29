@@ -587,3 +587,103 @@ def _events_to_turns(events: list[dict]) -> list[dict]:
                 "timestamp": ts,
             })
     return turns
+
+
+# ---------------------------------------------------------------------------
+# DEMO-ONLY: True SSE streaming — pushes events the instant they hit the buffer
+# Uses query-param auth because browser EventSource doesn't support headers.
+# ---------------------------------------------------------------------------
+
+import asyncio
+import json
+
+from fastapi.responses import StreamingResponse
+
+
+@router.get("/run/{run_id}/stream")
+async def stream_live_transcript(
+    run_id: int,
+    api_key: str,  # query param — EventSource can't send headers
+):
+    """[DEMO ONLY] Server-Sent Events stream of live transcript turns.
+
+    Pushes each turn the instant it appears in InMemoryLogsBuffer (100 ms
+    check cadence). Also emits partial user transcriptions so words appear
+    as they're being spoken. Pure read — zero call impact.
+    """
+    # Validate the API key (same helper, just sourced from query)
+    key_obj = await db_client.validate_api_key(api_key)
+    if not key_obj:
+        async def _deny():
+            yield "data: " + json.dumps({"type": "error", "message": "Invalid API key"}) + "\n\n"
+        return StreamingResponse(_deny(), media_type="text/event-stream")
+
+    async def event_generator():
+        sent_event_idx = 0  # index into the raw events list we've already streamed
+        partial_text_sent = ""  # last partial text we emitted so we don't spam repeats
+        POLL_MS = 0.1  # 100 ms — tight loop but cheap (in-process list read)
+
+        yield "data: " + json.dumps({"type": "connected", "run_id": run_id}) + "\n\n"
+
+        while True:
+            buf = get_live_buffer(run_id)
+
+            if buf is None:
+                # Pipeline finished — signal the frontend and stop
+                yield "data: " + json.dumps({"type": "ended"}) + "\n\n"
+                break
+
+            events = buf.get_events()
+
+            # Emit any new events since our last send
+            for ev in events[sent_event_idx:]:
+                sent_event_idx += 1
+                ev_type = ev.get("type", "")
+                payload = ev.get("payload", {})
+                ts = ev.get("timestamp") or payload.get("timestamp", "")
+                text = payload.get("text", "")
+
+                if not text:
+                    continue
+
+                if ev_type == "rtf-user-transcription":
+                    if payload.get("final"):
+                        # Final turn — clear partial
+                        partial_text_sent = ""
+                        yield "data: " + json.dumps({
+                            "type": "turn",
+                            "role": "user",
+                            "text": text,
+                            "final": True,
+                            "timestamp": ts,
+                        }) + "\n\n"
+                    elif text != partial_text_sent:
+                        # Interim/partial — stream word-by-word feel
+                        partial_text_sent = text
+                        yield "data: " + json.dumps({
+                            "type": "turn",
+                            "role": "user",
+                            "text": text,
+                            "final": False,
+                            "timestamp": ts,
+                        }) + "\n\n"
+
+                elif ev_type == "rtf-bot-text":
+                    yield "data: " + json.dumps({
+                        "type": "turn",
+                        "role": "agent",
+                        "text": text,
+                        "final": True,
+                        "timestamp": ts,
+                    }) + "\n\n"
+
+            await asyncio.sleep(POLL_MS)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable nginx buffering
+        },
+    )

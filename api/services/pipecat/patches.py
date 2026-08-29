@@ -40,13 +40,9 @@ try:
         SmallWebRTCClient.write_audio_frame = _smallwebrtc_client_write_audio_frame
         logger.info("Patched SmallWebRTCClient.write_audio_frame (non-blocking)")
 
-    if hasattr(SmallWebRTCOutputTransport, "write_audio_frame"):
-        async def _smallwebrtc_output_write_audio_frame(self, frame: _OutputAudioRawFrame) -> bool:
-            """Non-blocking: delegate without awaiting."""
-            return await self._transport.write_audio_frame(frame)
-
-        SmallWebRTCOutputTransport.write_audio_frame = _smallwebrtc_output_write_audio_frame
-        logger.info("Patched SmallWebRTCOutputTransport.write_audio_frame (non-blocking)")
+    # SmallWebRTCOutputTransport.write_audio_frame just delegates to
+    # SmallWebRTCClient.write_audio_frame, which we already patched above.
+    # No need to patch the output transport separately.
 
 except Exception as e:
     logger.warning(f"Could not apply SmallWebRTC audio patch: {e}")

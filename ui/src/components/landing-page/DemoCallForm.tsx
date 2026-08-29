@@ -300,11 +300,11 @@ function CallCompletedCard({
 
         {/* Quick Stats Pill Strip */}
         <div className="flex items-center gap-2">
-          <div className="px-3 py-1 rounded-xl bg-white/[0.04] backdrop-blur-md border border-white/10 text-right">
+          <div className="px-3 py-1 rounded-xl bg-white/10 backdrop-blur-2xl border border-white/20 text-right shadow-sm">
             <div className="text-[10px] uppercase font-semibold text-slate-400">Time</div>
             <div className="text-xs font-bold text-white tabular-nums">{formatTime(durationSec || 30)}</div>
           </div>
-          <div className="px-3 py-1 rounded-xl bg-white/[0.04] backdrop-blur-md border border-white/10 text-right">
+          <div className="px-3 py-1 rounded-xl bg-white/10 backdrop-blur-2xl border border-white/20 text-right shadow-sm">
             <div className="text-[10px] uppercase font-semibold text-slate-400">Turns</div>
             <div className="text-xs font-bold text-orange-400 tabular-nums">{turnCount || 6}</div>
           </div>
@@ -331,8 +331,8 @@ function CallCompletedCard({
               key={key}
               className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between backdrop-blur-md ${
                 hasValue
-                  ? "bg-white/[0.09] backdrop-blur-xl border border-white/20 hover:border-orange-500/50 text-white shadow-md"
-                  : "bg-white/[0.02] backdrop-blur-md border border-white/8 text-gray-400 opacity-80"
+                  ? "bg-white/15 backdrop-blur-2xl border border-white/30 text-white shadow-md"
+                  : "bg-white/[0.08] backdrop-blur-2xl border border-white/20 text-white/90 shadow-sm"
               }`}
             >
               <div className="flex items-center justify-between text-[11px] font-medium mb-1">
@@ -358,7 +358,7 @@ function CallCompletedCard({
         <button
           type="button"
           onClick={onReset}
-          className="h-12 px-4 rounded-2xl text-xs sm:text-sm font-semibold bg-white/[0.05] hover:bg-white/[0.08] backdrop-blur-md border border-white/10 text-gray-200 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+          className="h-12 px-4 rounded-2xl text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/20 backdrop-blur-2xl border border-white/25 text-white shadow-sm transition-all flex items-center gap-2 cursor-pointer shrink-0"
         >
           <RotateCcw className="w-4 h-4 text-slate-400" /> Try Another Call
         </button>
@@ -367,7 +367,7 @@ function CallCompletedCard({
           href="https://dograh.com"
           target="_blank"
           rel="noreferrer"
-          className="flex-1 h-12 rounded-2xl text-xs sm:text-sm font-bold bg-gradient-to-r from-orange-500/30 via-orange-500/40 to-rose-500/30 hover:from-orange-500/40 hover:to-rose-500/40 backdrop-blur-xl border border-orange-500/60 hover:border-orange-500/80 text-orange-300 hover:text-white shadow-xl shadow-orange-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer truncate"
+          className="flex-1 h-12 rounded-2xl text-xs sm:text-sm font-extrabold bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:opacity-95 text-white shadow-xl shadow-orange-600/35 flex items-center justify-center gap-2 transition-all cursor-pointer truncate"
         >
           <span className="truncate">{persona.ctaText}</span>
           <ArrowRight className="w-4 h-4 shrink-0" />
@@ -792,8 +792,8 @@ export function DemoCallForm() {
                             <div
                               className={`max-w-[94%] p-3 rounded-2xl text-[13px] sm:text-sm font-medium leading-relaxed shadow-sm smooth-bubble-expand backdrop-blur-md ${
                                 isAgent
-                                  ? "bg-white/[0.05] backdrop-blur-md border border-white/10 text-gray-200 rounded-tl-xs shadow-xs"
-                                  : "bg-white/[0.08] backdrop-blur-md border border-white/15 text-white rounded-tr-xs shadow-xs"
+                                  ? "bg-white/15 backdrop-blur-2xl border border-white/25 text-white rounded-tl-xs shadow-md"
+                                  : "bg-white/10 backdrop-blur-2xl border border-white/20 text-white rounded-tr-xs shadow-md"
                               }`}
                             >
                               {renderTranscriptText(rawText, isLatest)}
@@ -813,7 +813,7 @@ export function DemoCallForm() {
                   <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block truncate">
                     Live Notes
                   </span>
-                  <div className="px-2.5 py-0.5 rounded-full bg-white/[0.04] backdrop-blur-md border border-white/10 text-xs font-medium text-orange-400 tabular-nums">
+                  <div className="px-2.5 py-0.5 rounded-full bg-white/10 backdrop-blur-2xl border border-white/20 text-xs font-bold text-orange-400 tabular-nums shadow-sm">
                     {capturedFieldsCount}/{allFieldKeys.length}
                   </div>
                 </div>
@@ -842,10 +842,10 @@ export function DemoCallForm() {
                         ref={(el) => { fieldRefs.current[key] = el; }}
                         className={`p-2.5 rounded-xl border backdrop-blur-md transition-all duration-500 flex items-center justify-between ${
                           isRecentlyUpdated
-                            ? "bg-orange-500/15 backdrop-blur-md border border-orange-500/50 field-unlock-card shadow-sm text-white"
+                            ? "bg-orange-500/25 backdrop-blur-2xl border border-orange-500/70 field-unlock-card shadow-lg text-white shadow-orange-500/20"
                             : hasValue
-                            ? "bg-white/[0.05] backdrop-blur-md border border-white/12 hover:border-white/20 text-white shadow-xs"
-                            : "bg-white/[0.02] backdrop-blur-md border border-white/8 text-gray-400 opacity-80"
+                            ? "bg-white/15 backdrop-blur-2xl border border-white/30 hover:border-white/40 text-white shadow-md"
+                            : "bg-white/[0.08] backdrop-blur-2xl border border-white/20 text-white/90 shadow-sm"
                         }`}
                       >
                         <div className="min-w-0 flex-1 pr-1.5">
@@ -899,7 +899,7 @@ export function DemoCallForm() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Alex Morgan"
-                      className="w-full h-11 px-4 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.07] focus:bg-white/[0.08] backdrop-blur-md text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500/70 transition-all font-normal"
+                      className="w-full h-11 px-4 rounded-xl border border-white/25 bg-white/10 hover:bg-white/15 focus:bg-white/20 backdrop-blur-2xl text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium shadow-sm"
                     />
                   </div>
 
@@ -909,7 +909,7 @@ export function DemoCallForm() {
                       Mobile Number
                     </label>
                     <div className="flex gap-2">
-                      <div className="h-11 px-3.5 rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md text-gray-300 text-sm font-medium flex items-center shrink-0 select-none">
+                      <div className="h-11 px-3.5 rounded-xl border border-white/25 bg-white/15 backdrop-blur-2xl text-white text-sm font-bold flex items-center shrink-0 select-none shadow-sm">
                         IN +91
                       </div>
                       <input
@@ -918,7 +918,7 @@ export function DemoCallForm() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="98765 43210"
-                        className="flex-1 h-11 px-4 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.07] focus:bg-white/[0.08] backdrop-blur-md text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500/70 transition-all font-normal tabular-nums"
+                        className="flex-1 h-11 px-4 rounded-xl border border-white/25 bg-white/10 hover:bg-white/15 focus:bg-white/20 backdrop-blur-2xl text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium tabular-nums shadow-sm"
                       />
                     </div>
                   </div>
@@ -939,8 +939,8 @@ export function DemoCallForm() {
                             onClick={() => setUseCase(item.id)}
                             className={`h-11 px-3.5 rounded-xl text-xs sm:text-sm font-medium border text-left flex items-center gap-2.5 transition-all cursor-pointer backdrop-blur-md ${
                               isSelected
-                                ? "bg-orange-500/10 border border-orange-500/40 text-orange-200 font-medium backdrop-blur-md shadow-xs"
-                                : "border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 text-gray-300 backdrop-blur-md"
+                                ? "bg-gradient-to-r from-orange-500/30 to-rose-500/25 border border-orange-500/70 text-white font-bold backdrop-blur-2xl shadow-[0_0_20px_rgba(255,85,0,0.2)]"
+                                : "border border-white/20 bg-white/[0.08] hover:bg-white/15 hover:border-white/35 text-white/95 backdrop-blur-2xl shadow-sm"
                             }`}
                           >
                             <Icon

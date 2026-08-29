@@ -39,7 +39,7 @@ export const VoiceWaveCanvas: React.FC = () => {
       const points = 75;
       const spacingX = width / (points - 1);
       
-      step += 0.014;
+      step += 0.006;
 
       for (let i = 0; i < lines; i++) {
         ctx.beginPath();

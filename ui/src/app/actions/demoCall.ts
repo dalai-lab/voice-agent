@@ -122,7 +122,7 @@ const WORKFLOW_MAP: Record<string, string> = {
 };
 
 interface RateLimitData {
-    [ip: string]: number; // timestamp in milliseconds
+    [ip: string]: number[]; // array of timestamps in milliseconds
 }
 
 async function checkRateLimit(ip: string): Promise<boolean> {
@@ -131,7 +131,16 @@ async function checkRateLimit(ip: string): Promise<boolean> {
         
         try {
             const fileContent = await fs.readFile(RATE_LIMIT_FILE, "utf-8");
-            data = JSON.parse(fileContent);
+            const parsed = JSON.parse(fileContent);
+            
+            // Migrate old {ip: number} to {ip: number[]} seamlessly
+            for (const key in parsed) {
+                if (typeof parsed[key] === "number") {
+                    data[key] = [parsed[key]];
+                } else if (Array.isArray(parsed[key])) {
+                    data[key] = parsed[key];
+                }
+            }
         } catch (error: any) {
             // File doesn't exist or is invalid, start fresh
             if (error.code !== "ENOENT") {
@@ -140,17 +149,19 @@ async function checkRateLimit(ip: string): Promise<boolean> {
         }
 
         const now = Date.now();
-        const lastCallTime = data[ip];
+        const history = data[ip] || [];
+        
+        // Filter out timestamps older than RATE_LIMIT_HOURS (24)
+        const recentCalls = history.filter(t => (now - t) / (1000 * 60 * 60) < RATE_LIMIT_HOURS);
 
-        if (lastCallTime) {
-            const hoursSinceLastCall = (now - lastCallTime) / (1000 * 60 * 60);
-            if (hoursSinceLastCall < RATE_LIMIT_HOURS) {
-                return false; // Rate limited
-            }
+        if (recentCalls.length >= 2) {
+            return false; // Rate limited (max 2 calls per day)
         }
 
-        // Update timestamp for this IP
-        data[ip] = now;
+        // Update timestamps for this IP
+        recentCalls.push(now);
+        data[ip] = recentCalls;
+        
         await fs.writeFile(RATE_LIMIT_FILE, JSON.stringify(data, null, 2));
         return true;
 
@@ -342,4 +353,60 @@ export async function pollDemoCallResult(
         console.error("[DemoCall] pollDemoCallResult error:", error);
         return { ready: false, error: "Unexpected error while polling." };
     }
+}
+
+// ---------------------------------------------------------------------------
+// Live Extraction during SSE
+// ---------------------------------------------------------------------------
+const EXTRACTION_PROMPTS: Record<string, string> = {
+  hotel: `Extract the following fields from this hotel reservation call. Return ONLY valid JSON, no markdown.
+Fields: caller_name (string), wants_to_book (boolean), inquiry_type (string), check_in_date (string or null), check_out_date (string or null), guests_count (number or null), room_preference (string or null), sentiment ("Positive"|"Neutral"|"Negative"), interest_score (1-10 integer). If not yet mentioned, set to null.`,
+  medical: `Extract the following fields from this medical intake call. Return ONLY valid JSON, no markdown.
+Fields: patient_name (string), patient_type (string), call_reason (string), symptoms_mentioned (string or null), preferred_date_time (string or null), action_taken (string), urgency_level ("Low"|"Medium"|"High"). If not yet mentioned, set to null.`,
+  sales: `Extract the following fields from this sales call. Return ONLY valid JSON, no markdown.
+Fields: prospect_name (string), company_size (string or null), primary_pain_point (string or null), timeline (string or null), demo_booked (boolean), lead_score (1-10 integer), sentiment (string). If not yet mentioned, set to null.`,
+  service: `Extract the following fields from this home services call. Return ONLY valid JSON, no markdown.
+Fields: customer_name (string), service_category (string), issue_description (string), service_address (string or null), preferred_schedule (string or null), urgency_level ("Low"|"Medium"|"High"), job_status (string). If not yet mentioned, set to null.`,
+  real_estate: `Extract the following fields from this real estate call. Return ONLY valid JSON, no markdown.
+Fields: client_name (string), client_intent ("Buying"|"Selling"|"Renting"|"unknown"), property_preference (string or null), budget_range (string or null), timeline (string or null), pre_approved_status (string or null), lead_outcome (string). If not yet mentioned, set to null.`,
+  recruiter: `Extract the following fields from this recruiter screening call. Return ONLY valid JSON, no markdown.
+Fields: candidate_name (string), experience_level (string), key_skills (string), salary_expectations (string or null), notice_period (string or null), communication_skills ("Poor"|"Average"|"Good"|"Excellent"), candidate_score (1-10 integer). If not yet mentioned, set to null.`,
+};
+
+export async function runLiveExtraction(transcriptLines: string[], useCase: string) {
+  if (transcriptLines.length === 0) return {};
+  const prompt = (EXTRACTION_PROMPTS[useCase] || EXTRACTION_PROMPTS.hotel) + `
+
+CRITICAL INSTRUCTION FOR CITATIONS:
+You MUST also include a top-level "_citations" object in your JSON response. This object must map every extracted field key (that is not null) to an array of exact, verbatim text snippets directly from the transcript that justify that extracted value. These snippets can be disconnected phrases or whole sentences, but they MUST be exact substrings from the transcript.`;
+
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_DEMO_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0,
+        messages: [
+          { role: "system", content: prompt },
+          {
+            role: "user",
+            content: `The following is an ongoing speech-to-text transcript. Extract all mentioned entities as valid JSON. If not yet said, leave the value as null:\n\n${transcriptLines.join("\n")}`,
+          },
+        ],
+      }),
+    });
+
+    if (!res.ok) return {};
+    const data = await res.json();
+    const raw = data.choices?.[0]?.message?.content ?? "{}";
+    const cleaned = raw.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/, "").trim();
+    return JSON.parse(cleaned);
+  } catch (err) {
+    console.error("[DemoCall] runLiveExtraction error:", err);
+    return {};
+  }
 }

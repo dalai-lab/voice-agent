@@ -1,1146 +1,1124 @@
 "use client";
+import { initiateDemoCall, pollDemoCallResult, runLiveExtraction } from "@/app/actions/demoCall";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Check,
+  X,
+  PhoneCall,
+  ArrowRight,
+  Hotel,
+  Stethoscope,
+  Briefcase,
+  Wrench,
+  Users,
+  Home,
+  Sparkles,
+  RotateCcw,
+  CheckCircle2,
+  Copy,
+  ChevronRight,
+  Clock,
+  Mic,
+  Shield,
+  Layers,
+  Code2,
+  ExternalLink,
+  FileText,
+  Upload,
+} from "lucide-react";
 
-import { useState, useEffect, useRef } from "react";
-import { Check, X, PhoneCall, ArrowRight, Hotel, Stethoscope, Briefcase, Wrench, Star, BedDouble, Users, Calendar, Smile, Meh, Frown, Home } from "lucide-react";
-import Link from "next/link";
-import { initiateDemoCall, pollDemoCallResult } from "@/app/actions/demoCall";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface HotelExtractedData {
-    caller_name?: string;
-    wants_to_book?: boolean;
-    inquiry_type?: string;
-    check_in_date?: string;
-    guests_count?: number;
-    room_preference?: string;
-    sentiment?: "Positive" | "Neutral" | "Negative";
-    interest_score?: number;
-}
-
-interface SalesExtractedData {
-    prospect_name?: string;
-    company_size?: string;
-    primary_pain_point?: string;
-    timeline?: string;
-    demo_booked?: boolean;
-    lead_score?: number;
-    sentiment?: string;
-}
-
-interface RecruiterExtractedData {
-    candidate_name?: string;
-    experience_level?: string;
-    key_skills?: string;
-    salary_expectations?: string;
-    notice_period?: string;
-    communication_skills?: string;
-    candidate_score?: number;
-}
-
-interface MedicalExtractedData {
-    patient_name?: string;
-    patient_type?: string;
-    call_reason?: string;
-    symptoms_mentioned?: string;
-    preferred_date_time?: string;
-    action_taken?: string;
-    urgency_level?: string;
-}
-
-interface ServiceExtractedData {
-    customer_name?: string;
-    service_category?: string;
-    issue_description?: string;
-    service_address?: string;
-    preferred_schedule?: string;
-    urgency_level?: string;
-    job_status?: string;
-}
-
-interface RealEstateExtractedData {
-    client_name?: string;
-    client_intent?: string;
-    property_preference?: string;
-    budget_range?: string;
-    timeline?: string;
-    pre_approved_status?: string;
-    lead_outcome?: string;
-}
 
 // ---------------------------------------------------------------------------
-// Agent Personas & Configuration
+// Agent Personas
 // ---------------------------------------------------------------------------
+interface Persona {
+  id: string;
+  name: string;
+  role: string;
+  company: string;
+  description: string;
+  greeting: string;
+  inCallHint: string;
+  ctaText: string;
+  accent: string;
+}
 
-const AGENT_PERSONAS: Record<string, {
-    personaName: string;
-    company: string;
-    roleTitle: string;
-    greetingPreview: string;
-    inCallMessage: string;
-    ctaLabel: string;
-    brandColorClass: string;
-}> = {
-    hotel: {
-        personaName: "Sarah",
-        company: "The Grand Horizon",
-        roleTitle: "Guest Concierge",
-        greetingPreview: "Hi, this is Sarah from The Grand Horizon. How can I help you today?",
-        inCallMessage: "Talk to Sarah (The Grand Horizon) — your live reservation brief will appear here when the call ends!",
-        ctaLabel: "Automate Hotel Reservations",
-        brandColorClass: "bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-amber-500/20",
-    },
-    medical: {
-        personaName: "Emma",
-        company: "Riverside Family Clinic",
-        roleTitle: "Patient Intake AI",
-        greetingPreview: "Hi, this is Emma from Riverside Family Clinic. How can I help you today?",
-        inCallMessage: "Talk to Emma (Riverside Family Clinic) — your clinical intake report will appear here when the call ends!",
-        ctaLabel: "Automate Patient Triage",
-        brandColorClass: "bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20",
-    },
-    sales: {
-        personaName: "Jordan",
-        company: "Northwind Software",
-        roleTitle: "Inbound Sales AI",
-        greetingPreview: "Hey, Jordan here with Northwind Software. I saw you were looking into our platform...",
-        inCallMessage: "Talk to Jordan (Northwind Software) — your deal intelligence brief will appear here when the call ends!",
-        ctaLabel: "Get Your 24/7 Sales Agent",
-        brandColorClass: "bg-indigo-500 hover:bg-indigo-400 text-white shadow-indigo-500/20",
-    },
-    service: {
-        personaName: "Casey",
-        company: "Bluefield Home Services",
-        roleTitle: "Field Dispatch AI",
-        greetingPreview: "Hi, this is Casey from Bluefield Home Services. How can I help you today?",
-        inCallMessage: "Talk to Casey (Bluefield Home Services) — your dispatch ticket will appear here when the call ends!",
-        ctaLabel: "Automate Service Dispatch",
-        brandColorClass: "bg-orange-500 hover:bg-orange-400 text-white shadow-orange-500/20",
-    },
-    real_estate: {
-        personaName: "Riley",
-        company: "Maple & Co Realty",
-        roleTitle: "Real Estate Assistant",
-        greetingPreview: "Hi, this is Riley from Maple & Co Realty. How can I help you today?",
-        inCallMessage: "Talk to Riley (Maple & Co Realty) — your buyer/seller lead report will appear here when the call ends!",
-        ctaLabel: "Capture Real Estate Leads",
-        brandColorClass: "bg-amber-600 hover:bg-amber-500 text-slate-900 shadow-amber-500/20",
-    },
-    recruiter: {
-        personaName: "Alex",
-        company: "Recruitment Team",
-        roleTitle: "Candidate Screening AI",
-        greetingPreview: "Hi, this is Alex from the recruitment team calling about your recent application...",
-        inCallMessage: "Talk to Alex (Recruitment Team) — your ATS candidate assessment will appear here when the call ends!",
-        ctaLabel: "Automate Candidate Screening",
-        brandColorClass: "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20",
-    },
+const PERSONAS: Record<string, Persona> = {
+  hotel: {
+    id: "hotel",
+    name: "Sarah",
+    role: "Front Desk Concierge",
+    company: "The Grand Horizon Hotel",
+    description: "Handles bookings, room choices, party sizes, and check-in schedules.",
+    greeting: "Hi, this is Sarah from The Grand Horizon. How can I assist you with your reservation today?",
+    inCallHint: "Try asking about room rates, dates, or party sizes to see fields capture in real time.",
+    ctaText: "Automate Hospitality Bookings",
+    accent: "orange",
+  },
+  medical: {
+    id: "medical",
+    name: "Emma",
+    role: "Patient Intake Coordinator",
+    company: "Riverside Clinic",
+    description: "Gathers symptoms, patient history, triage priority, and preferred slots.",
+    greeting: "Hello, this is Emma from Riverside Clinic. How can I help you today?",
+    inCallHint: "Mention symptoms, appointment preferences, or urgency level.",
+    ctaText: "Automate Patient Intake",
+    accent: "teal",
+  },
+  sales: {
+    id: "sales",
+    name: "Jordan",
+    role: "Inbound Sales Specialist",
+    company: "Northwind Software",
+    description: "Qualifies prospect size, software pain points, timeline, and demo booking.",
+    greeting: "Hey, Jordan here with Northwind Software. Thanks for checking us out!",
+    inCallHint: "Discuss your team size, key challenges, or preferred timeline for a demo.",
+    ctaText: "Scale Inbound Sales",
+    accent: "blue",
+  },
+  service: {
+    id: "service",
+    name: "Casey",
+    role: "Dispatch Coordinator",
+    company: "Bluefield Home Services",
+    description: "Captures job category, repair details, location address, and emergency status.",
+    greeting: "Hi, Casey with Bluefield Home Services. What issue can we help you resolve?",
+    inCallHint: "Describe a plumbing or AC issue and share your location and urgency.",
+    ctaText: "Automate Service Dispatch",
+    accent: "amber",
+  },
+  real_estate: {
+    id: "real_estate",
+    name: "Riley",
+    role: "Real Estate Advisor",
+    company: "Maple & Co Realty",
+    description: "Extracts buying/renting intent, property preference, budget, and timeline.",
+    greeting: "Hi, Riley from Maple & Co Realty. Looking to buy, sell, or rent?",
+    inCallHint: "Share your target budget, number of bedrooms, and preferred location.",
+    ctaText: "Capture Real Estate Leads",
+    accent: "emerald",
+  },
+  recruiter: {
+    id: "recruiter",
+    name: "Alex",
+    role: "Talent Screener",
+    company: "TalentStream Global",
+    description: "Screens skills, experience level, salary expectation, and notice period.",
+    greeting: "Hi, Alex calling from the talent acquisition team regarding your application.",
+    inCallHint: "Mention your years of experience, primary skills, and notice period.",
+    ctaText: "Streamline Candidate Screening",
+    accent: "indigo",
+  },
+};
+
+const FIELD_LABELS: Record<string, Record<string, string>> = {
+  hotel: {
+    caller_name: "Guest Name",
+    wants_to_book: "Booking Intent",
+    inquiry_type: "Inquiry Type",
+    check_in_date: "Check-in Date",
+    check_out_date: "Check-out Date",
+    guests_count: "Party Size",
+    room_preference: "Room Preference",
+    sentiment: "Guest Sentiment",
+    interest_score: "Interest Score",
+  },
+  medical: {
+    patient_name: "Patient Name",
+    patient_type: "Patient Type",
+    call_reason: "Reason for Visit",
+    symptoms_mentioned: "Symptoms Reported",
+    preferred_date_time: "Requested Slot",
+    action_taken: "Action Taken",
+    urgency_level: "Urgency Level",
+  },
+  sales: {
+    prospect_name: "Prospect Name",
+    company_size: "Company Size",
+    primary_pain_point: "Core Pain Point",
+    timeline: "Purchase Timeline",
+    demo_booked: "Demo Scheduled",
+    lead_score: "Lead Score",
+    sentiment: "Buyer Sentiment",
+  },
+  service: {
+    customer_name: "Customer Name",
+    service_category: "Service Category",
+    issue_description: "Issue Description",
+    service_address: "Service Address",
+    preferred_schedule: "Preferred Time",
+    urgency_level: "Urgency Level",
+    job_status: "Job Status",
+  },
+  real_estate: {
+    client_name: "Client Name",
+    client_intent: "Intent (Buy/Rent/Sell)",
+    property_preference: "Property Type",
+    budget_range: "Target Budget",
+    timeline: "Purchase Timeline",
+    pre_approved_status: "Pre-Approved",
+    lead_outcome: "Lead Status",
+  },
+  recruiter: {
+    candidate_name: "Candidate Name",
+    experience_level: "Experience Level",
+    key_skills: "Primary Skills",
+    salary_expectations: "Compensation Expectation",
+    notice_period: "Notice Period",
+    communication_skills: "Communication Score",
+    candidate_score: "Candidate Fit Score",
+  },
 };
 
 // ---------------------------------------------------------------------------
-// Hotel Demo Result Card
+// Sub-Components: Formatted Value Renderer
 // ---------------------------------------------------------------------------
+function FormattedValue({ value, labelKey }: { value: any; labelKey: string }) {
+  if (value === null || value === undefined || value === "" || value === "null") {
+    return <span className="text-xs sm:text-sm text-slate-500 font-medium">—</span>;
+  }
 
-function HotelResultCard({
-    data,
-    phone,
-}: {
-    data: HotelExtractedData;
-    phone: string;
-}) {
-    const isBooking = data.wants_to_book === true;
-    const isSupport = data.inquiry_type?.toLowerCase().includes("complaint") || data.inquiry_type?.toLowerCase().includes("support");
-    
-    const headerText = isBooking ? "VIP RESERVATION INTAKE" : isSupport ? "GUEST CONCIERGE SUPPORT" : "RATES & AVAILABILITY INQUIRY";
-    
-    const badgeText = isBooking ? "Booking Requested" : isSupport ? "Support Ticket" : "Inquiry Logged";
-    const badgeColor = isBooking ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : isSupport ? "bg-rose-500/10 border-rose-500/20 text-rose-400" : "bg-slate-500/10 border-slate-500/20 text-slate-400";
-
-    const hasHighIntent = data.wants_to_book && (data.interest_score ?? 0) >= 7;
-    
-    const engagementLabel = 
-        (data.interest_score ?? 0) >= 8 ? "Highly Committed" :
-        (data.interest_score ?? 0) >= 5 ? "Inquisitive & Warm" : "General Inquiry";
-        
-    const sentimentLabel = 
-        data.sentiment === "Positive" ? "Warm & Receptive" :
-        data.sentiment === "Negative" ? "Hesitant / Neutral" : "Neutral & Polite";
-
+  if (typeof value === "boolean") {
     return (
-        <div className="w-full max-w-md bg-[#0C0B0F] border border-neutral-850 rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
-            {/* Header / Branding */}
-            <div className="border-b border-neutral-900 px-6 py-4 flex items-center justify-between bg-[#111014]">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-                        <Hotel className="w-4 h-4 text-amber-400" />
-                    </div>
-                    <div>
-                        <h4 className="text-xs font-semibold tracking-wider text-neutral-300 uppercase leading-none">THE GRAND HORIZON</h4>
-                        <span className="text-[10px] text-neutral-500 font-medium">{headerText}</span>
-                    </div>
-                </div>
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
-                    {badgeText}
-                </span>
-            </div>
-
-            {/* AI Summary Highlight */}
-            <div className="px-6 py-4.5 bg-[#141318]/50 border-b border-neutral-900/60">
-                <span className="text-[9px] font-bold text-amber-400/80 uppercase tracking-wider block mb-1">CONVERSATION OVERVIEW</span>
-                <p className="text-xs text-neutral-400 italic leading-relaxed">
-                    "{data.caller_name || "Guest"} initiated an inquiry. {
-                        isBooking 
-                            ? "They demonstrated clear booking intent and would like to finalize room arrangements." 
-                            : isSupport
-                            ? "They required assistance and support regarding their stay experience."
-                            : "They reviewed property details and availability with no active booking requested yet."
-                    }"
-                </p>
-            </div>
-
-            {/* Industrial Grid Details */}
-            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-neutral-900/60">
-                <div>
-                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">GUEST</span>
-                    <span className="text-xs font-semibold text-neutral-200">{data.caller_name || "Anonymous Guest"}</span>
-                </div>
-                <div>
-                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">INTENT STATUS</span>
-                    <span className={`text-xs font-semibold ${data.wants_to_book ? "text-amber-400" : "text-neutral-400"}`}>
-                        {data.wants_to_book ? "Reservation Requested" : "Inquiry Only"}
-                    </span>
-                </div>
-
-                {data.check_in_date && (
-                    <div>
-                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">CHECK-IN</span>
-                        <span className="text-xs font-semibold text-neutral-200">{data.check_in_date}</span>
-                    </div>
-                )}
-                {data.guests_count != null && data.guests_count > 0 && (
-                    <div>
-                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">PARTY SIZE</span>
-                        <span className="text-xs font-semibold text-neutral-200">{data.guests_count} {data.guests_count === 1 ? "Guest" : "Guests"}</span>
-                    </div>
-                )}
-                
-                {data.room_preference && (
-                    <div className="col-span-2">
-                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">ROOM PREFERENCE</span>
-                        <span className="text-xs font-semibold text-neutral-300">{data.room_preference}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Hospitality Engagement Insights */}
-            <div className="px-6 py-4 bg-[#111014]/80 grid grid-cols-2 gap-4 border-b border-neutral-900/60">
-                <div>
-                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">GUEST SENTIMENT</span>
-                    <span className="text-xs font-semibold text-neutral-200">{sentimentLabel}</span>
-                </div>
-                <div>
-                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">ENGAGEMENT INDEX</span>
-                    <span className="text-xs font-semibold text-amber-400">{engagementLabel}</span>
-                </div>
-            </div>
-
-            {/* Action Footer */}
-            <div className="p-4 bg-[#111014] flex items-center justify-between gap-3">
-                <Link
-                    href="/auth/signup"
-                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-amber-500 text-neutral-950 hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/10 flex items-center justify-center gap-1.5"
-                >
-                    Automate Hotel Reservations <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-            </div>
-        </div>
+      <span
+        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs sm:text-sm font-bold ${
+          value ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25" : "bg-slate-800 text-slate-400"
+        }`}
+      >
+        {value ? "✓ Yes" : "✕ No"}
+      </span>
     );
+  }
+
+  if (Array.isArray(value)) {
+    return (
+      <div className="flex flex-wrap gap-1 mt-0.5">
+        {value.map((item, idx) => (
+          <span
+            key={idx}
+            className="inline-flex items-center px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.08] text-slate-200 text-xs font-semibold"
+          >
+            {String(item)}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  if (typeof value === "number" && (labelKey.includes("score") || labelKey.includes("interest"))) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs sm:text-sm font-bold text-orange-400 tabular-nums">{value}/10</span>
+        <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full"
+            style={{ width: `${Math.min(100, Math.max(0, value * 10))}%` }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const str = String(value);
+  if (labelKey === "sentiment") {
+    const isPos = str.toLowerCase().includes("pos");
+    const isNeg = str.toLowerCase().includes("neg");
+    return (
+      <span
+        className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs sm:text-sm font-bold border ${
+          isPos
+            ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
+            : isNeg
+            ? "bg-rose-500/10 border-rose-500/25 text-rose-400"
+            : "bg-amber-500/10 border-amber-500/25 text-amber-400"
+        }`}
+      >
+        {str}
+      </span>
+    );
+  }
+
+  return <span className="text-xs sm:text-sm font-bold text-slate-100 break-words leading-relaxed">{str}</span>;
 }
 
 // ---------------------------------------------------------------------------
-// Sales Demo Result Card
+// Call Completed Summary Card (Matching Exact Demo Theme & Layout)
 // ---------------------------------------------------------------------------
-
-function SalesResultCard({
-    data,
+function CallCompletedCard({
+  data,
+  useCase,
+  durationSec,
+  turnCount,
+  onReset,
 }: {
-    data: SalesExtractedData;
-    phone: string;
+  data: any;
+  useCase: string;
+  durationSec: number;
+  turnCount: number;
+  onReset: () => void;
 }) {
-    // Generate SaaS CRM-themed status and intent summaries
-    const isHotLead = (data.lead_score ?? 0) >= 8;
-    const isWarmLead = (data.lead_score ?? 0) >= 5;
-    
-    const headerText = data.demo_booked ? "HIGH-VALUE DEMO BOOKED" : isHotLead ? "PRIORITY OPPORTUNITY BRIEF" : isWarmLead ? "PROSPECT DISCOVERY BRIEF" : "INBOUND LEAD QUALIFICATION";
-    const badgeText = data.demo_booked ? "Meeting Confirmed" : isHotLead ? "Hot Lead" : "Pipeline Nurture";
-    const badgeColor = data.demo_booked ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : isHotLead ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : "bg-indigo-500/10 border-indigo-500/20 text-indigo-400";
-    
-    const pipelineStatus = data.demo_booked ? "Product Demo Scheduled" : isHotLead ? "High-Intent Qualified Lead" : "Lead Nurture";
-    const pipelineColor = data.demo_booked ? "text-emerald-400" : isHotLead ? "text-amber-400" : "text-indigo-400";
-        
-    const scoreLabel = 
-        (data.lead_score ?? 0) >= 8 ? "High Interest (Ready to Buy)" :
-        (data.lead_score ?? 0) >= 5 ? "Moderate Interest (Exploring)" : "Low Engagement";
+  const persona = PERSONAS[useCase] || PERSONAS.hotel;
+  const labels = FIELD_LABELS[useCase] || FIELD_LABELS.hotel;
 
-    return (
-        <div className="w-full max-w-md bg-[#0A0F1C] border border-[#1E293B] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
-            {/* Header / Branding */}
-            <div className="border-b border-[#1E293B] px-6 py-4 flex items-center justify-between bg-[#0F172A]">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                        <Briefcase className="w-4 h-4 text-indigo-400" />
-                    </div>
-                    <div>
-                        <h4 className="text-xs font-semibold tracking-wider text-slate-300 uppercase leading-none">NORTHWIND SOFTWARE</h4>
-                        <span className="text-[10px] text-slate-500 font-medium">{headerText}</span>
-                    </div>
-                </div>
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
-                    {badgeText}
-                </span>
+  const allEntries = Object.entries(labels).map(([key, label]) => {
+    const val = data?.[key];
+    const hasValue = val !== null && val !== undefined && val !== "" && val !== "null";
+    return { key, label, val, hasValue };
+  });
+
+  const capturedCount = allEntries.filter((e) => e.hasValue).length;
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] pb-3 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-sm">
+            <Check className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                Call Completed
+              </span>
+              <span className="text-xs text-slate-400 font-medium">
+                {persona.company}
+              </span>
             </div>
-
-            {/* AI Summary Highlight */}
-            <div className="px-6 py-4.5 bg-[#0F172A]/50 border-b border-[#1E293B]/60">
-                <span className="text-[9px] font-bold text-indigo-400/80 uppercase tracking-wider block mb-1">DEAL BRIEF</span>
-                <p className="text-xs text-slate-400 italic leading-relaxed">
-                    "Prospect initiated an inbound sales inquiry. {
-                        data.demo_booked 
-                            ? "They are actively evaluating solutions and scheduled a product demo." 
-                            : "They are currently exploring options and gathering initial information."
-                    }"
-                </p>
-            </div>
-
-            {/* Industrial CRM Grid Details */}
-            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#1E293B]/60">
-                <div>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">LEAD NAME</span>
-                    <span className="text-xs font-semibold text-slate-200">{data.prospect_name || "Anonymous Prospect"}</span>
-                </div>
-                <div>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PIPELINE STATUS</span>
-                    <span className={`text-xs font-semibold ${pipelineColor}`}>
-                        {pipelineStatus}
-                    </span>
-                </div>
-
-                {data.company_size && (
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">COMPANY SIZE</span>
-                        <span className="text-xs font-semibold text-slate-200">{data.company_size}</span>
-                    </div>
-                )}
-                {data.timeline && (
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">TIMELINE</span>
-                        <span className="text-xs font-semibold text-slate-200">{data.timeline}</span>
-                    </div>
-                )}
-                
-                {data.primary_pain_point && (
-                    <div className="col-span-2">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PRIMARY USE CASE / PAIN POINT</span>
-                        <span className="text-xs font-semibold text-slate-300">{data.primary_pain_point}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Call Metrics */}
-            <div className="px-6 py-4 bg-[#0F172A]/80 grid grid-cols-2 gap-4 border-b border-[#1E293B]/60">
-                <div>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PROSPECT VIBE</span>
-                    <span className="text-xs font-semibold text-slate-200">{data.sentiment || "Neutral"}</span>
-                </div>
-                <div>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">LEAD QUALIFICATION</span>
-                    <span className="text-xs font-semibold text-indigo-400">{scoreLabel}</span>
-                </div>
-            </div>
-
-            {/* Action Footer */}
-            <div className="p-4 bg-[#0F172A] flex items-center justify-between gap-3">
-                <Link
-                    href="/auth/signup"
-                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-indigo-500 text-white hover:bg-indigo-400 transition-colors shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-1.5"
-                >
-                    Get Your 24/7 Sales Agent <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-            </div>
+            <h2 className="text-sm sm:text-base font-bold text-white mt-0.5">
+              Call Summary & Extracted Data
+            </h2>
+          </div>
         </div>
-    );
+
+        {/* Quick Stats Pill Strip */}
+        <div className="flex items-center gap-2">
+          <div className="px-3 py-1 rounded-xl bg-white/[0.03] border border-white/[0.08] text-right">
+            <div className="text-[10px] uppercase font-semibold text-slate-400">Time</div>
+            <div className="text-xs font-bold text-white tabular-nums">{formatTime(durationSec || 30)}</div>
+          </div>
+          <div className="px-3 py-1 rounded-xl bg-white/[0.03] border border-white/[0.08] text-right">
+            <div className="text-[10px] uppercase font-semibold text-slate-400">Turns</div>
+            <div className="text-xs font-bold text-orange-400 tabular-nums">{turnCount || 6}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Structured Fields Body (Always displays all schema fields with minimal accent colors) */}
+      <div className="flex-1 min-h-0 flex flex-col space-y-2 py-2">
+        <div className="flex items-center justify-between shrink-0 px-0.5">
+          <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-orange-400" />
+            Extracted Fields ({capturedCount}/{allEntries.length})
+          </span>
+          <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Synchronized
+          </span>
+        </div>
+
+        {/* Data Cards Grid with Minimal Accent Tints */}
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pr-0.5 grid grid-cols-2 gap-2">
+          {allEntries.map(({ key, label, val, hasValue }) => (
+            <div
+              key={key}
+              className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between ${
+                hasValue
+                  ? "bg-gradient-to-br from-orange-500/[0.08] to-transparent border-orange-500/25 hover:border-orange-500/40 shadow-xs"
+                  : "bg-white/[0.015] border-white/[0.05] opacity-55"
+              }`}
+            >
+              <div className="flex items-center justify-between text-[11px] font-medium mb-1">
+                <span className={`truncate ${hasValue ? "text-orange-200/80 font-semibold" : "text-slate-400"}`}>
+                  {label}
+                </span>
+                {hasValue ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                ) : (
+                  <span className="text-[10px] text-slate-600 font-normal shrink-0">N/A</span>
+                )}
+              </div>
+              <div>
+                <FormattedValue value={val} labelKey={key} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer / CTA Actions matching Exact Colors */}
+      <div className="pt-2.5 border-t border-white/[0.08] flex items-center justify-between gap-3 shrink-0">
+        <button
+          type="button"
+          onClick={onReset}
+          className="h-12 px-4 rounded-2xl text-xs sm:text-sm font-semibold bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-200 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+        >
+          <RotateCcw className="w-4 h-4 text-slate-400" /> Start Over
+        </button>
+
+        <a
+          href="https://dograh.com"
+          target="_blank"
+          rel="noreferrer"
+          className="flex-1 h-12 rounded-2xl text-xs sm:text-sm font-extrabold bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:from-[#ff6414] hover:to-[#f43f5e] text-white shadow-xl shadow-orange-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer truncate"
+        >
+          <span className="truncate">{persona.ctaText}</span>
+          <ArrowRight className="w-4 h-4 shrink-0" />
+        </a>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
-// Recruiter Demo Result Card
+// Main Interactive Application
 // ---------------------------------------------------------------------------
-
-function RecruiterResultCard({
-    data,
-}: {
-    data: RecruiterExtractedData;
-    phone: string;
-}) {
-    const score = data.candidate_score ?? 0;
-    const isStrongFit = score >= 8;
-    const isModFit = score >= 5;
-    
-    const headerText = isStrongFit ? "TOP-TIER CANDIDATE ASSESSMENT" : isModFit ? "CANDIDATE SCREENING SUMMARY" : "APPLICANT EVALUATION REPORT";
-    const badgeText = isStrongFit ? "Fast-Track to Interview" : isModFit ? "Secondary Review" : "Kept in Talent Pool";
-    const badgeColor = isStrongFit ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : isModFit ? "bg-blue-500/10 border-blue-500/20 text-blue-400" : "bg-neutral-800 border-neutral-700 text-neutral-400";
-
-    const stageStatus = isStrongFit ? "Move to Next Interview" : "Reviewed & Saved to Talent Pool";
-    const stageColor = isStrongFit ? "text-emerald-400" : "text-neutral-400";
-
-    return (
-        <div className="w-full max-w-md bg-[#0F0E14] border border-[#27272A] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
-            {/* Header / Branding */}
-            <div className="border-b border-[#27272A] px-6 py-4 flex items-center justify-between bg-[#18181B]">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                        <Users className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <div>
-                        <h4 className="text-xs font-semibold tracking-wider text-neutral-300 uppercase leading-none">NORTHWIND HR</h4>
-                        <span className="text-[10px] text-neutral-500 font-medium">{headerText}</span>
-                    </div>
-                </div>
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
-                    {badgeText}
-                </span>
-            </div>
-
-            {/* AI Summary Highlight */}
-            <div className="px-6 py-4.5 bg-[#18181B]/50 border-b border-[#27272A]/60">
-                <span className="text-[9px] font-bold text-blue-400/80 uppercase tracking-wider block mb-1">CANDIDATE BRIEF</span>
-                <p className="text-xs text-neutral-400 italic leading-relaxed">
-                    "Completed initial screening with {data.candidate_name || 'Candidate'}. {
-                        isStrongFit 
-                            ? "Candidate demonstrated strong alignment with the job description and communicated effectively." 
-                            : "Candidate may require further review or lacks some key qualifications at this time."
-                    }"
-                </p>
-            </div>
-
-            {/* ATS Grid Details */}
-            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#27272A]/60">
-                <div>
-                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">CANDIDATE NAME</span>
-                    <span className="text-xs font-semibold text-neutral-200">{data.candidate_name || "Unknown"}</span>
-                </div>
-                <div>
-                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">RECOMMENDED ACTION</span>
-                    <span className={`text-xs font-semibold ${stageColor}`}>
-                        {stageStatus}
-                    </span>
-                </div>
-
-                {data.experience_level && (
-                    <div>
-                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">EXPERIENCE</span>
-                        <span className="text-xs font-semibold text-neutral-200">{data.experience_level}</span>
-                    </div>
-                )}
-                {data.notice_period && (
-                    <div>
-                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">AVAILABILITY</span>
-                        <span className="text-xs font-semibold text-neutral-200">{data.notice_period}</span>
-                    </div>
-                )}
-                
-                {data.key_skills && (
-                    <div className="col-span-2">
-                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">KEY SKILLS EXTRACTED</span>
-                        <span className="text-xs font-semibold text-neutral-300">{data.key_skills}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Metrics */}
-            <div className="px-6 py-4 bg-[#18181B]/80 grid grid-cols-2 gap-4 border-b border-[#27272A]/60">
-                <div>
-                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">COMMUNICATION</span>
-                    <span className="text-xs font-semibold text-neutral-200">{data.communication_skills || "N/A"}</span>
-                </div>
-                <div>
-                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">JD ALIGNMENT SCORE</span>
-                    <span className="text-xs font-semibold text-blue-400">{data.candidate_score ?? 0} / 10</span>
-                </div>
-            </div>
-
-            {/* Action Footer */}
-            <div className="p-4 bg-[#18181B] flex items-center justify-between gap-3">
-                <Link
-                    href="/auth/signup"
-                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-emerald-600 text-slate-950 hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-1.5 font-semibold"
-                >
-                    Automate Candidate Screening <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-            </div>
-        </div>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Medical Demo Result Card
-// ---------------------------------------------------------------------------
-
-function MedicalResultCard({
-    data,
-}: {
-    data: MedicalExtractedData;
-    phone: string;
-}) {
-    const isUrgent = data.urgency_level?.toLowerCase() === "high" || data.urgency_level?.toLowerCase() === "emergency";
-    const isService = data.call_reason?.toLowerCase().includes("refill") || data.call_reason?.toLowerCase().includes("billing");
-    
-    const headerText = isUrgent ? "PRIORITY CLINICAL TRIAGE" : isService ? "CLINIC SERVICE REQUEST" : "PATIENT INTAKE & SCHEDULING";
-    const badgeText = isUrgent ? "Urgent Attention" : isService ? "Provider Review" : "Visit Requested";
-    const badgeColor = isUrgent ? "bg-rose-500/10 border-rose-500/20 text-rose-400 animate-pulse" : isService ? "bg-teal-500/10 border-teal-500/20 text-teal-400" : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400";
-    
-    const urgencyColor = isUrgent ? "text-rose-400" : data.urgency_level === "Medium" ? "text-amber-400" : "text-emerald-400";
-
-    return (
-        <div className="w-full max-w-md bg-[#0F172A] border border-[#1E293B] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
-            {/* Header / Branding */}
-            <div className="border-b border-[#1E293B] px-6 py-4 flex items-center justify-between bg-[#0B1120]">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
-                        <Stethoscope className="w-4 h-4 text-cyan-400" />
-                    </div>
-                    <div>
-                        <h4 className="text-xs font-semibold tracking-wider text-slate-300 uppercase leading-none">RIVERSIDE CLINIC</h4>
-                        <span className="text-[10px] text-slate-500 font-medium">{headerText}</span>
-                    </div>
-                </div>
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
-                    {badgeText}
-                </span>
-            </div>
-
-            {/* AI Summary Highlight */}
-            <div className="px-6 py-4.5 bg-[#0B1120]/50 border-b border-[#1E293B]/60">
-                <span className="text-[9px] font-bold text-cyan-400/80 uppercase tracking-wider block mb-1">CLINICAL SUMMARY</span>
-                <p className="text-xs text-slate-400 italic leading-relaxed">
-                    "Completed triage for {data.patient_name || 'Patient'}. {
-                        data.action_taken ? `Outcome: ${data.action_taken}.` : "Request logged for provider review."
-                    }"
-                </p>
-            </div>
-
-            {/* Medical Grid Details */}
-            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#1E293B]/60">
-                <div>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PATIENT NAME</span>
-                    <span className="text-xs font-semibold text-slate-200">{data.patient_name || "Unknown"}</span>
-                </div>
-                <div>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">URGENCY LEVEL</span>
-                    <span className={`text-xs font-semibold ${urgencyColor}`}>
-                        {data.urgency_level || "Standard"}
-                    </span>
-                </div>
-
-                {data.patient_type && (
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PATIENT TYPE</span>
-                        <span className="text-xs font-semibold text-slate-200">{data.patient_type}</span>
-                    </div>
-                )}
-                {data.call_reason && (
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">REASON FOR CALL</span>
-                        <span className="text-xs font-semibold text-slate-200">{data.call_reason}</span>
-                    </div>
-                )}
-                
-                {data.symptoms_mentioned && (
-                    <div className="col-span-2">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">SYMPTOMS / NOTES</span>
-                        <span className="text-xs font-semibold text-slate-300">{data.symptoms_mentioned}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Metrics */}
-            <div className="px-6 py-4 bg-[#0B1120]/80 grid grid-cols-2 gap-4 border-b border-[#1E293B]/60">
-                <div>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">ACTION TAKEN</span>
-                    <span className="text-xs font-semibold text-cyan-400">{data.action_taken || "Pending"}</span>
-                </div>
-                {data.preferred_date_time && (
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PREFERRED TIME</span>
-                        <span className="text-xs font-semibold text-slate-200">{data.preferred_date_time}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Action Footer */}
-            <div className="p-4 bg-[#0B1120] flex items-center justify-between gap-3">
-                <Link
-                    href="/auth/signup"
-                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition-colors shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-1.5"
-                >
-                    Automate Patient Triage <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-            </div>
-        </div>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Home Services Demo Result Card
-// ---------------------------------------------------------------------------
-
-function ServiceResultCard({
-    data,
-}: {
-    data: ServiceExtractedData;
-    phone: string;
-}) {
-    const isUrgent = data.urgency_level?.toLowerCase() === "emergency";
-    const isBooked = data.job_status?.toLowerCase() === "booked";
-    const isQuote = data.job_status?.toLowerCase() === "quote requested";
-    
-    const headerText = isUrgent ? "EMERGENCY WORK ORDER" : isBooked ? "CONFIRMED SERVICE TICKET" : isQuote ? "ON-SITE ESTIMATE REQUEST" : "SERVICE DISPATCH INQUIRY";
-    const badgeText = isUrgent ? "Priority Dispatch" : isBooked ? "Technician Scheduled" : isQuote ? "Quote Follow-up" : "Log Created";
-    const badgeColor = isUrgent ? "bg-rose-500/10 border-rose-500/20 text-rose-400 animate-pulse" : isBooked ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : isQuote ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : "bg-orange-500/10 border-orange-500/20 text-orange-400";
-    
-    const statusColor = isBooked ? "text-emerald-400" : isQuote ? "text-amber-400" : "text-orange-400";
-
-    return (
-        <div className="w-full max-w-md bg-[#18181B] border border-[#27272A] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
-            {/* Header / Branding */}
-            <div className="border-b border-[#27272A] px-6 py-4 flex items-center justify-between bg-[#09090B]">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
-                        <Wrench className="w-4 h-4 text-orange-400" />
-                    </div>
-                    <div>
-                        <h4 className="text-xs font-bold tracking-wider text-neutral-300 uppercase leading-none">BLUEFIELD DISPATCH</h4>
-                        <span className="text-[10px] text-neutral-500 font-medium">{headerText}</span>
-                    </div>
-                </div>
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
-                    {badgeText}
-                </span>
-            </div>
-
-            {/* AI Summary Highlight */}
-            <div className="px-6 py-4.5 bg-[#09090B]/50 border-b border-[#27272A]/60">
-                <span className="text-[9px] font-bold text-orange-400/80 uppercase tracking-wider block mb-1">CALL SUMMARY</span>
-                <p className="text-xs text-neutral-400 italic leading-relaxed">
-                    "Field agent intake complete for {data.customer_name || 'Customer'}. {
-                        data.job_status === "Booked" 
-                            ? "Service appointment successfully scheduled." 
-                            : data.job_status === "Quote Requested"
-                            ? "Estimate requested, dispatching field assessor."
-                            : "Issue documented for follow-up."
-                    }"
-                </p>
-            </div>
-
-            {/* Service Grid Details */}
-            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#27272A]/60">
-                <div>
-                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">CUSTOMER NAME</span>
-                    <span className="text-xs font-semibold text-neutral-200">{data.customer_name || "Unknown"}</span>
-                </div>
-                <div>
-                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">JOB STATUS</span>
-                    <span className={`text-xs font-semibold ${statusColor}`}>
-                        {data.job_status || "Pending"}
-                    </span>
-                </div>
-
-                {data.service_category && (
-                    <div>
-                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">SERVICE TYPE</span>
-                        <span className="text-xs font-semibold text-neutral-200">{data.service_category}</span>
-                    </div>
-                )}
-                {data.urgency_level && (
-                    <div>
-                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">URGENCY</span>
-                        <span className={`text-xs font-semibold ${isUrgent ? 'text-rose-400' : 'text-neutral-200'}`}>
-                            {data.urgency_level}
-                        </span>
-                    </div>
-                )}
-                
-                {data.issue_description && (
-                    <div className="col-span-2">
-                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">ISSUE DESCRIPTION</span>
-                        <span className="text-xs font-semibold text-neutral-300">{data.issue_description}</span>
-                    </div>
-                )}
-                {data.service_address && (
-                    <div className="col-span-2">
-                        <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">SERVICE ADDRESS</span>
-                        <span className="text-xs font-semibold text-neutral-300">{data.service_address}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Metrics */}
-            <div className="px-6 py-4 bg-[#09090B]/80 grid grid-cols-2 gap-4 border-b border-[#27272A]/60">
-                <div className="col-span-2">
-                    <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider block mb-0.5">PREFERRED SCHEDULE</span>
-                    <span className="text-xs font-semibold text-orange-400">{data.preferred_schedule || "ASAP"}</span>
-                </div>
-            </div>
-
-            {/* Action Footer */}
-            <div className="p-4 bg-[#09090B] flex items-center justify-between gap-3">
-                <Link
-                    href="/auth/signup"
-                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-orange-500 text-white hover:bg-orange-400 transition-colors shadow-lg shadow-orange-500/10 flex items-center justify-center gap-1.5"
-                >
-                    Automate Service Dispatch <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-            </div>
-        </div>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Real Estate Demo Result Card
-// ---------------------------------------------------------------------------
-
-function RealEstateResultCard({
-    data,
-}: {
-    data: RealEstateExtractedData;
-    phone: string;
-}) {
-    const isShowing = data.lead_outcome?.toLowerCase() === "showing scheduled";
-    const isSeller = data.client_intent?.toLowerCase().includes("sell") || data.lead_outcome?.toLowerCase() === "valuation requested";
-    const isBuyer = data.client_intent?.toLowerCase().includes("buy") || data.client_intent?.toLowerCase().includes("rent");
-    
-    const headerText = isShowing ? "PRIVATE PROPERTY TOUR REQUEST" : isSeller ? "SELLER LEAD & VALUATION INTAKE" : isBuyer ? "BUYER PROFILE & PREFERENCE BRIEF" : "REAL ESTATE LEAD LOG";
-    const badgeText = isShowing ? "Showing Booked" : isSeller ? "Valuation Requested" : isBuyer ? "Active Searcher" : "Lead Captured";
-    const badgeColor = isShowing ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : isSeller ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : isBuyer ? "bg-blue-500/10 border-blue-500/20 text-blue-400" : "bg-slate-500/10 border-slate-500/20 text-slate-400";
-
-    const isHotLead = isShowing || isSeller;
-    const statusColor = isHotLead ? "text-amber-400" : "text-blue-400";
-
-    return (
-        <div className="w-full max-w-md bg-[#0F172A] border border-[#1E293B] rounded-xl shadow-2xl overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-500 space-y-0">
-            {/* Header / Branding */}
-            <div className="border-b border-[#1E293B] px-6 py-4 flex items-center justify-between bg-[#0B1120]">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-                        <Home className="w-4 h-4 text-amber-400" />
-                    </div>
-                    <div>
-                        <h4 className="text-xs font-bold tracking-wider text-slate-200 uppercase leading-none">MAPLE & CO REALTY</h4>
-                        <span className="text-[10px] text-slate-500 font-medium">{headerText}</span>
-                    </div>
-                </div>
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[9px] font-bold tracking-wider uppercase ${badgeColor}`}>
-                    {badgeText}
-                </span>
-            </div>
-
-            {/* AI Summary Highlight */}
-            <div className="px-6 py-4.5 bg-[#0B1120]/50 border-b border-[#1E293B]/60">
-                <span className="text-[9px] font-bold text-amber-400/80 uppercase tracking-wider block mb-1">CALL SUMMARY</span>
-                <p className="text-xs text-slate-400 italic leading-relaxed">
-                    "Incoming inquiry captured for {data.client_name || 'Client'}. {
-                        isHotLead 
-                            ? "Action required: Lead successfully booked for next steps." 
-                            : "Lead logged into CRM for future nurturing."
-                    }"
-                </p>
-            </div>
-
-            {/* Real Estate Grid Details */}
-            <div className="p-6 grid grid-cols-2 gap-x-6 gap-y-4 border-b border-[#1E293B]/60">
-                <div>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">CLIENT NAME</span>
-                    <span className="text-xs font-semibold text-slate-200">{data.client_name || "Unknown"}</span>
-                </div>
-                <div>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">INTENT</span>
-                    <span className={`text-xs font-semibold text-slate-200`}>
-                        {data.client_intent || "Inquiry"}
-                    </span>
-                </div>
-
-                {data.budget_range && (
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">BUDGET RANGE</span>
-                        <span className="text-xs font-semibold text-emerald-400">{data.budget_range}</span>
-                    </div>
-                )}
-                {data.timeline && (
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">TIMELINE</span>
-                        <span className="text-xs font-semibold text-slate-200">{data.timeline}</span>
-                    </div>
-                )}
-                
-                {data.property_preference && (
-                    <div className="col-span-2">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PROPERTY INTEREST / AREA</span>
-                        <span className="text-xs font-semibold text-slate-300">{data.property_preference}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Metrics */}
-            <div className="px-6 py-4 bg-[#0B1120]/80 grid grid-cols-2 gap-4 border-b border-[#1E293B]/60">
-                <div>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">PRE-APPROVED</span>
-                    <span className={`text-xs font-semibold ${data.pre_approved_status === 'Yes' ? 'text-emerald-400' : 'text-slate-400'}`}>
-                        {data.pre_approved_status || "Not Discussed"}
-                    </span>
-                </div>
-                <div>
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">LEAD OUTCOME</span>
-                    <span className={`text-xs font-bold ${statusColor}`}>{data.lead_outcome || "Pending"}</span>
-                </div>
-            </div>
-
-            {/* Action Footer */}
-            <div className="p-4 bg-[#0B1120] flex items-center justify-between gap-3">
-                <Link
-                    href="/auth/signup"
-                    className="w-full py-3 px-4 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/10 flex items-center justify-center gap-1.5"
-                >
-                    Capture Real Estate Leads <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-            </div>
-        </div>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 export function DemoCallForm() {
-    const [name, setName] = useState("");
-    const [phone, setPhone] = useState("");
-    const [useCase, setUseCase] = useState("hotel");
-    const [callingState, setCallingState] = useState<"idle" | "calling" | "connected" | "polling" | "done" | "error">("idle");
-    const [errorMessage, setErrorMessage] = useState("");
-    const [workflowRunId, setWorkflowRunId] = useState<number | null>(null);
-    const [extractedData, setExtractedData] = useState<any | null>(null);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [useCase, setUseCase] = useState("hotel");
+  const [callingState, setCallingState] = useState<"idle" | "calling" | "connected" | "done" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [extractedData, setExtractedData] = useState<any | null>(null);
 
-    // Keep a ref to the interval so we can clear it safely
-    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    // Safety cap: stop polling after 10 minutes
-    const pollStartRef = useRef<number>(0);
-    const MAX_POLL_MS = 10 * 60 * 1000;
-    // Guard so the polling effect only fires once per run — not every re-render
-    const hasStartedPollingRef = useRef(false);
+  // Recruiter specific context inputs
+  const [jobDescription, setJobDescription] = useState("");
+  const [resumeText, setResumeText] = useState("");
+  const [resumeFileName, setResumeFileName] = useState("");
 
-    // Stop polling on unmount to avoid memory leaks
-    useEffect(() => {
-        return () => {
-            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        };
-    }, []);
+  // Real-time live extraction states
+  const [liveFields, setLiveFields] = useState<Record<string, any>>({});
+  const [liveTurns, setLiveTurns] = useState<string[]>([]);
+  const [turnCount, setTurnCount] = useState(0);
+  const [callDuration, setCallDuration] = useState(0);
 
-    // Start polling whenever a new workflowRunId arrives.
-    // Depends ONLY on workflowRunId — not on callingState — so the cleanup
-    // that fires when we call setCallingState("polling") inside here doesn't
-    // immediately destroy the interval we just created.
-    useEffect(() => {
-        if (!workflowRunId || hasStartedPollingRef.current) return;
+  // Temporary 2.5-3s highlight tracking for newly extracted words & fields
+  const [activeHighlights, setActiveHighlights] = useState<
+    Array<{ phrase: string; key: string; expiresAt: number }>
+  >([]);
+  const [recentFieldKeys, setRecentFieldKeys] = useState<Record<string, number>>({});
 
-        hasStartedPollingRef.current = true;
-        setCallingState("polling");
-        pollStartRef.current = Date.now();
+  const pollIntervalRef = useRef<any>(null);
+  const sseRef = useRef<EventSource | null>(null);
+  const transcriptBottomRef = useRef<HTMLDivElement | null>(null);
+  const durationTimerRef = useRef<any>(null);
+  const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-        pollIntervalRef.current = setInterval(async () => {
-            // Safety cap
-            if (Date.now() - pollStartRef.current > MAX_POLL_MS) {
-                clearInterval(pollIntervalRef.current!);
-                return;
-            }
+  // Auto-scroll newly extracted/updated field into view in right column
+  useEffect(() => {
+    const updatedKeys = Object.keys(recentFieldKeys);
+    if (updatedKeys.length > 0) {
+      const newestKey = updatedKeys.sort(
+        (a, b) => (recentFieldKeys[b] || 0) - (recentFieldKeys[a] || 0)
+      )[0];
+      if (newestKey && fieldRefs.current[newestKey]) {
+        fieldRefs.current[newestKey]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  }, [recentFieldKeys]);
 
-            const result = await pollDemoCallResult(workflowRunId);
+  const clearTimers = () => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
+    if (durationTimerRef.current) {
+      clearInterval(durationTimerRef.current);
+      durationTimerRef.current = null;
+    }
+  };
 
-            if (result.ready) {
-                clearInterval(pollIntervalRef.current!);
-                setExtractedData(result.extractedData ?? {});
-                setCallingState("done");
-            }
-            // If error on individual poll, just keep polling — don't surface noise
-        }, 5000);
+  useEffect(() => {
+    return () => clearTimers();
+  }, []);
 
-        return () => {
-            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workflowRunId]);
-
-    const handleInitiateCall = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        setCallingState("calling");
-        setErrorMessage("");
-        setWorkflowRunId(null);
-        setExtractedData(null);
-
-        const formData = new FormData(e.currentTarget);
-        formData.set("useCase", useCase);
-
-        try {
-            const result = await initiateDemoCall(null, formData);
-            if (!result?.success) {
-                setCallingState("error");
-                setErrorMessage(result?.error || "Failed to connect to the voice agent.");
-                return;
-            }
-            // Store run ID — the polling effect kicks in once callingState → "connected"
-            if (result.workflowRunId) setWorkflowRunId(result.workflowRunId);
-            setCallingState("connected");
-        } catch {
-            setCallingState("error");
-            setErrorMessage("An unexpected error occurred.");
+  // Cleanup expired highlights periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setActiveHighlights((prev) => prev.filter((h) => h.expiresAt > now));
+      setRecentFieldKeys((prev) => {
+        const next: Record<string, number> = {};
+        for (const [k, exp] of Object.entries(prev)) {
+          if (exp > now) next[k] = exp;
         }
-    };
+        return next;
+      });
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
 
-    const handleReset = () => {
-        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        hasStartedPollingRef.current = false;
-        setCallingState("idle");
-        setErrorMessage("");
-        setWorkflowRunId(null);
-        setExtractedData(null);
-    };
+  // Trigger temporary highlight when new field values arrive
+  const triggerFieldHighlights = (newFields: Record<string, any>, currentPrevFields: Record<string, any>) => {
+    const now = Date.now();
+    const expiresAt = now + 2800; // 2.8 seconds
+    const newHighlights: Array<{ phrase: string; key: string; expiresAt: number }> = [];
+    const updatedKeys: Record<string, number> = {};
+    const citations = newFields._citations || {};
 
-    // ── Error state ──────────────────────────────────────────────────────────
-    if (callingState === "error") {
-        return (
-            <div className="py-6 px-4 space-y-4 text-center flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300 w-full max-w-md bg-[#16151E]/95 border border-white/10 p-6 sm:p-8 rounded-2xl shadow-2xl backdrop-blur-xl">
-                <div className="relative flex items-center justify-center my-2 text-rose-500">
-                    <X className="w-12 h-12" />
-                </div>
-                <div className="space-y-1">
-                    <p className="text-sm font-bold text-white">Call Request Failed</p>
-                    <p className="text-xs text-gray-400">{errorMessage}</p>
-                </div>
-                <button
-                    onClick={handleReset}
-                    type="button"
-                    className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-white mt-2"
-                >
-                    Go Back
-                </button>
-            </div>
-        );
+    for (const [key, val] of Object.entries(newFields)) {
+      if (key === "_citations") continue;
+      if (val !== null && val !== undefined && val !== "" && currentPrevFields[key] !== val) {
+        updatedKeys[key] = expiresAt;
+
+        // Determine extractable search words/phrases from AI citations
+        if (citations[key] && Array.isArray(citations[key])) {
+          for (const phrase of citations[key]) {
+            if (typeof phrase === "string" && phrase.trim().length >= 2) {
+              newHighlights.push({ phrase: phrase.trim(), key, expiresAt });
+            }
+          }
+        } else {
+          // Fallback if AI didn't provide a citation
+          if (typeof val === "string" && val.trim().length >= 2) {
+            newHighlights.push({ phrase: val.trim(), key, expiresAt });
+          } else if (typeof val === "number") {
+            newHighlights.push({ phrase: String(val), key, expiresAt });
+          }
+        }
+      }
     }
 
-    // ── Result cards ───────────────────────────────
-    if (callingState === "done" && extractedData) {
-        if (useCase === "hotel") {
-            return <HotelResultCard data={extractedData} phone={phone} />;
+    if (newHighlights.length > 0) {
+      setActiveHighlights((prev) => [...prev, ...newHighlights]);
+    }
+    if (Object.keys(updatedKeys).length > 0) {
+      setRecentFieldKeys((prev) => ({ ...prev, ...updatedKeys }));
+    }
+  };
+
+  // Duration timer
+  useEffect(() => {
+    if (callingState === "connected") {
+      setCallDuration(0);
+      durationTimerRef.current = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else if (callingState !== "done") {
+      if (durationTimerRef.current) {
+        clearInterval(durationTimerRef.current);
+        durationTimerRef.current = null;
+      }
+    }
+  }, [callingState]);
+
+  // Auto-scroll transcript
+  useEffect(() => {
+    if (transcriptBottomRef.current) {
+      transcriptBottomRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [liveTurns]);
+
+  const formatDuration = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const handleInitiateCall = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phone || !name) return;
+
+    setCallingState("calling");
+    setErrorMessage("");
+    setExtractedData(null);
+    setLiveFields({});
+    setLiveTurns([]);
+    setTurnCount(0);
+    setCallDuration(0);
+
+    try {
+      const formData = new FormData();
+      formData.set("name", name);
+      formData.set("phone", phone);
+      formData.set("useCase", useCase);
+      if (jobDescription) formData.set("jobDescription", jobDescription);
+      if (resumeText) formData.set("resumeText", resumeText); // We don't have file here, just pass text
+      
+      const result = await initiateDemoCall(null, formData as any);
+      if (!result?.success) {
+        setCallingState("error");
+        setErrorMessage(result?.error || "Failed to initiate call.");
+        return;
+      }
+      const runId = result.workflowRunId;
+
+      // SSE connection for live transcription
+      const sseUrl = `https://talkar.in/api/v1/public/agent/run/${runId}/stream?use_case=${useCase}`;
+      const es = new EventSource(sseUrl);
+      sseRef.current = es;
+
+      const lastExtractedTurnCountRef = { current: 0 };
+      const finalLinesRef: string[] = [];
+      let partialUserLine = "";
+
+      es.onmessage = (evt) => {
+        if (!evt.data) return;
+        const msg = JSON.parse(evt.data);
+
+        if (msg.type === "ended" || msg.type === "timeout") {
+          es.close();
+          sseRef.current = null;
+          return;
         }
-        if (useCase === "sales") {
-            return <SalesResultCard data={extractedData} phone={phone} />;
+
+        if (msg.type !== "turn") return;
+
+        // Active connection
+        setCallingState("connected");
+
+        if (msg.role === "agent") {
+          if (finalLinesRef.length > 0 && finalLinesRef[finalLinesRef.length - 1].startsWith("Agent: ")) {
+            finalLinesRef[finalLinesRef.length - 1] +=
+              (finalLinesRef[finalLinesRef.length - 1] === "Agent: " ? "" : " ") + msg.text;
+          } else {
+            finalLinesRef.push(`Agent: ${msg.text}`);
+          }
+
+          setLiveTurns([...finalLinesRef, ...(partialUserLine ? [partialUserLine] : [])]);
+
+          // Trigger extraction on bot turn
+          if (finalLinesRef.length > lastExtractedTurnCountRef.current) {
+            lastExtractedTurnCountRef.current = finalLinesRef.length;
+            runLiveExtraction([...finalLinesRef], useCase)
+              .then((fields) => {
+                if (fields && Object.keys(fields).length > 0) {
+                  setLiveFields((prev) => {
+                    triggerFieldHighlights(fields, prev);
+                    return { ...prev, ...fields };
+                  });
+                }
+              })
+              .catch(console.error);
+          }
+        } else if (msg.role === "user") {
+          if (!msg.final) {
+            partialUserLine = `Caller: ${msg.text}`;
+            setLiveTurns([...finalLinesRef, partialUserLine]);
+          } else {
+            partialUserLine = "";
+            finalLinesRef.push(`Caller: ${msg.text}`);
+            const snapshot = [...finalLinesRef];
+            setLiveTurns(snapshot);
+            setTurnCount(snapshot.length);
+
+            if (snapshot.length > lastExtractedTurnCountRef.current) {
+              lastExtractedTurnCountRef.current = snapshot.length;
+              runLiveExtraction(snapshot, useCase)
+                .then((fields) => {
+                  if (fields && Object.keys(fields).length > 0) {
+                    setLiveFields((prev) => {
+                      triggerFieldHighlights(fields, prev);
+                      return { ...prev, ...fields };
+                    });
+                  }
+                })
+                .catch(console.error);
+            }
+          }
         }
-        if (useCase === "recruiter") {
-            return <RecruiterResultCard data={extractedData} phone={phone} />;
+      };
+
+      es.onerror = () => {
+        es.close();
+        sseRef.current = null;
+      };
+
+      // Periodic check for call completion
+      pollIntervalRef.current = setInterval(async () => {
+        const { ready: isCompleted, extractedData: doneData } = await pollDemoCallResult(runId);
+        if (isCompleted) {
+          clearTimers();
+          setLiveFields((currentLive) => {
+            const merged = { ...currentLive, ...(doneData || {}) };
+            setExtractedData(merged);
+            return merged;
+          });
+          setCallingState("done");
         }
-        if (useCase === "medical") {
-            return <MedicalResultCard data={extractedData} phone={phone} />;
-        }
-        if (useCase === "service") {
-            return <ServiceResultCard data={extractedData} phone={phone} />;
-        }
-        if (useCase === "real_estate") {
-            return <RealEstateResultCard data={extractedData} phone={phone} />;
-        }
+      }, 4000);
+    } catch (err: any) {
+      setCallingState("error");
+      setErrorMessage(err.message || "Failed to initiate outbound demo call.");
+    }
+  };
+
+  const handleReset = () => {
+    clearTimers();
+    setCallingState("idle");
+    setErrorMessage("");
+    setExtractedData(null);
+    setLiveFields({});
+    setLiveTurns([]);
+    setTurnCount(0);
+    setCallDuration(0);
+    setActiveHighlights([]);
+    setRecentFieldKeys({});
+    setJobDescription("");
+    setResumeText("");
+    setResumeFileName("");
+  };
+
+  // Helper to render transcript text with temporary entity highlights & smooth blur-in streaming
+  const renderTranscriptText = (rawText: string, isLatest: boolean) => {
+    const matchingPhrases = activeHighlights
+      .map((h) => h.phrase.trim())
+      .filter((p) => p.length >= 2 && rawText.toLowerCase().includes(p.toLowerCase()));
+
+    if (matchingPhrases.length === 0) {
+      const words = rawText.split(" ");
+      return (
+        <span className="font-normal whitespace-pre-wrap">
+          {words.map((word, wIdx) => {
+            const isStreamedWord = isLatest && wIdx >= words.length - 4;
+            return (
+              <span
+                key={wIdx}
+                className={isStreamedWord ? "animate-word-stream-blur" : "inline"}
+              >
+                {word}
+                {wIdx < words.length - 1 ? " " : ""}
+              </span>
+            );
+          })}
+        </span>
+      );
     }
 
-    // ── Calling / connected / polling ────────────────────────────────────────
-    if (callingState === "calling" || callingState === "connected" || callingState === "polling") {
-        const isPolling = callingState === "polling";
-        return (
-            <div className="py-6 px-4 space-y-4 text-center flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300 w-full max-w-md bg-[#0C0B0F] border border-neutral-800 p-6 sm:p-8 rounded-xl shadow-2xl">
-                <div className="relative flex items-center justify-center my-2">
-                    {callingState === "calling" ? (
-                        <div className="w-14 h-14 rounded-full border border-neutral-800 flex items-center justify-center relative bg-neutral-900/30">
-                            <span className="absolute inset-0 rounded-full border border-t-amber-500/60 border-neutral-800 animate-spin" />
-                            <PhoneCall className="w-5 h-5 text-neutral-400" />
-                        </div>
-                    ) : isPolling ? (
-                        <div className="w-14 h-14 rounded-full border border-neutral-800 flex items-center justify-center relative bg-neutral-900/30">
-                            <span className="absolute inset-0 rounded-full border border-t-amber-500/60 border-neutral-800 animate-spin" />
-                            <PhoneCall className="w-5 h-5 text-amber-400" />
-                        </div>
-                    ) : (
-                        <div className="w-14 h-14 rounded-full border border-emerald-800/30 bg-emerald-950/10 flex items-center justify-center relative text-emerald-400 animate-pulse">
-                            <Check className="w-5 h-5" />
-                        </div>
-                    )}
-                </div>
-
-                <div className="space-y-1">
-                    <p className="text-sm font-bold text-white">
-                        {callingState === "calling"
-                            ? "Initiating Call..."
-                            : isPolling
-                            ? "Call in Progress…"
-                            : "Call Connected"}
-                    </p>
-                    <p className="text-xs text-gray-400 font-mono">+91 {phone || "98765 43210"}</p>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-400 w-full space-y-1">
-                    <p className="font-semibold text-white">
-                        {callingState === "calling"
-                            ? `Connecting call from ${AGENT_PERSONAS[useCase]?.personaName || "Agent"} to your mobile...`
-                            : isPolling
-                            ? (AGENT_PERSONAS[useCase]?.inCallMessage || "Talk to the agent — your live brief will appear when the call ends!")
-                            : "Your phone should be ringing!"}
-                    </p>
-                </div>
-
-                {(callingState === "connected" || isPolling) && (
-                    <Link
-                        href="/auth/signup"
-                        className={`w-full py-3 px-4 rounded-lg text-xs font-bold transition-all shadow-lg flex items-center justify-center gap-2 mt-2 ${AGENT_PERSONAS[useCase]?.brandColorClass || "bg-amber-500 text-neutral-950 hover:bg-amber-400"}`}
-                    >
-                        {AGENT_PERSONAS[useCase]?.ctaLabel || "Get Started"} <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                )}
-            </div>
-        );
-    }
-
-    // ── Idle form ────────────────────────────────────────────────────────────
-    const businessOptions = [
-        { id: "hotel",       label: "Hotels & Stays",  icon: Hotel,       available: true },
-        { id: "medical",     label: "Healthcare",       icon: Stethoscope, available: true },
-        { id: "sales",       label: "Sales & Leads",   icon: Briefcase,   available: true },
-        { id: "service",     label: "Home Services",   icon: Wrench,      available: true },
-        { id: "real_estate", label: "Real Estate",     icon: Home,        available: true },
-        { id: "recruiter",   label: "Recruiter AI",    icon: Users,       available: true },
-    ];
+    matchingPhrases.sort((a, b) => b.length - a.length);
+    const escaped = matchingPhrases.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const regex = new RegExp(`(${escaped.join("|")})`, "gi");
+    const parts = rawText.split(regex);
 
     return (
-        <div className="w-full max-w-md bg-[#16151E]/95 border border-white/10 p-6 sm:p-8 flex flex-col gap-5 rounded-2xl shadow-2xl backdrop-blur-xl hover:border-orange-500/30 transition-all">
-            <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <div>
-                    <div className="text-sm text-white font-bold tracking-tight">Try Live AI Demo</div>
-                    <div className="text-xs text-gray-400 font-light mt-0.5">Receive an instant test call from Talkar</div>
+      <span className="font-normal whitespace-pre-wrap">
+        {parts.map((part, pIdx) => {
+          const isMatch = matchingPhrases.some(
+            (phrase) => phrase.toLowerCase() === part.toLowerCase()
+          );
+          if (isMatch) {
+            return (
+              <span key={pIdx} className="entity-temporary-highlight font-semibold">
+                {part}
+              </span>
+            );
+          }
+          return <span key={pIdx}>{part}</span>;
+        })}
+      </span>
+    );
+  };
+
+  const currentPersona = PERSONAS[useCase] || PERSONAS.hotel;
+  const currentLabels = FIELD_LABELS[useCase] || FIELD_LABELS.hotel;
+  const allFieldKeys = Object.keys(currentLabels);
+  const capturedFieldsCount = Object.entries(liveFields).filter(
+    ([k, v]) => k !== "_citations" && v !== null && v !== undefined && v !== ""
+  ).length;
+
+  const industryOptions = [
+    { id: "hotel", label: "Hotels & Stays", persona: "Sarah · Front Desk", icon: Hotel },
+    { id: "medical", label: "Healthcare", persona: "Emma · Patient Intake", icon: Stethoscope },
+    { id: "sales", label: "Sales & Leads", persona: "Jordan · Qualifying AI", icon: Briefcase },
+    { id: "service", label: "Home Services", persona: "Casey · Dispatcher", icon: Wrench },
+    { id: "real_estate", label: "Real Estate", persona: "Riley · Advisor", icon: Home },
+    { id: "recruiter", label: "Recruiter AI", persona: "Alex · HR Specialist", icon: Users },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#090A0F] text-slate-100 flex flex-col items-center justify-between p-4 sm:p-6 md:p-10 font-sans selection:bg-orange-500 selection:text-white">
+      {/* Top Brand Bar */}
+      <header className="w-full max-w-5xl flex items-center justify-between py-2 mb-6 sm:mb-8">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400 shadow-sm">
+            <Mic className="w-4 h-4" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-sm sm:text-base text-white tracking-tight">Dograh</span>
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-400 hidden sm:inline-block">
+              Voice Telephony Platform
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 text-xs">
+          <span className="flex items-center gap-1.5 text-slate-400 text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" /> Live Demo Engine
+          </span>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="w-full max-w-5xl flex flex-col items-center justify-center flex-1 my-auto">
+        {/* COMPLETED STATE */}
+        {callingState === "done" && extractedData && (
+          <CallCompletedCard
+            data={extractedData}
+            useCase={useCase}
+            durationSec={callDuration}
+            turnCount={turnCount || liveTurns.length}
+            onReset={handleReset}
+          />
+        )}
+
+        {/* IN-CALL / STREAMING STATE (Completely Transparent 540x540 Placeholder, No Background, No Border, Pure Full-Height Split) */}
+        {(callingState === "calling" || callingState === "connected") && (
+          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
+            {/* 60/40 Split: Transcript (7/12) & Captured Data (5/12) - Pure Full Height */}
+            <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 h-full items-stretch">
+              {/* Left Column: Live Transcript (60%) Completely Backgroundless with Upper Mask Fade */}
+              <div className="col-span-7 bg-transparent border-0 p-0 flex flex-col h-full overflow-hidden">
+                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pr-0.5 flex flex-col justify-end mask-top-fade scroll-smooth">
+                  {liveTurns.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-400 space-y-2 my-auto">
+                      <div className="w-10 h-10 rounded-xl bg-white/[0.02] border border-white/[0.08] flex items-center justify-center text-slate-300">
+                        <PhoneCall className="w-5 h-5 animate-pulse text-amber-400" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-200">
+                        {callingState === "calling" ? "Calling your phone..." : "Connected · Speak now"}
+                      </p>
+                      <p className="text-xs text-slate-400 max-w-[200px] leading-relaxed">
+                        {callingState === "calling"
+                          ? "Answer call to start."
+                          : currentPersona.inCallHint}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 pt-1 pb-1 flex flex-col justify-end min-h-full">
+                      {liveTurns.map((turn, i) => {
+                        const isAgent = turn.startsWith("Agent:");
+                        const rawText = turn.replace(/^(Agent|Caller):\s*/, "");
+                        const isLatest = i === liveTurns.length - 1;
+
+                        return (
+                          <div
+                            key={i}
+                            className={`flex flex-col ${isAgent ? "items-start" : "items-end"} message-bubble-in`}
+                          >
+                            <div
+                              className={`flex items-center gap-1.5 px-1 mb-1 text-xs font-bold ${
+                                isAgent ? "flex-row text-orange-400" : "flex-row-reverse text-indigo-300"
+                              }`}
+                            >
+                              <span>{isAgent ? currentPersona.name : name || "You"}</span>
+                            </div>
+
+                            <div
+                              className={`max-w-[94%] p-3 rounded-2xl text-[13px] sm:text-sm font-medium leading-relaxed shadow-sm smooth-bubble-expand ${
+                                isAgent
+                                  ? "bg-gradient-to-br from-[#241710] to-[#15131a] border border-[#ea580c]/30 text-slate-100 rounded-tl-xs"
+                                  : "bg-gradient-to-br from-[#1b1f30] to-[#111320] border border-indigo-500/25 text-white rounded-tr-xs"
+                              }`}
+                            >
+                              {renderTranscriptText(rawText, isLatest)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div ref={transcriptBottomRef} className="h-1" />
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span className="text-xs text-emerald-400 font-medium">Ready</span>
+              </div>
+
+              {/* Right Column: Live Captured Data (40%) Completely Backgroundless */}
+              <div className="col-span-5 bg-transparent border-0 p-0 flex flex-col h-full overflow-hidden">
+                <div className="flex items-center justify-between pb-2 mb-1 shrink-0">
+                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block truncate">
+                    Fields
+                  </span>
+                  <div className="px-2.5 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-xs font-bold text-orange-400 tabular-nums">
+                    {capturedFieldsCount}/{allFieldKeys.length}
+                  </div>
                 </div>
+
+                {/* Progress bar */}
+                <div className="w-full bg-white/[0.04] h-1.5 rounded-full overflow-hidden mb-2 shrink-0">
+                  <div
+                    className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-500"
+                    style={{
+                      width: `${Math.round((capturedFieldsCount / Math.max(1, allFieldKeys.length)) * 100)}%`,
+                    }}
+                  />
+                </div>
+
+                {/* Field Grid with Transparent Scrolling & Auto-scroll */}
+                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pr-0.5 space-y-2 scroll-smooth">
+                  {allFieldKeys.map((key) => {
+                    const label = currentLabels[key] || key;
+                    const val = liveFields[key];
+                    const hasValue = val !== null && val !== undefined && val !== "";
+                    const isRecentlyUpdated = (recentFieldKeys[key] || 0) > Date.now();
+
+                    return (
+                      <div
+                        key={key}
+                        ref={(el) => { fieldRefs.current[key] = el; }}
+                        className={`p-2.5 rounded-xl border backdrop-blur-md transition-all duration-500 flex items-center justify-between ${
+                          isRecentlyUpdated
+                            ? "bg-orange-500/[0.12] border-orange-500/60 field-unlock-card shadow-sm shadow-orange-500/10"
+                            : hasValue
+                            ? "bg-white/[0.03] border-white/[0.10] hover:bg-white/[0.05]"
+                            : "bg-white/[0.01] border-white/[0.04] opacity-50"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1 pr-1.5">
+                          <span className="text-xs text-slate-300 block truncate font-semibold">
+                            {label}
+                          </span>
+                          <div className="mt-1">
+                            <FormattedValue value={val} labelKey={key} />
+                          </div>
+                        </div>
+
+                        {hasValue && (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* IDLE / SETUP FORM STATE (Exact Design & Color Language from Screenshot) */}
+        {callingState === "idle" && (
+          <div className="w-full max-w-[540px] space-y-4 animate-turn-in">
+            {/* Hero Header */}
+            <div className="text-center space-y-1.5">
+              <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-[11px] text-slate-300 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Live Interactive Demo</span>
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                Conversational{" "}
+                <span className="bg-gradient-to-r from-orange-400 via-amber-300 to-orange-500 bg-clip-text text-transparent">
+                  Voice AI
+                </span>
+              </h1>
+
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                Choose an agent, enter your number, and test live AI calling.
+              </p>
             </div>
 
-            <form onSubmit={handleInitiateCall} className="space-y-3.5 text-xs text-white">
-                <div className="space-y-1 text-left">
-                    <label className="text-[11px] font-semibold text-white/90 block">Your Name</label>
+            {/* Main Form Card (Completely Transparent Placeholder, No Background, No Border) */}
+            <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden">
+              {/* Card Header */}
+              <div className="flex justify-between items-center border-b border-white/[0.08] pb-3 shrink-0">
+                <div>
+                  <h2 className="text-sm sm:text-base text-white font-bold tracking-tight">
+                    Try Live AI Demo
+                  </h2>
+                  <p className="text-xs text-gray-400 font-normal mt-0.5">
+                    Receive an instant test call from Dograh
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-xs text-emerald-400 font-semibold">Ready</span>
+                </div>
+              </div>
+
+              <form onSubmit={handleInitiateCall} className="flex-1 min-h-0 flex flex-col justify-between mt-3">
+                {/* Scrollable Form Body (No Visible Scrollbars) */}
+                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-3.5 pr-0.5 pb-1">
+                  {/* Your Name */}
+                  <div className="space-y-1 text-left">
+                    <label className="text-xs sm:text-sm font-semibold text-white/90 block">
+                      Your Name
+                    </label>
                     <input
-                        type="text"
-                        required
-                        name="name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Rahul Sharma"
-                        className="w-full h-9.5 px-3 py-3 rounded-lg border border-white/10 bg-[#0F0E14] text-white text-xs placeholder:text-gray-500 focus:outline-none focus:border-orange-500 transition-all"
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Rahul Sharma"
+                      className="w-full h-11 px-4 rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500 focus:bg-white/[0.06] transition-all font-medium"
                     />
-                </div>
+                  </div>
 
-                <div className="space-y-1 text-left">
-                    <label className="text-[11px] font-semibold text-white/90 block">Mobile Number</label>
+                  {/* Mobile Number */}
+                  <div className="space-y-1 text-left">
+                    <label className="text-xs sm:text-sm font-semibold text-white/90 block">
+                      Mobile Number
+                    </label>
                     <div className="flex gap-2">
-                        <span className="h-9.5 px-3 py-3 rounded-lg border border-white/10 bg-white/5 text-white text-xs font-semibold flex items-center font-mono shrink-0 gap-1.5">
-                            <span className="text-sm leading-none">🇮🇳</span> +91
+                      <div className="h-11 px-3.5 rounded-xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-md text-white text-sm font-semibold flex items-center shrink-0 select-none">
+                        IN +91
+                      </div>
+                      <input
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="98765 43210"
+                        className="flex-1 h-11 px-4 rounded-xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-md text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-orange-500 focus:bg-white/[0.06] transition-all font-medium tabular-nums"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Select Business Type */}
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-xs sm:text-sm font-semibold text-white/90 block">
+                      Select Business Type
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {industryOptions.map((item) => {
+                        const Icon = item.icon;
+                        const isSelected = useCase === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setUseCase(item.id)}
+                            className={`h-11 px-3.5 rounded-xl text-xs sm:text-sm font-medium border text-left flex items-center gap-2.5 transition-all cursor-pointer backdrop-blur-md ${
+                              isSelected
+                                ? "bg-[#28150a]/80 border-2 border-[#ea580c] text-[#f97316] font-bold shadow-[0_0_15px_rgba(234,88,12,0.2)]"
+                                : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.12] text-gray-300"
+                            }`}
+                          >
+                            <Icon
+                              className={`w-4 h-4 shrink-0 ${
+                                isSelected ? "text-[#f97316]" : "text-gray-400"
+                              }`}
+                            />
+                            <span className="truncate">{item.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Recruiter Context Section (If Recruiter AI Selected) */}
+                  {useCase === "recruiter" && (
+                    <div className="p-3.5 rounded-2xl bg-indigo-500/[0.05] backdrop-blur-md border border-indigo-500/20 space-y-2.5 animate-turn-in">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                          <FileText className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs sm:text-sm font-bold text-slate-200">
+                          Screening Context (Optional)
                         </span>
-                        <input
-                            type="tel"
-                            required
-                            name="phone"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            placeholder="98765 43210"
-                            className="w-full h-9.5 px-3 py-3 rounded-lg border border-white/10 bg-[#0F0E14] text-white text-xs font-mono placeholder:text-gray-500 focus:outline-none focus:border-orange-500 transition-all"
+                      </div>
+
+                      {/* Job Description */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-300 block">
+                          Job Description
+                        </label>
+                        <textarea
+                          value={jobDescription}
+                          onChange={(e) => setJobDescription(e.target.value)}
+                          placeholder="Paste job requirements or role details..."
+                          className="w-full h-16 p-2.5 rounded-xl bg-white/[0.03] backdrop-blur-md border border-white/[0.08] text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:bg-white/[0.05] text-xs sm:text-sm font-medium transition-all resize-none"
                         />
-                    </div>
-                </div>
+                      </div>
 
-                <div className="space-y-1 text-left">
-                    <label className="text-[11px] font-semibold text-white/90 block">Select Business Type</label>
-                    <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-                        {businessOptions.map((item) => {
-                            const Icon = item.icon;
-                            const isSelected = useCase === item.id;
-                            return (
-                                <button
-                                    key={item.id}
-                                    type="button"
-                                    disabled={!item.available}
-                                    onClick={() => item.available && setUseCase(item.id)}
-                                    className={`h-9 px-2.5 rounded-lg text-[11px] font-medium border text-left flex items-center justify-between gap-1.5 transition-all ${
-                                        isSelected
-                                            ? "bg-orange-500/20 border-orange-500 text-orange-500 font-semibold shadow-xs"
-                                            : item.available
-                                            ? "border-white/10 bg-[#0F0E14] hover:bg-white/5 text-gray-300"
-                                            : "border-white/5 bg-white/5 text-gray-600 cursor-not-allowed"
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-1.5 min-w-0 truncate">
-                                        <Icon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-orange-500" : "text-gray-500"}`} />
-                                        <span className="truncate">{item.label}</span>
-                                    </div>
-                                    {!item.available && (
-                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-sans uppercase font-semibold shrink-0">
-                                            Soon
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5 text-[11px] text-gray-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
-                    <span className="truncate">Agent: <strong className="text-white font-semibold">{AGENT_PERSONAS[useCase]?.personaName}</strong> from <span className="text-gray-300">{AGENT_PERSONAS[useCase]?.company}</span></span>
-                </div>
-
-                {useCase === "recruiter" && (
-                    <>
-                        <div className="space-y-1 text-left mt-2 animate-in fade-in zoom-in-95 duration-300">
-                            <label className="text-[11px] font-semibold text-white/90 block">Job Description</label>
-                            <textarea
-                                name="jobDescription"
-                                placeholder="Paste the JD here..."
-                                className="w-full h-20 px-3 py-2 rounded-lg border border-white/10 bg-[#0F0E14] text-white text-xs placeholder:text-gray-500 focus:outline-none focus:border-indigo-500 transition-all resize-none"
-                            />
-                        </div>
-                        <div className="space-y-1 text-left animate-in fade-in zoom-in-95 duration-300">
-                            <label className="text-[11px] font-semibold text-white/90 block">Upload Resume (PDF/DOCX/TXT)</label>
+                      {/* Resume Upload / Text */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-300 block">
+                          Candidate Resume
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="relative">
                             <input
-                                type="file"
-                                name="resumeFile"
-                                accept=".pdf,.docx,.txt"
-                                className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-500 file:text-white hover:file:bg-indigo-600 transition-all border border-white/10 bg-[#0F0E14] rounded-lg p-1.5 focus:outline-none cursor-pointer"
+                              type="file"
+                              accept=".pdf,.docx,.txt,.md"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setResumeFileName(file.name);
+                                  try {
+                                    const text = await file.text();
+                                    setResumeText(text);
+                                  } catch {
+                                    setResumeText(`Resume: ${file.name}`);
+                                  }
+                                }
+                              }}
+                              className="hidden"
+                              id="resume-file-input"
                             />
-                        </div>
-                    </>
-                )}
+                            <label
+                              htmlFor="resume-file-input"
+                              className="w-full h-10 px-3 rounded-xl bg-white/[0.03] backdrop-blur-md border border-white/[0.08] hover:border-indigo-500/50 text-slate-300 text-xs font-medium flex items-center justify-between cursor-pointer transition-colors"
+                            >
+                              <span className="truncate flex items-center gap-1.5">
+                                <Upload className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                <span className="truncate">
+                                  {resumeFileName || "Upload file"}
+                                </span>
+                              </span>
+                            </label>
+                          </div>
 
-                <button
+                          <input
+                            type="text"
+                            value={resumeText}
+                            onChange={(e) => setResumeText(e.target.value)}
+                            placeholder="Or paste skills..."
+                            className="w-full h-10 px-3 rounded-xl bg-white/[0.03] backdrop-blur-md border border-white/[0.08] text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:bg-white/[0.05] text-xs sm:text-sm font-medium truncate"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pinned Action Button (Full Height, Never Squished) */}
+                <div className="pt-3 border-t border-white/[0.08] shrink-0">
+                  <button
                     type="submit"
-                    className="w-full mt-2 rounded-xl text-xs font-bold bg-gradient-to-r from-[#FF5500] to-[#E11D48] text-white hover:opacity-95 transition-all shadow-lg shadow-orange-600/25 flex items-center justify-center gap-2 group py-3.5"
-                >
-                    <PhoneCall className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-                    Receive Demo Call
-                    <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-            </form>
-        </div>
-    );
+                    className="w-full h-14 min-h-[56px] rounded-2xl text-base sm:text-lg font-extrabold bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:from-[#ff6414] hover:to-[#f43f5e] text-white shadow-xl shadow-orange-600/30 ring-2 ring-orange-500/30 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer tracking-wide shrink-0"
+                  >
+                    <PhoneCall className="w-5 h-5 fill-current shrink-0" />
+                    <span>Receive Demo Call</span>
+                    <ArrowRight className="w-5 h-5 shrink-0" />
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ERROR STATE */}
+        {callingState === "error" && (
+          <div className="w-full max-w-md bg-[#111218] border border-white/[0.08] p-6 sm:p-7 rounded-2xl shadow-2xl text-center space-y-4 animate-turn-in">
+            <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
+              <X className="w-6 h-6" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-white">Call Connection Failed</h3>
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">{errorMessage}</p>
+            </div>
+            <button
+              onClick={handleReset}
+              type="button"
+              className="w-full py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+      </main>
+
+      {/* Clean Bottom Footer */}
+      <footer className="w-full max-w-5xl py-4 mt-6 text-center text-xs sm:text-sm text-slate-500 border-t border-white/[0.04] flex items-center justify-between">
+        <span>Powered by Dograh Telephony Engine</span>
+        <span className="font-mono text-xs text-slate-600">v1.2 · Real-Time Extraction</span>
+      </footer>
+    </div>
+  );
 }

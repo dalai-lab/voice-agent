@@ -429,3 +429,49 @@
     background-color: #FFFFFF;
   }
 }
+
+/* Demo Call Animations */
+
+.mask-top-fade {
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.05) 6%, rgba(0, 0, 0, 0.5) 16%, black 28%, black 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.05) 6%, rgba(0, 0, 0, 0.5) 16%, black 28%, black 100%);
+}
+
+.animate-word-stream-blur {
+  display: inline-block;
+  animation: smoothWordBlurIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, filter, opacity;
+}
+
+.smooth-bubble-expand {
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              height 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              padding 0.3s ease,
+              background-color 0.3s ease,
+              border-color 0.3s ease,
+              box-shadow 0.3s ease;
+  will-change: width, height, max-width;
+}
+
+.message-bubble-in {
+  animation: messageBubbleSmoothIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes smoothWordBlurIn {
+  0% {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(3px) scale(0.96);
+  }
+  50% {
+    opacity: 0.85;
+    filter: blur(1.5px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0) scale(1);
+  }
+}

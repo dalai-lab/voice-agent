@@ -391,7 +391,6 @@
     height: 100%;
     pointer-events: none;
     z-index: 1;
-    filter: drop-shadow(0 0 12px rgba(255, 85, 0, 0.2));
 }
 
 .hero-stripe-pattern {
@@ -419,6 +418,47 @@
     background: rgba(255, 77, 0, 0.06);
     border: 1px solid rgba(255, 107, 74, 0.25);
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* Guaranteed Frosted Glass Utilities */
+.glass-frosted-bubble-agent {
+    background: rgba(255, 255, 255, 0.14) !important;
+    backdrop-filter: blur(28px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
+}
+
+.glass-frosted-bubble-user {
+    background: rgba(255, 255, 255, 0.10) !important;
+    backdrop-filter: blur(28px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
+}
+
+.glass-frosted-card {
+    background: rgba(255, 255, 255, 0.09) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.20) !important;
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.25) !important;
+}
+
+.glass-frosted-card-active {
+    background: rgba(255, 255, 255, 0.16) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+.glass-frosted-input {
+    background: rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
 }
 
 @layer utilities {

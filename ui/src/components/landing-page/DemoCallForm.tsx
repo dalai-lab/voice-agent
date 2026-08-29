@@ -329,10 +329,10 @@ function CallCompletedCard({
           {allEntries.map(({ key, label, val, hasValue }) => (
             <div
               key={key}
-              className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between backdrop-blur-md ${
+              className={`p-2.5 rounded-xl transition-all flex flex-col justify-between ${
                 hasValue
-                  ? "bg-white/15 backdrop-blur-2xl border border-white/30 text-white shadow-md"
-                  : "bg-white/[0.08] backdrop-blur-2xl border border-white/20 text-white/90 shadow-sm"
+                  ? "glass-frosted-card-active text-white"
+                  : "glass-frosted-card text-white/90"
               }`}
             >
               <div className="flex items-center justify-between text-[11px] font-medium mb-1">
@@ -752,9 +752,11 @@ export function DemoCallForm() {
           <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
             {/* 60/40 Split: Transcript (7/12) & Captured Data (5/12) - Pure Full Height */}
             <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 h-full items-stretch">
-              {/* Left Column: Live Transcript (60%) Completely Backgroundless with Upper Mask Fade */}
-              <div className="col-span-7 bg-transparent border-0 p-0 flex flex-col h-full overflow-hidden">
-                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pr-0.5 flex flex-col justify-end mask-top-fade scroll-smooth">
+              {/* Left Column: Live Transcript (60%) with Non-destructive Top Fade Overlay */}
+              <div className="col-span-7 bg-transparent border-0 p-0 flex flex-col h-full overflow-hidden relative">
+                {/* Subtle top fade overlay that preserves backdrop-filter */}
+                <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-[#090A0F]/60 to-transparent pointer-events-none z-10" />
+                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pr-0.5 flex flex-col justify-end scroll-smooth">
                   {liveTurns.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-400 space-y-2 my-auto">
                       <div className="w-10 h-10 rounded-xl bg-white/[0.02] border border-white/[0.08] flex items-center justify-center text-slate-300">
@@ -790,10 +792,10 @@ export function DemoCallForm() {
                             </div>
 
                             <div
-                              className={`max-w-[94%] p-3 rounded-2xl text-[13px] sm:text-sm font-medium leading-relaxed shadow-sm smooth-bubble-expand backdrop-blur-md ${
+                              className={`max-w-[94%] p-3.5 rounded-2xl text-[13px] sm:text-sm font-medium leading-relaxed smooth-bubble-expand ${
                                 isAgent
-                                  ? "bg-white/15 backdrop-blur-2xl border border-white/25 text-white rounded-tl-xs shadow-md"
-                                  : "bg-white/10 backdrop-blur-2xl border border-white/20 text-white rounded-tr-xs shadow-md"
+                                  ? "glass-frosted-bubble-agent text-white rounded-tl-xs"
+                                  : "glass-frosted-bubble-user text-white rounded-tr-xs"
                               }`}
                             >
                               {renderTranscriptText(rawText, isLatest)}
@@ -840,12 +842,12 @@ export function DemoCallForm() {
                       <div
                         key={key}
                         ref={(el) => { fieldRefs.current[key] = el; }}
-                        className={`p-2.5 rounded-xl border backdrop-blur-md transition-all duration-500 flex items-center justify-between ${
+                        className={`p-2.5 rounded-xl transition-all duration-500 flex items-center justify-between ${
                           isRecentlyUpdated
-                            ? "bg-orange-500/25 backdrop-blur-2xl border border-orange-500/70 field-unlock-card shadow-lg text-white shadow-orange-500/20"
+                            ? "glass-frosted-card-active border-orange-500/70 field-unlock-card shadow-lg text-white"
                             : hasValue
-                            ? "bg-white/15 backdrop-blur-2xl border border-white/30 hover:border-white/40 text-white shadow-md"
-                            : "bg-white/[0.08] backdrop-blur-2xl border border-white/20 text-white/90 shadow-sm"
+                            ? "glass-frosted-card-active text-white"
+                            : "glass-frosted-card text-white/90"
                         }`}
                       >
                         <div className="min-w-0 flex-1 pr-1.5">
@@ -899,7 +901,7 @@ export function DemoCallForm() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Alex Morgan"
-                      className="w-full h-11 px-4 rounded-xl border border-white/25 bg-white/10 hover:bg-white/15 focus:bg-white/20 backdrop-blur-2xl text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium shadow-sm"
+                      className="w-full h-11 px-4 rounded-xl glass-frosted-input text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium"
                     />
                   </div>
 
@@ -918,7 +920,7 @@ export function DemoCallForm() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="98765 43210"
-                        className="flex-1 h-11 px-4 rounded-xl border border-white/25 bg-white/10 hover:bg-white/15 focus:bg-white/20 backdrop-blur-2xl text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium tabular-nums shadow-sm"
+                        className="flex-1 h-11 px-4 rounded-xl glass-frosted-input text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium tabular-nums"
                       />
                     </div>
                   </div>

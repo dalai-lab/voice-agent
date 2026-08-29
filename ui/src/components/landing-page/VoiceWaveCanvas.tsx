@@ -47,15 +47,15 @@ export const VoiceWaveCanvas: React.FC = () => {
         const baseY = height * 0.42 + i * 18;
         
         const grad = ctx.createLinearGradient(0, 0, width, 0);
-        grad.addColorStop(0, `rgba(255, 85, 0, ${0.2 + lineYRatio * 0.55})`);
-        grad.addColorStop(0.5, `rgba(225, 29, 72, ${0.4 + lineYRatio * 0.55})`);
-        grad.addColorStop(1, `rgba(255, 85, 0, ${0.2 + lineYRatio * 0.45})`);
+        grad.addColorStop(0, `rgba(255, 85, 0, ${0.12 + lineYRatio * 0.32})`);
+        grad.addColorStop(0.5, `rgba(225, 29, 72, ${0.22 + lineYRatio * 0.35})`);
+        grad.addColorStop(1, `rgba(255, 85, 0, ${0.12 + lineYRatio * 0.28})`);
 
         ctx.strokeStyle = grad;
-        ctx.lineWidth = 1.5 + lineYRatio * 1.2;
+        ctx.lineWidth = 1.2 + lineYRatio * 0.8;
 
-        ctx.shadowBlur = 16 + lineYRatio * 10;
-        ctx.shadowColor = i % 2 === 0 ? 'rgba(255, 85, 0, 0.85)' : 'rgba(225, 29, 72, 0.85)';
+        ctx.shadowBlur = 8 + lineYRatio * 6;
+        ctx.shadowColor = i % 2 === 0 ? 'rgba(255, 85, 0, 0.45)' : 'rgba(225, 29, 72, 0.45)';
 
         for (let j = 0; j < points; j++) {
           const x = j * spacingX;

@@ -671,13 +671,21 @@ async def stream_live_transcript(
                     }) + "\n\n"
 
                 elif ev_type == "rtf-bot-text":
+                    # Emit each word as partial — frontend accumulates into one bubble
                     yield "data: " + json.dumps({
                         "type": "turn",
                         "role": "agent",
                         "text": text,
-                        "final": True,
+                        "final": False,  # partial word/phrase — not a complete turn yet
                         "timestamp": ts,
                     }) + "\n\n"
+
+                elif ev_type == "rtf-bot-started-speaking":
+                    yield "data: " + json.dumps({"type": "agent_start"}) + "\n\n"
+
+                elif ev_type == "rtf-bot-stopped-speaking":
+                    # Bot finished speaking — signal frontend to commit accumulated words
+                    yield "data: " + json.dumps({"type": "agent_done"}) + "\n\n"
 
         finally:
             unsubscribe(run_id, q)

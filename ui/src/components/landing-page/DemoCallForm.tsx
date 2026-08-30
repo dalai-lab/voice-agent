@@ -842,16 +842,20 @@ export function DemoCallForm() {
                                   style={isAgent ? {
                                     borderRadius: 16,
                                     borderTopLeftRadius: 4,
-                                    background: "linear-gradient(135deg, rgba(255,90,0,0.34) 0%, rgba(220,38,38,0.26) 100%)",
-                                    border: "1px solid rgba(255,120,40,0.58)",
-                                    boxShadow: "0 4px 24px rgba(255,85,0,0.22), inset 0 1px 0 rgba(255,255,255,0.18)",
+                                    background: "rgba(255, 255, 255, 0.05)",
+                                    backdropFilter: "blur(12px)",
+                                    WebkitBackdropFilter: "blur(12px)",
+                                    border: "1px solid rgba(255, 120, 40, 0.2)",
+                                    boxShadow: "0 4px 24px rgba(0, 0, 0, 0.1)",
                                     color: "white",
                                   } : {
                                     borderRadius: 16,
                                     borderTopRightRadius: 4,
-                                    background: "linear-gradient(135deg, rgba(37,99,235,0.36) 0%, rgba(124,58,237,0.30) 100%)",
-                                    border: "1px solid rgba(96,165,250,0.58)",
-                                    boxShadow: "0 4px 24px rgba(37,99,235,0.26), inset 0 1px 0 rgba(255,255,255,0.18)",
+                                    background: "rgba(255, 255, 255, 0.03)",
+                                    backdropFilter: "blur(12px)",
+                                    WebkitBackdropFilter: "blur(12px)",
+                                    border: "1px solid rgba(96, 165, 250, 0.2)",
+                                    boxShadow: "0 4px 24px rgba(0, 0, 0, 0.1)",
                                     color: "white",
                                   }}
                                 >

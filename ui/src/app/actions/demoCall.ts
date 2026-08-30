@@ -438,6 +438,11 @@ export async function runLiveExtraction(transcriptLines: string[], useCase: stri
 PART 1 — FIELD EXTRACTION:
 ${fieldPrompt}
 
+CRITICAL RULES FOR EXTRACTION:
+1. NEVER guess or hallucinate. If the caller has NOT explicitly provided the information yet, you MUST return null for that field.
+2. DO NOT return "unknown" or "N/A" unless it is explicitly an allowed enum value. Return null instead.
+3. Wait for the user to answer. A question asked by the agent does NOT count as a value until the user responds.
+
 PART 2 — CITATION HIGHLIGHTS (the most important part):
 After extracting fields, you MUST include a top-level "_citations" key in your JSON.
 "_citations" maps each extracted field key to an array of exact verbatim substrings from the transcript.

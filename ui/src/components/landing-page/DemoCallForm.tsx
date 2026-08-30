@@ -1,5 +1,6 @@
 "use client";
-import { initiateDemoCall, pollDemoCallResult, runLiveExtraction } from "@/app/actions/demoCall";
+
+import { initiateDemoCall, runLiveExtraction } from "@/app/actions/demoCall";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Check,
@@ -12,21 +13,12 @@ import {
   Wrench,
   Users,
   Home,
-  Sparkles,
   RotateCcw,
   CheckCircle2,
-  Copy,
-  ChevronRight,
-  Clock,
-  Mic,
-  Shield,
-  Layers,
-  Code2,
-  ExternalLink,
   FileText,
   Upload,
 } from "lucide-react";
-
+import { motion, AnimatePresence } from "framer-motion";
 
 // ---------------------------------------------------------------------------
 // Agent Personas
@@ -39,6 +31,8 @@ interface Persona {
   description: string;
   greeting: string;
   inCallHint: string;
+  callingInstruction: string;
+  connectedInstruction: string;
   ctaText: string;
   accent: string;
 }
@@ -52,6 +46,8 @@ const PERSONAS: Record<string, Persona> = {
     description: "Handles bookings, room choices, party sizes, and check-in schedules.",
     greeting: "Hi, this is Sarah from The Grand Horizon. How can I assist you with your reservation today?",
     inCallHint: "Try asking about room rates, dates, or party sizes to see fields capture in real time.",
+    callingInstruction: "Please answer Sarah's call and stay on this screen to watch your reservation details get captured in real time.",
+    connectedInstruction: "Speak naturally with Sarah — your booking details and live transcript will stream right here.",
     ctaText: "Automate Hospitality Bookings",
     accent: "orange",
   },
@@ -63,6 +59,8 @@ const PERSONAS: Record<string, Persona> = {
     description: "Gathers symptoms, patient history, triage priority, and preferred slots.",
     greeting: "Hello, this is Emma from Riverside Clinic. How can I help you today?",
     inCallHint: "Mention symptoms, appointment preferences, or urgency level.",
+    callingInstruction: "Please answer Emma's call and stay on this screen to see patient intake notes captured live.",
+    connectedInstruction: "Describe your symptoms or appointment request to see clinical triage notes log live.",
     ctaText: "Automate Patient Intake",
     accent: "teal",
   },
@@ -74,6 +72,8 @@ const PERSONAS: Record<string, Persona> = {
     description: "Qualifies prospect size, software pain points, timeline, and demo booking.",
     greeting: "Hey, Jordan here with Northwind Software. Thanks for checking us out!",
     inCallHint: "Discuss your team size, key challenges, or preferred timeline for a demo.",
+    callingInstruction: "Please answer Jordan's call and stay on this screen to see qualification criteria captured live.",
+    connectedInstruction: "Share your team's software requirements to see qualification notes fill live.",
     ctaText: "Scale Inbound Sales",
     accent: "blue",
   },
@@ -85,6 +85,8 @@ const PERSONAS: Record<string, Persona> = {
     description: "Captures job category, repair details, location address, and emergency status.",
     greeting: "Hi, Casey with Bluefield Home Services. What issue can we help you resolve?",
     inCallHint: "Describe a plumbing or AC issue and share your location and urgency.",
+    callingInstruction: "Please answer Casey's call and stay on this screen to see service dispatch details filled live.",
+    connectedInstruction: "Explain the maintenance or repair issue to see the dispatch ticket build live.",
     ctaText: "Automate Service Dispatch",
     accent: "amber",
   },
@@ -96,6 +98,8 @@ const PERSONAS: Record<string, Persona> = {
     description: "Extracts buying/renting intent, property preference, budget, and timeline.",
     greeting: "Hi, Riley from Maple & Co Realty. Looking to buy, sell, or rent?",
     inCallHint: "Share your target budget, number of bedrooms, and preferred location.",
+    callingInstruction: "Please answer Riley's call and stay on this screen to watch buyer preferences logged live.",
+    connectedInstruction: "Share your property search criteria to see buyer preferences captured live.",
     ctaText: "Capture Real Estate Leads",
     accent: "emerald",
   },
@@ -107,6 +111,8 @@ const PERSONAS: Record<string, Persona> = {
     description: "Screens skills, experience level, salary expectation, and notice period.",
     greeting: "Hi, Alex calling from the talent acquisition team regarding your application.",
     inCallHint: "Mention your years of experience, primary skills, and notice period.",
+    callingInstruction: "Please answer Alex's call and stay on this screen to watch candidate screening notes captured live.",
+    connectedInstruction: "Discuss your background and experience to see screening criteria evaluate live.",
     ctaText: "Streamline Candidate Screening",
     accent: "indigo",
   },
@@ -176,13 +182,13 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
 // ---------------------------------------------------------------------------
 function FormattedValue({ value, labelKey }: { value: any; labelKey: string }) {
   if (value === null || value === undefined || value === "" || value === "null") {
-    return <span className="text-xs sm:text-sm text-slate-500 font-medium">—</span>;
+    return <span className="text-xs text-slate-500 font-medium">—</span>;
   }
 
   if (typeof value === "boolean") {
     return (
       <span
-        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs sm:text-sm font-bold ${
+        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold ${
           value ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25" : "bg-slate-800 text-slate-400"
         }`}
       >
@@ -209,7 +215,7 @@ function FormattedValue({ value, labelKey }: { value: any; labelKey: string }) {
   if (typeof value === "number" && (labelKey.includes("score") || labelKey.includes("interest"))) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-xs sm:text-sm font-bold text-orange-400 tabular-nums">{value}/10</span>
+        <span className="text-xs font-bold text-orange-400 tabular-nums">{value}/10</span>
         <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full"
@@ -226,7 +232,7 @@ function FormattedValue({ value, labelKey }: { value: any; labelKey: string }) {
     const isNeg = str.toLowerCase().includes("neg");
     return (
       <span
-        className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs sm:text-sm font-bold border ${
+        className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold border ${
           isPos
             ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
             : isNeg
@@ -239,11 +245,11 @@ function FormattedValue({ value, labelKey }: { value: any; labelKey: string }) {
     );
   }
 
-  return <span className="text-xs sm:text-sm font-bold text-slate-100 break-words leading-relaxed">{str}</span>;
+  return <span className="text-xs font-bold text-slate-100 break-words leading-relaxed">{str}</span>;
 }
 
 // ---------------------------------------------------------------------------
-// Call Completed Summary Card (Matching Exact Demo Theme & Layout)
+// Call Completed Summary Card
 // ---------------------------------------------------------------------------
 function CallCompletedCard({
   data,
@@ -276,7 +282,7 @@ function CallCompletedCard({
   };
 
   return (
-    <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
+    <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] pb-3 shrink-0">
         <div className="flex items-center gap-3">
@@ -288,17 +294,11 @@ function CallCompletedCard({
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
                 Call Completed
               </span>
-              <span className="text-xs text-slate-400 font-medium">
-                {persona.company}
-              </span>
+              <span className="text-xs text-slate-400 font-medium">{persona.company}</span>
             </div>
-            <h2 className="text-sm sm:text-base font-bold text-white mt-0.5">
-              Call Summary & Notes
-            </h2>
+            <h2 className="text-sm font-bold text-white mt-0.5">Call Summary & Notes</h2>
           </div>
         </div>
-
-        {/* Quick Stats Pill Strip */}
         <div className="flex items-center gap-2">
           <div className="px-3 py-1 rounded-xl bg-white/10 backdrop-blur-2xl border border-white/20 text-right shadow-sm">
             <div className="text-[10px] uppercase font-semibold text-slate-400">Time</div>
@@ -311,29 +311,23 @@ function CallCompletedCard({
         </div>
       </div>
 
-      {/* Structured Fields Body (Always displays all schema fields with minimal accent colors) */}
+      {/* Fields body */}
       <div className="flex-1 min-h-0 flex flex-col space-y-2 py-2">
         <div className="flex items-center justify-between shrink-0 px-0.5">
           <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-orange-400" />
             Details Captured ({capturedCount}/{allEntries.length})
           </span>
-          <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Live Sync
-          </span>
         </div>
 
-        {/* Data Cards Grid with Minimal Accent Tints */}
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pr-0.5 grid grid-cols-2 gap-2">
           {allEntries.map(({ key, label, val, hasValue }) => (
             <div
               key={key}
-              className={`p-2.5 rounded-xl transition-all flex flex-col justify-between ${
-                hasValue
-                  ? "glass-frosted-card-active text-white"
-                  : "glass-frosted-card text-white/90"
+              className={`p-2.5 rounded-xl transition-all duration-500 flex flex-col justify-between ${
+                hasValue ? "demo-glass-card-active text-white" : "demo-glass-card text-white/90"
               }`}
+              style={{ backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)" } as any}
             >
               <div className="flex items-center justify-between text-[11px] font-medium mb-1">
                 <span className={`truncate ${hasValue ? "text-orange-200/80 font-semibold" : "text-slate-400"}`}>
@@ -353,21 +347,20 @@ function CallCompletedCard({
         </div>
       </div>
 
-      {/* Footer / CTA Actions matching Exact Colors */}
+      {/* Footer CTA */}
       <div className="pt-2.5 border-t border-white/[0.08] flex items-center justify-between gap-3 shrink-0">
         <button
           type="button"
           onClick={onReset}
-          className="h-12 px-4 rounded-2xl text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/20 backdrop-blur-2xl border border-white/25 text-white shadow-sm transition-all flex items-center gap-2 cursor-pointer shrink-0"
+          className="h-12 px-4 rounded-2xl text-xs font-semibold bg-white/10 hover:bg-white/20 backdrop-blur-2xl border border-white/25 text-white shadow-sm transition-all flex items-center gap-2 cursor-pointer shrink-0"
         >
           <RotateCcw className="w-4 h-4 text-slate-400" /> Try Another Call
         </button>
-
         <a
           href="https://dograh.com"
           target="_blank"
           rel="noreferrer"
-          className="flex-1 h-12 rounded-2xl text-xs sm:text-sm font-extrabold bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:opacity-95 text-white shadow-xl shadow-orange-600/35 flex items-center justify-center gap-2 transition-all cursor-pointer truncate"
+          className="flex-1 h-12 rounded-2xl text-xs font-extrabold bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:opacity-95 text-white shadow-xl shadow-orange-600/35 flex items-center justify-center gap-2 transition-all cursor-pointer truncate"
         >
           <span className="truncate">{persona.ctaText}</span>
           <ArrowRight className="w-4 h-4 shrink-0" />
@@ -378,7 +371,7 @@ function CallCompletedCard({
 }
 
 // ---------------------------------------------------------------------------
-// Main Interactive Application
+// Main Interactive DemoCallForm Component
 // ---------------------------------------------------------------------------
 export function DemoCallForm() {
   const [name, setName] = useState("");
@@ -388,18 +381,18 @@ export function DemoCallForm() {
   const [errorMessage, setErrorMessage] = useState("");
   const [extractedData, setExtractedData] = useState<any | null>(null);
 
-  // Recruiter specific context inputs
+  // Recruiter specific
   const [jobDescription, setJobDescription] = useState("");
   const [resumeText, setResumeText] = useState("");
   const [resumeFileName, setResumeFileName] = useState("");
 
-  // Real-time live extraction states
+  // Live extraction state
   const [liveFields, setLiveFields] = useState<Record<string, any>>({});
   const [liveTurns, setLiveTurns] = useState<string[]>([]);
   const [turnCount, setTurnCount] = useState(0);
   const [callDuration, setCallDuration] = useState(0);
 
-  // Temporary 2.5-3s highlight tracking for newly extracted words & fields
+  // Highlight tracking
   const [activeHighlights, setActiveHighlights] = useState<
     Array<{ phrase: string; key: string; expiresAt: number }>
   >([]);
@@ -411,13 +404,11 @@ export function DemoCallForm() {
   const durationTimerRef = useRef<any>(null);
   const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // Auto-scroll newly extracted/updated field into view in right column
+  // Auto-scroll newly updated field into view
   useEffect(() => {
     const updatedKeys = Object.keys(recentFieldKeys);
     if (updatedKeys.length > 0) {
-      const newestKey = updatedKeys.sort(
-        (a, b) => (recentFieldKeys[b] || 0) - (recentFieldKeys[a] || 0)
-      )[0];
+      const newestKey = updatedKeys.sort((a, b) => (recentFieldKeys[b] || 0) - (recentFieldKeys[a] || 0))[0];
       if (newestKey && fieldRefs.current[newestKey]) {
         fieldRefs.current[newestKey]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
@@ -426,40 +417,29 @@ export function DemoCallForm() {
 
   const clearTimers = () => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    if (sseRef.current) {
-      sseRef.current.close();
-      sseRef.current = null;
-    }
-    if (durationTimerRef.current) {
-      clearInterval(durationTimerRef.current);
-      durationTimerRef.current = null;
-    }
+    if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
+    if (durationTimerRef.current) { clearInterval(durationTimerRef.current); durationTimerRef.current = null; }
   };
 
-  useEffect(() => {
-    return () => clearTimers();
-  }, []);
+  useEffect(() => { return () => clearTimers(); }, []);
 
-  // Cleanup expired highlights periodically
+  // Cleanup expired highlights
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
       setActiveHighlights((prev) => prev.filter((h) => h.expiresAt > now));
       setRecentFieldKeys((prev) => {
         const next: Record<string, number> = {};
-        for (const [k, exp] of Object.entries(prev)) {
-          if (exp > now) next[k] = exp;
-        }
+        for (const [k, exp] of Object.entries(prev)) { if (exp > now) next[k] = exp; }
         return next;
       });
     }, 500);
     return () => clearInterval(interval);
   }, []);
 
-  // Trigger temporary highlight when new field values arrive
   const triggerFieldHighlights = (newFields: Record<string, any>, currentPrevFields: Record<string, any>) => {
     const now = Date.now();
-    const expiresAt = now + 2800; // 2.8 seconds
+    const expiresAt = now + 2800;
     const newHighlights: Array<{ phrase: string; key: string; expiresAt: number }> = [];
     const updatedKeys: Record<string, number> = {};
     const citations = newFields._citations || {};
@@ -468,8 +448,6 @@ export function DemoCallForm() {
       if (key === "_citations") continue;
       if (val !== null && val !== undefined && val !== "" && currentPrevFields[key] !== val) {
         updatedKeys[key] = expiresAt;
-
-        // Determine extractable search words/phrases from AI citations
         if (citations[key] && Array.isArray(citations[key])) {
           for (const phrase of citations[key]) {
             if (typeof phrase === "string" && phrase.trim().length >= 2) {
@@ -477,7 +455,6 @@ export function DemoCallForm() {
             }
           }
         } else {
-          // Fallback if AI didn't provide a citation
           if (typeof val === "string" && val.trim().length >= 2) {
             newHighlights.push({ phrase: val.trim(), key, expiresAt });
           } else if (typeof val === "number") {
@@ -486,27 +463,17 @@ export function DemoCallForm() {
         }
       }
     }
-
-    if (newHighlights.length > 0) {
-      setActiveHighlights((prev) => [...prev, ...newHighlights]);
-    }
-    if (Object.keys(updatedKeys).length > 0) {
-      setRecentFieldKeys((prev) => ({ ...prev, ...updatedKeys }));
-    }
+    if (newHighlights.length > 0) setActiveHighlights((prev) => [...prev, ...newHighlights]);
+    if (Object.keys(updatedKeys).length > 0) setRecentFieldKeys((prev) => ({ ...prev, ...updatedKeys }));
   };
 
-  // Duration timer
+  // Call duration timer
   useEffect(() => {
     if (callingState === "connected") {
       setCallDuration(0);
-      durationTimerRef.current = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
+      durationTimerRef.current = setInterval(() => setCallDuration((prev) => prev + 1), 1000);
     } else if (callingState !== "done") {
-      if (durationTimerRef.current) {
-        clearInterval(durationTimerRef.current);
-        durationTimerRef.current = null;
-      }
+      if (durationTimerRef.current) { clearInterval(durationTimerRef.current); durationTimerRef.current = null; }
     }
   }, [callingState]);
 
@@ -517,10 +484,100 @@ export function DemoCallForm() {
     }
   }, [liveTurns]);
 
-  const formatDuration = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  const handleReset = () => {
+    clearTimers();
+    setCallingState("idle");
+    setExtractedData(null);
+    setLiveFields({});
+    setLiveTurns([]);
+    setTurnCount(0);
+    setCallDuration(0);
+    setActiveHighlights([]);
+    setRecentFieldKeys({});
+    setErrorMessage("");
+    setResumeFileName("");
+  };
+
+  const renderTranscriptText = (rawText: string, isLatest: boolean) => {
+    const matchIndices: { start: number; end: number; phrase: string; isExpired: boolean }[] = [];
+    if (activeHighlights.length > 0) {
+      const phrases = activeHighlights.filter((h) => h.phrase.trim().length >= 2);
+      phrases.sort((a, b) => b.phrase.length - a.phrase.length);
+      const escaped = phrases.map((p) => p.phrase.trim().replace(/[.*+?^${}()|[\\]\\]/g, "\\$&"));
+      if (escaped.length > 0) {
+        const regex = new RegExp(`(${escaped.join("|")})`, "gi");
+        let match;
+        while ((match = regex.exec(rawText)) !== null) {
+          const matchedText = match[0];
+          const hObj = phrases.find((p) => p.phrase.trim().toLowerCase() === matchedText.toLowerCase());
+          if (hObj) {
+            matchIndices.push({
+              start: match.index,
+              end: match.index + matchedText.length,
+              phrase: matchedText,
+              isExpired: Date.now() > hObj.expiresAt,
+            });
+          }
+        }
+      }
+    }
+
+    const words = rawText.split(" ");
+    let charIndex = 0;
+
+    return (
+      <span className="font-normal whitespace-pre-wrap">
+        {words.map((word, wIdx) => {
+          const wordStart = charIndex;
+          const wordEnd = charIndex + word.length;
+          charIndex += word.length + 1;
+
+          const match = matchIndices.find((m) => wordStart < m.end && wordEnd > m.start);
+          const isStreamedWord = isLatest && wIdx >= words.length - 4;
+
+          let bgClass = "";
+          let textClass = "text-white/90";
+          let duration = "0ms";
+          let delay = "0ms";
+          let extraRadius = "";
+
+          if (match) {
+            const phrasePrefix = rawText.substring(match.start, wordStart);
+            const charsBefore = phrasePrefix.length;
+            const wordLength = word.length + 1;
+            const totalChars = match.phrase.length;
+            const wordIndexInPhrase = phrasePrefix.split(" ").length - 1;
+            const totalWordsInPhrase = match.phrase.split(" ").length;
+
+            if (wordIndexInPhrase === 0) extraRadius += " rounded-l-[4px]";
+            if (wordIndexInPhrase === totalWordsInPhrase - 1) extraRadius += " rounded-r-[4px]";
+
+            const sweepTime = Math.max(350, totalChars * 10);
+            const speedPerChar = sweepTime / totalChars;
+            duration = `${wordLength * speedPerChar}ms`;
+            delay = `${charsBefore * speedPerChar}ms`;
+
+            if (!match.isExpired) {
+              bgClass = "active";
+              textClass = "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]";
+            }
+          }
+
+          return (
+            <span
+              key={wIdx}
+              className={`word-sweep ${bgClass} ${textClass} ${extraRadius} ${
+                isStreamedWord && !match ? "animate-word-stream-blur" : ""
+              }`}
+              style={{ transitionDuration: duration, transitionDelay: delay }}
+            >
+              {word}
+              {wIdx < words.length - 1 ? " " : ""}
+            </span>
+          );
+        })}
+      </span>
+    );
   };
 
   const handleInitiateCall = async (e: React.FormEvent) => {
@@ -541,8 +598,8 @@ export function DemoCallForm() {
       formData.set("phone", phone);
       formData.set("useCase", useCase);
       if (jobDescription) formData.set("jobDescription", jobDescription);
-      if (resumeText) formData.set("resumeText", resumeText); // We don't have file here, just pass text
-      
+      if (resumeText) formData.set("resumeText", resumeText);
+
       const result = await initiateDemoCall(null, formData as any);
       if (!result?.success) {
         setCallingState("error");
@@ -551,7 +608,6 @@ export function DemoCallForm() {
       }
       const runId = result.workflowRunId as number;
 
-      // SSE connection for live transcription
       const sseUrl = `/api/demo-stream/${runId}`;
       const es = new EventSource(sseUrl);
       sseRef.current = es;
@@ -567,12 +623,28 @@ export function DemoCallForm() {
         if (msg.type === "ended" || msg.type === "timeout") {
           es.close();
           sseRef.current = null;
+          // Final extraction from server polling
+          if (finalLinesRef.length > 0) {
+            runLiveExtraction([...finalLinesRef], useCase)
+              .then((fields) => {
+                if (fields && Object.keys(fields).length > 0) {
+                  setExtractedData(fields);
+                }
+              })
+              .catch(console.error)
+              .finally(() => {
+                setCallingState("done");
+                setExtractedData((prev: any) => prev || liveFields);
+              });
+          } else {
+            setCallingState("done");
+            setExtractedData(liveFields);
+          }
           return;
         }
 
         if (msg.type !== "turn") return;
 
-        // Active connection
         setCallingState("connected");
 
         if (msg.role === "agent") {
@@ -582,10 +654,8 @@ export function DemoCallForm() {
           } else {
             finalLinesRef.push(`Agent: ${msg.text}`);
           }
-
           setLiveTurns([...finalLinesRef, ...(partialUserLine ? [partialUserLine] : [])]);
 
-          // Trigger extraction on bot turn
           if (finalLinesRef.length > lastExtractedTurnCountRef.current) {
             lastExtractedTurnCountRef.current = finalLinesRef.length;
             runLiveExtraction([...finalLinesRef], useCase)
@@ -600,121 +670,29 @@ export function DemoCallForm() {
               .catch(console.error);
           }
         } else if (msg.role === "user") {
-          if (!msg.final) {
-            partialUserLine = `Caller: ${msg.text}`;
-            setLiveTurns([...finalLinesRef, partialUserLine]);
-          } else {
-            partialUserLine = "";
+          setTurnCount((t) => t + 1);
+          if (msg.is_final) {
             finalLinesRef.push(`Caller: ${msg.text}`);
-            const snapshot = [...finalLinesRef];
-            setLiveTurns(snapshot);
-            setTurnCount(snapshot.length);
-
-            if (snapshot.length > lastExtractedTurnCountRef.current) {
-              lastExtractedTurnCountRef.current = snapshot.length;
-              runLiveExtraction(snapshot, useCase)
-                .then((fields) => {
-                  if (fields && Object.keys(fields).length > 0) {
-                    setLiveFields((prev) => {
-                      triggerFieldHighlights(fields, prev);
-                      return { ...prev, ...fields };
-                    });
-                  }
-                })
-                .catch(console.error);
-            }
+            partialUserLine = "";
+          } else {
+            partialUserLine = `Caller: ${msg.text}`;
           }
+          setLiveTurns([...finalLinesRef, ...(partialUserLine ? [partialUserLine] : [])]);
         }
       };
 
       es.onerror = () => {
         es.close();
         sseRef.current = null;
-      };
-
-      // Periodic check for call completion
-      pollIntervalRef.current = setInterval(async () => {
-        const { ready: isCompleted, extractedData: doneData } = await pollDemoCallResult(runId);
-        if (isCompleted) {
-          clearTimers();
-          setLiveFields((currentLive) => {
-            const merged = { ...currentLive, ...(doneData || {}) };
-            setExtractedData(merged);
-            return merged;
-          });
+        if (callingState !== "done") {
           setCallingState("done");
+          setExtractedData(liveFields);
         }
-      }, 4000);
+      };
     } catch (err: any) {
       setCallingState("error");
-      setErrorMessage(err.message || "Failed to initiate outbound demo call.");
+      setErrorMessage(err?.message || "Unexpected error. Please try again.");
     }
-  };
-
-  const handleReset = () => {
-    clearTimers();
-    setCallingState("idle");
-    setErrorMessage("");
-    setExtractedData(null);
-    setLiveFields({});
-    setLiveTurns([]);
-    setTurnCount(0);
-    setCallDuration(0);
-    setActiveHighlights([]);
-    setRecentFieldKeys({});
-    setJobDescription("");
-    setResumeText("");
-    setResumeFileName("");
-  };
-
-  // Helper to render transcript text with temporary entity highlights & smooth blur-in streaming
-  const renderTranscriptText = (rawText: string, isLatest: boolean) => {
-    const matchingPhrases = activeHighlights
-      .map((h) => h.phrase.trim())
-      .filter((p) => p.length >= 2 && rawText.toLowerCase().includes(p.toLowerCase()));
-
-    if (matchingPhrases.length === 0) {
-      const words = rawText.split(" ");
-      return (
-        <span className="font-normal whitespace-pre-wrap">
-          {words.map((word, wIdx) => {
-            const isStreamedWord = isLatest && wIdx >= words.length - 4;
-            return (
-              <span
-                key={wIdx}
-                className={isStreamedWord ? "animate-word-stream-blur" : "inline"}
-              >
-                {word}
-                {wIdx < words.length - 1 ? " " : ""}
-              </span>
-            );
-          })}
-        </span>
-      );
-    }
-
-    matchingPhrases.sort((a, b) => b.length - a.length);
-    const escaped = matchingPhrases.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    const regex = new RegExp(`(${escaped.join("|")})`, "gi");
-    const parts = rawText.split(regex);
-
-    return (
-      <span className="font-normal whitespace-pre-wrap">
-        {parts.map((part, pIdx) => {
-          const isMatch = matchingPhrases.some(
-            (phrase) => phrase.toLowerCase() === part.toLowerCase()
-          );
-          if (isMatch) {
-            return (
-              <span key={pIdx} className="entity-temporary-highlight font-semibold">
-                {part}
-              </span>
-            );
-          }
-          return <span key={pIdx}>{part}</span>;
-        })}
-      </span>
-    );
   };
 
   const currentPersona = PERSONAS[useCase] || PERSONAS.hotel;
@@ -725,349 +703,369 @@ export function DemoCallForm() {
   ).length;
 
   const industryOptions = [
-    { id: "hotel", label: "Hotel Bookings", persona: "Sarah · Front Desk", icon: Hotel },
-    { id: "medical", label: "Clinic Appointments", persona: "Emma · Intake", icon: Stethoscope },
-    { id: "sales", label: "Inbound Sales", persona: "Jordan · Sales", icon: Briefcase },
-    { id: "service", label: "Service Dispatch", persona: "Casey · Dispatch", icon: Wrench },
-    { id: "real_estate", label: "Real Estate", persona: "Riley · Advisor", icon: Home },
-    { id: "recruiter", label: "Hiring & Screening", persona: "Alex · Recruiter", icon: Users },
+    { id: "hotel", label: "Hotel Bookings", icon: Hotel },
+    { id: "medical", label: "Clinic Appointments", icon: Stethoscope },
+    { id: "sales", label: "Inbound Sales", icon: Briefcase },
+    { id: "service", label: "Service Dispatch", icon: Wrench },
+    { id: "real_estate", label: "Real Estate", icon: Home },
+    { id: "recruiter", label: "Hiring & Screening", icon: Users },
   ];
 
   return (
-    <div className="w-full bg-transparent text-slate-100 flex flex-col items-center justify-center font-sans selection:bg-orange-500 selection:text-white p-0">
-      <main className="w-full flex flex-col items-center justify-center">
+    <div className="w-full h-full text-slate-100 flex flex-col items-center justify-center font-sans selection:bg-orange-500 selection:text-white relative">
+      <AnimatePresence mode="wait">
         {/* COMPLETED STATE */}
         {callingState === "done" && extractedData && (
-          <CallCompletedCard
-            data={extractedData}
-            useCase={useCase}
-            durationSec={callDuration}
-            turnCount={turnCount || liveTurns.length}
-            onReset={handleReset}
-          />
+          <motion.div
+            key="done"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.98 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full flex justify-center"
+          >
+            <CallCompletedCard
+              data={extractedData}
+              useCase={useCase}
+              durationSec={callDuration}
+              turnCount={turnCount || liveTurns.length}
+              onReset={handleReset}
+            />
+          </motion.div>
         )}
 
-        {/* IN-CALL / STREAMING STATE (Completely Transparent 540x540 Placeholder, No Background, No Border, Pure Full-Height Split) */}
+        {/* IN-CALL / STREAMING STATE */}
         {(callingState === "calling" || callingState === "connected") && (
-          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
-            {/* 60/40 Split: Transcript (7/12) & Captured Data (5/12) - Pure Full Height */}
-            <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 h-full items-stretch">
-              {/* Left Column: Live Transcript (60%) with Non-destructive Top Fade Overlay */}
-              <div className="col-span-7 bg-transparent border-0 p-0 flex flex-col h-full overflow-hidden relative">
-                {/* Subtle top fade overlay that preserves backdrop-filter */}
-                <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-[#090A0F]/60 to-transparent pointer-events-none z-10" />
-                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pr-0.5 flex flex-col justify-end scroll-smooth">
-                  {liveTurns.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-400 space-y-2 my-auto">
-                      <div className="w-10 h-10 rounded-xl bg-white/[0.02] border border-white/[0.08] flex items-center justify-center text-slate-300">
-                        <PhoneCall className="w-5 h-5 animate-pulse text-amber-400" />
-                      </div>
-                      <p className="text-sm font-bold text-slate-200">
-                        {callingState === "calling" ? "Calling your phone..." : "Connected · Say hello to start"}
-                      </p>
-                      <p className="text-xs text-slate-400 max-w-[200px] leading-relaxed">
-                        {callingState === "calling"
-                          ? "Pick up when your phone rings and start talking!"
-                          : currentPersona.inCallHint}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5 pt-1 pb-1 flex flex-col justify-end min-h-full">
-                      {liveTurns.map((turn, i) => {
-                        const isAgent = turn.startsWith("Agent:");
-                        const rawText = turn.replace(/^(Agent|Caller):\s*/, "");
-                        const isLatest = i === liveTurns.length - 1;
-
-                        return (
-                          <div
-                            key={i}
-                            className={`flex flex-col ${isAgent ? "items-start" : "items-end"} message-bubble-in`}
-                          >
-                            <div
-                              className={`flex items-center gap-1.5 px-1 mb-1 text-xs font-bold ${
-                                isAgent ? "flex-row text-orange-400" : "flex-row-reverse text-indigo-300"
+          <motion.div
+            key="active-call"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.98 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-[540px] h-[540px] max-h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between"
+          >
+            <div className="flex-1 min-h-0 h-full flex gap-3 items-stretch">
+              {/* Left: Transcript */}
+              <div className="w-[58%] bg-transparent border-0 p-0 flex flex-col h-full">
+                <div className="flex-1 min-h-0 h-full overflow-y-auto no-scrollbar pr-0.5 flex flex-col justify-end scroll-smooth">
+                  <AnimatePresence mode="wait">
+                    {liveTurns.length === 0 ? (
+                      <motion.div
+                        key="waiting-state"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                        className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-400 space-y-3 my-auto"
+                      >
+                        <div
+                          className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-sm border ${
+                            callingState === "calling"
+                              ? "bg-orange-500/10 border-orange-500/25 text-orange-400"
+                              : "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
+                          }`}
+                        >
+                          <PhoneCall className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-1.5 max-w-[240px]">
+                          <p className="text-sm font-bold text-slate-100 flex items-center justify-center gap-2">
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                callingState === "calling" ? "bg-amber-400" : "bg-emerald-400"
                               }`}
-                            >
-                              <span>{isAgent ? currentPersona.name : name || "You"}</span>
-                            </div>
-
-                            <div
-                              className={`max-w-[94%] p-3.5 rounded-2xl text-[13px] sm:text-sm font-medium leading-relaxed smooth-bubble-expand ${
-                                isAgent
-                                  ? "glass-frosted-bubble-agent text-white rounded-tl-xs"
-                                  : "glass-frosted-bubble-user text-white rounded-tr-xs"
-                              }`}
-                            >
-                              {renderTranscriptText(rawText, isLatest)}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <div ref={transcriptBottomRef} className="h-1" />
-                    </div>
-                  )}
+                            />
+                            {callingState === "calling" ? "Calling your phone..." : "Call Connected"}
+                          </p>
+                          <p className="text-xs text-slate-300 font-normal leading-relaxed">
+                            {callingState === "calling"
+                              ? currentPersona.callingInstruction
+                              : currentPersona.connectedInstruction}
+                          </p>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="turns-list"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-2.5 pt-1 pb-1 flex flex-col justify-end min-h-full"
+                      >
+                        <AnimatePresence initial={false}>
+                          {liveTurns.map((turn, i) => {
+                            const isAgent = turn.startsWith("Agent:");
+                            const rawText = turn.replace(/^(Agent|Caller):\s*/, "");
+                            const isLatest = i === liveTurns.length - 1;
+                            return (
+                              <motion.div
+                                key={i}
+                                initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                transition={{ type: "spring", stiffness: 400, damping: 28, mass: 0.8 }}
+                                className={`flex flex-col w-full ${isAgent ? "items-start" : "items-end"}`}
+                              >
+                                <motion.div
+                                  layout
+                                  className={`flex items-center gap-1.5 px-1 mb-1 text-xs font-bold ${
+                                    isAgent ? "flex-row text-orange-400" : "flex-row-reverse text-indigo-300"
+                                  }`}
+                                >
+                                  <span>{isAgent ? currentPersona.name : name || "You"}</span>
+                                </motion.div>
+                                <motion.div
+                                  layout
+                                  className={`max-w-[94%] p-3.5 overflow-hidden text-[13px] font-medium leading-relaxed border ${
+                                    isAgent
+                                      ? "glass-frosted-bubble-agent text-white rounded-2xl rounded-tl-sm shadow-[0_4px_24px_rgba(255,85,0,0.2)]"
+                                      : "glass-frosted-bubble-user text-white rounded-2xl rounded-tr-sm shadow-[0_4px_24px_rgba(37,99,235,0.25)]"
+                                  }`}
+                                  style={{ borderRadius: 16 }}
+                                >
+                                  <motion.span layout="position" className="inline-block">
+                                    {renderTranscriptText(rawText, isLatest)}
+                                  </motion.span>
+                                </motion.div>
+                              </motion.div>
+                            );
+                          })}
+                        </AnimatePresence>
+                        <div ref={transcriptBottomRef} className="h-1" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
 
-              {/* Right Column: Live Captured Data (40%) Completely Backgroundless */}
-              <div className="col-span-5 bg-transparent border-0 p-0 flex flex-col h-full overflow-hidden">
+              {/* Right: Live Notes */}
+              <div className="w-[42%] bg-transparent border-0 p-0 flex flex-col h-full">
                 <div className="flex items-center justify-between pb-2 mb-1 shrink-0">
-                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block truncate">
-                    Live Notes
-                  </span>
+                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block truncate">Live Notes</span>
                   <div className="px-2.5 py-0.5 rounded-full bg-white/10 backdrop-blur-2xl border border-white/20 text-xs font-bold text-orange-400 tabular-nums shadow-sm">
                     {capturedFieldsCount}/{allFieldKeys.length}
                   </div>
                 </div>
-
-                {/* Progress bar */}
-                <div className="w-full bg-white/[0.04] border border-white/8 h-1.5 rounded-full overflow-hidden mb-2 shrink-0">
+                <div className="w-full bg-white/[0.04] border border-white/[0.08] h-1.5 rounded-full overflow-hidden mb-2 shrink-0">
                   <div
                     className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-500"
-                    style={{
-                      width: `${Math.round((capturedFieldsCount / Math.max(1, allFieldKeys.length)) * 100)}%`,
-                    }}
+                    style={{ width: `${Math.round((capturedFieldsCount / Math.max(1, allFieldKeys.length)) * 100)}%` }}
+                  />
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pr-0.5 space-y-2 scroll-smooth">
+                  <AnimatePresence>
+                    {allFieldKeys.map((key) => {
+                      const label = currentLabels[key] || key;
+                      const val = liveFields[key];
+                      const hasValue = val !== null && val !== undefined && val !== "";
+                      const isRecentlyUpdated = (recentFieldKeys[key] || 0) > Date.now();
+                      return (
+                        <motion.div
+                          key={key}
+                          layout
+                          ref={(el: HTMLDivElement | null) => { fieldRefs.current[key] = el; }}
+                          className={`p-2.5 rounded-xl transition-all duration-500 flex items-center justify-between relative overflow-hidden ${
+                            isRecentlyUpdated
+                              ? "demo-premium-extraction-card text-white"
+                              : hasValue
+                              ? "demo-glass-card-active text-white"
+                              : "demo-glass-card text-white/90"
+                          }`}
+                          style={{ backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)" } as any}
+                        >
+                          <div className="min-w-0 flex-1 pr-1.5">
+                            <span className="text-xs text-slate-300 block truncate font-semibold">{label}</span>
+                            <div className="mt-1">
+                              <FormattedValue value={val} labelKey={key} />
+                            </div>
+                          </div>
+                          {hasValue && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* IDLE FORM */}
+        {callingState === "idle" && (
+          <motion.div
+            key="idle"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.98 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between"
+          >
+            <div className="flex justify-between items-center pb-3 shrink-0">
+              <div>
+                <h2 className="text-sm text-white font-bold tracking-tight">Test a Live AI Phone Call</h2>
+                <p className="text-xs text-gray-400 font-normal mt-0.5">
+                  Enter your number and pick a scenario to get an instant test call.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleInitiateCall} className="flex-1 min-h-0 flex flex-col justify-between mt-3">
+              <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-3.5 pr-0.5 pb-1">
+                {/* Name */}
+                <div className="space-y-1 text-left">
+                  <label className="text-xs font-semibold text-white/90 block">Your Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Alex Morgan"
+                    className="w-full h-11 px-4 rounded-xl demo-glass-input text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium shadow-sm"
                   />
                 </div>
 
-                {/* Field Grid with Transparent Scrolling & Auto-scroll */}
-                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pr-0.5 space-y-2 scroll-smooth">
-                  {allFieldKeys.map((key) => {
-                    const label = currentLabels[key] || key;
-                    const val = liveFields[key];
-                    const hasValue = val !== null && val !== undefined && val !== "";
-                    const isRecentlyUpdated = (recentFieldKeys[key] || 0) > Date.now();
-
-                    return (
-                      <div
-                        key={key}
-                        ref={(el) => { fieldRefs.current[key] = el; }}
-                        className={`p-2.5 rounded-xl transition-all duration-500 flex items-center justify-between ${
-                          isRecentlyUpdated
-                            ? "glass-frosted-card-active border-orange-500/70 field-unlock-card shadow-lg text-white"
-                            : hasValue
-                            ? "glass-frosted-card-active text-white"
-                            : "glass-frosted-card text-white/90"
-                        }`}
-                      >
-                        <div className="min-w-0 flex-1 pr-1.5">
-                          <span className="text-xs text-slate-300 block truncate font-semibold">
-                            {label}
-                          </span>
-                          <div className="mt-1">
-                            <FormattedValue value={val} labelKey={key} />
-                          </div>
-                        </div>
-
-                        {hasValue && (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* IDLE / SETUP FORM STATE */}
-        {callingState === "idle" && (
-          <div className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between overflow-hidden animate-turn-in">
-              {/* Card Header */}
-              <div className="flex justify-between items-center border-b border-white/[0.08] pb-3 shrink-0">
-                <div>
-                  <h2 className="text-sm sm:text-base text-white font-bold tracking-tight">
-                    Test a Live AI Phone Call
-                  </h2>
-                  <p className="text-xs text-gray-400 font-normal mt-0.5">
-                    Enter your number and pick a scenario to get an instant test call.
-                  </p>
-                </div>
-                
-              </div>
-
-              <form onSubmit={handleInitiateCall} className="flex-1 min-h-0 flex flex-col justify-between mt-3">
-                {/* Scrollable Form Body (No Visible Scrollbars) */}
-                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-3.5 pr-0.5 pb-1">
-                  {/* Your Name */}
-                  <div className="space-y-1 text-left">
-                    <label className="text-xs sm:text-sm font-semibold text-white/90 block">
-                      Your Name
-                    </label>
+                {/* Phone */}
+                <div className="space-y-1 text-left">
+                  <label className="text-xs font-semibold text-white/90 block">Mobile Number</label>
+                  <div className="flex gap-2">
+                    <div className="h-11 px-3.5 rounded-xl demo-glass-input text-white text-sm font-bold flex items-center shrink-0 select-none shadow-sm">
+                      IN +91
+                    </div>
                     <input
-                      type="text"
+                      type="tel"
                       required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Alex Morgan"
-                      className="w-full h-11 px-4 rounded-xl glass-frosted-input text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="98765 43210"
+                      className="flex-1 h-11 px-4 rounded-xl demo-glass-input text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium tabular-nums shadow-sm"
                     />
                   </div>
+                </div>
 
-                  {/* Mobile Number */}
-                  <div className="space-y-1 text-left">
-                    <label className="text-xs sm:text-sm font-semibold text-white/90 block">
-                      Mobile Number
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="h-11 px-3.5 rounded-xl border border-white/25 bg-white/15 backdrop-blur-2xl text-white text-sm font-bold flex items-center shrink-0 select-none shadow-sm">
-                        IN +91
+                {/* Scenario */}
+                <div className="space-y-1.5 text-left">
+                  <label className="text-xs font-semibold text-white/90 block">Choose a Scenario</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {industryOptions.map((item) => {
+                      const Icon = item.icon;
+                      const isSelected = useCase === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setUseCase(item.id)}
+                          className={`h-11 px-3.5 rounded-xl text-xs font-medium text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                            isSelected
+                              ? "demo-glass-card-selected text-white font-bold shadow-[0_0_15px_rgba(255,85,0,0.3)]"
+                              : "demo-glass-card text-white shadow-sm"
+                          }`}
+                        >
+                          <Icon className={`w-4 h-4 shrink-0 ${isSelected ? "text-[#f97316]" : "text-gray-400"}`} />
+                          <span className="truncate">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Recruiter extras */}
+                {useCase === "recruiter" && (
+                  <div className="p-3.5 rounded-2xl bg-indigo-500/[0.05] backdrop-blur-md border border-indigo-500/20 space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                        <FileText className="w-3.5 h-3.5" />
                       </div>
-                      <input
-                        type="tel"
-                        required
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="98765 43210"
-                        className="flex-1 h-11 px-4 rounded-xl glass-frosted-input text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium tabular-nums"
+                      <span className="text-xs font-bold text-slate-200">Role & Company Context (Optional)</span>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-300 block">Job Description</label>
+                      <textarea
+                        value={jobDescription}
+                        onChange={(e) => setJobDescription(e.target.value)}
+                        placeholder="Paste job requirements or role details..."
+                        className="w-full h-16 p-2.5 rounded-xl bg-white/[0.03] backdrop-blur-md border border-white/[0.08] text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs font-medium transition-all resize-none"
                       />
                     </div>
-                  </div>
-
-                  {/* Choose a Scenario */}
-                  <div className="space-y-1.5 text-left">
-                    <label className="text-xs sm:text-sm font-semibold text-white/90 block">
-                      Choose a Scenario
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {industryOptions.map((item) => {
-                        const Icon = item.icon;
-                        const isSelected = useCase === item.id;
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => setUseCase(item.id)}
-                            className={`h-11 px-3.5 rounded-xl text-xs sm:text-sm font-medium border text-left flex items-center gap-2.5 transition-all cursor-pointer backdrop-blur-md ${
-                              isSelected
-                                ? "bg-gradient-to-r from-orange-500/30 to-rose-500/25 border border-orange-500/70 text-white font-bold backdrop-blur-2xl shadow-[0_0_20px_rgba(255,85,0,0.2)]"
-                                : "border border-white/20 bg-white/[0.08] hover:bg-white/15 hover:border-white/35 text-white/95 backdrop-blur-2xl shadow-sm"
-                            }`}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-300 block">Resume or Candidate Notes</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.txt,.md"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setResumeFileName(file.name);
+                                try { setResumeText(await file.text()); }
+                                catch { setResumeText(`Resume: ${file.name}`); }
+                              }
+                            }}
+                            className="hidden"
+                            id="demo-resume-file-input"
+                          />
+                          <label
+                            htmlFor="demo-resume-file-input"
+                            className="w-full h-10 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:border-indigo-500/50 text-slate-300 text-xs font-medium flex items-center justify-between cursor-pointer transition-colors"
                           >
-                            <Icon
-                              className={`w-4 h-4 shrink-0 ${
-                                isSelected ? "text-[#f97316]" : "text-gray-400"
-                              }`}
-                            />
-                            <span className="truncate">{item.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Recruiter Context Section (If Recruiter AI Selected) */}
-                  {useCase === "recruiter" && (
-                    <div className="p-3.5 rounded-2xl bg-indigo-500/[0.05] backdrop-blur-md border border-indigo-500/20 space-y-2.5 animate-turn-in">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400">
-                          <FileText className="w-3.5 h-3.5" />
+                            <span className="truncate flex items-center gap-1.5">
+                              <Upload className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                              <span className="truncate">{resumeFileName || "Upload file"}</span>
+                            </span>
+                          </label>
                         </div>
-                        <span className="text-xs sm:text-sm font-bold text-slate-200">
-                          Role & Company Context (Optional)
-                        </span>
-                      </div>
-
-                      {/* Job Description */}
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-300 block">
-                          Job Description
-                        </label>
-                        <textarea
-                          value={jobDescription}
-                          onChange={(e) => setJobDescription(e.target.value)}
-                          placeholder="Paste job requirements or role details..."
-                          className="w-full h-16 p-2.5 rounded-xl bg-white/[0.03] backdrop-blur-md border border-white/[0.08] text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:bg-white/[0.05] text-xs sm:text-sm font-medium transition-all resize-none"
+                        <input
+                          type="text"
+                          value={resumeText}
+                          onChange={(e) => setResumeText(e.target.value)}
+                          placeholder="Or paste skills..."
+                          className="w-full h-10 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs font-medium truncate"
                         />
                       </div>
-
-                      {/* Resume Upload / Text */}
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-300 block">
-                          Resume or Candidate Notes
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="relative">
-                            <input
-                              type="file"
-                              accept=".pdf,.docx,.txt,.md"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  setResumeFileName(file.name);
-                                  try {
-                                    const text = await file.text();
-                                    setResumeText(text);
-                                  } catch {
-                                    setResumeText(`Resume: ${file.name}`);
-                                  }
-                                }
-                              }}
-                              className="hidden"
-                              id="resume-file-input"
-                            />
-                            <label
-                              htmlFor="resume-file-input"
-                              className="w-full h-10 px-3 rounded-xl bg-white/[0.03] backdrop-blur-md border border-white/[0.08] hover:border-indigo-500/50 text-slate-300 text-xs font-medium flex items-center justify-between cursor-pointer transition-colors"
-                            >
-                              <span className="truncate flex items-center gap-1.5">
-                                <Upload className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                                <span className="truncate">
-                                  {resumeFileName || "Upload file"}
-                                </span>
-                              </span>
-                            </label>
-                          </div>
-
-                          <input
-                            type="text"
-                            value={resumeText}
-                            onChange={(e) => setResumeText(e.target.value)}
-                            placeholder="Or paste skills..."
-                            className="w-full h-10 px-3 rounded-xl bg-white/[0.03] backdrop-blur-md border border-white/[0.08] text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:bg-white/[0.05] text-xs sm:text-sm font-medium truncate"
-                          />
-                        </div>
-                      </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
 
-                {/* Pinned Action Button (Full Height, Never Squished) */}
-                <div className="pt-3 border-t border-white/[0.08] shrink-0">
-                  <button
-                    type="submit"
-                    className="w-full h-14 min-h-[56px] rounded-2xl text-base sm:text-lg font-bold bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:opacity-95 text-white shadow-xl shadow-orange-600/30 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer tracking-wide shrink-0"
-                  >
-                    <PhoneCall className="w-5 h-5 fill-current shrink-0" />
-                    <span>Call My Phone</span>
-                    <ArrowRight className="w-5 h-5 shrink-0" />
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div className="pt-3 shrink-0">
+                <button
+                  type="submit"
+                  className="w-full h-14 min-h-[56px] rounded-2xl text-base font-bold bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:opacity-95 text-white shadow-xl shadow-orange-600/30 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 cursor-pointer tracking-wide shrink-0"
+                >
+                  <PhoneCall className="w-5 h-5 fill-current shrink-0" />
+                  <span>Call My Phone</span>
+                  <ArrowRight className="w-5 h-5 shrink-0" />
+                </button>
+              </div>
+            </form>
+          </motion.div>
         )}
 
         {/* ERROR STATE */}
         {callingState === "error" && (
-          <div className="w-full max-w-md bg-[#111218] border border-white/[0.08] p-6 sm:p-7 rounded-2xl shadow-2xl text-center space-y-4 animate-turn-in">
+          <motion.div
+            key="error"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.98 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full max-w-md bg-[#111218] border border-white/[0.08] p-6 rounded-2xl shadow-2xl text-center space-y-4"
+          >
             <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
               <X className="w-6 h-6" />
             </div>
             <div className="space-y-1.5">
               <h3 className="text-base font-bold text-white">Call Connection Failed</h3>
-              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">{errorMessage}</p>
+              <p className="text-xs text-slate-400 leading-relaxed">{errorMessage}</p>
             </div>
             <button
               onClick={handleReset}
               type="button"
-              className="w-full py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white transition-colors"
+              className="w-full py-3 px-4 rounded-xl text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white transition-colors cursor-pointer"
             >
               Try Again
             </button>
-          </div>
+          </motion.div>
         )}
-      </main>
+      </AnimatePresence>
     </div>
   );
 }

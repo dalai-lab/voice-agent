@@ -356,29 +356,105 @@ export async function pollDemoCallResult(
 }
 
 // ---------------------------------------------------------------------------
-// Live Extraction during SSE
+// Live Extraction during SSE — smart domain-aware prompts
 // ---------------------------------------------------------------------------
 const EXTRACTION_PROMPTS: Record<string, string> = {
-  hotel: `Extract the following fields from this hotel reservation call. Return ONLY valid JSON, no markdown.
-Fields: caller_name (string), wants_to_book (boolean), inquiry_type (string), check_in_date (string or null), check_out_date (string or null), guests_count (number or null), room_preference (string or null), sentiment ("Positive"|"Neutral"|"Negative"), interest_score (1-10 integer). If not yet mentioned, set to null.`,
-  medical: `Extract the following fields from this medical intake call. Return ONLY valid JSON, no markdown.
-Fields: patient_name (string), patient_type (string), call_reason (string), symptoms_mentioned (string or null), preferred_date_time (string or null), action_taken (string), urgency_level ("Low"|"Medium"|"High"). If not yet mentioned, set to null.`,
-  sales: `Extract the following fields from this sales call. Return ONLY valid JSON, no markdown.
-Fields: prospect_name (string), company_size (string or null), primary_pain_point (string or null), timeline (string or null), demo_booked (boolean), lead_score (1-10 integer), sentiment (string). If not yet mentioned, set to null.`,
-  service: `Extract the following fields from this home services call. Return ONLY valid JSON, no markdown.
-Fields: customer_name (string), service_category (string), issue_description (string), service_address (string or null), preferred_schedule (string or null), urgency_level ("Low"|"Medium"|"High"), job_status (string). If not yet mentioned, set to null.`,
-  real_estate: `Extract the following fields from this real estate call. Return ONLY valid JSON, no markdown.
-Fields: client_name (string), client_intent ("Buying"|"Selling"|"Renting"|"unknown"), property_preference (string or null), budget_range (string or null), timeline (string or null), pre_approved_status (string or null), lead_outcome (string). If not yet mentioned, set to null.`,
-  recruiter: `Extract the following fields from this recruiter screening call. Return ONLY valid JSON, no markdown.
-Fields: candidate_name (string), experience_level (string), key_skills (string), salary_expectations (string or null), notice_period (string or null), communication_skills ("Poor"|"Average"|"Good"|"Excellent"), candidate_score (1-10 integer). If not yet mentioned, set to null.`,
+  hotel: `You are extracting structured data from a HOTEL RESERVATION call between a hotel front desk agent and a caller.
+
+Extract these fields (return null if not yet mentioned):
+- caller_name: The caller's full name as stated. e.g. "John Smith"
+- wants_to_book: true if they express intent to make a reservation, false otherwise.
+- inquiry_type: Normalize to one of: "Room Booking", "Availability Check", "Price Inquiry", "Amenities", "Cancellation", "Complaint", "Other".
+- check_in_date: Normalize to a readable string like "March 15" or "next Friday". Do NOT copy filler words.
+- check_out_date: Same format as check_in_date.
+- guests_count: Number of guests as an integer. e.g. 2
+- room_preference: MUST be one of: "Single", "Double", "Twin", "Suite", "Deluxe", "Family Room". Infer from context — do NOT use the caller's literal phrasing if it doesn't match a room type.
+- sentiment: "Positive", "Neutral", or "Negative" based on caller's tone.
+- interest_score: Integer 1-10 rating of how likely they are to book.`,
+
+  medical: `You are extracting structured data from a MEDICAL INTAKE call between a clinic coordinator and a patient.
+
+Extract these fields (return null if not yet mentioned):
+- patient_name: The patient's full name. e.g. "Priya Sharma"
+- patient_type: "New Patient" or "Existing Patient" based on context.
+- call_reason: Brief normalized reason. e.g. "Fever and headache", "Annual checkup".
+- symptoms_mentioned: Comma-separated list of specific symptoms. e.g. "fever, headache, sore throat".
+- preferred_date_time: When they want the appointment. e.g. "Monday afternoon".
+- action_taken: What the agent did. e.g. "Appointment scheduled", "Referred to specialist".
+- urgency_level: "Low", "Medium", or "High" — infer from symptoms and tone.`,
+
+  sales: `You are extracting structured data from a B2B SALES call between a sales rep and a prospect.
+
+Extract these fields (return null if not yet mentioned):
+- prospect_name: The prospect's full name. e.g. "Michael Torres"
+- company_size: Normalize to: "1-10", "11-50", "51-200", "201-1000", "1000+". Infer from context.
+- primary_pain_point: Their core business problem in 3-6 words. e.g. "Manual data entry overhead".
+- timeline: When they want to buy/implement. e.g. "Q1 2025", "Within 3 months".
+- demo_booked: true if they agreed to a demo/meeting, false otherwise.
+- lead_score: Integer 1-10. Score based on: budget authority (2pts), need expressed (3pts), timeline urgency (3pts), engagement quality (2pts).
+- sentiment: "Excited", "Interested", "Skeptical", "Neutral", or "Negative".`,
+
+  service: `You are extracting structured data from a HOME SERVICES dispatch call between a coordinator and a customer.
+
+Extract these fields (return null if not yet mentioned):
+- customer_name: The customer's full name. e.g. "Sarah Johnson"
+- service_category: Normalize to: "Plumbing", "Electrical", "HVAC / AC", "Carpentry", "Painting", "Pest Control", "Cleaning", "Appliance Repair", "Other".
+- issue_description: Concise problem description. Max 8 words. e.g. "Kitchen sink blocked".
+- service_address: Their full address if mentioned.
+- preferred_schedule: When they want the service. e.g. "Tomorrow morning".
+- urgency_level: "Low" (routine), "Medium" (inconvenient), "High" (emergency).
+- job_status: "New Request", "Scheduled", "In Progress", "Completed", or "Follow-up Needed".`,
+
+  real_estate: `You are extracting structured data from a REAL ESTATE inquiry call between a property advisor and a client.
+
+Extract these fields (return null if not yet mentioned):
+- client_name: The client's full name. e.g. "Arnav Mehta"
+- client_intent: MUST be exactly one of: "Buying", "Selling", "Renting", "unknown".
+- property_preference: Normalize to: "1BHK Apartment", "2BHK Apartment", "3BHK Apartment", "Villa", "Studio", "Commercial Space", "Plot/Land". Do NOT copy phrases like "quiet room".
+- budget_range: Format as a clean range e.g. "₹20L - ₹30L" or "$500k - $700k". Infer currency from context.
+- timeline: e.g. "Immediately", "Within 1 month", "By end of year".
+- pre_approved_status: "Pre-approved", "In progress", "Not yet", or "Not Discussed".
+- lead_outcome: One of: "Hot Lead", "Warm Lead", "Nurture Lead", "Not Interested", "Converted".`,
+
+  recruiter: `You are extracting structured data from a RECRUITER SCREENING call between a talent screener and a job candidate.
+
+Extract these fields (return null if not yet mentioned):
+- candidate_name: The candidate's full name. e.g. "Rahul Verma"
+- experience_level: Normalize to: "Fresher (0-1 yrs)", "Junior (1-3 yrs)", "Mid-level (3-6 yrs)", "Senior (6-10 yrs)", "Lead/Principal (10+ yrs)".
+- key_skills: Top 3-5 skills as a comma-separated string. e.g. "React, Node.js, TypeScript".
+- salary_expectations: Format as e.g. "₹12 LPA", "$95,000/yr". Include currency from context.
+- notice_period: e.g. "Immediate", "30 days", "60 days", "3 months".
+- communication_skills: "Poor", "Average", "Good", or "Excellent".
+- candidate_score: Integer 1-10 based on: skill match (4pts), experience relevance (3pts), communication (2pts), enthusiasm (1pt).`,
 };
 
 export async function runLiveExtraction(transcriptLines: string[], useCase: string) {
   if (transcriptLines.length === 0) return {};
-  const prompt = (EXTRACTION_PROMPTS[useCase] || EXTRACTION_PROMPTS.hotel) + `
 
-CRITICAL INSTRUCTION FOR CITATIONS:
-You MUST also include a top-level "_citations" object in your JSON response. This object must map every extracted field key (that is not null) to an array of exact, verbatim text snippets directly from the transcript that justify that extracted value. These snippets can be disconnected phrases or whole sentences, but they MUST be exact substrings from the transcript.`;
+  const fieldPrompt = EXTRACTION_PROMPTS[useCase] || EXTRACTION_PROMPTS.hotel;
+
+  const systemPrompt = `You are a data extraction engine for a live call transcript. Your job has two parts:
+
+PART 1 — FIELD EXTRACTION:
+${fieldPrompt}
+
+PART 2 — CITATION HIGHLIGHTS (the most important part):
+After extracting fields, you MUST include a top-level "_citations" key in your JSON.
+"_citations" maps each extracted field key to an array of exact verbatim substrings from the transcript.
+
+STRICT CITATION RULES — READ CAREFULLY:
+1. Citations MUST be the actual data value as spoken, not the question or trigger phrase.
+   - CORRECT for check_in_date: ["March 15th"] or ["next Friday"]
+   - WRONG: ["I want to check in"] or ["check-in date"]
+2. Citations MUST be the SHORTEST possible verbatim substring — ideally 1-4 words.
+   - CORRECT for guest_name: ["John Smith"]
+   - WRONG: ["My name is John Smith"]
+3. NEVER cite filler words, agent questions, or generic words like "booking", "reservation", "appointment".
+4. If the caller says "I want a double room" — cite "double room", NOT "I want a double room".
+5. Citations must be EXACT character-for-character substrings that appear in the transcript.
+6. Only cite fields that have non-null extracted values.
+
+Return ONLY valid JSON with no markdown fencing.`;
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -391,10 +467,10 @@ You MUST also include a top-level "_citations" object in your JSON response. Thi
         model: "gpt-4o-mini",
         temperature: 0,
         messages: [
-          { role: "system", content: prompt },
+          { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: `The following is an ongoing speech-to-text transcript. Extract all mentioned entities as valid JSON. If not yet said, leave the value as null:\n\n${transcriptLines.join("\n")}`,
+            content: `Transcript:\n${transcriptLines.join("\n")}\n\nExtract fields and citations as JSON:`,
           },
         ],
       }),

@@ -588,3 +588,116 @@
   animation: glassShimmer 0.9s ease-in-out forwards;
 }
 
+
+
+/* ─────────────────────────────────────────────────────
+   DEMO CALL WIDGET — Scoped glass, sweep, and shimmer
+   ───────────────────────────────────────────────────── */
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Chat bubbles */
+.glass-frosted-bubble-agent {
+  background: linear-gradient(135deg, rgba(255, 90, 0, 0.32) 0%, rgba(220, 38, 38, 0.24) 100%) !important;
+  border: 1px solid rgba(255, 120, 40, 0.55) !important;
+  box-shadow: 0 4px 24px 0 rgba(255, 85, 0, 0.2), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+.glass-frosted-bubble-user {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.35) 0%, rgba(124, 58, 237, 0.28) 100%) !important;
+  border: 1px solid rgba(96, 165, 250, 0.55) !important;
+  box-shadow: 0 4px 24px 0 rgba(37, 99, 235, 0.25), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+
+/* Extraction field cards */
+.demo-glass-card {
+  background: rgba(255, 255, 255, 0.09) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.20) !important;
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.25) !important;
+}
+.demo-glass-card-active {
+  background: rgba(255, 255, 255, 0.16) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.3) !important;
+}
+.demo-glass-card-selected {
+  background: rgba(255, 85, 0, 0.18) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(255, 100, 0, 0.8) !important;
+  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.3) !important;
+}
+.demo-glass-input {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+}
+
+/* Premium extraction flash for newly-filled cards */
+.demo-premium-extraction-card {
+  position: relative;
+  background: rgba(255, 85, 0, 0.15) !important;
+  backdrop-filter: blur(24px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+  border: 1px solid rgba(255, 100, 0, 1) !important;
+  box-shadow: 0 0 20px rgba(255, 85, 0, 0.4) !important;
+  animation: demoExtractionCardPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  z-index: 10;
+  overflow: hidden;
+}
+.demo-premium-extraction-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,150,50,0.4), rgba(255,255,255,0.9), rgba(255,150,50,0.4), transparent);
+  transform: skewX(-25deg);
+  animation: demoExtractionShimmerSweep 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes demoExtractionCardPop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1); box-shadow: 0 0 30px rgba(255,85,0,0.7) !important; background: rgba(255,85,0,0.25) !important; }
+  100% { transform: scale(1); }
+}
+@keyframes demoExtractionShimmerSweep {
+  0%   { left: -100%; opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { left: 200%; opacity: 0; }
+}
+
+/* Physics-based sweep highlight for transcript words */
+.word-sweep {
+  display: inline;
+  color: inherit;
+  font-weight: inherit;
+  background-image: linear-gradient(90deg, rgba(255, 120, 20, 0.65), rgba(255, 120, 20, 0.65));
+  background-size: 0% 100%;
+  background-repeat: no-repeat;
+  background-position: right 0;
+  transition-property: background-size, color, text-shadow;
+  transition-timing-function: linear;
+}
+.word-sweep.active {
+  background-size: 100% 100%;
+  background-position: left 0;
+}
+
+/* Streaming word blur-in */
+@keyframes smoothWordBlurIn {
+  0%   { opacity: 0; filter: blur(6px); transform: translateY(3px) scale(0.96); }
+  50%  { opacity: 0.85; filter: blur(1.5px); }
+  100% { opacity: 1; filter: blur(0px); transform: translateY(0) scale(1); }
+}
+.animate-word-stream-blur {
+  display: inline-block;
+  animation: smoothWordBlurIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, filter, opacity;
+}

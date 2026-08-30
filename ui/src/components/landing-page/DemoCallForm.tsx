@@ -397,6 +397,7 @@ export function DemoCallForm() {
     Array<{ phrase: string; key: string; expiresAt: number }>
   >([]);
   const [recentFieldKeys, setRecentFieldKeys] = useState<Record<string, number>>({});
+  const [turnIds, setTurnIds] = useState<string[]>([]);
 
   const pollIntervalRef = useRef<any>(null);
   const sseRef = useRef<EventSource | null>(null);
@@ -490,6 +491,7 @@ export function DemoCallForm() {
     setExtractedData(null);
     setLiveFields({});
     setLiveTurns([]);
+    setTurnIds([]);
     setTurnCount(0);
     setCallDuration(0);
     setActiveHighlights([]);
@@ -589,6 +591,7 @@ export function DemoCallForm() {
     setExtractedData(null);
     setLiveFields({});
     setLiveTurns([]);
+    setTurnIds([]);
     setTurnCount(0);
     setCallDuration(0);
 
@@ -614,7 +617,15 @@ export function DemoCallForm() {
 
       const lastExtractedTurnCountRef = { current: 0 };
       const finalLinesRef: string[] = [];
-      let partialUserLine = "";
+      const turnIdCounter = { current: 0 };
+      const stableTurnsRef: { id: string; text: string }[] = [];
+      let partialUserLine: { id: string; text: string } | null = null;
+
+      const syncTurns = () => {
+        const arr = [...stableTurnsRef, ...(partialUserLine ? [partialUserLine] : [])];
+        setLiveTurns(arr.map((t) => t.text));
+        setTurnIds(arr.map((t) => t.id));
+      };
 
       es.onmessage = (evt) => {
         if (!evt.data) return;
@@ -623,13 +634,10 @@ export function DemoCallForm() {
         if (msg.type === "ended" || msg.type === "timeout") {
           es.close();
           sseRef.current = null;
-          // Final extraction from server polling
           if (finalLinesRef.length > 0) {
             runLiveExtraction([...finalLinesRef], useCase)
               .then((fields) => {
-                if (fields && Object.keys(fields).length > 0) {
-                  setExtractedData(fields);
-                }
+                if (fields && Object.keys(fields).length > 0) setExtractedData(fields);
               })
               .catch(console.error)
               .finally(() => {
@@ -644,20 +652,23 @@ export function DemoCallForm() {
         }
 
         if (msg.type !== "turn") return;
-
         setCallingState("connected");
 
         if (msg.role === "agent") {
-          if (finalLinesRef.length > 0 && finalLinesRef[finalLinesRef.length - 1].startsWith("Agent: ")) {
-            finalLinesRef[finalLinesRef.length - 1] +=
-              (finalLinesRef[finalLinesRef.length - 1] === "Agent: " ? "" : " ") + msg.text;
+          const lastStable = stableTurnsRef[stableTurnsRef.length - 1];
+          if (lastStable && lastStable.text.startsWith("Agent: ")) {
+            lastStable.text += (lastStable.text === "Agent: " ? "" : " ") + msg.text;
+            finalLinesRef[finalLinesRef.length - 1] = lastStable.text;
           } else {
-            finalLinesRef.push(`Agent: ${msg.text}`);
+            const id = `agent-${turnIdCounter.current++}`;
+            const entry = { id, text: `Agent: ${msg.text}` };
+            stableTurnsRef.push(entry);
+            finalLinesRef.push(entry.text);
           }
-          setLiveTurns([...finalLinesRef, ...(partialUserLine ? [partialUserLine] : [])]);
+          syncTurns();
 
-          if (finalLinesRef.length > lastExtractedTurnCountRef.current) {
-            lastExtractedTurnCountRef.current = finalLinesRef.length;
+          if (stableTurnsRef.length > lastExtractedTurnCountRef.current) {
+            lastExtractedTurnCountRef.current = stableTurnsRef.length;
             runLiveExtraction([...finalLinesRef], useCase)
               .then((fields) => {
                 if (fields && Object.keys(fields).length > 0) {
@@ -671,13 +682,20 @@ export function DemoCallForm() {
           }
         } else if (msg.role === "user") {
           setTurnCount((t) => t + 1);
-          if (msg.is_final) {
-            finalLinesRef.push(`Caller: ${msg.text}`);
-            partialUserLine = "";
+          if (msg.final || msg.is_final) {
+            const id = `user-${turnIdCounter.current++}`;
+            const entry = { id, text: `Caller: ${msg.text}` };
+            stableTurnsRef.push(entry);
+            finalLinesRef.push(entry.text);
+            partialUserLine = null;
           } else {
-            partialUserLine = `Caller: ${msg.text}`;
+            if (!partialUserLine) {
+              partialUserLine = { id: `user-partial-${turnIdCounter.current}`, text: `Caller: ${msg.text}` };
+            } else {
+              partialUserLine.text = `Caller: ${msg.text}`;
+            }
           }
-          setLiveTurns([...finalLinesRef, ...(partialUserLine ? [partialUserLine] : [])]);
+          syncTurns();
         }
       };
 
@@ -689,6 +707,12 @@ export function DemoCallForm() {
           setExtractedData(liveFields);
         }
       };
+
+      pollIntervalRef.current = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/demo-stream/${runId}`.replace("/stream", ""), { method: "HEAD" });
+        } catch { /* ignore */ }
+      }, 5000);
     } catch (err: any) {
       setCallingState("error");
       setErrorMessage(err?.message || "Unexpected error. Please try again.");
@@ -798,7 +822,7 @@ export function DemoCallForm() {
                             const isLatest = i === liveTurns.length - 1;
                             return (
                               <motion.div
-                                key={i}
+                                key={turnIds[i] || i}
                                 initial={{ opacity: 0, y: 12, scale: 0.95 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 transition={{ type: "spring", stiffness: 400, damping: 28, mass: 0.8 }}
@@ -814,12 +838,22 @@ export function DemoCallForm() {
                                 </motion.div>
                                 <motion.div
                                   layout
-                                  className={`max-w-[94%] p-3.5 overflow-hidden text-[13px] font-medium leading-relaxed border ${
-                                    isAgent
-                                      ? "glass-frosted-bubble-agent text-white rounded-2xl rounded-tl-sm shadow-[0_4px_24px_rgba(255,85,0,0.2)]"
-                                      : "glass-frosted-bubble-user text-white rounded-2xl rounded-tr-sm shadow-[0_4px_24px_rgba(37,99,235,0.25)]"
-                                  }`}
-                                  style={{ borderRadius: 16 }}
+                                  className={`max-w-[94%] p-3.5 overflow-hidden text-[13px] font-medium leading-relaxed`}
+                                  style={isAgent ? {
+                                    borderRadius: 16,
+                                    borderTopLeftRadius: 4,
+                                    background: "linear-gradient(135deg, rgba(255,90,0,0.34) 0%, rgba(220,38,38,0.26) 100%)",
+                                    border: "1px solid rgba(255,120,40,0.58)",
+                                    boxShadow: "0 4px 24px rgba(255,85,0,0.22), inset 0 1px 0 rgba(255,255,255,0.18)",
+                                    color: "white",
+                                  } : {
+                                    borderRadius: 16,
+                                    borderTopRightRadius: 4,
+                                    background: "linear-gradient(135deg, rgba(37,99,235,0.36) 0%, rgba(124,58,237,0.30) 100%)",
+                                    border: "1px solid rgba(96,165,250,0.58)",
+                                    boxShadow: "0 4px 24px rgba(37,99,235,0.26), inset 0 1px 0 rgba(255,255,255,0.18)",
+                                    color: "white",
+                                  }}
                                 >
                                   <motion.span layout="position" className="inline-block">
                                     {renderTranscriptText(rawText, isLatest)}
@@ -862,14 +896,29 @@ export function DemoCallForm() {
                           key={key}
                           layout
                           ref={(el: HTMLDivElement | null) => { fieldRefs.current[key] = el; }}
-                          className={`p-2.5 rounded-xl transition-all duration-500 flex items-center justify-between relative overflow-hidden ${
-                            isRecentlyUpdated
-                              ? "demo-premium-extraction-card text-white"
-                              : hasValue
-                              ? "demo-glass-card-active text-white"
-                              : "demo-glass-card text-white/90"
-                          }`}
-                          style={{ backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)" } as any}
+                          className="p-2.5 rounded-xl transition-all duration-500 flex items-center justify-between relative overflow-hidden"
+                          style={isRecentlyUpdated ? {
+                            background: "rgba(255,85,0,0.16)",
+                            backdropFilter: "blur(24px) saturate(200%)",
+                            WebkitBackdropFilter: "blur(24px) saturate(200%)",
+                            border: "1px solid rgba(255,100,0,0.95)",
+                            boxShadow: "0 0 18px rgba(255,85,0,0.38)",
+                            color: "white",
+                          } : hasValue ? {
+                            background: "rgba(255,255,255,0.17)",
+                            backdropFilter: "blur(24px) saturate(180%)",
+                            WebkitBackdropFilter: "blur(24px) saturate(180%)",
+                            border: "1px solid rgba(255,255,255,0.36)",
+                            boxShadow: "0 4px 24px rgba(0,0,0,0.28)",
+                            color: "white",
+                          } : {
+                            background: "rgba(255,255,255,0.09)",
+                            backdropFilter: "blur(24px) saturate(180%)",
+                            WebkitBackdropFilter: "blur(24px) saturate(180%)",
+                            border: "1px solid rgba(255,255,255,0.18)",
+                            boxShadow: "0 4px 16px rgba(0,0,0,0.22)",
+                            color: "rgba(255,255,255,0.85)",
+                          } as any}
                         >
                           <div className="min-w-0 flex-1 pr-1.5">
                             <span className="text-xs text-slate-300 block truncate font-semibold">{label}</span>
@@ -918,7 +967,8 @@ export function DemoCallForm() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Alex Morgan"
-                    className="w-full h-11 px-4 rounded-xl demo-glass-input text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium shadow-sm"
+                    className="w-full h-11 px-4 rounded-xl text-white text-sm placeholder:text-white/45 focus:outline-none transition-all font-medium"
+                    style={{ background: "rgba(255,255,255,0.09)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.20)" } as any}
                   />
                 </div>
 
@@ -926,7 +976,10 @@ export function DemoCallForm() {
                 <div className="space-y-1 text-left">
                   <label className="text-xs font-semibold text-white/90 block">Mobile Number</label>
                   <div className="flex gap-2">
-                    <div className="h-11 px-3.5 rounded-xl demo-glass-input text-white text-sm font-bold flex items-center shrink-0 select-none shadow-sm">
+                    <div
+                      className="h-11 px-3.5 rounded-xl text-white text-sm font-bold flex items-center shrink-0 select-none"
+                      style={{ background: "rgba(255,255,255,0.09)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.20)" } as any}
+                    >
                       IN +91
                     </div>
                     <input
@@ -935,7 +988,8 @@ export function DemoCallForm() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="98765 43210"
-                      className="flex-1 h-11 px-4 rounded-xl demo-glass-input text-white text-sm placeholder:text-white/45 focus:outline-none focus:border-[#FF5500] transition-all font-medium tabular-nums shadow-sm"
+                      className="flex-1 h-11 px-4 rounded-xl text-white text-sm placeholder:text-white/45 focus:outline-none transition-all font-medium tabular-nums"
+                      style={{ background: "rgba(255,255,255,0.09)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.20)" } as any}
                     />
                   </div>
                 </div>
@@ -952,11 +1006,22 @@ export function DemoCallForm() {
                           key={item.id}
                           type="button"
                           onClick={() => setUseCase(item.id)}
-                          className={`h-11 px-3.5 rounded-xl text-xs font-medium text-left flex items-center gap-2.5 transition-all cursor-pointer ${
-                            isSelected
-                              ? "demo-glass-card-selected text-white font-bold shadow-[0_0_15px_rgba(255,85,0,0.3)]"
-                              : "demo-glass-card text-white shadow-sm"
-                          }`}
+                          className="h-11 px-3.5 rounded-xl text-xs font-medium text-left flex items-center gap-2.5 transition-all cursor-pointer"
+                          style={isSelected ? {
+                            background: "rgba(255,85,0,0.20)",
+                            backdropFilter: "blur(20px)",
+                            WebkitBackdropFilter: "blur(20px)",
+                            border: "1px solid rgba(255,100,0,0.85)",
+                            boxShadow: "0 0 14px rgba(255,85,0,0.28)",
+                            color: "white",
+                            fontWeight: 700,
+                          } : {
+                            background: "rgba(255,255,255,0.09)",
+                            backdropFilter: "blur(20px)",
+                            WebkitBackdropFilter: "blur(20px)",
+                            border: "1px solid rgba(255,255,255,0.18)",
+                            color: "white",
+                          } as any}
                         >
                           <Icon className={`w-4 h-4 shrink-0 ${isSelected ? "text-[#f97316]" : "text-gray-400"}`} />
                           <span className="truncate">{item.label}</span>

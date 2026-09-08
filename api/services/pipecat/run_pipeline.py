@@ -146,12 +146,12 @@ async def _warmup_llm_connection(llm) -> None:
     if not model:
         return
 
-    with contextlib.suppress(Exception):
+    try:
         # GPT-5 models (gpt-5, gpt-5-mini, gpt-5-nano) require
         # `max_completion_tokens`; older models use the legacy `max_tokens`.
         token_limit_kwarg = (
             {"max_completion_tokens": 1}
-            if isinstance(model, str) and model.startswith("gpt-5")
+            if isinstance(model, str) and "gpt-5" in model
             else {"max_tokens": 1}
         )
         await client.chat.completions.create(
@@ -160,6 +160,8 @@ async def _warmup_llm_connection(llm) -> None:
             **token_limit_kwarg,
             stream=False,
         )
+    except Exception as e:
+        logger.warning(f"LLM connection warmup failed for model {model}: {e}")
 
 
 def _resolve_user_turn_stop_timeout(
@@ -726,6 +728,8 @@ async def _run_pipeline_impl(
     # Detect realtime mode (speech-to-speech services like OpenAI Realtime, Gemini Live)
     is_realtime = user_config.is_realtime and user_config.realtime is not None
 
+    _llm_warmup_task = None
+
     # Create services based on user configuration
     if is_realtime:
         llm = create_realtime_llm_service(user_config, audio_config)
@@ -755,7 +759,7 @@ async def _run_pipeline_impl(
 
         # Pre-warm the LLM HTTP/TLS connection while setup continues and the
         # greeting plays. This avoids paying the ~800ms cold-start penalty on
-        # the first real user turn. Fire-and-forget: failures are swallowed.
+        # the first real user turn. Fire-and-forget: failures are logged.
         # Operators can disable via run_config `llm_connection_warmup: false`
         # if provider rate limits or per-request billing is a concern.
         # Store the task reference to prevent premature GC (Python best practice).
@@ -1250,6 +1254,10 @@ async def _run_pipeline_impl(
     finally:
         if dtmf_listener_task:
             dtmf_listener_task.cancel()
+        if _llm_warmup_task and not _llm_warmup_task.done():
+            _llm_warmup_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await _llm_warmup_task
         # Close MCP sessions here, not in engine.cleanup(). The anyio cancel
         # scopes opened by MCPClient.start() in engine.initialize() are
         # task-affine; this finally runs in the same task as initialize(),

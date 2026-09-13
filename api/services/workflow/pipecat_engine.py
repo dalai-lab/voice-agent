@@ -649,6 +649,20 @@ class PipecatEngine:
         else:
             logger.debug(f"All pending extraction tasks completed in {elapsed:.2f}s")
 
+
+    async def flush_variable_extraction(self) -> Optional[dict]:
+        """Refresh extracted variables without marking the call finalized.
+
+        This operation is intentionally repeatable. Transfer routing and
+        external-PBX field mappings need current conversation values, but a
+        failed transfer can return control to the agent and gather more input.
+        """
+        await self._await_pending_extractions()
+        return await self._perform_variable_extraction_if_needed(
+            self._current_node,
+            run_in_background=False,
+        )
+
     async def perform_final_variable_extraction(self) -> None:
         """Flush in-flight + current-node variable extraction synchronously.
 

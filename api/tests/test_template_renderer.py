@@ -36,3 +36,18 @@ def test_initial_context_prefix_uses_fallback_when_missing_from_both_contexts():
     assert (
         render_template("Hi {{initial_context.first_name | there}}", {}) == "Hi there"
     )
+
+
+def test_gathered_context_nested_path_resolves():
+    context = {"gathered_context": {"order": {"id": "ORD-123"}}}
+    assert render_template("{{gathered_context.order.id}}", context) == "ORD-123"
+
+
+def test_gathered_context_missing_key_resolves_to_empty():
+    context = {"gathered_context": {}}
+    assert render_template("{{gathered_context.foo}}", context) == ""
+
+
+def test_gathered_context_with_fallback_filter():
+    context = {"gathered_context": {}}
+    assert render_template("{{gathered_context.foo | default_val}}", context) == "default_val"

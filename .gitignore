@@ -38,3 +38,12 @@ non_tech_interviewer_dashboard.html
 recruitment_crm_dashboard.html
 run_crm.py
 /Demo/
+
+# Requested ignores
+agent_v2.json
+agent.json
+APALEO_PMS_INTEGRATION_GUIDE.md
+dalai_call_initiator.html
+runthiscode
+workflow_editor.html
+pipecat/

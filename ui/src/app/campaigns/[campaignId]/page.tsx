@@ -219,10 +219,10 @@ export default function CampaignDetailPage() {
 
             if (response.data) {
                 setCampaign(response.data);
-                toast.success('Campaign started');
+                toast.success('Campaign / Event started');
             } else if (response.error) {
                 // Extract error message from response
-                let errorMsg = 'Failed to start campaign';
+                let errorMsg = 'Failed to start campaign / event';
                 if (typeof response.error === 'string') {
                     errorMsg = response.error;
                 } else if (response.error && typeof response.error === 'object') {
@@ -231,8 +231,8 @@ export default function CampaignDetailPage() {
                 toast.error(errorMsg);
             }
         } catch (error) {
-            console.error('Failed to start campaign:', error);
-            toast.error('Failed to start campaign');
+            console.error('Failed to start campaign / event:', error);
+            toast.error('Failed to start campaign / event');
         } finally {
             setIsExecutingAction(false);
         }
@@ -255,10 +255,10 @@ export default function CampaignDetailPage() {
 
             if (response.data) {
                 setCampaign(response.data);
-                toast.success('Campaign resumed');
+                toast.success('Campaign / Event resumed');
             } else if (response.error) {
                 // Extract error message from response
-                let errorMsg = 'Failed to resume campaign';
+                let errorMsg = 'Failed to resume campaign / event';
                 if (typeof response.error === 'string') {
                     errorMsg = response.error;
                 } else if (response.error && typeof response.error === 'object') {
@@ -347,11 +347,11 @@ export default function CampaignDetailPage() {
 
             if (response.data) {
                 setCampaign(response.data);
-                toast.success('Campaign paused');
+                toast.success('Campaign / Event paused');
             }
         } catch (error) {
-            console.error('Failed to pause campaign:', error);
-            toast.error('Failed to pause campaign');
+            console.error('Failed to pause campaign / event:', error);
+            toast.error('Failed to pause campaign / event');
         } finally {
             setIsExecutingAction(false);
         }
@@ -416,7 +416,7 @@ export default function CampaignDetailPage() {
         const editButton = canEdit ? (
             <Button variant="outline" onClick={() => router.push(`/campaigns/${campaignId}/edit`)}>
                 <Pencil className="h-4 w-4 mr-2" />
-                Edit Campaign
+                Edit Campaign / Event
             </Button>
         ) : null;
 
@@ -427,7 +427,7 @@ export default function CampaignDetailPage() {
                         {editButton}
                         <Button onClick={handleStart} disabled={isExecutingAction}>
                             <Play className="h-4 w-4 mr-2" />
-                            Start Campaign
+                            Start Campaign / Event
                         </Button>
                     </div>
                 );
@@ -437,7 +437,7 @@ export default function CampaignDetailPage() {
                         {editButton}
                         <Button onClick={handlePause} disabled={isExecutingAction}>
                             <Pause className="h-4 w-4 mr-2" />
-                            Pause Campaign
+                            Pause Campaign / Event
                         </Button>
                     </div>
                 );
@@ -447,7 +447,7 @@ export default function CampaignDetailPage() {
                         {editButton}
                         <Button onClick={handleResume} disabled={isExecutingAction}>
                             <RefreshCw className="h-4 w-4 mr-2" />
-                            Resume Campaign
+                            Resume Campaign / Event
                         </Button>
                     </div>
                 );
@@ -458,7 +458,7 @@ export default function CampaignDetailPage() {
                 return (
                     <Button onClick={openRedialDialog}>
                         <Phone className="h-4 w-4 mr-2" />
-                        Redial Campaign
+                        Redial Campaign / Event
                     </Button>
                 );
             default:
@@ -481,7 +481,7 @@ export default function CampaignDetailPage() {
         return (
             <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background">
                 <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm mx-auto border border-border bg-card rounded-xl shadow-xs">
-                    <p className="text-xs text-muted-foreground">Campaign not found</p>
+                    <p className="text-xs text-muted-foreground">Campaign / Event not found</p>
                 </div>
             </div>
         );
@@ -497,7 +497,7 @@ export default function CampaignDetailPage() {
                             variant="outline"
                             onClick={handleBack}
                             className="h-8 w-8 rounded-lg p-0"
-                            aria-label="Back to Campaigns"
+                            aria-label="Back to Campaigns / Events"
                         >
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
@@ -600,7 +600,7 @@ export default function CampaignDetailPage() {
                 {/* Campaign Details */}
                 <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
                     <div>
-                        <h2 className="text-sm font-bold text-foreground">Campaign Details</h2>
+                        <h2 className="text-sm font-bold text-foreground">Campaign / Event Details</h2>
                         <p className="text-[10px] text-muted-foreground/60 mt-0.5">Configuration and source information</p>
                     </div>
                     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border/40">
@@ -676,7 +676,7 @@ export default function CampaignDetailPage() {
                                         onClick={() => router.push(`/campaigns/${campaign.parent_campaign_id}`)}
                                         className="text-cta hover:underline font-bold text-left"
                                     >
-                                        Campaign #{campaign.parent_campaign_id}
+                                        Campaign / Event #{campaign.parent_campaign_id}
                                     </button>
                                 </dd>
                             </div>
@@ -689,7 +689,7 @@ export default function CampaignDetailPage() {
                                         onClick={() => router.push(`/campaigns/${campaign.redialed_campaign_id}`)}
                                         className="text-cta hover:underline font-bold text-left"
                                     >
-                                        Campaign #{campaign.redialed_campaign_id}
+                                        Campaign / Event #{campaign.redialed_campaign_id}
                                     </button>
                                 </dd>
                             </div>
@@ -716,7 +716,7 @@ export default function CampaignDetailPage() {
                 {/* Campaign Settings */}
                 <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
                     <div>
-                        <h2 className="text-sm font-bold text-foreground">Campaign Settings</h2>
+                        <h2 className="text-sm font-bold text-foreground">Campaign / Event Settings</h2>
                         <p className="text-[10px] text-muted-foreground/60 mt-0.5">Concurrency and retry configuration</p>
                     </div>
                     <div className="space-y-4 pt-2 border-t border-border/40">
@@ -897,9 +897,9 @@ export default function CampaignDetailPage() {
             <Dialog open={isRedialDialogOpen} onOpenChange={setIsRedialDialogOpen}>
                 <DialogContent className="max-w-md rounded-xl bg-background border border-border shadow-lg p-6">
                     <DialogHeader className="space-y-1.5">
-                        <DialogTitle className="text-base font-bold text-foreground">Redial Campaign</DialogTitle>
+                        <DialogTitle className="text-base font-bold text-foreground">Redial Campaign / Event</DialogTitle>
                         <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
-                            Creates a new campaign that re-dials unique subscribers whose
+                            Creates a new campaign / event that re-dials unique subscribers whose
                             last call ended with one of the selected outcomes. Subscribers
                             who were successfully reached on a retry are skipped.
                         </DialogDescription>
@@ -911,7 +911,7 @@ export default function CampaignDetailPage() {
                                 id="redial-name"
                                 value={redialName}
                                 onChange={(e) => setRedialName(e.target.value)}
-                                placeholder="Campaign name"
+                                placeholder="Campaign / event name"
                                 className="h-9 rounded-lg border-border bg-background text-xs"
                             />
                         </div>
@@ -961,7 +961,7 @@ export default function CampaignDetailPage() {
                             Cancel
                         </Button>
                         <Button onClick={handleRedial} disabled={isRedialing} className="h-9 px-4 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer">
-                            {isRedialing ? 'Creating...' : 'Create Redial Campaign'}
+                            {isRedialing ? 'Creating...' : 'Create Redial Campaign / Event'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

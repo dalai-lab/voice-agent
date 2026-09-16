@@ -52,13 +52,13 @@ export const HeroSection: React.FC = () => {
               >
                 Get Started Free
               </a>
-              <a
+              {/* <a
                 className="bg-white/10 hover:bg-white/15 text-white border border-white/15 px-7 py-3.5 rounded-full text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-2"
                 href="#home"
               >
                 <Play className="w-4 h-4 fill-white text-white" />
                 Watch Demo Call
-              </a>
+              </a> */}
             </div>
 
             {/* Talkar Integration & Partnership Trust Signals */}

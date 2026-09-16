@@ -93,7 +93,7 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         icon: PhosphorIcons.Robot,
       },
       {
-        title: "Campaigns",
+        title: "Campaigns / Events",
         url: "/campaigns",
         icon: PhosphorIcons.Megaphone,
       },

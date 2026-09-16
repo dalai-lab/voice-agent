@@ -374,7 +374,7 @@ export default function NewCampaignPage() {
     };
 
     const CREATION_TABS = [
-        { id: "details", label: "Campaign Details" },
+        { id: "details", label: "Campaign / Event Details" },
         { id: "source", label: "Data Source (CSV)" },
         { id: "advanced", label: "Advanced Settings" },
     ];
@@ -392,8 +392,8 @@ export default function NewCampaignPage() {
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">Campaigns</p>
-                    <h1 className="text-sm font-bold text-foreground tracking-tight">Create New Campaign</h1>
+                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">Campaigns / Events</p>
+                    <h1 className="text-sm font-bold text-foreground tracking-tight">Create New Campaign / Event</h1>
                 </div>
             </header>
 
@@ -443,14 +443,14 @@ export default function NewCampaignPage() {
                         <div className="bg-card border border-border rounded-xl p-6 shadow-xs">
                             {activeTab === "details" && (
                                 <div className="space-y-5">
-                                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80 border-b border-border pb-2">Campaign Details</h3>
+                                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80 border-b border-border pb-2">Campaign / Event Details</h3>
 
                                     {/* Campaign Name */}
                                     <div className="space-y-2">
-                                        <Label htmlFor="campaign-name" className="text-xs font-bold text-foreground">Campaign Name</Label>
+                                        <Label htmlFor="campaign-name" className="text-xs font-bold text-foreground">Campaign / Event Name</Label>
                                         <Input
                                             id="campaign-name"
-                                            placeholder="Enter campaign name"
+                                            placeholder="Enter campaign / event name"
                                             value={campaignName}
                                             onChange={(e) => setCampaignName(e.target.value)}
                                             maxLength={255}
@@ -458,7 +458,7 @@ export default function NewCampaignPage() {
                                             className="h-9 rounded-lg border-border bg-background text-xs"
                                         />
                                         <p className="text-[10px] text-muted-foreground/60">
-                                            Choose a descriptive name for your campaign.
+                                            Choose a descriptive name for your campaign / event.
                                         </p>
                                     </div>
 
@@ -512,7 +512,7 @@ export default function NewCampaignPage() {
                                                 >
                                                     Add one
                                                 </Link>{' '}
-                                                to create a campaign.
+                                                to create a campaign / event.
                                             </div>
                                         ) : (
                                             <Select
@@ -544,7 +544,7 @@ export default function NewCampaignPage() {
                                             </Select>
                                         )}
                                         <p className="text-[10px] text-muted-foreground/60">
-                                            Outbound calls for this campaign will use this configuration&apos;s caller IDs.
+                                            Outbound calls for this campaign / event will use this configuration&apos;s caller IDs.
                                         </p>
                                     </div>
                                 </div>
@@ -653,7 +653,7 @@ export default function NewCampaignPage() {
                                 disabled={isSubmitting || !campaignName || !selectedWorkflowId || !sourceId || !selectedTelephonyConfigId}
                                 className="h-9 px-4 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs transition-all cursor-pointer"
                             >
-                                {isSubmitting ? 'Creating...' : 'Create Campaign'}
+                                {isSubmitting ? 'Creating...' : 'Create Campaign / Event'}
                             </Button>
                             <Button
                                 type="button"

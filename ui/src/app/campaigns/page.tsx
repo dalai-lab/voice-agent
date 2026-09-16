@@ -96,12 +96,12 @@ export default function CampaignsPage() {
             {/* Header section */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border/40">
                 <div>
-                    <h1 className="text-xl font-bold tracking-tight text-foreground">Campaigns</h1>
-                    <p className="text-xs text-muted-foreground mt-0.5">Manage and track your bulk workflow execution campaigns</p>
+                    <h1 className="text-xl font-bold tracking-tight text-foreground">Campaigns / Events</h1>
+                    <p className="text-xs text-muted-foreground mt-0.5">Manage and track your bulk workflow execution campaigns / events</p>
                 </div>
                 <Button onClick={handleCreateCampaign} className="h-9 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-xs font-semibold text-xs cursor-pointer">
                     <Plus className="h-4 w-4 mr-1.5" />
-                    Create Campaign
+                    Create Campaign / Event
                 </Button>
             </div>
 
@@ -222,11 +222,11 @@ export default function CampaignsPage() {
                         <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted/30 text-muted-foreground mb-4">
                             <Plus className="h-6 w-6" />
                         </div>
-                        <h3 className="text-xs font-bold text-foreground tracking-tight mb-2 uppercase">No campaigns found</h3>
-                        <p className="text-xs text-muted-foreground leading-relaxed mb-6">Create your first bulk execution campaign to run workflows in parallel.</p>
+                        <h3 className="text-xs font-bold text-foreground tracking-tight mb-2 uppercase">No campaigns / events found</h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-6">Create your first bulk execution campaign or event to run workflows in parallel.</p>
                         <Button onClick={handleCreateCampaign} className="h-9 px-4 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs transition-all cursor-pointer">
                             <Plus className="h-4 w-4 mr-1.5" />
-                            Create Campaign
+                            Create Campaign / Event
                         </Button>
                     </div>
                 </div>

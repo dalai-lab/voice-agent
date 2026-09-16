@@ -362,7 +362,7 @@ export default function CampaignAdvancedSettings({
                     <div className="space-y-0.5">
                         <Label htmlFor="circuit-breaker-enabled" className="text-xs font-bold text-foreground">Circuit Breaker</Label>
                         <p className="text-[10px] text-muted-foreground/60 font-semibold">
-                            Auto-pause campaign on high failure rates
+                            Auto-pause campaign / event on high failure rates
                         </p>
                     </div>
                     <Switch
@@ -425,7 +425,7 @@ export default function CampaignAdvancedSettings({
                     <div className="space-y-0.5">
                         <Label htmlFor="callback-enabled" className="text-xs font-bold text-foreground">Callback Settings</Label>
                         <p className="text-[10px] text-muted-foreground/60 font-semibold">
-                            Configure callback handling for this campaign
+                            Configure callback handling for this campaign / event
                         </p>
                     </div>
                     <Switch

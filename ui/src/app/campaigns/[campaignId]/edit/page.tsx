@@ -289,12 +289,12 @@ export default function EditCampaignPage() {
             }
 
             if (response.data) {
-                toast.success('Campaign updated successfully');
+                toast.success('Campaign / Event updated successfully');
                 router.push(`/campaigns/${campaignId}`);
             }
         } catch (error) {
-            console.error('Failed to update campaign:', error);
-            const errorMessage = 'Failed to update campaign';
+            console.error('Failed to update campaign / event:', error);
+            const errorMessage = 'Failed to update campaign / event';
             setSubmitError(errorMessage);
             toast.error(errorMessage);
         } finally {
@@ -321,7 +321,7 @@ export default function EditCampaignPage() {
         return (
             <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6 bg-background">
                 <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm mx-auto border border-border bg-card rounded-xl shadow-xs">
-                    <p className="text-xs text-muted-foreground">Campaign not found</p>
+                    <p className="text-xs text-muted-foreground">Campaign / Event not found</p>
                 </div>
             </div>
         );
@@ -332,8 +332,8 @@ export default function EditCampaignPage() {
             {/* Header section */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/40">
                 <div className="space-y-1">
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Edit Campaign</h1>
-                    <p className="text-xs text-muted-foreground">Modify campaign settings, retry behavior, and calling windows</p>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Edit Campaign / Event</h1>
+                    <p className="text-xs text-muted-foreground">Modify campaign / event settings, retry behavior, and calling windows</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button
@@ -342,7 +342,7 @@ export default function EditCampaignPage() {
                         className="h-9 text-xs font-semibold rounded-lg"
                     >
                         <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
-                        Back to Campaign
+                        Back to Campaign / Event
                     </Button>
                 </div>
             </div>
@@ -351,10 +351,10 @@ export default function EditCampaignPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Campaign Name Card */}
                 <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-3">
-                    <Label htmlFor="campaign-name" className="text-xs font-bold text-foreground">Campaign Name</Label>
+                    <Label htmlFor="campaign-name" className="text-xs font-bold text-foreground">Campaign / Event Name</Label>
                     <Input
                         id="campaign-name"
-                        placeholder="Enter campaign name"
+                        placeholder="Enter campaign / event name"
                         value={campaignName}
                         onChange={(e) => setCampaignName(e.target.value)}
                         maxLength={255}

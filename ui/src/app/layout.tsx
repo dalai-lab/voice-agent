@@ -30,6 +30,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Talkar",
   description: "Build powerful voice AI workflows and configurations.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.png", type: "image/png", sizes: "256x256" },
+    ],
+    apple: [{ url: "/favicon.png", sizes: "256x256" }],
+  },
 };
 
 export default function RootLayout({

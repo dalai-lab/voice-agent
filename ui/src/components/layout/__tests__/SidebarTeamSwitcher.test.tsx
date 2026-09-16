@@ -152,6 +152,7 @@ function makeAuthValue(user: AuthUser | null): AuthContextType {
     user,
     isAuthenticated: !!user,
     loading: false,
+    organizationId: undefined,
     getAccessToken: async () => "token",
     redirectToLogin: () => {},
     logout: async () => {},

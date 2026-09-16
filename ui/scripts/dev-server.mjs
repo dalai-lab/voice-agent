@@ -1,5 +1,6 @@
-// Launcher behind `npm run dev`: starts `next dev --turbopack` on this
-// worktree's pinned UI port.
+// Launcher behind `npm run dev`: starts `next dev` on this worktree's pinned
+// UI port. Turbopack is on by default; set TURBOPACK=0 to use webpack when
+// Turbopack panics (seen on Windows with PostCSS/Tailwind timeouts).
 //
 // Next reads its port from argv/process.env at CLI-parse time, BEFORE it loads
 // .env files, so a UI_PORT line in ui/.env cannot reach it on its own -- this
@@ -35,6 +36,7 @@ function pinnedPort() {
 }
 
 const port = process.env.UI_PORT || pinnedPort();
+const useTurbopack = process.env.TURBOPACK !== '0';
 
 // Spawn Next's JS entry through node rather than node_modules/.bin/next: the
 // bin shim is a .cmd on Windows and would need a shell to invoke.
@@ -43,7 +45,7 @@ const child = spawn(
     [
         join(uiRoot, 'node_modules', 'next', 'dist', 'bin', 'next'),
         'dev',
-        '--turbopack',
+        ...(useTurbopack ? ['--turbopack'] : []),
         ...(port ? ['-p', port] : []),
         ...process.argv.slice(2),
     ],

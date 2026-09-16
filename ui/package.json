@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--enable-source-maps node scripts/dev-server.mjs",
+    "dev:webpack": "cross-env TURBOPACK=0 NODE_OPTIONS=--enable-source-maps node scripts/dev-server.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

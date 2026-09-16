@@ -201,7 +201,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
     !pathname.startsWith("/integrations") &&
     !pathname.startsWith("/handler") &&
     !pathname.startsWith("/auth") &&
-    !pathname.startsWith("/onboarding");
+    !pathname.startsWith("/onboarding") &&
+    !pathname.startsWith("/privacy-policy") &&
+    !pathname.startsWith("/terms-of-service");
 
   // Only match the exact editor page /workflow/<id>, not sub-routes like /workflow/<id>/runs
   const isWorkflowEditor = /^\/workflow\/\d+$/.test(pathname);

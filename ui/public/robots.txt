@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Allow: /privacy-policy
+Allow: /terms-of-service
+Disallow: /api/
+Disallow: /overview
+Disallow: /workflow
+Disallow: /campaigns
+Disallow: /wallet
+Disallow: /billing
+Disallow: /settings
+Disallow: /tools
+Disallow: /recordings
+Disallow: /onboarding
+Disallow: /handler/
+Disallow: /auth/
+
+Sitemap: https://talkar.in/sitemap.xml

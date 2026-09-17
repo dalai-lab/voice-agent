@@ -25,7 +25,7 @@ export const FooterCtaSection: React.FC = () => {
 
         {/* Subtitle */}
         <p className="text-base md:text-lg text-gray-300 max-w-xl mx-auto leading-relaxed font-light text-center mb-8">
-          Set up your AI phone agent in minutes. Activation starts from ₹6,000.
+          Set up your AI phone agent in minutes.
         </p>
 
         {/* CTA Button */}
@@ -35,7 +35,7 @@ export const FooterCtaSection: React.FC = () => {
           </a>
           
           <p className="text-xs text-gray-400 font-mono">
-            talkar.in — Activation starts from ₹6,000
+            talkar.in
           </p>
         </div>
 

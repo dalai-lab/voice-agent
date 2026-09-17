@@ -357,9 +357,7 @@ function CallCompletedCard({
           <RotateCcw className="w-4 h-4 text-slate-400" /> Try Another Call
         </button>
         <a
-          href="https://dograh.com"
-          target="_blank"
-          rel="noreferrer"
+          href="/handler/sign-up"
           className="flex-1 h-12 rounded-2xl text-xs font-extrabold bg-gradient-to-r from-[#FF5500] to-[#E11D48] hover:opacity-95 text-white shadow-xl shadow-orange-600/35 flex items-center justify-center gap-2 transition-all cursor-pointer truncate"
         >
           <span className="truncate">{persona.ctaText}</span>

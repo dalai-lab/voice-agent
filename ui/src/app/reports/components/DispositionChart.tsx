@@ -41,10 +41,10 @@ export function DispositionChart({ data }: DispositionChartProps) {
     if (active && payload && payload[0]) {
       const item = payload[0].payload;
       return (
-        <div className="bg-[#171717] border border-[#333] rounded-lg shadow-lg p-3 text-xs space-y-1">
-          <p className="font-semibold text-foreground">{item.disposition}</p>
-          <p className="text-muted-foreground">Count: <span className="text-foreground font-mono">{item.count}</span></p>
-          <p className="text-muted-foreground"><span className="text-foreground font-semibold">{item.percentage}%</span> of total</p>
+        <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg p-3 text-xs space-y-1">
+          <p className="font-semibold text-white">{item.disposition}</p>
+          <p className="text-zinc-300">Count: <span className="text-white font-mono">{item.count}</span></p>
+          <p className="text-zinc-300"><span className="text-white font-semibold">{item.percentage}%</span> of total</p>
         </div>
       );
     }
@@ -52,7 +52,7 @@ export function DispositionChart({ data }: DispositionChartProps) {
   };
 
   return (
-    <div className="p-5 rounded-xl border border-border/60 bg-card/30 shadow-xs space-y-4">
+    <div className="p-5 rounded-xl border border-border/60 bg-card shadow-xs space-y-4 text-card-foreground">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
           <PieChart className="w-3.5 h-3.5 text-indigo-400" />
@@ -71,21 +71,21 @@ export function DispositionChart({ data }: DispositionChartProps) {
               data={chartData}
               margin={{ top: 10, right: 20, left: 0, bottom: 45 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border" vertical={false} />
               <XAxis
                 dataKey="disposition"
                 angle={-35}
                 textAnchor="end"
                 interval={0}
-                tick={{ fontSize: 10, fill: '#888' }}
-                stroke="#333"
+                tick={{ fontSize: 10, fill: '#a1a1aa' }}
+                stroke="#52525b"
               />
               <YAxis
-                tick={{ fontSize: 10, fill: '#888' }}
-                stroke="#333"
+                tick={{ fontSize: 10, fill: '#a1a1aa' }}
+                stroke="#52525b"
                 allowDecimals={false}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.fill} />

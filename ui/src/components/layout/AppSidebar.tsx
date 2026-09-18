@@ -83,11 +83,12 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         url: "/overview",
         icon: PhosphorIcons.SquaresFour,
       },
-      {
-        title: "AI Voice Models",
-        url: "/models",
-        icon: PhosphorIcons.Brain,
-      },
+      // Temporarily hidden
+      // {
+      //   title: "AI Voice Models",
+      //   url: "/models",
+      //   icon: PhosphorIcons.Brain,
+      // },
       {
         title: "Voice Agents",
         url: "/workflow",
@@ -106,25 +107,27 @@ const NAV_SECTIONS: SidebarNavSection[] = [
     ],
   },
   {
-    label: "OPERATIONS",
+    // Temporarily hidden: OPERATIONS heading
+    // label: "OPERATIONS",
     items: [
-      {
-        type: "group",
-        title: "Call Activity",
-        icon: PhosphorIcons.PhoneCall,
-        items: [
-          {
-            title: "Call History",
-            url: "/runs",
-            icon: PhosphorIcons.ClockCounterClockwise,
-          },
-          {
-            title: "Scheduled Callbacks",
-            url: "/callbacks",
-            icon: PhosphorIcons.PhoneCall,
-          },
-        ],
-      },
+      // Temporarily hidden
+      // {
+      //   type: "group",
+      //   title: "Call Activity",
+      //   icon: PhosphorIcons.PhoneCall,
+      //   items: [
+      //     {
+      //       title: "Call History",
+      //       url: "/runs",
+      //       icon: PhosphorIcons.ClockCounterClockwise,
+      //     },
+      //     {
+      //       title: "Scheduled Callbacks",
+      //       url: "/callbacks",
+      //       icon: PhosphorIcons.PhoneCall,
+      //     },
+      //   ],
+      // },
       {
         type: "group",
         title: "Agent Resources",

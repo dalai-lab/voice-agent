@@ -218,11 +218,11 @@ export default function ReportsPage() {
         <div className="flex flex-wrap gap-2.5 items-center">
           {/* Workflow Selector */}
           <Select value={selectedWorkflow} onValueChange={setSelectedWorkflow}>
-            <SelectTrigger className="w-[180px] h-9 rounded-lg border-border/60 text-xs bg-card/30">
+            <SelectTrigger className="w-[180px] h-9 rounded-lg border-border/60 text-xs bg-card text-foreground">
               <Filter className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
               <SelectValue placeholder="Select workflow" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-popover text-popover-foreground">
               <SelectItem value="all">All Workflows</SelectItem>
               {workflows.map((workflow) => (
                 <SelectItem key={workflow.id} value={workflow.id.toString()}>
@@ -237,7 +237,7 @@ export default function ReportsPage() {
             <Button
               variant="outline"
               size="icon"
-              className="h-9 w-9 rounded-lg border-border/60 bg-card/30"
+              className="h-9 w-9 rounded-lg border-border/60 bg-card text-foreground"
               onClick={handlePreviousDay}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -245,7 +245,7 @@ export default function ReportsPage() {
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-[140px] h-9 rounded-lg text-xs font-semibold border-border/60 bg-card/30">
+                <Button variant="outline" className="w-[140px] h-9 rounded-lg text-xs font-semibold border-border/60 bg-card text-foreground">
                   <Calendar className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
                   {format(selectedDate, 'MMM dd, yyyy')}
                 </Button>
@@ -263,7 +263,7 @@ export default function ReportsPage() {
             <Button
               variant="outline"
               size="icon"
-              className="h-9 w-9 rounded-lg border-border/60 bg-card/30"
+              className="h-9 w-9 rounded-lg border-border/60 bg-card text-foreground"
               onClick={handleNextDay}
               disabled={isToday}
             >
@@ -277,7 +277,7 @@ export default function ReportsPage() {
               variant="outline"
               size="sm"
               onClick={handleDownloadCSV}
-              className="h-9 rounded-lg text-xs font-semibold flex items-center gap-1.5 border-border/60 bg-card/30 hover:bg-card/60"
+              className="h-9 rounded-lg text-xs font-semibold flex items-center gap-1.5 border-border/60 bg-card text-foreground hover:bg-muted"
             >
               <Download className="h-3.5 w-3.5" />
               Download CSV
@@ -324,7 +324,7 @@ export default function ReportsPage() {
 
               {/* Live Daily Call Runs Detail Table */}
               {runsDetail.length > 0 && (
-                <div className="p-5 rounded-xl border border-border/60 bg-card/30 shadow-xs space-y-4">
+                <div className="p-5 rounded-xl border border-border/60 bg-card shadow-xs space-y-4 text-card-foreground">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                       <PhoneCall className="w-3.5 h-3.5 text-cta" />

@@ -386,63 +386,122 @@ export default function OnboardingPage() {
 
       {/* Corporate Header */}
       <header className="w-full border-b border-zinc-200 bg-white/80 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BrandLogo size="md" className="h-7" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0 shrink-0">
+            <BrandLogo size="md" className="h-6 sm:h-7" />
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="w-48">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <div className="hidden sm:block w-40 md:w-48 shrink-0">
               <SidebarTeamSwitcher />
             </div>
-            <Button 
-              variant="ghost" 
-              onClick={() => void logout()} 
-              className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg h-9 px-3 border border-zinc-200 cursor-pointer"
+            <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full border border-orange-200 bg-orange-50 text-orange-600 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap">
+              <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Account Setup
+            </div>
+            <Button
+              variant="ghost"
+              onClick={() => void logout()}
+              className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg h-9 px-2.5 sm:px-3 border border-zinc-200 cursor-pointer shrink-0"
             >
               Sign Out
             </Button>
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-orange-200 bg-orange-50 text-orange-600 text-[10px] font-semibold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Account Setup
-            </div>
           </div>
         </div>
       </header>
 
       {/* Main Container - Large Wide Space Layout */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12 lg:py-20 z-10">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-12 lg:py-20 z-10">
         
-        {/* ── 3. PENDING APPROVAL: Premium Split-Screen Wizard ── */}
-        {status === "pending_approval" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-start">
+        {/* ── 3. NEW / PENDING APPROVAL: Premium Split-Screen Wizard ── */}
+        {(status === "pending_approval" || status === "new") && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-10 lg:gap-20 items-start">
             
-            {/* LEFT COLUMN: Progress & Navigation Timeline */}
-            <div className="lg:col-span-4 space-y-8 lg:sticky lg:top-28">
-              {/* Title removed per user request */}
+            {/* Progress: horizontal on mobile, vertical timeline on desktop */}
+            <div className="lg:col-span-4 space-y-4 lg:space-y-8 lg:sticky lg:top-28">
+              {/* Mobile / tablet horizontal stepper */}
+              <div className="lg:hidden space-y-3">
+                <div className="flex items-center justify-between gap-1">
+                  {mainSteps.map((s, idx) => {
+                    const isDone = activeStep > s.num;
+                    const isCurrent = activeStep === s.num;
+                    return (
+                      <React.Fragment key={s.num}>
+                        <div className="flex flex-col items-center gap-1.5 min-w-0 flex-1">
+                          <div
+                            className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-300 ${
+                              isCurrent
+                                ? "bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/20 scale-105"
+                                : isDone
+                                  ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                                  : "bg-white border-zinc-200 text-zinc-400"
+                            }`}
+                          >
+                            {isDone ? (
+                              <Check className="w-3.5 h-3.5" />
+                            ) : (
+                              <span className="text-[11px] font-bold">{s.num}</span>
+                            )}
+                          </div>
+                          <span
+                            className={`text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide text-center leading-tight px-0.5 ${
+                              isCurrent ? "text-orange-600" : isDone ? "text-emerald-600" : "text-zinc-400"
+                            }`}
+                          >
+                            <span className="hidden sm:inline">{s.label}</span>
+                            <span className="sm:hidden">
+                              {s.num === 1 ? "Company" : s.num === 2 ? "Contact" : s.num === 3 ? "Agent" : "Setup"}
+                            </span>
+                          </span>
+                        </div>
+                        {idx < mainSteps.length - 1 && (
+                          <div
+                            className={`h-0.5 w-2 sm:w-4 md:w-6 shrink-0 mb-5 rounded-full ${
+                              activeStep > s.num ? "bg-emerald-300" : "bg-zinc-200"
+                            }`}
+                          />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-zinc-500 text-center sm:text-left">
+                  Step {activeStep} of {mainSteps.length}:{" "}
+                  <span className="font-medium text-zinc-700">
+                    {mainSteps.find((s) => s.num === activeStep)?.label}
+                  </span>
+                  {" — "}Provide details for this section to continue.
+                </p>
+              </div>
 
-              {/* Vertical Custom Timeline */}
-              <div className="relative pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-zinc-200">
+              {/* Desktop vertical timeline */}
+              <div className="relative hidden lg:block pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-zinc-200">
                 {mainSteps.map((s) => {
-                  const IconComp = s.icon;
                   const isDone = activeStep > s.num;
                   const isCurrent = activeStep === s.num;
                   return (
                     <div key={s.num} className="relative flex items-start gap-4">
-                      {/* Node circle */}
-                      <div 
+                      <div
                         className={`absolute -left-[20px] w-6 h-6 rounded-full border flex items-center justify-center transition-all duration-300 ${
-                          isCurrent ? "bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-500/20 scale-110" :
-                          isDone ? "bg-emerald-50 border-emerald-200 text-emerald-600" :
-                          "bg-white border-zinc-200 text-zinc-400"
+                          isCurrent
+                            ? "bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-500/20 scale-110"
+                            : isDone
+                              ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                              : "bg-white border-zinc-200 text-zinc-400"
                         }`}
                       >
-                        {isDone ? <Check className="w-3.5 h-3.5" /> : <span className="text-[10px] font-bold">{s.num}</span>}
+                        {isDone ? (
+                          <Check className="w-3.5 h-3.5" />
+                        ) : (
+                          <span className="text-[10px] font-bold">{s.num}</span>
+                        )}
                       </div>
 
                       <div className="space-y-1 pl-4">
-                        <h4 className={`text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
-                          isCurrent ? "text-orange-600" : isDone ? "text-emerald-600" : "text-zinc-400"
-                        }`}>
+                        <h4
+                          className={`text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
+                            isCurrent ? "text-orange-600" : isDone ? "text-emerald-600" : "text-zinc-400"
+                          }`}
+                        >
                           {s.label}
                         </h4>
                         {isCurrent && (
@@ -458,14 +517,14 @@ export default function OnboardingPage() {
             </div>
 
             {/* RIGHT COLUMN: The Form Content (Borderless, Clean) */}
-            <div className="lg:col-span-8 space-y-12">
-              <form onSubmit={handleSubmit} className="space-y-10">
+            <div className="lg:col-span-8 space-y-8 sm:space-y-12 min-w-0">
+              <form onSubmit={handleSubmit} className="space-y-8 sm:space-y-10">
 
                 {/* STEP 1: COMPANY PROFILE */}
                 {activeStep === 1 && (
                   <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
                     <div className="border-b border-zinc-200 pb-4">
-                      <h3 className="text-xl font-bold text-zinc-900">Company Details</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-zinc-900">Company Details</h3>
                       <p className="text-xs text-zinc-500 mt-1">Basic information about your business.</p>
                     </div>
 
@@ -525,7 +584,7 @@ export default function OnboardingPage() {
                 {activeStep === 2 && (
                   <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
                     <div className="border-b border-zinc-200 pb-4">
-                      <h3 className="text-xl font-bold text-zinc-900">Contact Details</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-zinc-900">Contact Details</h3>
                       <p className="text-xs text-zinc-500 mt-1">Who should we contact for account updates?</p>
                     </div>
 
@@ -552,7 +611,7 @@ export default function OnboardingPage() {
                 {activeStep === 3 && (
                   <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
                     <div className="border-b border-zinc-200 pb-4">
-                      <h3 className="text-xl font-bold text-zinc-900">Agent Settings</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-zinc-900">Agent Settings</h3>
                       <p className="text-xs text-zinc-500 mt-1">How will your AI voice agent be used?</p>
                     </div>
 
@@ -619,7 +678,7 @@ export default function OnboardingPage() {
                 {activeStep === 4 && (
                   <div className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
                     <div className="border-b border-zinc-200 pb-4">
-                      <h3 className="text-xl font-bold text-zinc-900">Integrations</h3>
+                      <h3 className="text-lg sm:text-xl font-bold text-zinc-900">Integrations</h3>
                       <p className="text-xs text-zinc-500 mt-1">Connect your existing tools to your voice agent.</p>
                     </div>
 
@@ -734,23 +793,23 @@ export default function OnboardingPage() {
                 )}
 
                 {/* Wizard Action Footer - Spacious & Clean */}
-                <div className="flex items-center justify-between pt-8 border-t border-zinc-200">
+                <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-6 sm:pt-8 border-t border-zinc-200">
                   {activeStep > 1 ? (
-                    <Button type="button" variant="outline" onClick={handlePrevStep} className="border-zinc-300 text-zinc-600 hover:bg-zinc-50 rounded-xl h-12 px-6">
+                    <Button type="button" variant="outline" onClick={handlePrevStep} className="border-zinc-300 text-zinc-600 hover:bg-zinc-50 rounded-xl h-11 sm:h-12 px-6 w-full sm:w-auto">
                       <ArrowLeft className="w-4 h-4 mr-2" /> Previous
                     </Button>
-                  ) : <div />}
+                  ) : <div className="hidden sm:block" />}
 
                   {activeStep < 4 ? (
                     // key="next" forces React to unmount this button when we switch to Submit,
                     // preventing the click event from bleeding into the new DOM node.
-                    <Button key="next-step-btn" type="button" onClick={handleNextStep} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-12 px-8 font-semibold shadow-lg shadow-orange-500/10">
+                    <Button key="next-step-btn" type="button" onClick={handleNextStep} className="bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 rounded-xl h-11 sm:h-12 px-8 font-semibold shadow-lg shadow-orange-500/10 w-full sm:w-auto">
                       Next Step <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                   ) : (
                     // type="button" + explicit onClick so the form's onSubmit can never fire
                     // accidentally from a click event that leaked from the previous render.
-                    <Button key="submit-btn" type="button" disabled={submitting} onClick={handleSubmit as any} className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 text-white h-12 px-8 rounded-xl font-bold shadow-lg shadow-orange-500/25 min-w-[180px]">
+                    <Button key="submit-btn" type="button" disabled={submitting} onClick={handleSubmit as any} className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 text-white h-11 sm:h-12 px-8 rounded-xl font-bold shadow-lg shadow-orange-500/25 w-full sm:w-auto sm:min-w-[180px]">
                       {submitting ? "Submitting Application..." : "Submit Activation Request"}
                     </Button>
                   )}

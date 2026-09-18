@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Bell } from "lucide-react";
+import { Bell, CheckCircle2, AlertTriangle, Info, Sparkles, AlertCircle, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -31,17 +31,21 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
     if (!dograhOrgId || (!isTalkarCustomer && !isAdminBypass)) return;
 
     const fetchNotifications = async () => {
       try {
-        const res = await fetch(`/api/talkar/notifications?dograh_org_id=${dograhOrgId}`);
+        const res = await fetch(`/api/talkar/notifications?dograh_org_id=${dograhOrgId}&limit=20&offset=0`);
         if (res.ok) {
           const data = await res.json();
           setNotifications(data.notifications || []);
           setUnreadCount(data.unread_count || 0);
+          setHasMore((data.notifications?.length || 0) === 20);
+          setOffset(20);
         }
       } catch (err) {
         console.error("Failed to fetch notifications", err);
@@ -84,16 +88,39 @@ export function NotificationBell() {
     }
   };
 
-  const getIconColor = (type: string) => {
+  const loadMore = async () => {
+    try {
+      const res = await fetch(`/api/talkar/notifications?dograh_org_id=${dograhOrgId}&limit=20&offset=${offset}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.notifications && data.notifications.length > 0) {
+          setNotifications((prev) => [...prev, ...data.notifications]);
+          setOffset((prev) => prev + 20);
+          setHasMore(data.notifications.length === 20);
+        } else {
+          setHasMore(false);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch more notifications", err);
+    }
+  };
+
+  const getCategoryConfig = (type: string) => {
     switch (type) {
+      case "success":
+        return { icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-50" };
       case "warning":
-        return "text-amber-500 bg-amber-500/10";
-      case "billing":
-        return "text-emerald-500 bg-emerald-500/10";
-      case "support":
-        return "text-blue-500 bg-blue-500/10";
+        return { icon: AlertTriangle, color: "text-amber-500", bg: "bg-amber-50" };
+      case "critical":
+        return { icon: AlertCircle, color: "text-red-500", bg: "bg-red-50" };
+      case "update":
+        return { icon: Sparkles, color: "text-purple-500", bg: "bg-purple-50" };
+      case "maintenance":
+        return { icon: Wrench, color: "text-orange-500", bg: "bg-orange-50" };
+      case "info":
       default:
-        return "text-indigo-500 bg-indigo-500/10";
+        return { icon: Info, color: "text-indigo-500", bg: "bg-indigo-50" };
     }
   };
 
@@ -138,29 +165,52 @@ export function NotificationBell() {
             </div>
           ) : (
             <div className="flex flex-col">
-              {notifications.map((notif) => (
-                <div
-                  key={notif.id}
-                  className={`flex flex-col gap-1 px-4 py-3 border-b border-border/50 last:border-0 transition-colors ${
-                    !notif.is_read ? "bg-indigo-50/30" : "hover:bg-slate-50/50"
-                  }`}
-                  onClick={() => !notif.is_read && markAsRead(notif.id)}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className={`text-sm ${!notif.is_read ? "font-semibold text-slate-900" : "font-medium text-slate-700"}`}>
-                      {notif.title}
-                    </p>
-                    <span className="text-[10px] text-slate-400 whitespace-nowrap shrink-0 mt-0.5">
-                      {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true })}
-                    </span>
+              {notifications.map((notif) => {
+                const config = getCategoryConfig(notif.type);
+                const Icon = config.icon;
+                
+                return (
+                  <div
+                    key={notif.id}
+                    className={`flex gap-3 px-4 py-3 border-b border-border/50 last:border-0 transition-colors ${
+                      !notif.is_read ? "bg-slate-50" : "hover:bg-slate-50/50"
+                    }`}
+                    onClick={() => !notif.is_read && markAsRead(notif.id)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className={`mt-0.5 shrink-0 flex items-center justify-center h-8 w-8 rounded-full ${config.bg}`}>
+                      <Icon className={`h-4 w-4 ${config.color}`} />
+                    </div>
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-sm ${!notif.is_read ? "font-semibold text-slate-900" : "font-medium text-slate-700"}`}>
+                          {notif.title}
+                        </p>
+                        <span className="text-[10px] text-slate-400 whitespace-nowrap shrink-0 mt-0.5">
+                          {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true })}
+                        </span>
+                      </div>
+                      <p className={`text-xs ${!notif.is_read ? "text-slate-700" : "text-slate-500"} line-clamp-2`}>
+                        {notif.body}
+                      </p>
+                    </div>
                   </div>
-                  <p className={`text-xs ${!notif.is_read ? "text-slate-700" : "text-slate-500"} line-clamp-2`}>
-                    {notif.body}
-                  </p>
+                );
+              })}
+              
+              {hasMore && (
+                <div className="p-2 flex justify-center border-t border-border/50">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={(e) => { e.stopPropagation(); loadMore(); }}
+                    className="text-xs text-slate-500 hover:text-slate-900"
+                  >
+                    Load more...
+                  </Button>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>

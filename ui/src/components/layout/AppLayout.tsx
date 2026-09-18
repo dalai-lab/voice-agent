@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Menu, RefreshCw } from "lucide-react";
+import { AlertTriangle, Menu, RefreshCw, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React, { ReactNode, useEffect, useRef } from "react";
@@ -79,7 +79,7 @@ function BackendStatusBanner() {
 // We cannot use middleware for this because the Stack Auth opaque access token
 // in hexclave-access cannot be validated server-side from Edge runtime.
 // The browser already has a valid session, so the /api/talkar proxy works fine.
-const TALKAR_ALLOWED_PATHS = ["/onboarding", "/wallet", "/billing", "/handler", "/auth", "/api", "/models"];
+const TALKAR_ALLOWED_PATHS = ["/onboarding", "/wallet", "/handler", "/auth", "/api", "/models", "/support"];
 
 function TalkarStatusGate() {
   const { user } = useAuth();
@@ -182,6 +182,99 @@ function TalkarStatusGate() {
   return null;
 }
 
+const TALKAR_FORBIDDEN_PREFIXES = [
+  "/workflow",
+  "/telephony-configurations",
+  "/model-configurations",
+  "/api-keys",
+  "/usage",
+  "/billing",
+  "/files",
+  "/recordings",
+  "/superadmin",
+  "/tools",
+  "/automation",
+  "/actions",
+  "/integrations",
+  "/impersonate",
+];
+
+function isTalkarForbiddenPath(path: string): boolean {
+  // Allow call runs: /workflow/<id>/run/<runId> and /workflow/<id>/runs
+  if (/^\/workflow\/\d+\/run(\/|$)/.test(path) || /^\/workflow\/\d+\/runs(\/|$)/.test(path)) {
+    return false;
+  }
+
+  return TALKAR_FORBIDDEN_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(prefix + "/") || path.startsWith(prefix + "?")
+  );
+}
+
+function TalkarRouteGuard({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { isTalkarCustomer, isAdminBypass, isLoading } = useTalkarCustomer();
+  const isForbidden = isTalkarForbiddenPath(pathname);
+
+  useEffect(() => {
+    if (isAdminBypass) return;
+    if (isTalkarCustomer && isForbidden) {
+      router.replace("/runs");
+    }
+  }, [isTalkarCustomer, isAdminBypass, isForbidden, router]);
+
+  // Admin bypass sees everything
+  if (isAdminBypass) {
+    return <>{children}</>;
+  }
+
+  // If visiting a forbidden path and verified as a Talkar customer:
+  // Strictly prevent rendering {children} so no internal Dograh API requests fire
+  if (isForbidden && isTalkarCustomer) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-sm">
+          <ShieldAlert className="w-7 h-7" />
+        </div>
+        <div className="space-y-1.5 max-w-md">
+          <h2 className="text-xl font-bold tracking-tight text-foreground">Access Restricted</h2>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            This configuration area is managed directly by your dedicated Talkar engineering team. Need changes to your voice agent, numbers, or integrations?
+          </p>
+        </div>
+        <div className="flex items-center gap-3 pt-2">
+          <Button
+            onClick={() => router.replace("/support?type=support")}
+            size="sm"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 px-4 rounded-lg cursor-pointer shadow-sm"
+          >
+            Contact Support
+          </Button>
+          <Button
+            onClick={() => router.replace("/runs")}
+            variant="outline"
+            size="sm"
+            className="text-xs h-9 px-4 border-border rounded-lg cursor-pointer"
+          >
+            Go to Call History
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // If on a forbidden path and status is still loading, wait before mounting forbidden children
+  if (isForbidden && isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 interface AppLayoutProps {
   children: ReactNode;
   headerActions?: ReactNode;
@@ -247,7 +340,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
               {/* Main content area */}
               <main className="app-surface flex-1">
-                {children}
+                <TalkarRouteGuard>
+                  {children}
+                </TalkarRouteGuard>
               </main>
             </SidebarInset>
           </div>
@@ -256,7 +351,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         <div className="app-surface w-full flex-1">
           <TalkarStatusGate />
           <BackendStatusBanner />
-          {children}
+          <TalkarRouteGuard>
+            {children}
+          </TalkarRouteGuard>
         </div>
       )}
       </TalkarCustomerProvider>

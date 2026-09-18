@@ -40,11 +40,13 @@ export default function SettingsPage() {
         <div>
           <h2 className="text-sm font-bold text-foreground">Preferences</h2>
           <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-            Set organization-wide defaults such as the test phone number and timezone.
+            {isTalkarCustomer
+              ? "Set organization-wide defaults such as timezone."
+              : "Set organization-wide defaults such as the test phone number and timezone."}
           </p>
         </div>
         <div className="pt-2 border-t border-border/40">
-          <OrganizationPreferencesSection hidePbx={isTalkarCustomer} />
+          <OrganizationPreferencesSection hidePbx={isTalkarCustomer} hideTestPhone={isTalkarCustomer} />
         </div>
       </div>
 

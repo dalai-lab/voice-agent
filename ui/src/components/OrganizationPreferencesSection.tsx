@@ -90,7 +90,13 @@ function getTimezoneValue(tz: ITimezoneOption | string): string {
   return typeof tz === "string" ? tz : tz.value;
 }
 
-export function OrganizationPreferencesSection({ hidePbx = false }: { hidePbx?: boolean }) {
+export function OrganizationPreferencesSection({
+  hidePbx = false,
+  hideTestPhone = false,
+}: {
+  hidePbx?: boolean;
+  hideTestPhone?: boolean;
+}) {
   const { user, loading: authLoading } = useAuth();
   const { refreshConfig } = useUserConfig();
   const timezoneSelectId = useId();
@@ -192,22 +198,24 @@ export function OrganizationPreferencesSection({ hidePbx = false }: { hidePbx?: 
 
   return (
     <form onSubmit={handleSave} className="space-y-4 pt-1">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="settings-test-phone-number" className="text-xs font-bold text-foreground">Test Phone Number</Label>
-          <Input
-            id="settings-test-phone-number"
-            value={preferences.test_phone_number || ""}
-            onChange={(event) =>
-              setPreferences({
-                ...preferences,
-                test_phone_number: event.target.value,
-              })
-            }
-            placeholder="+15551234567"
-            className="h-9 rounded-lg border-border bg-background text-xs"
-          />
-        </div>
+      <div className={`grid gap-4 ${hideTestPhone ? "sm:grid-cols-1 max-w-md" : "sm:grid-cols-2"}`}>
+        {!hideTestPhone && (
+          <div className="space-y-2">
+            <Label htmlFor="settings-test-phone-number" className="text-xs font-bold text-foreground">Test Phone Number</Label>
+            <Input
+              id="settings-test-phone-number"
+              value={preferences.test_phone_number || ""}
+              onChange={(event) =>
+                setPreferences({
+                  ...preferences,
+                  test_phone_number: event.target.value,
+                })
+              }
+              placeholder="+15551234567"
+              className="h-9 rounded-lg border-border bg-background text-xs"
+            />
+          </div>
+        )}
         <div className="space-y-2">
           <Label className="text-xs font-bold text-foreground">Timezone</Label>
           <TimezoneSelect

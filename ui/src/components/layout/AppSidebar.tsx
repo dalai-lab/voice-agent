@@ -270,13 +270,13 @@ export function AppSidebar() {
           {
             type: "single",
             title: "Contact Support",
-            url: "mailto:it@4thorbit.in?subject=Support%20Request",
+            url: "/support?type=support",
             icon: PhosphorIcons.Envelope,
           },
           {
             type: "single",
             title: "Feature Requests",
-            url: "mailto:it@4thorbit.in?subject=Feature%20Request",
+            url: "/support?type=feature",
             icon: PhosphorIcons.Lightbulb,
           }
         ]

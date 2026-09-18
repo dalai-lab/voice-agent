@@ -243,6 +243,7 @@ export function AppSidebar() {
       "/files",
       "/recordings",
       "/superadmin",
+      "/tools",
     ];
 
     const isCustomerView = isTalkarCustomer && !isAdminBypass;

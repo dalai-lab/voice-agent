@@ -2,9 +2,33 @@
 
 import { Zap } from 'lucide-react';
 
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useOrgConfig } from '@/context/OrgConfigContext';
 
 export default function AutomationPage() {
+    const router = useRouter();
+    const { orgContext } = useOrgConfig();
+    const dograhOrgId = orgContext?.organization_id;
+
+    // Redirect Talkar customers away from automation page
+    useEffect(() => {
+        if (!dograhOrgId) return;
+        const isAdminBypass = document.cookie.includes('talkar_admin_bypass=true');
+        if (isAdminBypass) return;
+
+        fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data?.status) {
+                    router.replace('/overview');
+                }
+            })
+            .catch(() => { /* fail open */ });
+    }, [dograhOrgId, router]);
+
     return (
         <div className="max-w-7xl mx-auto px-6 py-6 space-y-6 bg-background text-foreground">
             <div className="pb-4 border-b border-border/40">

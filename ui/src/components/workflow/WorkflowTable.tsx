@@ -10,8 +10,10 @@ import {
     Settings,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
+
+import { useOrgConfig } from "@/context/OrgConfigContext";
 
 import {
     moveWorkflowToFolderApiV1WorkflowWorkflowIdFolderPut,
@@ -37,6 +39,7 @@ interface Workflow {
     created_at: string;
     total_runs?: number | null;
     folder_id?: number | null;
+    crm_link?: string | null;
 }
 
 interface WorkflowTableProps {
@@ -57,6 +60,27 @@ export function WorkflowTable({
     const [isPending, startTransition] = useTransition();
     const [loadingWorkflowId, setLoadingWorkflowId] = useState<number | null>(null);
     const [movingWorkflowId, setMovingWorkflowId] = useState<number | null>(null);
+    const [crmLinks, setCrmLinks] = useState<Record<number, string>>({});
+    const { orgContext } = useOrgConfig();
+    const dograhOrgId = orgContext?.organization_id;
+
+    useEffect(() => {
+        if (!dograhOrgId) return;
+        fetch(`/api/talkar/customers/by-org/${dograhOrgId}/agents`)
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    const links: Record<number, string> = {};
+                    data.forEach(a => {
+                        if (a.dograh_agent_id && a.crm_link) {
+                            links[a.dograh_agent_id] = a.crm_link;
+                        }
+                    });
+                    setCrmLinks(links);
+                }
+            })
+            .catch(() => {});
+    }, [dograhOrgId]);
 
     const handleEdit = (id: number) => {
         router.push(`/workflow/${id}`);
@@ -204,8 +228,23 @@ export function WorkflowTable({
                         </div>
 
                         <div className="flex items-center gap-2">
+                            {(workflow.crm_link || crmLinks[workflow.id]) && (
+                                <Button
+                                    variant="outline"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        window.open((workflow.crm_link || crmLinks[workflow.id])!, '_blank');
+                                    }}
+                                    className="h-8 rounded-lg shadow-sm font-semibold text-xs cursor-pointer px-3 border-slate-200"
+                                >
+                                    Open in CRM
+                                </Button>
+                            )}
                             <Button
-                                onClick={() => handleEdit(workflow.id)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEdit(workflow.id);
+                                }}
                                 className="h-8 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs cursor-pointer px-3"
                             >
                                 <Settings className="h-3.5 w-3.5 mr-1" />

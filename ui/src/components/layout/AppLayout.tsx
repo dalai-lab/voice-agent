@@ -16,6 +16,8 @@ import { useAuth } from "@/lib/auth";
 
 import { AppSidebar } from "./AppSidebar";
 
+import { NotificationBell } from "./NotificationBell";
+
 function AppHeader() {
   const { toggleSidebar } = useSidebar();
 
@@ -30,6 +32,7 @@ function AppHeader() {
         </Link>
       </div>
       <div className="flex items-center gap-3">
+        <NotificationBell />
       </div>
     </header>
   );

@@ -16,6 +16,7 @@ import React from "react";
 
 import { BrandLogo } from "@/components/BrandLogo";
 import { SidebarTeamSwitcher } from "@/components/layout/SidebarTeamSwitcher";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import ThemeToggle from "@/components/ThemeSwitcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -214,6 +215,22 @@ export function AppSidebar() {
   // Use shared TalkarCustomerContext — avoids a duplicate fetch that can fail
   // independently and leave the sidebar unfiltered when the Talkar service is slow.
   const { isTalkarCustomer, isAdminBypass } = useTalkarCustomer();
+  const dograhOrgId = orgContext?.organization_id;
+
+  const [crmLink, setCrmLink] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!user || !isTalkarCustomer || !dograhOrgId) return;
+    fetch(`/api/talkar/customers/by-org/${dograhOrgId}/agents`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const wfWithLink = data.find((w: any) => !!w.crm_link);
+          if (wfWithLink) setCrmLink(wfWithLink.crm_link);
+        }
+      })
+      .catch(() => {});
+  }, [user, isTalkarCustomer, dograhOrgId]);
 
   const filteredNavSections = React.useMemo(() => {
     const TALKAR_CUSTOMER_HIDDEN_URLS = [
@@ -264,6 +281,15 @@ export function AppSidebar() {
         icon: PhosphorIcons.Wallet,
       } as SidebarSingleItem);
 
+      if (crmLink) {
+        visibleSections[0].items.push({
+          type: "single",
+          title: "Open in CRM",
+          url: crmLink,
+          icon: PhosphorIcons.Link,
+        } as SidebarSingleItem);
+      }
+
       visibleSections.push({
         label: "HELP & SUPPORT",
         items: [
@@ -284,7 +310,7 @@ export function AppSidebar() {
     }
 
     return visibleSections;
-  }, [isTalkarCustomer, isAdminBypass]);
+  }, [isTalkarCustomer, isAdminBypass, crmLink]);
 
   const versionInfo = config ? { ui: config.uiVersion, api: config.apiVersion } : null;
 
@@ -526,6 +552,7 @@ export function AppSidebar() {
             </div>
           )}
           <div className={cn("flex items-center gap-2", isCollapsed && "hidden")}>
+            <NotificationBell />
             {isBehind && latestRelease && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -641,6 +668,7 @@ export function AppSidebar() {
               {!isCollapsed && (
                 <div className="flex items-center gap-2">
                   {hireExpertButton}
+                  <NotificationBell />
                   <ThemeToggle
                     showLabel={false}
                     className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
@@ -651,6 +679,7 @@ export function AppSidebar() {
               {isCollapsed && (
                 <div className="flex flex-col items-center gap-2 mt-2">
                   {hireExpertButton}
+                  <NotificationBell />
                   <ThemeToggle
                     showLabel={false}
                     className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
@@ -697,6 +726,7 @@ export function AppSidebar() {
               {!isCollapsed && (
                 <div className="flex items-center gap-2">
                   {hireExpertButton}
+                  <NotificationBell />
                   <ThemeToggle
                     showLabel={false}
                     className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
@@ -707,6 +737,7 @@ export function AppSidebar() {
               {isCollapsed && (
                 <div className="flex flex-col items-center gap-2 mt-2">
                   {hireExpertButton}
+                  <NotificationBell />
                   <ThemeToggle
                     showLabel={false}
                     className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"

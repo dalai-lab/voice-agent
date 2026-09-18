@@ -245,6 +245,10 @@ export default function WalletPage() {
 
   const handleSaveAutoRecharge = async () => {
     if (!resolvedOrgId) return;
+    if (autoRechargeEnabled && !hasSavedCard) {
+      alert("Please save and verify a card before enabling auto-recharge.");
+      return;
+    }
     const dograhOrgId = resolvedOrgId;
     setIsSavingRecharge(true);
     try {
@@ -570,8 +574,12 @@ export default function WalletPage() {
                 </div>
               )}
               
-              <Button className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90 border border-border/50 rounded-md h-9 text-xs font-semibold" onClick={handleSaveAutoRecharge} disabled={isSavingRecharge}>
-                 {isSavingRecharge ? "Saving Parameters..." : "Save Settings"}
+              <Button 
+                className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90 border border-border/50 rounded-md h-9 text-xs font-semibold" 
+                onClick={handleSaveAutoRecharge} 
+                disabled={isSavingRecharge || (autoRechargeEnabled && !hasSavedCard)}
+              >
+                 {isSavingRecharge ? "Saving Parameters..." : (autoRechargeEnabled && !hasSavedCard ? "Save Card Required to Enable" : "Save Settings")}
               </Button>
             </div>
           )}

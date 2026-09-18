@@ -183,6 +183,16 @@ function TalkarStatusGate() {
     );
   }
 
+  if (talkarStatus === 'suspended') {
+    return (
+      <div className="bg-gradient-to-r from-red-700 via-red-600 to-red-700 border-b border-red-500/40 text-white py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3 px-4">
+        <span className="text-lg">⛔</span>
+        <span>Your account has been suspended due to zero balance. Top up your wallet to instantly reactivate.</span>
+        <a href="/wallet" className="ml-2 shrink-0 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs transition-colors font-semibold">Add Credits →</a>
+      </div>
+    );
+  }
+
   return null;
 }
 

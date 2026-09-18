@@ -25,7 +25,7 @@ export const FooterCtaSection: React.FC = () => {
 
         {/* Subtitle */}
         <p className="text-base md:text-lg text-gray-300 max-w-xl mx-auto leading-relaxed font-light text-center mb-8">
-          Set up your AI phone agent in minutes. Activation starts from ₹6,000.
+          Set up your AI phone agent in minutes.
         </p>
 
         {/* CTA Button */}
@@ -35,7 +35,7 @@ export const FooterCtaSection: React.FC = () => {
           </a>
           
           <p className="text-xs text-gray-400 font-mono">
-            talkar.in — Activation starts from ₹6,000
+            talkar.in
           </p>
         </div>
 
@@ -55,6 +55,11 @@ export const FooterCtaSection: React.FC = () => {
 
           <div className="flex flex-col md:items-end gap-3 text-xs text-gray-500 shrink-0">
             <div>© {new Date().getFullYear()} Talkar Voice AI Engine. All rights reserved.</div>
+            <div className="flex items-center gap-3">
+              <a href="/privacy-policy" className="hover:text-gray-300 transition-colors">Privacy Policy</a>
+              <span>·</span>
+              <a href="/terms-of-service" className="hover:text-gray-300 transition-colors">Terms of Service</a>
+            </div>
           </div>
         </div>
 

@@ -907,6 +907,59 @@ export default function OnboardingPage() {
           </div>
         )}
 
+        {/* ── INFO REQUESTED SCREEN ── */}
+        {status === "info_requested" && (
+          <div className="max-w-xl mx-auto text-center space-y-8 py-12">
+            <div className="w-20 h-20 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center mx-auto">
+              <span className="text-4xl">📋</span>
+            </div>
+            <div className="space-y-3">
+              <h2 className="text-2xl font-bold text-zinc-900">We Need a Little More Info</h2>
+              <p className="text-zinc-500 text-sm leading-relaxed max-w-sm mx-auto">
+                Our team has reviewed your application and needs some additional details before we can proceed.
+                We&apos;ll be reaching out to you shortly via email or WhatsApp.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl border border-amber-200 bg-amber-50 text-left space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">What to expect</p>
+              <ul className="text-sm text-zinc-700 space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500 mt-0.5">•</span>
+                  A Talkar team member will contact you within 24 hours.
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500 mt-0.5">•</span>
+                  Please keep your phone handy for a quick call or message.
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500 mt-0.5">•</span>
+                  Once we get the info, your account will be reviewed immediately.
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+              <a
+                href="https://wa.me/919876543210"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 h-11 px-6 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl text-sm transition-colors shadow-md"
+              >
+                <span>💬</span>
+                Chat on WhatsApp
+              </a>
+              <Button
+                variant="outline"
+                className="h-11 px-6 border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-xl text-sm"
+                onClick={() => void logout()}
+              >
+                Sign Out
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* ── 4. UNDER REVIEW SCREEN ── */}
         {status === "under_review" && (
           <div className="max-w-xl mx-auto text-center space-y-6 py-12">
@@ -970,12 +1023,6 @@ export default function OnboardingPage() {
               <Button size="lg" className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 text-white font-semibold shadow-lg shadow-orange-500/25 h-12 px-8 rounded-xl min-w-[220px]" onClick={handlePaySetupFee}>
                 <CreditCard className="w-4 h-4 mr-2" /> Pay Setup Fee
               </Button>
-              
-              {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
-                <Button onClick={handleMockSetupFee} variant="outline" size="lg" className="border-zinc-300 text-zinc-700 hover:bg-zinc-50 h-12 rounded-xl">
-                  Bypass Payment (Dev)
-                </Button>
-              )}
             </div>
           </div>
         )}

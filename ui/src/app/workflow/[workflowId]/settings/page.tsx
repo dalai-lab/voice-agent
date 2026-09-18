@@ -1639,10 +1639,30 @@ function WorkflowModelOverridesSection({
 
 export default function WorkflowSettingsPage() {
     const params = useParams();
+    const router = useRouter();
     const { user, redirectToLogin, loading: authLoading } = useAuth();
     const [workflow, setWorkflow] = useState<WorkflowResponse | undefined>(undefined);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const { orgContext } = useOrgConfig();
+    const dograhOrgId = orgContext?.organization_id;
+
+    // Redirect Talkar customers away from settings
+    useEffect(() => {
+        if (!dograhOrgId) return;
+        const isAdminBypass = document.cookie.includes('talkar_admin_bypass=true');
+        if (isAdminBypass) return;
+
+        fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data?.status) {
+                    // Talkar customer — redirect to overview
+                    router.replace('/overview');
+                }
+            })
+            .catch(() => { /* fail open */ });
+    }, [dograhOrgId, router]);
 
     useEffect(() => {
         if (!authLoading && !user) {

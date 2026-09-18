@@ -45,6 +45,7 @@ import { useAppConfig } from "@/context/AppConfigContext";
 import { useOrgConfig } from "@/context/OrgConfigContext";
 import { useLeadForms } from "@/context/LeadFormsContext";
 import { useTelephonyConfigWarnings } from "@/context/TelephonyConfigWarningsContext";
+import { useTalkarCustomer } from "@/context/TalkarCustomerContext";
 import { useLatestReleaseVersion } from "@/hooks/useLatestReleaseVersion";
 import type { LocalUser } from "@/lib/auth";
 import { useAuth } from "@/lib/auth";
@@ -201,7 +202,6 @@ export function AppSidebar() {
   const { config } = useAppConfig();
   const { openHireExpert } = useLeadForms();
   const { orgContext } = useOrgConfig();
-  const dograhOrgId = orgContext?.organization_id;
   const {
     telnyxMissingWebhookPublicKeyCount,
     vonageMissingSignatureSecretCount,
@@ -211,26 +211,9 @@ export function AppSidebar() {
     vonageMissingSignatureSecretCount > 0;
   const isCollapsed = !isMobile && state === "collapsed";
 
-  const [isTalkarCustomer, setIsTalkarCustomer] = React.useState(false);
-  const [isAdminBypass, setIsAdminBypass] = React.useState(false);
-
-  React.useEffect(() => {
-    setIsAdminBypass(document.cookie.includes('talkar_admin_bypass=true'));
-  }, []);
-
-  React.useEffect(() => {
-    // Skip if admin bypass is active, or org context not loaded yet
-    if (isAdminBypass || !dograhOrgId) return;
-
-    fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
-      .then(async r => {
-        if (!r.ok) return; // 404 = new customer, fail open (will be gated by AppLayout anyway)
-        const data = await r.json();
-        // Any valid Talkar customer record means this is a managed Talkar org
-        if (data?.status) setIsTalkarCustomer(true);
-      })
-      .catch(() => { /* fail open */ });
-  }, [dograhOrgId, isAdminBypass]);
+  // Use shared TalkarCustomerContext — avoids a duplicate fetch that can fail
+  // independently and leave the sidebar unfiltered when the Talkar service is slow.
+  const { isTalkarCustomer, isAdminBypass } = useTalkarCustomer();
 
   const filteredNavSections = React.useMemo(() => {
     const TALKAR_CUSTOMER_HIDDEN_URLS = [
@@ -240,6 +223,10 @@ export function AppSidebar() {
       "/api-keys",
       "/usage",
       "/billing",
+      "/files",
+      "/recordings",
+      "/superadmin",
+      "/tools",
     ];
 
     const isCustomerView = isTalkarCustomer && !isAdminBypass;

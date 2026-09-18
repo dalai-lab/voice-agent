@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import posthog from 'posthog-js';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -10,6 +10,7 @@ import type { WorkflowResponse } from '@/client/types.gen';
 import { FlowEdge, FlowNode } from '@/components/flow/types';
 import SpinLoader from '@/components/SpinLoader';
 import { PostHogEvent } from '@/constants/posthog-events';
+import { useOrgConfig } from '@/context/OrgConfigContext';
 import { detailFromError } from '@/lib/apiError';
 import { useAuth } from '@/lib/auth';
 import logger from '@/lib/logger';
@@ -20,10 +21,30 @@ import WorkflowLayout from '../WorkflowLayout';
 export default function WorkflowDetailPage() {
     const params = useParams();
     const searchParams = useSearchParams();
+    const router = useRouter();
     const [workflow, setWorkflow] = useState<WorkflowResponse | undefined>(undefined);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const { user, redirectToLogin, loading: authLoading } = useAuth();
+    const { orgContext } = useOrgConfig();
+    const dograhOrgId = orgContext?.organization_id;
+
+    // Redirect Talkar customers away from the canvas editor (read-only for clients)
+    useEffect(() => {
+        if (!dograhOrgId) return;
+        const isAdminBypass = document.cookie.includes('talkar_admin_bypass=true');
+        if (isAdminBypass) return;
+
+        fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data?.status) {
+                    // Talkar customer — redirect to overview
+                    router.replace('/overview');
+                }
+            })
+            .catch(() => { /* fail open */ });
+    }, [dograhOrgId, router]);
 
     // Redirect if not authenticated
     useEffect(() => {

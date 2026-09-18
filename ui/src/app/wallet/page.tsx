@@ -42,6 +42,7 @@ export default function WalletPage() {
   const [selectedTierToSwitch, setSelectedTierToSwitch] = useState<string | null>(null);
 
   const [resolvedOrgId, setResolvedOrgId] = useState<number | null>(null);
+  const [customerStatus, setCustomerStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -71,11 +72,13 @@ export default function WalletPage() {
       fetch(`${TALKAR}/billing/subscription/by-org/${resolvedOrgId}`).then(r => r.json()),
       fetch(`${TALKAR}/billing/transactions/by-org/${resolvedOrgId}?limit=100`).then(r => r.json()),
       fetch(`${TALKAR}/billing/usage/by-org/${resolvedOrgId}`).then(r => r.json()),
-    ]).then(([walletData, subData, txnData, usageData]) => {
+      fetch(`${TALKAR}/customers/status?dograh_org_id=${resolvedOrgId}`).then(r => r.ok ? r.json() : null),
+    ]).then(([walletData, subData, txnData, usageData, statusData]) => {
       setWallet(walletData);
       setSubscription(subData);
       setTransactions(txnData.transactions || []);
       setUsage(usageData);
+      if (statusData?.status) setCustomerStatus(statusData.status);
       
       setAutoRechargeEnabled(walletData.auto_recharge_enabled);
       setThreshold(String((walletData.auto_recharge_threshold_paise || 100000) / 100));
@@ -86,20 +89,37 @@ export default function WalletPage() {
 
   useEffect(() => {
     if (subscription) {
-      const p = subscription.plan || "starter";
-      const min = PLAN_MINIMUMS[p] ?? 6000;
-      if (parseInt(topupAmount || "0") < min) {
-        setTopupAmount(String(min));
+      const isActivationNeeded = customerStatus === "pending_deposit" || customerStatus === "pending_plan_selection" || isActivation;
+      if (isActivationNeeded) {
+        // During activation: pre-fill with the plan minimum so user doesn't get blocked
+        const p = subscription.plan || "starter";
+        const min = isCustomPlan
+          ? (subscription.custom_activation_deposit_paise ?? 600000) / 100
+          : (PLAN_MINIMUMS[p] ?? 6000);
+        if (parseInt(topupAmount || "0") < min) {
+          setTopupAmount(String(min));
+        }
       }
+      // For active/suspended users, don't force a minimum — let them type any amount >= ₹500
     }
-  }, [subscription]);
+  }, [subscription, customerStatus]);
 
   const balanceRupees = wallet && typeof wallet.balance_paise === 'number' ? (wallet.balance_paise / 100).toFixed(2) : "0.00";
   const isZero = !wallet || wallet.balance_paise === 0 || wallet.balance_paise === undefined;
   const isLow = wallet?.balance_paise > 0 && wallet?.balance_paise < 50000;
 
-  const currentPlan = subscription?.plan || plan || "starter";
-  const minTopup = PLAN_MINIMUMS[currentPlan] ?? 6000;
+  const currentPlan = subscription?.tier || plan || "starter";
+  const isCustomPlan = subscription?.is_custom;
+  
+  // Minimum top-up depends on account status:
+  // - Pending activation: must hit the full plan activation deposit
+  // - Active/suspended (regular top-up): just ₹500 minimum
+  const isActivationNeeded = customerStatus === "pending_deposit" || customerStatus === "pending_plan_selection" || isActivation;
+  const minTopup = isActivationNeeded
+    ? (isCustomPlan
+        ? (subscription?.custom_activation_deposit_paise ?? 600000) / 100
+        : PLAN_MINIMUMS[currentPlan] ?? 6000)
+    : 500; // Regular top-up floor: ₹500
 
   const handleTopup = async (isMock = false, isLiveTest = false) => {
     if (!resolvedOrgId) return;
@@ -494,14 +514,6 @@ export default function WalletPage() {
               <Button onClick={() => handleTopup(false)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} className="bg-primary text-primary-foreground hover:bg-primary/95 rounded-md h-10 px-4 text-xs font-semibold shadow-xs">
                 {isProcessing ? "Processing..." : "Add Credits"}
               </Button>
-              <Button variant="outline" onClick={() => handleTopup(false, true)} disabled={isProcessing} className="border-border/80 text-orange-500 hover:bg-orange-50 rounded-md h-10 text-xs font-bold border-orange-200">
-                Test ₹1 (Live)
-              </Button>
-              {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
-                <Button variant="outline" onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} className="border-border/80 hover:bg-accent text-foreground rounded-md h-10 text-xs">
-                  Bypass (Dev)
-                </Button>
-              )}
             </div>
           </div>
         </div>
@@ -554,9 +566,6 @@ export default function WalletPage() {
                   <span className="font-semibold">Payment method required</span>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => handleAddCard(false)} className="bg-primary text-primary-foreground hover:bg-primary/95 text-[9px] font-bold rounded px-2.5 py-0.5">Save Card</Button>
-                    {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
-                      <Button size="sm" variant="ghost" onClick={() => handleAddCard(true)} className="text-zinc-500 text-[9px] p-0 h-auto">Dev Bypass</Button>
-                    )}
                   </div>
                 </div>
               )}
@@ -584,7 +593,8 @@ export default function WalletPage() {
                 <div>
                   <span className="text-[9px] text-muted-foreground block uppercase font-mono tracking-wider">Active Engine</span>
                   <p className="text-base font-bold text-foreground mt-0.5">
-                    {subscription.tier === "pro" ? "Pro Engine" :
+                    {subscription.tier === "custom" ? (subscription.custom_plan_label || "Custom Engine") :
+                     subscription.tier === "pro" ? "Pro Engine" :
                      subscription.tier === "growth" ? "Growth Engine" :
                      subscription.tier === "elite" ? "Apex Omni Prime" :
                      "Echo-Lite Engine"}
@@ -602,7 +612,9 @@ export default function WalletPage() {
                 <div>
                   <span className="text-[9px] text-muted-foreground uppercase tracking-wider block font-semibold">Active Channels</span>
                   <p className="font-bold text-foreground mt-0.5">
-                    {subscription.tier === "pro" ? "10 call lines" : subscription.tier === "elite" ? "50 call lines" : "2 call lines"}
+                    {subscription.tier === "custom" ? "Configured by Talkar" :
+                     subscription.tier === "pro" ? "10 call lines" : 
+                     subscription.tier === "elite" ? "50 call lines" : "2 call lines"}
                   </p>
                 </div>
               </div>
@@ -615,17 +627,22 @@ export default function WalletPage() {
         </div>
       </div>
 
-      {/* Upgrade Plan Options */}
+      {/* Upgrade Plan Options — hidden for custom-plan customers */}
       <div className="bg-card border border-border/50 rounded-lg p-5 shadow-2xs space-y-6">
         <div>
           <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
             <ReceiptText className="w-4 h-4 text-primary" />
-            Change Call Tier
+            {isCustomPlan ? (subscription?.custom_plan_label || "Custom Plan") : "Change Call Tier"}
           </h2>
-          <p className="text-muted-foreground text-xs">Switch your call rate and capacity configurations.</p>
+          <p className="text-muted-foreground text-xs">
+            {isCustomPlan
+              ? "Your plan is custom-configured by Talkar. Contact support to make any adjustments."
+              : "Switch your call rate and capacity configurations."}
+          </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4">
+        {!isCustomPlan && (
+          <div className="grid md:grid-cols-3 gap-4">
           {/* Starter Plan Card */}
           <div 
             onClick={() => {
@@ -779,6 +796,7 @@ export default function WalletPage() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Switch Plan Confirmation Modal */}

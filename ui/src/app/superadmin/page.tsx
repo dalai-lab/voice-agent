@@ -2,7 +2,8 @@
 
 import { ArrowRight, List, Loader2 } from 'lucide-react';
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +20,14 @@ export default function SuperadminPage() {
     const [error, setError] = useState<{ target: ImpersonationTarget; message: string } | null>(null);
     const [loadingTarget, setLoadingTarget] = useState<ImpersonationTarget | null>(null);
     const { user, getAccessToken } = useAuth();
+    const router = useRouter();
+
+    // TALKAR PATCH: Guard — only dograh superadmins (with admin bypass cookie) can access this page.
+    useEffect(() => {
+        if (typeof document !== 'undefined' && !document.cookie.includes('talkar_admin_bypass=true')) {
+            router.replace('/overview');
+        }
+    }, [router]);
 
     const handleImpersonate = async (target: ImpersonationTarget, value: string) => {
         const trimmedValue = value.trim();

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { SidebarInset, SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { useAppConfig } from "@/context/AppConfigContext";
 import { LeadFormsProvider } from "@/context/LeadFormsContext";
+import { TalkarCustomerProvider, useTalkarCustomer } from "@/context/TalkarCustomerContext";
 import { useAuth } from "@/lib/auth";
 
 import { AppSidebar } from "./AppSidebar";
@@ -116,6 +117,7 @@ function TalkarStatusGate() {
         const data = await r.json();
         const { status, is_sub_org, has_onboarding_form } = data;
         setTalkarStatus(status);
+        // Note: isTalkarCustomer state is managed by TalkarCustomerContext (shared)
         
         // Edge case: Sub-orgs with no brief form need to fill it first
         if (is_sub_org && !has_onboarding_form && (status === 'agent_building' || status === 'pending_approval')) {
@@ -212,6 +214,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   // across route changes (avoids React hooks ordering violations during navigation).
   return (
     <SidebarProvider defaultOpen>
+      <TalkarCustomerProvider>
       {shouldShowSidebar ? (
         <LeadFormsProvider>
           <div className="flex min-h-screen w-full">
@@ -256,6 +259,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           {children}
         </div>
       )}
+      </TalkarCustomerProvider>
     </SidebarProvider>
   );
 };

@@ -290,7 +290,7 @@ export function AppSidebar() {
           items: crmLinks.map((crm) => ({
             type: "single",
             title: crm.name || "Open CRM",
-            url: crm.url,
+            url: crm.url.startsWith("http") ? crm.url : `https://${crm.url}`,
             icon: PhosphorIcons.LinkSimple,
           })),
         } as SidebarGroupItem);

@@ -331,9 +331,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   // always render SidebarProvider to keep the component tree shape consistent
   // across route changes (avoids React hooks ordering violations during navigation).
   return (
-    <SidebarProvider defaultOpen>
-      <TalkarCustomerProvider>
-        <TalkarLayoutGate>
+    <TalkarCustomerProvider>
+      <TalkarLayoutGate>
+        <SidebarProvider defaultOpen>
           {shouldShowSidebar ? (
             <LeadFormsProvider>
               <div className="flex min-h-screen w-full">
@@ -382,9 +382,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               </TalkarRouteGuard>
             </div>
           )}
-        </TalkarLayoutGate>
-      </TalkarCustomerProvider>
-    </SidebarProvider>
+        </SidebarProvider>
+      </TalkarLayoutGate>
+    </TalkarCustomerProvider>
   );
 };
 

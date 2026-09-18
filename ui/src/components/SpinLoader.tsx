@@ -6,7 +6,7 @@ interface SpinLoaderProps {
 
 export default function SpinLoader({ label }: SpinLoaderProps) {
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-background">
+        <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
             <div className="flex flex-col items-center gap-4">
                 <BrandLogo className="animate-pulse" />
 

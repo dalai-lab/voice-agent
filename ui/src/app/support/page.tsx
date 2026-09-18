@@ -65,6 +65,11 @@ function SupportContent() {
   const [supportPriority, setSupportPriority] = useState("medium");
   const [isSubmittingSupport, setIsSubmittingSupport] = useState(false);
 
+  // Phone Number Request State
+  const [phoneQuantity, setPhoneQuantity] = useState("1");
+  const [phoneRegion, setPhoneRegion] = useState("");
+  const [phoneUseCase, setPhoneUseCase] = useState("");
+
   // Feature Form State
   const [featureCategory, setFeatureCategory] = useState("voice_llm");
   const [featureTitle, setFeatureTitle] = useState("");
@@ -105,6 +110,40 @@ function SupportContent() {
       toast.error("Organization context not found. Please refresh.");
       return;
     }
+
+    if (supportCategory === "phone_number") {
+      if (!phoneRegion.trim() || !phoneUseCase.trim()) {
+        toast.error("Please provide both region and use case.");
+        return;
+      }
+      setIsSubmittingSupport(true);
+      try {
+        const res = await fetch(`/api/talkar/customers/by-org/${dograhOrgId}/request-phone-numbers`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            quantity: Number(phoneQuantity),
+            region: phoneRegion.trim(),
+            use_case: phoneUseCase.trim()
+          })
+        });
+        if (res.ok) {
+          toast.success("Phone number request submitted! Our team will process it shortly.");
+          setPhoneRegion("");
+          setPhoneUseCase("");
+          setPhoneQuantity("1");
+        } else {
+          const err = await res.json().catch(() => ({}));
+          toast.error(err.detail || "Failed to submit phone number request.");
+        }
+      } catch {
+        toast.error("Network error while submitting request.");
+      } finally {
+        setIsSubmittingSupport(false);
+      }
+      return;
+    }
+
     if (!supportSubject.trim() || !supportDescription.trim()) {
       toast.error("Please provide both a subject and description.");
       return;
@@ -340,36 +379,76 @@ function SupportContent() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">Subject</Label>
-                <Input
-                  value={supportSubject}
-                  onChange={(e) => setSupportSubject(e.target.value)}
-                  placeholder="e.g. Agent is pausing too long before answering"
-                  className="h-9 text-xs bg-background border-border"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-foreground">Description</Label>
-                <Textarea
-                  value={supportDescription}
-                  onChange={(e) => setSupportDescription(e.target.value)}
-                  placeholder="Describe the issue, phone numbers involved, expected behavior, and any timestamps if applicable..."
-                  className="min-h-[140px] text-xs bg-background border-border resize-y"
-                  required
-                />
-              </div>
+              {supportCategory === "phone_number" ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground">Quantity</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={phoneQuantity}
+                        onChange={(e) => setPhoneQuantity(e.target.value)}
+                        className="h-9 text-xs bg-background border-border"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-foreground">Region / Area Code</Label>
+                      <Input
+                        value={phoneRegion}
+                        onChange={(e) => setPhoneRegion(e.target.value)}
+                        placeholder="e.g. US, UK, +91, or specific area code"
+                        className="h-9 text-xs bg-background border-border"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">Use Case</Label>
+                    <Textarea
+                      value={phoneUseCase}
+                      onChange={(e) => setPhoneUseCase(e.target.value)}
+                      placeholder="Describe what these numbers will be used for (e.g. outbound sales, inbound support)..."
+                      className="min-h-[140px] text-xs bg-background border-border resize-y"
+                      required
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">Subject</Label>
+                    <Input
+                      value={supportSubject}
+                      onChange={(e) => setSupportSubject(e.target.value)}
+                      placeholder="e.g. Agent is pausing too long before answering"
+                      className="h-9 text-xs bg-background border-border"
+                      required
+                    />
+                  </div>
+    
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-foreground">Description</Label>
+                    <Textarea
+                      value={supportDescription}
+                      onChange={(e) => setSupportDescription(e.target.value)}
+                      placeholder="Describe the issue, phone numbers involved, expected behavior, and any timestamps if applicable..."
+                      className="min-h-[140px] text-xs bg-background border-border resize-y"
+                      required
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="flex justify-end pt-2">
                 <Button
                   type="submit"
-                  disabled={isSubmittingSupport || !supportSubject.trim() || !supportDescription.trim()}
+                  disabled={isSubmittingSupport || (supportCategory === "phone_number" ? (!phoneRegion.trim() || !phoneUseCase.trim()) : (!supportSubject.trim() || !supportDescription.trim()))}
                   className="h-9 px-5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-all shadow-sm cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5 mr-1.5" />
-                  {isSubmittingSupport ? "Submitting..." : "Send Ticket"}
+                  {isSubmittingSupport ? "Submitting..." : "Submit Request"}
                 </Button>
               </div>
             </form>

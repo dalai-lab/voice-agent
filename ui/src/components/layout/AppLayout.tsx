@@ -13,6 +13,7 @@ import { useAppConfig } from "@/context/AppConfigContext";
 import { LeadFormsProvider } from "@/context/LeadFormsContext";
 import { TalkarCustomerProvider, useTalkarCustomer } from "@/context/TalkarCustomerContext";
 import { useAuth } from "@/lib/auth";
+import SpinLoader from "@/components/SpinLoader";
 
 import { AppSidebar } from "./AppSidebar";
 
@@ -278,6 +279,27 @@ function TalkarRouteGuard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function TalkarLayoutGate({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const { isLoading, isAdminBypass } = useTalkarCustomer();
+
+  const isPublicRoute =
+    pathname === "/" ||
+    pathname.startsWith("/use-cases") ||
+    pathname.startsWith("/integrations") ||
+    pathname.startsWith("/handler") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/privacy-policy") ||
+    pathname.startsWith("/terms-of-service");
+
+  // Keep showing the initial Talkar SpinLoader until we know whether the user is an admin or customer
+  if (isLoading && !isPublicRoute && !isAdminBypass) {
+    return <SpinLoader />;
+  }
+
+  return <>{children}</>;
+}
+
 interface AppLayoutProps {
   children: ReactNode;
   headerActions?: ReactNode;
@@ -311,54 +333,56 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   return (
     <SidebarProvider defaultOpen>
       <TalkarCustomerProvider>
-      {shouldShowSidebar ? (
-        <LeadFormsProvider>
-          <div className="flex min-h-screen w-full">
-            <AppSidebar />
-            <SidebarInset className="flex-1">
+        <TalkarLayoutGate>
+          {shouldShowSidebar ? (
+            <LeadFormsProvider>
+              <div className="flex min-h-screen w-full">
+                <AppSidebar />
+                <SidebarInset className="flex-1">
+                  <TalkarStatusGate />
+                  <BackendStatusBanner />
+                  {!isWorkflowEditor && <AppHeader />}
+                  {/* Optional header area for specific pages */}
+                  {headerActions && (
+                    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/70 backdrop-blur-md supports-[backdrop-filter]:bg-background/55">
+                      <div className="container mx-auto px-4 py-4">
+                        <div className="flex items-center justify-center">
+                          {headerActions}
+                        </div>
+                      </div>
+                    </header>
+                  )}
+
+                  {/* Optional sticky tabs */}
+                  {stickyTabs && (
+                    <div className="sticky top-0 z-40 bg-[#2a2e39] border-b border-gray-700">
+                      <div className="container mx-auto px-4">
+                        <div className="flex items-center justify-center py-2">
+                          {stickyTabs}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Main content area */}
+                  <main className="app-surface flex-1">
+                    <TalkarRouteGuard>
+                      {children}
+                    </TalkarRouteGuard>
+                  </main>
+                </SidebarInset>
+              </div>
+            </LeadFormsProvider>
+          ) : (
+            <div className="app-surface w-full flex-1">
               <TalkarStatusGate />
               <BackendStatusBanner />
-              {!isWorkflowEditor && <AppHeader />}
-              {/* Optional header area for specific pages */}
-              {headerActions && (
-                <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/70 backdrop-blur-md supports-[backdrop-filter]:bg-background/55">
-                  <div className="container mx-auto px-4 py-4">
-                    <div className="flex items-center justify-center">
-                      {headerActions}
-                    </div>
-                  </div>
-                </header>
-              )}
-
-              {/* Optional sticky tabs */}
-              {stickyTabs && (
-                <div className="sticky top-0 z-40 bg-[#2a2e39] border-b border-gray-700">
-                  <div className="container mx-auto px-4">
-                    <div className="flex items-center justify-center py-2">
-                      {stickyTabs}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Main content area */}
-              <main className="app-surface flex-1">
-                <TalkarRouteGuard>
-                  {children}
-                </TalkarRouteGuard>
-              </main>
-            </SidebarInset>
-          </div>
-        </LeadFormsProvider>
-      ) : (
-        <div className="app-surface w-full flex-1">
-          <TalkarStatusGate />
-          <BackendStatusBanner />
-          <TalkarRouteGuard>
-            {children}
-          </TalkarRouteGuard>
-        </div>
-      )}
+              <TalkarRouteGuard>
+                {children}
+              </TalkarRouteGuard>
+            </div>
+          )}
+        </TalkarLayoutGate>
       </TalkarCustomerProvider>
     </SidebarProvider>
   );

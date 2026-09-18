@@ -19,8 +19,8 @@ const TalkarCustomerContext = createContext<TalkarCustomerContextValue>({
 });
 
 export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const { orgContext } = useOrgConfig();
+  const { user, loading: authLoading } = useAuth();
+  const { orgContext, loading: orgLoading } = useOrgConfig();
   const dograhOrgId = orgContext?.organization_id;
 
   const [isAdminBypass, setIsAdminBypass] = React.useState(() => {
@@ -47,19 +47,35 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // If auth or org context is still resolving, keep waiting (prevents flash of admin controls)
+    if (authLoading || orgLoading) {
+      return;
+    }
+
+    // If user is not logged in or has no org, we are done
     if (!user || !dograhOrgId) {
       setIsLoading(false);
       return;
     }
+
+    // Admin bypass sees everything immediately
     if (isAdminBypass) {
       setIsLoading(false);
       return;
     }
-    // Only re-fetch when the org changes
-    if (lastCheckedOrgRef.current === dograhOrgId) return;
-    lastCheckedOrgRef.current = dograhOrgId;
 
-    fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
+    // Only re-fetch when the org changes
+    if (lastCheckedOrgRef.current === dograhOrgId) {
+      setIsLoading(false);
+      return;
+    }
+    lastCheckedOrgRef.current = dograhOrgId;
+    setIsLoading(true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`, { signal: controller.signal })
       .then(async (r) => {
         if (!r.ok) {
           setIsTalkarCustomer(false);
@@ -77,12 +93,18 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch(() => {
-        /* network failure — fail open */
+        /* network failure or abort — fail open */
       })
       .finally(() => {
+        clearTimeout(timeoutId);
         setIsLoading(false);
       });
-  }, [user, dograhOrgId, isAdminBypass]);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [user, authLoading, dograhOrgId, orgLoading, isAdminBypass]);
 
   return (
     <TalkarCustomerContext.Provider value={{ isTalkarCustomer, isAdminBypass, talkarStatus, isLoading }}>

@@ -109,18 +109,18 @@ export function NotificationBell() {
   const getCategoryConfig = (type: string) => {
     switch (type) {
       case "success":
-        return { icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-50" };
+        return { icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-500/10" };
       case "warning":
-        return { icon: AlertTriangle, color: "text-amber-500", bg: "bg-amber-50" };
+        return { icon: AlertTriangle, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-500/10" };
       case "critical":
-        return { icon: AlertCircle, color: "text-red-500", bg: "bg-red-50" };
+        return { icon: AlertCircle, color: "text-red-500", bg: "bg-red-50 dark:bg-red-500/10" };
       case "update":
-        return { icon: Sparkles, color: "text-purple-500", bg: "bg-purple-50" };
+        return { icon: Sparkles, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-500/10" };
       case "maintenance":
-        return { icon: Wrench, color: "text-orange-500", bg: "bg-orange-50" };
+        return { icon: Wrench, color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-500/10" };
       case "info":
       default:
-        return { icon: Info, color: "text-indigo-500", bg: "bg-indigo-50" };
+        return { icon: Info, color: "text-indigo-500", bg: "bg-indigo-50 dark:bg-indigo-500/10" };
     }
   };
 
@@ -141,7 +141,7 @@ export function NotificationBell() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 p-0 sm:w-96 shadow-xl border-border/50">
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-50/50 border-b border-border/50">
+        <div className="flex items-center justify-between px-4 py-3 bg-slate-50/50 dark:bg-slate-900/50 border-b border-border/50">
           <DropdownMenuLabel className="p-0 font-semibold text-sm">Notifications</DropdownMenuLabel>
           {unreadCount > 0 && (
             <Button
@@ -157,11 +157,11 @@ export function NotificationBell() {
         <div className="max-h-[60vh] overflow-y-auto no-scrollbar">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center px-4">
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-                <Bell className="h-5 w-5 text-slate-400" />
+              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                <Bell className="h-5 w-5 text-slate-400 dark:text-slate-500" />
               </div>
-              <p className="text-sm font-medium text-slate-900">No notifications</p>
-              <p className="text-xs text-slate-500 mt-1">You&apos;re all caught up!</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">No notifications</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">You&apos;re all caught up!</p>
             </div>
           ) : (
             <div className="flex flex-col">
@@ -173,7 +173,7 @@ export function NotificationBell() {
                   <div
                     key={notif.id}
                     className={`flex gap-3 px-4 py-3 border-b border-border/50 last:border-0 transition-colors ${
-                      !notif.is_read ? "bg-slate-50" : "hover:bg-slate-50/50"
+                      !notif.is_read ? "bg-slate-50 dark:bg-slate-800/40" : "hover:bg-slate-50/50 dark:hover:bg-slate-800/20"
                     }`}
                     onClick={() => !notif.is_read && markAsRead(notif.id)}
                     role="button"
@@ -184,14 +184,14 @@ export function NotificationBell() {
                     </div>
                     <div className="flex flex-col gap-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`text-sm ${!notif.is_read ? "font-semibold text-slate-900" : "font-medium text-slate-700"}`}>
+                        <p className={`text-sm ${!notif.is_read ? "font-semibold text-slate-900 dark:text-slate-100" : "font-medium text-slate-700 dark:text-slate-300"}`}>
                           {notif.title}
                         </p>
-                        <span className="text-[10px] text-slate-400 whitespace-nowrap shrink-0 mt-0.5">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0 mt-0.5">
                           {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true })}
                         </span>
                       </div>
-                      <p className={`text-xs ${!notif.is_read ? "text-slate-700" : "text-slate-500"} line-clamp-2`}>
+                      <p className={`text-xs ${!notif.is_read ? "text-slate-700 dark:text-slate-300" : "text-slate-500 dark:text-slate-400"} line-clamp-2`}>
                         {notif.body}
                       </p>
                     </div>
@@ -205,7 +205,7 @@ export function NotificationBell() {
                     variant="ghost" 
                     size="sm" 
                     onClick={(e) => { e.stopPropagation(); loadMore(); }}
-                    className="text-xs text-slate-500 hover:text-slate-900"
+                    className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                   >
                     Load more...
                   </Button>

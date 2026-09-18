@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,18 @@ export default function SelectPlanPage() {
   const dograhOrgId = orgContext?.organization_id;
   const router = useRouter();
   const [submitting, setSubmitting] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!dograhOrgId) return;
+    fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === "active") {
+          router.replace("/overview");
+        }
+      })
+      .catch(console.error);
+  }, [dograhOrgId, router]);
 
   const handleSelectTier = async (tierId: string) => {
     if (!dograhOrgId) return;

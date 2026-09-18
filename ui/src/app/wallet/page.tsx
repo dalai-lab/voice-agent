@@ -98,8 +98,11 @@ export default function WalletPage() {
   const isZero = !wallet || wallet.balance_paise === 0 || wallet.balance_paise === undefined;
   const isLow = wallet?.balance_paise > 0 && wallet?.balance_paise < 50000;
 
-  const currentPlan = subscription?.plan || plan || "starter";
-  const minTopup = PLAN_MINIMUMS[currentPlan] ?? 6000;
+  const currentPlan = subscription?.tier || plan || "starter";
+  const isCustomPlan = subscription?.is_custom;
+  const minTopup = isCustomPlan
+    ? (subscription?.custom_activation_deposit_paise ?? 600000) / 100
+    : PLAN_MINIMUMS[currentPlan] ?? 6000;
 
   const handleTopup = async (isMock = false, isLiveTest = false) => {
     if (!resolvedOrgId) return;
@@ -584,7 +587,8 @@ export default function WalletPage() {
                 <div>
                   <span className="text-[9px] text-muted-foreground block uppercase font-mono tracking-wider">Active Engine</span>
                   <p className="text-base font-bold text-foreground mt-0.5">
-                    {subscription.tier === "pro" ? "Pro Engine" :
+                    {subscription.tier === "custom" ? (subscription.custom_plan_label || "Custom Engine") :
+                     subscription.tier === "pro" ? "Pro Engine" :
                      subscription.tier === "growth" ? "Growth Engine" :
                      subscription.tier === "elite" ? "Apex Omni Prime" :
                      "Echo-Lite Engine"}
@@ -602,7 +606,9 @@ export default function WalletPage() {
                 <div>
                   <span className="text-[9px] text-muted-foreground uppercase tracking-wider block font-semibold">Active Channels</span>
                   <p className="font-bold text-foreground mt-0.5">
-                    {subscription.tier === "pro" ? "10 call lines" : subscription.tier === "elite" ? "50 call lines" : "2 call lines"}
+                    {subscription.tier === "custom" ? "Configured by Talkar" :
+                     subscription.tier === "pro" ? "10 call lines" : 
+                     subscription.tier === "elite" ? "50 call lines" : "2 call lines"}
                   </p>
                 </div>
               </div>
@@ -615,17 +621,22 @@ export default function WalletPage() {
         </div>
       </div>
 
-      {/* Upgrade Plan Options */}
+      {/* Upgrade Plan Options — hidden for custom-plan customers */}
       <div className="bg-card border border-border/50 rounded-lg p-5 shadow-2xs space-y-6">
         <div>
           <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
             <ReceiptText className="w-4 h-4 text-primary" />
-            Change Call Tier
+            {isCustomPlan ? (subscription?.custom_plan_label || "Custom Plan") : "Change Call Tier"}
           </h2>
-          <p className="text-muted-foreground text-xs">Switch your call rate and capacity configurations.</p>
+          <p className="text-muted-foreground text-xs">
+            {isCustomPlan
+              ? "Your plan is custom-configured by Talkar. Contact support to make any adjustments."
+              : "Switch your call rate and capacity configurations."}
+          </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4">
+        {!isCustomPlan && (
+          <div className="grid md:grid-cols-3 gap-4">
           {/* Starter Plan Card */}
           <div 
             onClick={() => {
@@ -779,6 +790,7 @@ export default function WalletPage() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Switch Plan Confirmation Modal */}

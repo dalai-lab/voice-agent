@@ -5,6 +5,7 @@ import { ExternalLink } from "lucide-react";
 
 import { MCPSection } from "@/components/MCPSection";
 import { OrganizationPreferencesSection } from "@/components/OrganizationPreferencesSection";
+import { ScheduledReportsSection } from "@/components/ScheduledReportsSection";
 import { TelemetrySection } from "@/components/TelemetrySection";
 import { useOrgConfig } from "@/context/OrgConfigContext";
 
@@ -49,6 +50,11 @@ export default function SettingsPage() {
           <OrganizationPreferencesSection hidePbx={isTalkarCustomer} hideTestPhone={isTalkarCustomer} />
         </div>
       </div>
+
+      {/* Scheduled Email Reports Section (Talkar Customers) */}
+      {isTalkarCustomer && (
+        <ScheduledReportsSection dograhOrgId={dograhOrgId} />
+      )}
 
       {/* MCP Server Section — hidden for Talkar customers */}
       {!isTalkarCustomer && (

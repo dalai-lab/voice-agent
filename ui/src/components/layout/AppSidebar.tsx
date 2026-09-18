@@ -217,16 +217,17 @@ export function AppSidebar() {
   const { isTalkarCustomer, isAdminBypass } = useTalkarCustomer();
   const dograhOrgId = orgContext?.organization_id;
 
-  const [crmLink, setCrmLink] = React.useState<string | null>(null);
+  const [crmLinks, setCrmLinks] = React.useState<Array<{ name: string; url: string }>>([]);
 
   React.useEffect(() => {
     if (!user || !isTalkarCustomer || !dograhOrgId) return;
-    fetch(`/api/talkar/customers/by-org/${dograhOrgId}/agents`)
+    fetch(`/api/talkar/customers/by-org/${dograhOrgId}/crm-links`)
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) {
-          const wfWithLink = data.find((w: any) => !!w.crm_link);
-          if (wfWithLink) setCrmLink(wfWithLink.crm_link);
+        if (Array.isArray(data) && data.length > 0) {
+          setCrmLinks(data);
+          // Auto-expand CRM group by default so user immediately sees links
+          setOpenGroups((prev) => ({ ...prev, CRM: true }));
         }
       })
       .catch(() => {});
@@ -281,13 +282,18 @@ export function AppSidebar() {
         icon: PhosphorIcons.Wallet,
       } as SidebarSingleItem);
 
-      if (crmLink) {
+      if (crmLinks.length > 0) {
         visibleSections[0].items.push({
-          type: "single",
-          title: "Open in CRM",
-          url: crmLink,
-          icon: PhosphorIcons.Link,
-        } as SidebarSingleItem);
+          type: "group",
+          title: "CRM",
+          icon: PhosphorIcons.ShareNetwork,
+          items: crmLinks.map((crm) => ({
+            type: "single",
+            title: crm.name || "Open CRM",
+            url: crm.url,
+            icon: PhosphorIcons.LinkSimple,
+          })),
+        } as SidebarGroupItem);
       }
 
       visibleSections.push({
@@ -310,7 +316,7 @@ export function AppSidebar() {
     }
 
     return visibleSections;
-  }, [isTalkarCustomer, isAdminBypass, crmLink]);
+  }, [isTalkarCustomer, isAdminBypass, crmLinks]);
 
   const versionInfo = config ? { ui: config.uiVersion, api: config.apiVersion } : null;
 
@@ -390,6 +396,8 @@ export function AppSidebar() {
       >
         <Link
           href={item.url}
+          target={item.url.startsWith("http") ? "_blank" : undefined}
+          rel={item.url.startsWith("http") ? "noopener noreferrer" : undefined}
           onClick={handleMobileNavClick}
           className={cn("flex items-center gap-2.5 px-2.5", isCollapsed && "justify-center px-0 w-full h-full")}
           translate="no"
@@ -407,6 +415,9 @@ export function AppSidebar() {
           >
             {item.title}
           </span>
+          {item.url.startsWith("http") && !isCollapsed && (
+            <PhosphorIcons.ArrowSquareOut className="ml-auto h-3 w-3 opacity-60 shrink-0" />
+          )}
           {showWarningDot && (
             isCollapsed ? (
               warningIndicator

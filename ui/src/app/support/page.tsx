@@ -241,10 +241,11 @@ function SupportContent() {
             <Clock className="w-3 h-3 animate-spin" /> In Progress
           </span>
         );
+      case "denied":
       case "rejected":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
-            <XCircle className="w-3 h-3" /> Rejected
+            <XCircle className="w-3 h-3" /> Denied
           </span>
         );
       case "closed":

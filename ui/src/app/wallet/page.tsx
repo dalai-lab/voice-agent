@@ -108,8 +108,17 @@ export default function WalletPage() {
   const isZero = !wallet || wallet.balance_paise === 0 || wallet.balance_paise === undefined;
   const isLow = wallet?.balance_paise > 0 && wallet?.balance_paise < 50000;
 
-  const currentPlan = subscription?.tier || plan || "starter";
+  const currentPlan = String(subscription?.tier || plan || "starter").toLowerCase();
   const isCustomPlan = subscription?.is_custom;
+  const isCurrentTier = (tier: string) => currentPlan === tier;
+  const planCardClass = (tier: string) =>
+    isCurrentTier(tier)
+      ? "p-4 border-2 !border-orange-500 rounded-lg space-y-3 transition-all flex flex-col justify-between bg-orange-50 dark:bg-orange-500/10 shadow-[0_0_0_1px_rgba(249,115,22,0.45)] cursor-default"
+      : "p-4 border-2 border-border/50 rounded-lg space-y-3 transition-all flex flex-col justify-between bg-background hover:border-orange-400/50 cursor-pointer";
+  const planCardStyle = (tier: string): React.CSSProperties | undefined =>
+    isCurrentTier(tier)
+      ? { borderColor: "#f97316", boxShadow: "0 0 0 1px rgba(249,115,22,0.35), 0 4px 14px rgba(249,115,22,0.18)" }
+      : undefined;
   
   // Minimum top-up depends on account status:
   // - Pending activation: must hit the full plan activation deposit
@@ -646,30 +655,31 @@ export default function WalletPage() {
           {/* Starter Plan Card */}
           <div 
             onClick={() => {
-              if (subscription?.tier !== 'starter') {
+              if (!isCurrentTier('starter')) {
                 setSelectedTierToSwitch('starter');
               }
             }}
-            className={`p-4 border rounded-lg space-y-3 transition-all flex flex-col justify-between ${
-              subscription?.tier === 'starter' 
-                ? 'border-foreground bg-foreground/[0.02] cursor-default' 
-                : 'border-border/50 bg-background hover:border-foreground/30 cursor-pointer'
-            }`}
+            className={planCardClass('starter')}
+            style={planCardStyle('starter')}
           >
             <div className="space-y-3">
               <div className="flex justify-between items-start gap-2">
                 <div>
                   <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
                     Starter Engine
-                    {subscription?.tier === 'starter' && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    {isCurrentTier('starter') && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500 text-white">
                         Current
                       </span>
                     )}
                   </h3>
                   <p className="text-[10px] text-muted-foreground">Ideal for getting started — answer calls, book appointments, and qualify leads.</p>
                 </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/20 text-muted-foreground font-mono shrink-0">
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full border font-mono shrink-0 ${
+                  isCurrentTier('starter')
+                    ? 'border-orange-500/40 bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                    : 'border-border bg-muted/20 text-muted-foreground'
+                }`}>
                   ₹6 / min
                 </span>
               </div>
@@ -685,7 +695,7 @@ export default function WalletPage() {
                 </li>
               </ul>
             </div>
-            {subscription?.tier !== 'starter' && (
+            {!isCurrentTier('starter') && (
               <div className="pt-3">
                 <Button variant="outline" className="w-full text-xs font-semibold h-8 rounded-md pointer-events-none">
                   Switch to Starter
@@ -697,30 +707,31 @@ export default function WalletPage() {
           {/* Growth Plan Card */}
           <div 
             onClick={() => {
-              if (subscription?.tier !== 'growth') {
+              if (!isCurrentTier('growth')) {
                 setSelectedTierToSwitch('growth');
               }
             }}
-            className={`p-4 border rounded-lg space-y-3 transition-all flex flex-col justify-between ${
-              subscription?.tier === 'growth' 
-                ? 'border-foreground bg-foreground/[0.02] cursor-default' 
-                : 'border-border/50 bg-background hover:border-foreground/30 cursor-pointer'
-            }`}
+            className={planCardClass('growth')}
+            style={planCardStyle('growth')}
           >
             <div className="space-y-3">
               <div className="flex justify-between items-start gap-2">
                 <div>
                   <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
                     Growth Engine
-                    {subscription?.tier === 'growth' && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    {isCurrentTier('growth') && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500 text-white">
                         Current
                       </span>
                     )}
                   </h3>
                   <p className="text-[10px] text-muted-foreground">Indian-optimised multilingual voice.</p>
                 </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/20 text-muted-foreground font-mono shrink-0">
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full border font-mono shrink-0 ${
+                  isCurrentTier('growth')
+                    ? 'border-orange-500/40 bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                    : 'border-border bg-muted/20 text-muted-foreground'
+                }`}>
                   ₹6 / min
                 </span>
               </div>
@@ -736,7 +747,7 @@ export default function WalletPage() {
                 </li>
               </ul>
             </div>
-            {subscription?.tier !== 'growth' && (
+            {!isCurrentTier('growth') && (
               <div className="pt-3">
                 <Button variant="outline" className="w-full text-xs font-semibold h-8 rounded-md pointer-events-none">
                   Switch to Growth
@@ -748,30 +759,27 @@ export default function WalletPage() {
           {/* Pro Plan Card */}
           <div 
             onClick={() => {
-              if (subscription?.tier !== 'pro') {
+              if (!isCurrentTier('pro')) {
                 setSelectedTierToSwitch('pro');
               }
             }}
-            className={`p-4 border rounded-lg space-y-3 transition-all flex flex-col justify-between ${
-              subscription?.tier === 'pro' 
-                ? 'border-foreground bg-foreground/[0.02] cursor-default' 
-                : 'border-border/50 bg-background hover:border-foreground/30 cursor-pointer'
-            }`}
+            className={planCardClass('pro')}
+            style={planCardStyle('pro')}
           >
             <div className="space-y-3">
               <div className="flex justify-between items-start gap-2">
                 <div>
                   <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
                     Pro Engine
-                    {subscription?.tier === 'pro' && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    {isCurrentTier('pro') && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500 text-white">
                         Current
                       </span>
                     )}
                   </h3>
                   <p className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold">Recommended Engine</p>
                 </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-orange-500/20 bg-orange-500/5 text-orange-600 dark:text-orange-400 font-mono shrink-0">
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-orange-500/40 bg-orange-500/10 text-orange-600 dark:text-orange-400 font-mono shrink-0">
                   ₹4 / min
                 </span>
               </div>
@@ -787,7 +795,7 @@ export default function WalletPage() {
                 </li>
               </ul>
             </div>
-            {subscription?.tier !== 'pro' && (
+            {!isCurrentTier('pro') && (
               <div className="pt-3">
                 <Button variant="secondary" className="w-full text-xs font-semibold h-8 rounded-md pointer-events-none">
                   Switch to Pro

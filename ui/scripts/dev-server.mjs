@@ -1,6 +1,9 @@
 // Launcher behind `npm run dev`: starts `next dev` on this worktree's pinned
-// UI port. Turbopack is on by default; set TURBOPACK=0 to use webpack when
-// Turbopack panics (seen on Windows with PostCSS/Tailwind timeouts).
+// UI port.
+//
+// Webpack is the default. Turbopack has been panicking on Windows while
+// PostCSS-processing globals.css (timeout talking to the worker). Opt into
+// Turbopack with USE_TURBOPACK=1 (see `npm run dev:turbo`).
 //
 // Next reads its port from argv/process.env at CLI-parse time, BEFORE it loads
 // .env files, so a UI_PORT line in ui/.env cannot reach it on its own -- this
@@ -36,7 +39,14 @@ function pinnedPort() {
 }
 
 const port = process.env.UI_PORT || pinnedPort();
-const useTurbopack = process.env.TURBOPACK !== '0';
+// Default OFF. Do not key off TURBOPACK — Next sets that itself when turbo is on.
+const useTurbopack = process.env.USE_TURBOPACK === '1';
+
+if (useTurbopack) {
+    console.log('[dev-server] Using Turbopack (USE_TURBOPACK=1)');
+} else {
+    console.log('[dev-server] Using Webpack (default). Set USE_TURBOPACK=1 for Turbopack.');
+}
 
 // Spawn Next's JS entry through node rather than node_modules/.bin/next: the
 // bin shim is a .cmd on Windows and would need a shell to invoke.
@@ -49,7 +59,7 @@ const child = spawn(
         ...(port ? ['-p', port] : []),
         ...process.argv.slice(2),
     ],
-    { cwd: uiRoot, stdio: 'inherit' }
+    { cwd: uiRoot, stdio: 'inherit', env: process.env }
 );
 
 child.on('exit', (code, signal) => process.exit(signal ? 1 : (code ?? 0)));

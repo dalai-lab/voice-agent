@@ -42,6 +42,7 @@ export default function WalletPage() {
   const [selectedTierToSwitch, setSelectedTierToSwitch] = useState<string | null>(null);
 
   const [resolvedOrgId, setResolvedOrgId] = useState<number | null>(null);
+  const [customerStatus, setCustomerStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -71,11 +72,13 @@ export default function WalletPage() {
       fetch(`${TALKAR}/billing/subscription/by-org/${resolvedOrgId}`).then(r => r.json()),
       fetch(`${TALKAR}/billing/transactions/by-org/${resolvedOrgId}?limit=100`).then(r => r.json()),
       fetch(`${TALKAR}/billing/usage/by-org/${resolvedOrgId}`).then(r => r.json()),
-    ]).then(([walletData, subData, txnData, usageData]) => {
+      fetch(`${TALKAR}/customers/status?dograh_org_id=${resolvedOrgId}`).then(r => r.ok ? r.json() : null),
+    ]).then(([walletData, subData, txnData, usageData, statusData]) => {
       setWallet(walletData);
       setSubscription(subData);
       setTransactions(txnData.transactions || []);
       setUsage(usageData);
+      if (statusData?.status) setCustomerStatus(statusData.status);
       
       setAutoRechargeEnabled(walletData.auto_recharge_enabled);
       setThreshold(String((walletData.auto_recharge_threshold_paise || 100000) / 100));
@@ -86,13 +89,20 @@ export default function WalletPage() {
 
   useEffect(() => {
     if (subscription) {
-      const p = subscription.plan || "starter";
-      const min = PLAN_MINIMUMS[p] ?? 6000;
-      if (parseInt(topupAmount || "0") < min) {
-        setTopupAmount(String(min));
+      const isActivationNeeded = customerStatus === "pending_deposit" || customerStatus === "pending_plan_selection" || isActivation;
+      if (isActivationNeeded) {
+        // During activation: pre-fill with the plan minimum so user doesn't get blocked
+        const p = subscription.plan || "starter";
+        const min = isCustomPlan
+          ? (subscription.custom_activation_deposit_paise ?? 600000) / 100
+          : (PLAN_MINIMUMS[p] ?? 6000);
+        if (parseInt(topupAmount || "0") < min) {
+          setTopupAmount(String(min));
+        }
       }
+      // For active/suspended users, don't force a minimum — let them type any amount >= ₹500
     }
-  }, [subscription]);
+  }, [subscription, customerStatus]);
 
   const balanceRupees = wallet && typeof wallet.balance_paise === 'number' ? (wallet.balance_paise / 100).toFixed(2) : "0.00";
   const isZero = !wallet || wallet.balance_paise === 0 || wallet.balance_paise === undefined;
@@ -100,9 +110,16 @@ export default function WalletPage() {
 
   const currentPlan = subscription?.tier || plan || "starter";
   const isCustomPlan = subscription?.is_custom;
-  const minTopup = isCustomPlan
-    ? (subscription?.custom_activation_deposit_paise ?? 600000) / 100
-    : PLAN_MINIMUMS[currentPlan] ?? 6000;
+  
+  // Minimum top-up depends on account status:
+  // - Pending activation: must hit the full plan activation deposit
+  // - Active/suspended (regular top-up): just ₹500 minimum
+  const isActivationNeeded = customerStatus === "pending_deposit" || customerStatus === "pending_plan_selection" || isActivation;
+  const minTopup = isActivationNeeded
+    ? (isCustomPlan
+        ? (subscription?.custom_activation_deposit_paise ?? 600000) / 100
+        : PLAN_MINIMUMS[currentPlan] ?? 6000)
+    : 500; // Regular top-up floor: ₹500
 
   const handleTopup = async (isMock = false, isLiveTest = false) => {
     if (!resolvedOrgId) return;

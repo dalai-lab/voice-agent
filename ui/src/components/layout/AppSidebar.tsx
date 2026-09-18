@@ -240,6 +240,9 @@ export function AppSidebar() {
       "/api-keys",
       "/usage",
       "/billing",
+      "/files",
+      "/recordings",
+      "/superadmin",
     ];
 
     const isCustomerView = isTalkarCustomer && !isAdminBypass;

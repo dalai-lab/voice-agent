@@ -514,14 +514,6 @@ export default function WalletPage() {
               <Button onClick={() => handleTopup(false)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} className="bg-primary text-primary-foreground hover:bg-primary/95 rounded-md h-10 px-4 text-xs font-semibold shadow-xs">
                 {isProcessing ? "Processing..." : "Add Credits"}
               </Button>
-              <Button variant="outline" onClick={() => handleTopup(false, true)} disabled={isProcessing} className="border-border/80 text-orange-500 hover:bg-orange-50 rounded-md h-10 text-xs font-bold border-orange-200">
-                Test ₹1 (Live)
-              </Button>
-              {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
-                <Button variant="outline" onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} className="border-border/80 hover:bg-accent text-foreground rounded-md h-10 text-xs">
-                  Bypass (Dev)
-                </Button>
-              )}
             </div>
           </div>
         </div>
@@ -574,9 +566,6 @@ export default function WalletPage() {
                   <span className="font-semibold">Payment method required</span>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => handleAddCard(false)} className="bg-primary text-primary-foreground hover:bg-primary/95 text-[9px] font-bold rounded px-2.5 py-0.5">Save Card</Button>
-                    {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
-                      <Button size="sm" variant="ghost" onClick={() => handleAddCard(true)} className="text-zinc-500 text-[9px] p-0 h-auto">Dev Bypass</Button>
-                    )}
                   </div>
                 </div>
               )}

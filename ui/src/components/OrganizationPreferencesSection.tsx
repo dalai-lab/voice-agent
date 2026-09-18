@@ -90,7 +90,7 @@ function getTimezoneValue(tz: ITimezoneOption | string): string {
   return typeof tz === "string" ? tz : tz.value;
 }
 
-export function OrganizationPreferencesSection() {
+export function OrganizationPreferencesSection({ hidePbx = false }: { hidePbx?: boolean }) {
   const { user, loading: authLoading } = useAuth();
   const { refreshConfig } = useUserConfig();
   const timezoneSelectId = useId();
@@ -233,28 +233,30 @@ export function OrganizationPreferencesSection() {
           />
         </div>
       </div>
-      <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-4 bg-muted/20">
-        <div className="space-y-1">
-          <Label htmlFor="settings-external-pbx-integrations" className="text-xs font-bold text-foreground cursor-pointer">
-            External PBX integrations
-          </Label>
-          <p className="text-[10px] text-muted-foreground/60 leading-normal max-w-lg">
-            Show and enable advanced external-PBX configuration for Asterisk,
-            transfer tools, and workflows. Existing configuration is preserved
-            when this is disabled.
-          </p>
+      {!hidePbx && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-4 bg-muted/20">
+          <div className="space-y-1">
+            <Label htmlFor="settings-external-pbx-integrations" className="text-xs font-bold text-foreground cursor-pointer">
+              External PBX integrations
+            </Label>
+            <p className="text-[10px] text-muted-foreground/60 leading-normal max-w-lg">
+              Show and enable advanced external-PBX configuration for Asterisk,
+              transfer tools, and workflows. Existing configuration is preserved
+              when this is disabled.
+            </p>
+          </div>
+          <Switch
+            id="settings-external-pbx-integrations"
+            checked={preferences.external_pbx_integrations_enabled ?? false}
+            onCheckedChange={(checked) =>
+              setPreferences({
+                ...preferences,
+                external_pbx_integrations_enabled: checked,
+              })
+            }
+          />
         </div>
-        <Switch
-          id="settings-external-pbx-integrations"
-          checked={preferences.external_pbx_integrations_enabled ?? false}
-          onCheckedChange={(checked) =>
-            setPreferences({
-              ...preferences,
-              external_pbx_integrations_enabled: checked,
-            })
-          }
-        />
-      </div>
+      )}
       <div className="flex justify-end pt-2 border-t border-border/40">
         <Button type="submit" disabled={saving} className="h-9 px-4 rounded-lg bg-cta text-cta-foreground hover:bg-cta/90 shadow-sm font-semibold text-xs transition-all cursor-pointer">
           <Save className="mr-1.5 h-3.5 w-3.5" />

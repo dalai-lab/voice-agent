@@ -970,12 +970,6 @@ export default function OnboardingPage() {
               <Button size="lg" className="bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-90 text-white font-semibold shadow-lg shadow-orange-500/25 h-12 px-8 rounded-xl min-w-[220px]" onClick={handlePaySetupFee}>
                 <CreditCard className="w-4 h-4 mr-2" /> Pay Setup Fee
               </Button>
-              
-              {!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID && (
-                <Button onClick={handleMockSetupFee} variant="outline" size="lg" className="border-zinc-300 text-zinc-700 hover:bg-zinc-50 h-12 rounded-xl">
-                  Bypass Payment (Dev)
-                </Button>
-              )}
             </div>
           </div>
         )}

@@ -1,10 +1,43 @@
 "use client";
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
+import { LayoutDashboard, LogOut, Settings } from 'lucide-react';
+
 import { useAuth } from '@/lib/auth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
+  const router = useRouter();
+
+  const displayIdentity = user?.displayName || (user as any)?.primaryEmail || "";
+  const userInitials =
+    displayIdentity
+      .split(/[\s@]/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((s: string) => s[0]?.toUpperCase())
+      .join("") || "U";
+
+  const profileImageUrl = (user as any)?.profileImageUrl;
+
+  const userChipTrigger = (
+    <button className="h-10 w-10 shrink-0 cursor-pointer rounded-full border border-white/20 bg-white/10 hover:bg-white/20 text-white overflow-hidden p-0 transition-colors flex items-center justify-center outline-none">
+      {profileImageUrl ? (
+        <img src={profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
+      ) : (
+        <span className="text-sm font-semibold">{userInitials}</span>
+      )}
+    </button>
+  );
 
   return (
     <nav className="container mx-auto px-6 py-6 flex items-center justify-between z-10 relative">
@@ -40,17 +73,35 @@ export const Navbar: React.FC = () => {
 
       <div className="flex items-center gap-4">
         {user ? (
-          <>
-            <a href="/overview" className="text-sm font-medium text-gray-300 hover:text-white transition-colors">
-              Go to Dashboard
-            </a>
-            <button
-              onClick={() => void logout()}
-              className="bg-white/10 hover:bg-white/15 text-white border border-white/15 px-5 py-2 rounded-full text-xs font-semibold transition-all duration-300 backdrop-blur-md cursor-pointer"
-            >
-              Sign Out
-            </button>
-          </>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              {userChipTrigger}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="bottom" align="end" className="w-56 mt-2 shadow-2xl">
+              <DropdownMenuLabel className="font-normal p-3 bg-muted/30">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-semibold tracking-tight">{displayIdentity}</p>
+                  {(user as any)?.primaryEmail && displayIdentity !== (user as any)?.primaryEmail && (
+                    <p className="text-xs text-muted-foreground">{(user as any)?.primaryEmail}</p>
+                  )}
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push("/overview")} className="cursor-pointer py-2.5">
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                <span className="font-medium">Dashboard</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/settings")} className="cursor-pointer py-2.5">
+                <Settings className="mr-2 h-4 w-4" />
+                <span className="font-medium">Platform Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => void logout()} className="cursor-pointer text-red-500 focus:text-red-500 py-2.5">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span className="font-medium">Sign Out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
           <>
             <a href="/handler/sign-in" className="text-sm font-medium text-gray-300 hover:text-white transition-colors">

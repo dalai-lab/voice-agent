@@ -18,17 +18,52 @@ export function AuthSettingsSection() {
     // comply with the "DO NOT BRING API KEYS" requirement.
     const observer = new MutationObserver(() => {
       if (!containerRef.current) return;
+      
+      // 1. Hide by href (most reliable for Stack Auth tabs)
+      const links = containerRef.current.querySelectorAll("a");
+      links.forEach((a) => {
+        const href = a.getAttribute("href") || "";
+        if (
+          href.includes("/api-keys") || 
+          href.includes("/notifications") || 
+          href.includes("/teams") || 
+          href.includes("/settings") || 
+          href.match(/\/team\//)
+        ) {
+          a.style.setProperty("display", "none", "important");
+          const li = a.closest("li");
+          if (li) li.style.setProperty("display", "none", "important");
+        }
+      });
+
+      // 2. Hide by exact text match (catches headers, buttons, and anything href missed)
       const elements = containerRef.current.querySelectorAll("*");
       elements.forEach((el) => {
-        // If the element text matches the tabs we want to completely hide
         const text = el.textContent?.trim();
-        if (el.childNodes.length === 1 && (text === "API Keys" || text === "Team" || text === "Teams" || text === "Notifications" || text === "Notification")) {
-          const clickable = el.closest("button") || el.closest("a") || el.closest('[role="tab"]') || el as HTMLElement;
-          if (clickable && clickable.style.display !== "none") {
-            clickable.style.display = "none !important";
-            // Also try to hide its parent li if it's in a list
-            const li = clickable.closest("li");
-            if (li) li.style.display = "none";
+        const exactMatches = [
+          "API Keys", 
+          "Notifications", 
+          "Notification", 
+          "Settings", 
+          "Teams", 
+          "Team", 
+          "Create a team",
+          "Create Team"
+        ];
+        
+        if (text && exactMatches.includes(text)) {
+           (el as HTMLElement).style.setProperty("display", "none", "important");
+           const li = el.closest("li");
+           if (li) li.style.setProperty("display", "none", "important");
+        }
+
+        // Hide dynamic team names (e.g. "it@4thorbit.in's Team" or "it@4thorbit.in")
+        // We know it's a team link if it has an avatar or specific classes, but text matching is safer:
+        if ((el.tagName === 'A' || el.tagName === 'BUTTON') && text) {
+          if (text.includes("'s Team") || (text.includes("@") && el.closest("ul")?.previousElementSibling?.textContent?.includes("Teams"))) {
+             (el as HTMLElement).style.setProperty("display", "none", "important");
+             const li = el.closest("li");
+             if (li) li.style.setProperty("display", "none", "important");
           }
         }
       });
@@ -44,46 +79,67 @@ export function AuthSettingsSection() {
     <div className="w-full relative auth-settings-container -ml-4" ref={containerRef}>
       <style jsx global>{`
         /* 
-           Overrides to make Stack Auth blend better into our settings page layout.
-           We remove external borders and padding since it's already wrapped in our Card.
+           Aggressive overrides for Stack Auth.
+           We use !important everywhere because Stack injects inline styles and tailwind classes.
         */
-        .auth-settings-container > div {
+        
+        /* Strip outer backgrounds and borders */
+        .auth-settings-container > div,
+        .auth-settings-container [data-radix-scroll-area-viewport],
+        .auth-settings-container [class*="bg-white"],
+        .auth-settings-container [class*="bg-gray"],
+        .auth-settings-container [class*="bg-zinc"] {
+          background: transparent !important;
           box-shadow: none !important;
           border: none !important;
-          background: transparent !important;
         }
-        /* Hide the navigation sidebar title if it conflicts */
-        .auth-settings-container h2:contains('Account Settings') {
-          display: none !important;
-        }
-        
-        /* Aggressively force Stack Auth to adopt Dograh's light/dark mode variables */
+
+        /* Force Dograh text and border colors globally within the component */
         .auth-settings-container * {
           border-color: hsl(var(--border)) !important;
+          color: hsl(var(--foreground));
         }
+
+        /* Style inputs, selects, and textareas */
         .auth-settings-container input,
         .auth-settings-container select,
         .auth-settings-container textarea {
           background-color: hsl(var(--background)) !important;
           color: hsl(var(--foreground)) !important;
+          border: 1px solid hsl(var(--border)) !important;
+          border-radius: var(--radius) !important;
+          padding: 0.5rem !important;
+        }
+
+        /* Style buttons */
+        .auth-settings-container button[type="submit"],
+        .auth-settings-container button[class*="bg-black"],
+        .auth-settings-container button[class*="bg-primary"] {
+          background-color: hsl(var(--primary)) !important;
+          color: hsl(var(--primary-foreground)) !important;
           border-radius: var(--radius) !important;
         }
-        .auth-settings-container [role="tablist"] {
-          background-color: transparent !important;
-          border-right: 1px solid hsl(var(--border)) !important;
-        }
-        .auth-settings-container [role="tab"][data-state="active"] {
+
+        /* Sidebar active tab styling */
+        .auth-settings-container a[data-active="true"],
+        .auth-settings-container [role="tab"][data-state="active"],
+        .auth-settings-container [class*="bg-gray-100"] {
           background-color: hsl(var(--accent)) !important;
           color: hsl(var(--accent-foreground)) !important;
+          border-radius: var(--radius) !important;
         }
+        
+        .auth-settings-container a:hover,
         .auth-settings-container [role="tab"]:hover {
           background-color: hsl(var(--accent)/0.5) !important;
         }
-        
-        /* 
-           Fix the scrolling bug: Stack Auth tries to auto-scroll to the top of its 
-           container when tabs change. We disable scroll anchoring and overflow tricks. 
-        */
+
+        /* Hide the annoying 'Account Settings' title if it shows up */
+        .auth-settings-container h2:contains('Account Settings') {
+          display: none !important;
+        }
+
+        /* Fix Stack Auth scrolling bugs */
         .auth-settings-container, 
         .auth-settings-container > div,
         .auth-settings-container [role="tabpanel"],
@@ -91,9 +147,6 @@ export function AuthSettingsSection() {
           overflow-anchor: none !important;
           overscroll-behavior: none !important;
           scroll-snap-type: none !important;
-        }
-        .auth-settings-container * {
-          scroll-behavior: auto !important;
         }
       `}</style>
       <AccountSettings fullPage={false} />

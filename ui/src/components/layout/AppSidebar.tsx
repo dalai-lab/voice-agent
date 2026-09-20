@@ -505,13 +505,19 @@ export function AppSidebar() {
       .map((s: string) => s[0]?.toUpperCase())
       .join("") || "U";
 
+  const profileImageUrl = (user as any)?.profileImageUrl;
+
   const userChipTrigger = (
     <Button
       variant="ghost"
       size="icon"
-      className="h-8 w-8 shrink-0 cursor-pointer rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
+      className="h-8 w-8 shrink-0 cursor-pointer rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground overflow-hidden p-0"
     >
-      <span className="text-xs font-semibold">{userInitials}</span>
+      {profileImageUrl ? (
+        <img src={profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
+      ) : (
+        <span className="text-xs font-semibold">{userInitials}</span>
+      )}
     </Button>
   );
 

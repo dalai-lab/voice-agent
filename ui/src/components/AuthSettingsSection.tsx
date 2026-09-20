@@ -20,11 +20,15 @@ export function AuthSettingsSection() {
       if (!containerRef.current) return;
       const elements = containerRef.current.querySelectorAll("*");
       elements.forEach((el) => {
-        // If the element has exact text "API Keys"
-        if (el.childNodes.length === 1 && el.textContent?.trim() === "API Keys") {
+        // If the element text matches the tabs we want to completely hide
+        const text = el.textContent?.trim();
+        if (el.childNodes.length === 1 && (text === "API Keys" || text === "Team" || text === "Teams" || text === "Notifications" || text === "Notification")) {
           const clickable = el.closest("button") || el.closest("a") || el.closest('[role="tab"]') || el as HTMLElement;
           if (clickable && clickable.style.display !== "none") {
-            clickable.style.display = "none";
+            clickable.style.display = "none !important";
+            // Also try to hide its parent li if it's in a list
+            const li = clickable.closest("li");
+            if (li) li.style.display = "none";
           }
         }
       });
@@ -51,6 +55,45 @@ export function AuthSettingsSection() {
         /* Hide the navigation sidebar title if it conflicts */
         .auth-settings-container h2:contains('Account Settings') {
           display: none !important;
+        }
+        
+        /* Aggressively force Stack Auth to adopt Dograh's light/dark mode variables */
+        .auth-settings-container * {
+          border-color: hsl(var(--border)) !important;
+        }
+        .auth-settings-container input,
+        .auth-settings-container select,
+        .auth-settings-container textarea {
+          background-color: hsl(var(--background)) !important;
+          color: hsl(var(--foreground)) !important;
+          border-radius: var(--radius) !important;
+        }
+        .auth-settings-container [role="tablist"] {
+          background-color: transparent !important;
+          border-right: 1px solid hsl(var(--border)) !important;
+        }
+        .auth-settings-container [role="tab"][data-state="active"] {
+          background-color: hsl(var(--accent)) !important;
+          color: hsl(var(--accent-foreground)) !important;
+        }
+        .auth-settings-container [role="tab"]:hover {
+          background-color: hsl(var(--accent)/0.5) !important;
+        }
+        
+        /* 
+           Fix the scrolling bug: Stack Auth tries to auto-scroll to the top of its 
+           container when tabs change. We disable scroll anchoring and overflow tricks. 
+        */
+        .auth-settings-container, 
+        .auth-settings-container > div,
+        .auth-settings-container [role="tabpanel"],
+        .stack-account-settings-container {
+          overflow-anchor: none !important;
+          overscroll-behavior: none !important;
+          scroll-snap-type: none !important;
+        }
+        .auth-settings-container * {
+          scroll-behavior: auto !important;
         }
       `}</style>
       <AccountSettings fullPage={false} />

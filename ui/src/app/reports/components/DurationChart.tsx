@@ -44,10 +44,10 @@ export function DurationChart({ data }: DurationChartProps) {
     if (active && payload && payload[0]) {
       const item = payload[0].payload;
       return (
-        <div className="bg-[#171717] border border-[#333] rounded-lg shadow-lg p-3 text-xs space-y-1">
-          <p className="font-semibold text-foreground">{item.label}</p>
-          <p className="text-muted-foreground">Calls: <span className="text-foreground font-mono">{item.count}</span></p>
-          <p className="text-muted-foreground"><span className="text-foreground font-semibold">{item.percentage}%</span> of total</p>
+        <div className="bg-popover border border-border rounded-lg shadow-lg p-3 text-xs space-y-1">
+          <p className="font-semibold text-popover-foreground">{item.label}</p>
+          <p className="text-muted-foreground">Calls: <span className="text-popover-foreground font-mono">{item.count}</span></p>
+          <p className="text-muted-foreground"><span className="text-popover-foreground font-semibold">{item.percentage}%</span> of total</p>
         </div>
       );
     }

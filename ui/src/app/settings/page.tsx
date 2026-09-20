@@ -6,7 +6,10 @@ import { ExternalLink } from "lucide-react";
 import { MCPSection } from "@/components/MCPSection";
 import { OrganizationPreferencesSection } from "@/components/OrganizationPreferencesSection";
 import { ScheduledReportsSection } from "@/components/ScheduledReportsSection";
+import { OrganizationProfileSection } from "@/components/OrganizationProfileSection";
+import { NotificationSettingsSection } from "@/components/NotificationSettingsSection";
 import { TelemetrySection } from "@/components/TelemetrySection";
+import { AuthSettingsSection } from "@/components/AuthSettingsSection";
 import { useOrgConfig } from "@/context/OrgConfigContext";
 
 export default function SettingsPage() {
@@ -36,6 +39,21 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      {/* Profile Section (Talkar Customers) */}
+      {isTalkarCustomer && (
+        <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
+          <div>
+            <h2 className="text-sm font-bold text-foreground">Organization Profile</h2>
+            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+              Manage your company information and contact details.
+            </p>
+          </div>
+          <div className="pt-2 border-t border-border/40">
+            <OrganizationProfileSection dograhOrgId={dograhOrgId} />
+          </div>
+        </div>
+      )}
+
       {/* Preferences Section */}
       <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
         <div>
@@ -50,6 +68,34 @@ export default function SettingsPage() {
           <OrganizationPreferencesSection hidePbx={isTalkarCustomer} hideTestPhone={isTalkarCustomer} />
         </div>
       </div>
+
+      {/* Account & Team Settings (Stack Auth) */}
+      <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
+        <div>
+          <h2 className="text-sm font-bold text-foreground">Account & Security</h2>
+          <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+            Manage your personal profile, email, authentication methods, and team members.
+          </p>
+        </div>
+        <div className="pt-2 border-t border-border/40">
+          <AuthSettingsSection />
+        </div>
+      </div>
+
+      {/* Notifications & Alerts Section (Talkar Customers) */}
+      {isTalkarCustomer && (
+        <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
+          <div>
+            <h2 className="text-sm font-bold text-foreground">Notifications & Alerts</h2>
+            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+              Customize how and when you receive billing and system alerts.
+            </p>
+          </div>
+          <div className="pt-2 border-t border-border/40">
+            <NotificationSettingsSection dograhOrgId={dograhOrgId} />
+          </div>
+        </div>
+      )}
 
       {/* Scheduled Email Reports Section (Talkar Customers) */}
       {isTalkarCustomer && (

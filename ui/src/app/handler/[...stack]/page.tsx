@@ -57,6 +57,17 @@ export default async function Handler(props: unknown) {
   const isAuthForm = segment !== "" && !FULL_PAGE_ROUTES.has(normalizedSegment);
   const showBackButton = !new Set(["signin", "login"]).has(normalizedSegment);
 
+  // Redirect customers away from the old account settings page to the new platform settings
+  if (normalizedSegment === "accountsettings") {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const isAdmin = cookieStore.get("talkar_admin_bypass")?.value === "true";
+    if (!isAdmin) {
+      const { redirect } = await import("next/navigation");
+      redirect("/settings");
+    }
+  }
+
   const handler = (
     <StackTheme theme={stackAuthDarkTheme}>
       <StackHandler fullPage={!isAuthForm} app={app!} routeProps={props} />

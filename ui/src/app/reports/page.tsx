@@ -206,9 +206,6 @@ export default function ReportsPage() {
         <div className="space-y-1">
           <h1 className="text-xl font-bold tracking-tight text-foreground">Daily Analytics Reports</h1>
           <div className="text-[11px] text-muted-foreground flex items-center gap-2">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted/40 text-muted-foreground border border-border/40">
-              {timezone}
-            </span>
             {selectedWorkflow !== 'all' && (
               <span className="text-cta font-medium">Filtered by: {workflows.find(w => w.id.toString() === selectedWorkflow)?.name}</span>
             )}

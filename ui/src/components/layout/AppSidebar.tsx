@@ -233,6 +233,8 @@ export function AppSidebar() {
       .catch(() => {});
   }, [user, isTalkarCustomer, dograhOrgId]);
 
+  const isCustomerView = isTalkarCustomer && !isAdminBypass;
+
   const filteredNavSections = React.useMemo(() => {
     const TALKAR_CUSTOMER_HIDDEN_URLS = [
       "/workflow",
@@ -246,8 +248,6 @@ export function AppSidebar() {
       "/superadmin",
       "/tools",
     ];
-
-    const isCustomerView = isTalkarCustomer && !isAdminBypass;
 
     const visibleSections = isCustomerView
       ? NAV_SECTIONS.map(section => ({
@@ -718,10 +718,12 @@ export function AppSidebar() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push("/handler/account-settings")} className="cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Account settings
-                  </DropdownMenuItem>
+                  {!isCustomerView && (
+                    <DropdownMenuItem onClick={() => router.push("/handler/account-settings")} className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Account settings
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => router.push("/settings")} className="cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />
                     Platform Settings

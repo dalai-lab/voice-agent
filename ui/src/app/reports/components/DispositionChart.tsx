@@ -11,6 +11,7 @@ import {
   YAxis,
 } from 'recharts';
 import { PieChart } from 'lucide-react';
+import { formatDispositionLabel } from '@/lib/dispositionLabels';
 
 interface DispositionData {
   disposition: string;
@@ -41,10 +42,10 @@ export function DispositionChart({ data }: DispositionChartProps) {
     if (active && payload && payload[0]) {
       const item = payload[0].payload;
       return (
-        <div className="bg-[#171717] border border-[#333] rounded-lg shadow-lg p-3 text-xs space-y-1">
-          <p className="font-semibold text-foreground">{item.disposition}</p>
-          <p className="text-muted-foreground">Count: <span className="text-foreground font-mono">{item.count}</span></p>
-          <p className="text-muted-foreground"><span className="text-foreground font-semibold">{item.percentage}%</span> of total</p>
+        <div className="bg-popover border border-border rounded-lg shadow-lg p-3 text-xs space-y-1">
+          <p className="font-semibold text-popover-foreground">{formatDispositionLabel(item.disposition)}</p>
+          <p className="text-muted-foreground">Count: <span className="text-popover-foreground font-mono">{item.count}</span></p>
+          <p className="text-muted-foreground"><span className="text-popover-foreground font-semibold">{item.percentage}%</span> of total</p>
         </div>
       );
     }
@@ -77,6 +78,7 @@ export function DispositionChart({ data }: DispositionChartProps) {
                 angle={-35}
                 textAnchor="end"
                 interval={0}
+                tickFormatter={(value) => formatDispositionLabel(value)}
                 tick={{ fontSize: 10, fill: '#888' }}
                 stroke="#333"
               />

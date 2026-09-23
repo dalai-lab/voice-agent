@@ -57,7 +57,7 @@ services:
       - app-network
 
   minio:
-    image: minio/minio
+    image: quay.io/minio/minio
     container_name: minio
     command: server /data --console-address ":9001"
     environment:
@@ -141,7 +141,9 @@ services:
       - app-network
 
   api:
-    build: ./api
+    build:
+      context: .
+      dockerfile: api/Dockerfile
     image: ${REGISTRY:-dograhai}/dograh-api:latest
     environment:
       # Core application config
@@ -150,6 +152,11 @@ services:
       DEPLOYMENT_MODE: "${DEPLOYMENT_MODE:-talkar}"
       CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:3010,http://localhost,https://admin.talkar.in,http://localhost:8000}"
       TALKAR_SERVICE_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8002}"
+      AUTH_PROVIDER: "${AUTH_PROVIDER:-local}"
+      STACK_AUTH_PROJECT_ID: "${STACK_AUTH_PROJECT_ID:-}"
+      STACK_PUBLISHABLE_CLIENT_KEY: "${STACK_PUBLISHABLE_CLIENT_KEY:-}"
+      STACK_SECRET_SERVER_KEY: "${STACK_SECRET_SERVER_KEY:-}"
+      STACK_AUTH_API_URL: "${STACK_AUTH_API_URL:-}"
 
       # Set to "false" in .env to disable public signup (invite-only installs).
       ENABLE_SIGNUP: "${ENABLE_SIGNUP:-true}"
@@ -168,10 +175,10 @@ services:
       BACKEND_API_ENDPOINT: "${BACKEND_API_ENDPOINT:-}"
 
       # Database configuration (using containerized postgres)
-      DATABASE_URL: "postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/postgres"
+      DATABASE_URL: "${DATABASE_URL:-postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/postgres}"
 
       # Redis configuration (using containerized redis)
-      REDIS_URL: "redis://:${REDIS_PASSWORD:-redissecret}@redis:6379"
+      REDIS_URL: "${REDIS_URL:-redis://:${REDIS_PASSWORD:-redissecret}@redis:6379}"
 
       # Storage configuration - bundled MinIO by default. Set ENABLE_AWS_S3=true
       # in .env to make the API use AWS S3 or another S3-compatible server.
@@ -276,7 +283,9 @@ services:
       - app-network
 
   ui:
-    build: ./ui
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
     image: ${REGISTRY:-dograhai}/dograh-ui:latest
     environment:
       # Bind the Next.js standalone server to all interfaces
@@ -297,6 +306,17 @@ services:
       # Talkar Integration
       TALKAR_API_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8002}"
       TALKAR_SERVICE_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8002}"
+
+      # Stack Auth
+      AUTH_PROVIDER: "${AUTH_PROVIDER:-local}"
+      NEXT_PUBLIC_AUTH_PROVIDER: "${AUTH_PROVIDER:-local}"
+      STACK_AUTH_PROJECT_ID: "${STACK_AUTH_PROJECT_ID:-}"
+      NEXT_PUBLIC_STACK_AUTH_PROJECT_ID: "${STACK_AUTH_PROJECT_ID:-}"
+      STACK_PUBLISHABLE_CLIENT_KEY: "${STACK_PUBLISHABLE_CLIENT_KEY:-}"
+      NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY: "${STACK_PUBLISHABLE_CLIENT_KEY:-}"
+      STACK_SECRET_SERVER_KEY: "${STACK_SECRET_SERVER_KEY:-}"
+      STACK_AUTH_API_URL: "${STACK_AUTH_API_URL:-}"
+      NEXT_PUBLIC_STACK_AUTH_API_URL: "${STACK_AUTH_API_URL:-}"
 
       # Demo keys
       OPENAI_API_DEMO_KEY: "${OPENAI_API_DEMO_KEY:-}"

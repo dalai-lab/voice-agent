@@ -47,7 +47,6 @@ virtualenv/
 
 # Documentation
 *.md
-docs/
 README*
 
 # Tests

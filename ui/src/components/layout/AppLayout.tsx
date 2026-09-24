@@ -83,7 +83,7 @@ function BackendStatusBanner() {
 // We cannot use middleware for this because the Stack Auth opaque access token
 // in hexclave-access cannot be validated server-side from Edge runtime.
 // The browser already has a valid session, so the /api/talkar proxy works fine.
-const TALKAR_ALLOWED_PATHS = ["/onboarding", "/wallet", "/handler", "/auth", "/api", "/models", "/support"];
+const TALKAR_ALLOWED_PATHS = ["/onboarding", "/wallet", "/handler", "/auth", "/api", "/support"];
 
 function TalkarStatusGate() {
   const { user } = useAuth();
@@ -200,6 +200,7 @@ const TALKAR_FORBIDDEN_PREFIXES = [
   "/workflow",
   "/telephony-configurations",
   "/model-configurations",
+  "/models",
   "/api-keys",
   "/usage",
   "/billing",

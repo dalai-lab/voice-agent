@@ -195,6 +195,39 @@ const NAV_SECTIONS: SidebarNavSection[] = [
   },
 ];
 
+function DevBypassToggle({ isAdminBypass }: { isAdminBypass: boolean }) {
+  if (process.env.NODE_ENV !== "development") return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => {
+             if (isAdminBypass) {
+               document.cookie = "talkar_admin_bypass=; Max-Age=0; path=/";
+             } else {
+               document.cookie = "talkar_admin_bypass=true; path=/";
+             }
+             window.location.reload();
+          }}
+          className={cn(
+            "h-8 w-8 shrink-0 rounded-lg border",
+            isAdminBypass 
+              ? "border-amber-500 bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-400" 
+              : "border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
+          )}
+        >
+          <PhosphorIcons.ShieldWarning className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="right">
+        <p>{isAdminBypass ? "Disable Admin Bypass" : "Enable Admin Bypass"}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -240,6 +273,7 @@ export function AppSidebar() {
       "/workflow",
       "/telephony-configurations",
       "/model-configurations",
+      "/models",
       "/api-keys",
       "/usage",
       "/billing",
@@ -569,7 +603,6 @@ export function AppSidebar() {
             </div>
           )}
           <div className={cn("flex items-center gap-2", isCollapsed && "hidden")}>
-            <NotificationBell />
             {isBehind && latestRelease && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -690,6 +723,7 @@ export function AppSidebar() {
                     showLabel={false}
                     className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
                   />
+                  <DevBypassToggle isAdminBypass={isAdminBypass} />
                 </div>
               )}
 
@@ -701,6 +735,7 @@ export function AppSidebar() {
                     showLabel={false}
                     className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
                   />
+                  <DevBypassToggle isAdminBypass={isAdminBypass} />
                 </div>
               )}
             </div>
@@ -750,6 +785,7 @@ export function AppSidebar() {
                     showLabel={false}
                     className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
                   />
+                  <DevBypassToggle isAdminBypass={isAdminBypass} />
                 </div>
               )}
 
@@ -761,6 +797,7 @@ export function AppSidebar() {
                     showLabel={false}
                     className="h-8 w-8 rounded-lg border border-border bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground"
                   />
+                  <DevBypassToggle isAdminBypass={isAdminBypass} />
                 </div>
               )}
             </div>

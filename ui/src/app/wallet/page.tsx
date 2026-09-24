@@ -25,6 +25,7 @@ export default function WalletPage() {
 
   const [wallet, setWallet] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [page, setPage] = useState<number>(1);
   const [subscription, setSubscription] = useState<any>(null);
@@ -73,11 +74,13 @@ export default function WalletPage() {
       fetch(`${TALKAR}/billing/transactions/by-org/${resolvedOrgId}?limit=100`).then(r => r.json()),
       fetch(`${TALKAR}/billing/usage/by-org/${resolvedOrgId}`).then(r => r.json()),
       fetch(`${TALKAR}/customers/status?dograh_org_id=${resolvedOrgId}`).then(r => r.ok ? r.json() : null),
-    ]).then(([walletData, subData, txnData, usageData, statusData]) => {
+      fetch(`${TALKAR}/invoices/by-org/${resolvedOrgId}`).then(r => r.ok ? r.json() : { invoices: [] })
+    ]).then(([walletData, subData, txnData, usageData, statusData, invoiceData]) => {
       setWallet(walletData);
       setSubscription(subData);
       setTransactions(txnData.transactions || []);
       setUsage(usageData);
+      setInvoices(invoiceData.invoices || []);
       if (statusData?.status) setCustomerStatus(statusData.status);
       
       setAutoRechargeEnabled(walletData.auto_recharge_enabled);
@@ -518,6 +521,11 @@ export default function WalletPage() {
               <Button onClick={() => handleTopup(false)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} className="bg-primary text-primary-foreground hover:bg-primary/95 rounded-md h-10 px-4 text-xs font-semibold shadow-xs">
                 {isProcessing ? "Processing..." : "Add Credits"}
               </Button>
+              {process.env.NODE_ENV !== "production" && (
+                <Button onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} variant="outline" className="border-amber-500 text-amber-600 hover:bg-amber-50 rounded-md h-10 px-4 text-xs font-semibold shadow-xs">
+                  Dev Bypass
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -932,6 +940,63 @@ export default function WalletPage() {
             </Button>
           </div>
         )}
+      </div>
+
+      {/* Invoices Card */}
+      <div className="bg-card border border-border/50 rounded-lg p-5 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-foreground">Invoices & Receipts</h2>
+            <p className="text-muted-foreground text-xs">Download PDF receipts for your wallet deposits.</p>
+          </div>
+        </div>
+
+        <div className="overflow-hidden border border-border/40 rounded-lg bg-background">
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow className="border-b border-border/40 hover:bg-transparent">
+                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4">Date</TableHead>
+                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4">Invoice #</TableHead>
+                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4">Amount</TableHead>
+                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4">Status</TableHead>
+                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4 text-right">Download</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoices.map(inv => (
+                <TableRow key={inv.id} className="border-b border-border/30 hover:bg-muted/10 transition-colors">
+                  <TableCell className="text-foreground text-xs py-3 px-4">{new Date(inv.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-foreground text-xs py-3 px-4 font-mono">{inv.invoice_number}</TableCell>
+                  <TableCell className="text-foreground text-xs py-3 px-4 font-bold">
+                    ₹{(inv.amount_paise / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell className="text-foreground text-xs py-3 px-4">
+                    <span className="px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] uppercase font-bold tracking-wider">
+                      {inv.status}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right py-3 px-4">
+                    <a 
+                      href={`/invoice/${inv.id}`} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border hover:bg-muted/50 text-xs font-semibold text-foreground transition-colors"
+                    >
+                      <ReceiptText className="w-3.5 h-3.5" /> PDF
+                    </a>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {invoices.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground text-xs py-8">
+                    No invoices found. Top up your wallet to generate one.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );

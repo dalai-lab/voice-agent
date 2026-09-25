@@ -1,7 +1,7 @@
 "use client";
 
 import { initiateDemoCall, runLiveExtraction } from "@/app/actions/demoCall";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Check,
   X,
@@ -17,6 +17,8 @@ import {
   CheckCircle2,
   FileText,
   Upload,
+  Clock,
+  RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -379,6 +381,30 @@ export function DemoCallForm() {
   const [errorMessage, setErrorMessage] = useState("");
   const [extractedData, setExtractedData] = useState<any | null>(null);
 
+  // System maintenance tracking
+  const [isMaintenance, setIsMaintenance] = useState(false);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+
+  const checkHealth = useCallback(async () => {
+    setIsCheckingHealth(true);
+    try {
+      const res = await fetch("/api/talkar/health", { cache: "no-store" });
+      if (res.ok) {
+        setIsMaintenance(false);
+      } else {
+        setIsMaintenance(true);
+      }
+    } catch {
+      setIsMaintenance(true);
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkHealth();
+  }, [checkHealth]);
+
   // Recruiter specific
   const [jobDescription, setJobDescription] = useState("");
   const [resumeText, setResumeText] = useState("");
@@ -736,8 +762,43 @@ export function DemoCallForm() {
   return (
     <div className="w-full h-full text-slate-100 flex flex-col items-center justify-center font-sans selection:bg-orange-500 selection:text-white relative">
       <AnimatePresence mode="wait">
+        {/* MAINTENANCE STATE */}
+        {isMaintenance && (
+          <motion.div
+            key="maintenance"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.25 }}
+            className="w-full max-w-md bg-[#111218] border border-white/[0.08] p-7 rounded-2xl shadow-2xl text-center space-y-4"
+          >
+            <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+              <Clock className="w-5 h-5 text-amber-500" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-semibold text-white tracking-tight">
+                Demo Calls Temporarily Paused
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                We are currently performing routine maintenance on our live telephony infrastructure. Interactive demo calls will resume shortly.
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={checkHealth}
+                disabled={isCheckingHealth}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] text-white transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isCheckingHealth ? "animate-spin" : ""}`} />
+                <span>{isCheckingHealth ? "Checking Status..." : "Refresh Status"}</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {/* COMPLETED STATE */}
-        {callingState === "done" && extractedData && (
+        {!isMaintenance && callingState === "done" && extractedData && (
           <motion.div
             key="done"
             initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -757,7 +818,7 @@ export function DemoCallForm() {
         )}
 
         {/* IN-CALL / STREAMING STATE */}
-        {(callingState === "calling" || callingState === "connected") && (
+        {!isMaintenance && (callingState === "calling" || callingState === "connected") && (
           <motion.div
             key="active-call"
             initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -940,7 +1001,7 @@ export function DemoCallForm() {
         )}
 
         {/* IDLE FORM */}
-        {callingState === "idle" && (
+        {!isMaintenance && callingState === "idle" && (
           <motion.div
             key="idle"
             initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -1107,7 +1168,7 @@ export function DemoCallForm() {
         )}
 
         {/* ERROR STATE */}
-        {callingState === "error" && (
+        {!isMaintenance && callingState === "error" && (
           <motion.div
             key="error"
             initial={{ opacity: 0, y: 12, scale: 0.98 }}

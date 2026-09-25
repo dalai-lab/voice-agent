@@ -14,6 +14,10 @@ export interface RealtimeWalletState {
   currency: string;
   isLoading: boolean;
   resolvedOrgId: number | null;
+  plan: string;
+  planTier: string;
+  planStatus: string;
+  isCustomPlan: boolean;
   refresh: () => Promise<void>;
 }
 
@@ -23,6 +27,10 @@ export function useRealtimeWallet(): RealtimeWalletState {
   const [resolvedOrgId, setResolvedOrgId] = useState<number | null>(null);
   const [balancePaise, setBalancePaise] = useState<number | null>(null);
   const [autoRechargeEnabled, setAutoRechargeEnabled] = useState(false);
+  const [planTier, setPlanTier] = useState<string>("starter");
+  const [planName, setPlanName] = useState<string>("Starter");
+  const [planStatus, setPlanStatus] = useState<string>("active");
+  const [isCustomPlan, setIsCustomPlan] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
   const fetchingRef = useRef(false);
 
@@ -51,19 +59,48 @@ export function useRealtimeWallet(): RealtimeWalletState {
     };
   }, [user, orgContext?.organization_id]);
 
-  // 2. Fetch Wallet Data
+  // 2. Fetch Wallet & Subscription Plan Data
   const fetchWallet = useCallback(async () => {
     if (!resolvedOrgId || fetchingRef.current) return;
     fetchingRef.current = true;
 
     try {
-      const res = await fetch(`/api/talkar/billing/wallet/by-org/${resolvedOrgId}`);
-      if (res.ok) {
-        const data = await res.json();
+      const [walletRes, subRes] = await Promise.all([
+        fetch(`/api/talkar/billing/wallet/by-org/${resolvedOrgId}`),
+        fetch(`/api/talkar/billing/subscription/by-org/${resolvedOrgId}`),
+      ]);
+
+      if (walletRes.ok) {
+        const data = await walletRes.json();
         if (typeof data?.balance_paise === "number") {
           setBalancePaise(data.balance_paise);
         }
         setAutoRechargeEnabled(!!data?.auto_recharge_enabled);
+
+        if (data?.plan) {
+          const rawTier = String(data.plan).toLowerCase();
+          setPlanTier(rawTier);
+          const isCustom = rawTier === "custom" || !!data?.custom_plan_label;
+          setIsCustomPlan(isCustom);
+          setPlanName(isCustom ? (data.custom_plan_label || "Custom") : (rawTier.charAt(0).toUpperCase() + rawTier.slice(1)));
+        }
+        if (data?.plan_status) {
+          setPlanStatus(data.plan_status);
+        }
+      }
+
+      if (subRes.ok) {
+        const subData = await subRes.json();
+        if (subData?.tier) {
+          const rawTier = String(subData.tier).toLowerCase();
+          setPlanTier(rawTier);
+          const isCustom = subData.is_custom || rawTier === "custom";
+          setIsCustomPlan(isCustom);
+          setPlanName(isCustom ? (subData.custom_plan_label || "Custom") : (rawTier.charAt(0).toUpperCase() + rawTier.slice(1)));
+        }
+        if (subData?.status) {
+          setPlanStatus(subData.status);
+        }
       }
     } catch {
       // Fallback silently if offline or network hiccup
@@ -85,11 +122,13 @@ export function useRealtimeWallet(): RealtimeWalletState {
 
     window.addEventListener("focus", onFocus);
     window.addEventListener("talkar:wallet-updated", onCustomUpdate);
+    window.addEventListener("talkar:plan-updated", onCustomUpdate);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("talkar:wallet-updated", onCustomUpdate);
+      window.removeEventListener("talkar:plan-updated", onCustomUpdate);
     };
   }, [resolvedOrgId, fetchWallet]);
 
@@ -133,6 +172,10 @@ export function useRealtimeWallet(): RealtimeWalletState {
     currency: "₹",
     isLoading,
     resolvedOrgId,
+    plan: planName,
+    planTier,
+    planStatus,
+    isCustomPlan,
     refresh: fetchWallet,
   };
 }

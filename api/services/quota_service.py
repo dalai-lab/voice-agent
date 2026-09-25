@@ -533,8 +533,12 @@ async def _authorize_talkar_workflow_run_start(organization_id: int) -> QuotaChe
             )
     except Exception as e:
         from loguru import logger
-        logger.error(f"Talkar billing service unreachable: {e}. Failing open.")
-        return QuotaCheckResult(has_quota=True)
+        logger.error(f"Talkar billing service unreachable: {e}. Failing closed to block unbilled calls.")
+        return QuotaCheckResult(
+            has_quota=False,
+            error_code="billing_service_unavailable",
+            error_message="Talkar billing and quota verification is temporarily unavailable. Calls are paused for safety."
+        )
 
 async def _authorize_oss_managed_v2_run(
     *,

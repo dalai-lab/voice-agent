@@ -1,6 +1,17 @@
 "use client";
 
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import {
+    ArrowDown,
+    ArrowRight,
+    ArrowUp,
+    ArrowUpDown,
+    Calendar,
+    ChevronLeft,
+    ChevronRight,
+    Globe,
+    Phone,
+    RefreshCw,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
@@ -23,7 +34,7 @@ import { useOrganizationTimezone } from "@/hooks/useOrganizationTimezone";
 import { formatDateTime } from "@/lib/dateTime";
 import { ActiveFilter, FilterAttribute } from "@/types/filters";
 import { RunUsagePills } from "@/components/RunUsagePills";
-
+import { useTalkarCustomer } from "@/context/TalkarCustomerContext";
 
 export interface WorkflowRunsTableProps {
     // Data
@@ -62,6 +73,91 @@ export interface WorkflowRunsTableProps {
     subtitle?: string;
     showFilters?: boolean;
     emptyMessage?: string;
+    /**
+     * Controls visibility of the Usage column.
+     * Defaulted to false per design preference: HIDE USAGE COLUMN DONT REMOVE.
+     */
+    showUsageColumn?: boolean;
+    /**
+     * Admin override. If omitted, resolved automatically via talkar customer & admin bypass state.
+     */
+    isAdmin?: boolean;
+}
+
+/**
+ * Extracts the caller / from phone number.
+ */
+function getCallerNumber(run: WorkflowRunResponseSchema): string | null {
+    const isOutbound = run.call_type === 'outbound';
+    let val: any =
+        (run as any).caller_number ||
+        run.initial_context?.caller_number ||
+        run.initial_context?.from_number ||
+        (run as any).context_variables?.caller_number ||
+        (run as any).context_variables?.from_number;
+
+    if (!val && !isOutbound) {
+        val =
+            run.gathered_context?.customer_phone_number ||
+            run.gathered_context?.caller_number ||
+            (run as any).phone_number;
+    }
+
+    if (!val) {
+        val = (run as any).phone_number;
+    }
+
+    return val && typeof val === 'string' && val.trim() ? val.trim() : null;
+}
+
+/**
+ * Extracts the called / destination phone number.
+ */
+function getCalledNumber(run: WorkflowRunResponseSchema): string | null {
+    const isOutbound = run.call_type === 'outbound';
+    let val: any =
+        (run as any).called_number ||
+        run.initial_context?.called_number ||
+        run.initial_context?.to_number ||
+        (run as any).context_variables?.called_number ||
+        (run as any).context_variables?.to_number;
+
+    if (!val && isOutbound) {
+        val =
+            run.gathered_context?.customer_phone_number ||
+            run.gathered_context?.called_number;
+    }
+
+    return val && typeof val === 'string' && val.trim() ? val.trim() : null;
+}
+
+/**
+ * Resolves call duration in seconds across available fields.
+ */
+function getCallDuration(run: WorkflowRunResponseSchema): number | null {
+    if (typeof run.cost_info?.call_duration_seconds === 'number') {
+        return run.cost_info.call_duration_seconds;
+    }
+    if (typeof (run as any).call_duration_seconds === 'number') {
+        return (run as any).call_duration_seconds;
+    }
+    if (typeof (run as any).duration === 'number') {
+        return (run as any).duration;
+    }
+    return null;
+}
+
+/**
+ * Clean human-readable duration format (e.g. 42s, 1m 15s).
+ */
+function formatCallDuration(seconds: number | null): string {
+    if (seconds === null || isNaN(seconds)) return "—";
+    if (seconds <= 0) return "0s";
+    const total = Math.round(seconds);
+    const mins = Math.floor(total / 60);
+    const secs = total % 60;
+    if (mins === 0) return `${secs}s`;
+    return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
 }
 
 export function WorkflowRunsTable({
@@ -88,16 +184,40 @@ export function WorkflowRunsTable({
     subtitle,
     showFilters = true,
     emptyMessage = "No workflow runs found",
+    showUsageColumn = false,
+    isAdmin: isAdminProp,
 }: WorkflowRunsTableProps) {
     const router = useRouter();
     const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
-    const [activeTab, setActiveTab] = useState<'all' | 'completed' | 'in_progress' | 'web' | 'telephony'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'completed' | 'in_progress' | 'telephony' | 'web'>('all');
     const organizationTimezone = useOrganizationTimezone();
+
+    // Determine admin status: bypass active OR not a customer
+    const { isTalkarCustomer, isAdminBypass } = useTalkarCustomer();
+    const isAdmin = typeof isAdminProp === 'boolean'
+        ? isAdminProp
+        : (isAdminBypass || (typeof window !== 'undefined' && document.cookie.includes('talkar_admin_bypass=true')) || (!isTalkarCustomer && !(typeof window !== 'undefined' && document.cookie.includes('talkar_customer=true'))));
 
     // Media preview dialog
     const mediaPreview = MediaPreviewDialog();
 
-    const formatDate = (dateString: string) => new Date(dateString).toLocaleString();
+    // Reset web tab filter for non-admins if active
+    React.useEffect(() => {
+        if (!isAdmin && (activeTab === 'web' || activeTab === 'telephony')) {
+            setActiveTab('all');
+        }
+    }, [isAdmin, activeTab]);
+
+    const isWebCall = (run: WorkflowRunResponseSchema): boolean => {
+        const mode = (run.mode || '').toLowerCase();
+        return mode === 'web' || mode === 'webrtc' || mode === 'smallwebrtc';
+    };
+
+    // Non-admins: hide all webcalls completely. Keep for admin.
+    const visibleRuns = React.useMemo(() => {
+        if (isAdmin) return runs;
+        return runs.filter(run => !isWebCall(run));
+    }, [runs, isAdmin]);
 
     const formatSectionDate = (dateString: string) => {
         const date = new Date(dateString);
@@ -132,16 +252,18 @@ export function WorkflowRunsTable({
         });
     };
 
-    const filteredRuns = runs.filter((run) => {
-        if (activeTab === 'completed') return run.is_completed;
-        if (activeTab === 'in_progress') return !run.is_completed;
-        if (activeTab === 'web') return run.mode === 'web';
-        if (activeTab === 'telephony') return run.mode === 'telephony';
-        return true;
-    });
+    const filteredRuns = React.useMemo(() => {
+        return visibleRuns.filter((run) => {
+            if (activeTab === 'completed') return run.is_completed;
+            if (activeTab === 'in_progress') return !run.is_completed;
+            if (activeTab === 'web') return isWebCall(run);
+            if (activeTab === 'telephony') return !isWebCall(run);
+            return true;
+        });
+    }, [visibleRuns, activeTab]);
 
     const groupedRuns = (() => {
-        const groups: { dateSection: string; items: typeof runs }[] = [];
+        const groups: { dateSection: string; items: typeof visibleRuns }[] = [];
         filteredRuns.forEach((run) => {
             const section = formatSectionDate(run.created_at);
             const lastGroup = groups[groups.length - 1];
@@ -154,15 +276,6 @@ export function WorkflowRunsTable({
         return groups;
     })();
 
-    // Compute dynamic custom columns from the first run's gathered_context
-    const SYSTEM_KEYS = new Set(['mapped_call_disposition', 'call_disposition', 'disposition', 'customer_phone_number', 'call_id', 'call_tags', 'caller_number', 'called_number']);
-    const dynamicGatheredColumns = runs.length > 0 && runs[0].gathered_context
-        ? Object.keys(runs[0].gathered_context).filter(k => !SYSTEM_KEYS.has(k)).slice(0, 2)
-        : [];
-    const dynamicExtractedColumns = runs.length > 0 && runs[0].extracted_data
-        ? Object.keys(runs[0].extracted_data).slice(0, 3)
-        : [];
-
     const handleRowClick = (runId: number, runWorkflowId: number) => {
         router.push(`/workflow/${runWorkflowId}/run/${runId}`);
     };
@@ -172,23 +285,31 @@ export function WorkflowRunsTable({
             {/* Title and Filters */}
             {showFilters && (
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <h1 className="text-xl font-bold tracking-tight text-foreground">{title}</h1>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2.5">
+                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{title}</h1>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/80 text-muted-foreground tabular-nums">
+                                    {(isAdmin ? totalCount : visibleRuns.length).toLocaleString()} {(isAdmin ? totalCount : visibleRuns.length) === 1 ? 'call' : 'calls'}
+                                </span>
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                                {subtitle || `Showing ${runs.length} of ${totalCount} total runs`}
+                                {subtitle || (isAdmin
+                                    ? `Showing ${runs.length} of ${totalCount} total calls across all active agents`
+                                    : `Showing ${visibleRuns.length} calls across active agents`)}
                             </p>
                         </div>
                         {onReload && (
                             <Button
                                 variant="outline"
-                                size="icon"
-                                className="h-9 w-9 rounded-lg"
+                                size="sm"
+                                className="h-8.5 px-3 rounded-lg border-border/70 hover:bg-muted/80 gap-2 text-xs font-medium shadow-2xs transition-colors self-start sm:self-auto"
                                 onClick={onReload}
                                 disabled={loading}
-                                title="Reload"
+                                title="Refresh Call Records"
                             >
-                                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                                <span>Refresh</span>
                             </Button>
                         )}
                     </div>
@@ -206,31 +327,35 @@ export function WorkflowRunsTable({
 
             {/* Loading / Error States */}
             {loading ? (
-                <div className="grid gap-3">
-                    {[1, 2, 3].map((i) => (
-                        <div key={i} className="h-16 rounded-xl bg-card border border-border animate-pulse" />
+                <div className="space-y-3">
+                    {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="h-14 rounded-xl bg-card border border-border/60 animate-pulse" />
                     ))}
                 </div>
             ) : error ? (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-semibold">
+                <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-4 text-xs text-destructive font-medium">
                     {error}
                 </div>
-            ) : runs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm mx-auto border border-border bg-card rounded-xl shadow-xs">
-                    <p className="text-xs text-muted-foreground leading-relaxed">{emptyMessage}</p>
+            ) : visibleRuns.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center py-16 px-6 max-w-sm mx-auto border border-border/60 bg-card rounded-xl shadow-xs">
+                    <Phone className="h-8 w-8 text-muted-foreground/30 stroke-1 mb-2" />
+                    <p className="text-sm font-semibold text-foreground">No call logs found</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed mt-1">{emptyMessage}</p>
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {/* Quick Filter Segmented Tabs Bar */}
-                    <div className="flex items-center gap-1.5 border-b border-border/60 pb-3 overflow-x-auto">
+                    {/* Quick Filter Segmented Control Bar */}
+                    <div className="flex items-center gap-1.5 p-1 bg-muted/30 border border-border/60 rounded-xl overflow-x-auto w-fit max-w-full">
                         {(
                             [
-                                { id: 'all', label: 'All', count: runs.length },
-                                { id: 'completed', label: 'Completed', count: runs.filter(r => r.is_completed).length },
-                                { id: 'in_progress', label: 'In Progress', count: runs.filter(r => !r.is_completed).length },
-                                { id: 'web', label: 'Web', count: runs.filter(r => r.mode === 'web').length },
-                                { id: 'telephony', label: 'Telephony', count: runs.filter(r => r.mode === 'telephony').length },
-                            ] as const
+                                { id: 'all' as const, label: 'All Calls', count: visibleRuns.length },
+                                { id: 'completed' as const, label: 'Completed', count: visibleRuns.filter(r => r.is_completed).length },
+                                { id: 'in_progress' as const, label: 'In Progress', count: visibleRuns.filter(r => !r.is_completed).length },
+                                ...(isAdmin ? [
+                                    { id: 'telephony' as const, label: 'Telephony', count: visibleRuns.filter(r => !isWebCall(r)).length },
+                                    { id: 'web' as const, label: 'Web Calls', count: visibleRuns.filter(r => isWebCall(r)).length },
+                                ] : []),
+                            ]
                         ).map((tab) => {
                             const isActive = activeTab === tab.id;
                             return (
@@ -238,17 +363,17 @@ export function WorkflowRunsTable({
                                     key={tab.id}
                                     type="button"
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
+                                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
                                         isActive
-                                            ? "bg-foreground text-background font-semibold shadow-xs"
-                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                            ? "bg-background text-foreground font-semibold shadow-xs border border-border/70"
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                                     }`}
                                 >
                                     <span>{tab.label}</span>
-                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium tabular-nums ${
                                         isActive
-                                            ? "bg-background/20 text-background"
-                                            : "bg-muted text-muted-foreground"
+                                            ? "bg-muted text-foreground font-semibold"
+                                            : "bg-muted/60 text-muted-foreground"
                                     }`}>
                                         {tab.count}
                                     </span>
@@ -257,186 +382,262 @@ export function WorkflowRunsTable({
                         })}
                     </div>
 
-                    {/* Frameless Table Container */}
-                    <div className="w-full overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="border-b border-border/80 hover:bg-transparent">
-                                    <TableHead className="font-semibold text-xs text-muted-foreground py-3 px-3 w-14">ID</TableHead>
-                                    <TableHead className="font-semibold text-xs text-muted-foreground py-3 px-3 whitespace-nowrap min-w-[140px]">Phone Number</TableHead>
-                                    {!workflowId && <TableHead className="font-semibold text-xs text-muted-foreground py-3 px-3 min-w-[180px]">Agent</TableHead>}
-                                    <TableHead className="font-semibold text-xs text-muted-foreground py-3 px-3 w-28">Status</TableHead>
-                                    <TableHead className="font-semibold text-xs text-muted-foreground py-3 px-3 whitespace-nowrap min-w-[120px]">Time</TableHead>
-                                    <TableHead className="font-semibold text-xs text-muted-foreground py-3 px-3 w-24">Call Type</TableHead>
-                                    <TableHead
-                                        className="font-semibold text-xs text-muted-foreground py-3 px-3 cursor-pointer hover:bg-accent/40 select-none whitespace-nowrap w-24"
-                                        onClick={() => onSort?.('duration')}
-                                    >
-                                        <div className="flex items-center gap-1">
-                                            Duration
-                                            {sortBy === 'duration' ? (
-                                                sortOrder === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
-                                            ) : (
-                                                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/60" />
-                                            )}
-                                        </div>
-                                    </TableHead>
-                                    <TableHead className="font-semibold text-xs text-muted-foreground py-3 px-3 whitespace-nowrap min-w-[140px]">Disposition</TableHead>
-                                    <TableHead className="font-semibold text-xs text-muted-foreground py-3 px-3 whitespace-nowrap min-w-[180px]">Usage</TableHead>
+                    {/* Framed Modern Table Container */}
+                    <div className="w-full rounded-xl border border-border/70 bg-card overflow-hidden shadow-2xs">
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-muted/30 border-b border-border/70 hover:bg-transparent">
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 w-14">ID</TableHead>
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[130px]">
+                                            Phone Number
+                                        </TableHead>
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[130px]">
+                                            Called Number
+                                        </TableHead>
+                                        {!workflowId && (
+                                            <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 min-w-[160px]">
+                                                Agent
+                                            </TableHead>
+                                        )}
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 w-28">Status</TableHead>
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[100px]">Time</TableHead>
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 w-24">Type</TableHead>
+                                        <TableHead
+                                            className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 cursor-pointer hover:bg-accent/40 select-none whitespace-nowrap w-24"
+                                            onClick={() => onSort?.('duration')}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                Duration
+                                                {sortBy === 'duration' ? (
+                                                    sortOrder === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+                                                ) : (
+                                                    <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/60" />
+                                                )}
+                                            </div>
+                                        </TableHead>
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[140px]">Disposition</TableHead>
 
-                                    {dynamicGatheredColumns.map(col => (
-                                        <TableHead key={col} className="font-semibold text-xs text-muted-foreground py-3 px-3 uppercase whitespace-nowrap min-w-[140px]" title={col.replace(/_/g, ' ')}>
-                                            {col.replace(/_/g, ' ')}
+                                        {/* Usage Column: Hidden per user preference (DO NOT REMOVE) */}
+                                        <TableHead className={showUsageColumn ? "font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[180px]" : "hidden"}>
+                                            Usage
                                         </TableHead>
-                                    ))}
-                                    {dynamicExtractedColumns.map(col => (
-                                        <TableHead key={`ext_${col}`} className="font-semibold text-xs text-blue-600/80 dark:text-blue-400/80 py-3 px-3 uppercase whitespace-nowrap min-w-[140px]" title={col.replace(/_/g, ' ')}>
-                                            {col.replace(/_/g, ' ')}
-                                        </TableHead>
-                                    ))}
-                                    <TableHead className="font-semibold text-xs text-muted-foreground py-3 px-3 text-right pr-4 w-24 whitespace-nowrap">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredRuns.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={16} className="py-14 text-center text-xs text-muted-foreground">
-                                            No runs match this tab filter.
-                                        </TableCell>
+
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 text-right pr-4 w-24 whitespace-nowrap">Actions</TableHead>
                                     </TableRow>
-                                ) : (
-                                    groupedRuns.map((group) => (
-                                        <React.Fragment key={group.dateSection}>
-                                            <TableRow className="bg-muted/30 hover:bg-muted/30 border-b border-border/60">
-                                                <TableCell colSpan={16} className="py-2.5 px-4 font-bold text-[11px] uppercase tracking-wider text-muted-foreground/90">
-                                                    {group.dateSection}
-                                                </TableCell>
-                                            </TableRow>
-                                            {group.items.map((run) => (
-                                                <TableRow
-                                                    key={run.id}
-                                                    className={`cursor-pointer hover:bg-accent/30 transition-colors border-b border-border/40 ${selectedRowId === run.id ? "bg-accent/40" : ""}`}
-                                                    onClick={() => handleRowClick(run.id, run.workflow_id)}
-                                                >
-                                                    <TableCell className="font-mono text-xs text-muted-foreground/80 py-3.5 px-3">#{run.id}</TableCell>
-                                                    <TableCell className="text-xs font-mono text-foreground whitespace-nowrap py-3 px-4">
-                                                        {(() => {
-                                                            const phone =
-                                                                (run.gathered_context?.customer_phone_number as string | undefined) ||
-                                                                (run.initial_context?.caller_number as string | undefined) ||
-                                                                (run.initial_context?.called_number as string | undefined);
-                                                            if (phone) return phone;
-                                                            if (run.mode === 'web') return <span className="text-muted-foreground font-sans text-xs">Web Browser</span>;
-                                                            return <span className="text-muted-foreground/40">-</span>;
-                                                        })()}
-                                                    </TableCell>
-                                                    {!workflowId && (
-                                                        <TableCell className="text-xs font-semibold text-foreground max-w-[220px] truncate whitespace-nowrap py-3 px-4" title={(run as any).workflow_name || `Agent #${run.workflow_id}`}>
-                                                            {(run as any).workflow_name || `Agent #${run.workflow_id}`}
-                                                        </TableCell>
-                                                    )}
-                                                    <TableCell className="py-3 px-4">
-                                                        <Badge variant="outline" className={`text-[10px] tracking-wide py-0.5 px-2 font-medium rounded-md whitespace-nowrap ${run.is_completed ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" : "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"}`}>
-                                                            {run.is_completed ? "Completed" : "In Progress"}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap py-3 px-4" title={formatDateTime(run.created_at, organizationTimezone)}>
-                                                        {formatTimeOnly(run.created_at)}
-                                                    </TableCell>
-                                                    <TableCell className="py-3 px-4">
-                                                        <CallTypeCell mode={run.mode} callType={run.call_type} />
-                                                    </TableCell>
-                                                    <TableCell className="text-xs font-medium text-foreground whitespace-nowrap py-3 px-4">
-                                                        {typeof run.cost_info?.call_duration_seconds === 'number'
-                                                            ? `${run.cost_info.call_duration_seconds.toFixed(1)}s`
-                                                            : "-"}
-                                                    </TableCell>
-                                                    <TableCell className="py-3 px-4">
-                                                        {run.gathered_context?.mapped_call_disposition ? (() => {
-                                                            const { label: dispLabel, className: dispClass } = getDispositionBadge(run.gathered_context.mapped_call_disposition as string);
-                                                            return (
-                                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${dispClass}`}>
-                                                                    {dispLabel}
-                                                                </span>
-                                                            );
-                                                        })() : (
-                                                            <span className="text-xs text-muted-foreground/50">-</span>
-                                                        )}
-                                                    </TableCell>
-
-                                                    <TableCell className="py-3 px-4">
-                                                        <RunUsagePills
-                                                            usageInfo={run.usage_info}
-                                                            costInfo={run.cost_info}
-                                                            logs={(run as any).logs}
-                                                            showEmpty
-                                                        />
-                                                    </TableCell>
-
-                                                    {dynamicGatheredColumns.map(col => (
-                                                        <TableCell key={col} className="text-xs text-foreground max-w-[180px] truncate whitespace-nowrap py-3 px-4" title={run.gathered_context?.[col] ? String(run.gathered_context[col]) : ""}>
-                                                            {run.gathered_context?.[col] ? String(run.gathered_context[col]) : <span className="text-muted-foreground/30">-</span>}
-                                                        </TableCell>
-                                                    ))}
-                                                    {dynamicExtractedColumns.map(col => (
-                                                        <TableCell key={`ext_${col}`} className="text-xs text-blue-600/90 dark:text-blue-400 max-w-[180px] truncate whitespace-nowrap py-3 px-4" title={run.extracted_data?.[col] ? String(run.extracted_data[col]) : ""}>
-                                                            {run.extracted_data?.[col] ? String(run.extracted_data[col]) : <span className="text-muted-foreground/30">-</span>}
-                                                        </TableCell>
-                                                    ))}
-                                                    <TableCell className="text-right pr-6 py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                                                        <div className="inline-flex items-center gap-1 justify-end">
-                                                            <MediaPreviewButton
-                                                                recordingUrl={run.recording_url}
-                                                                transcriptUrl={run.transcript_url}
-                                                                runId={run.id}
-                                                                onOpenPreview={mediaPreview.openPreview}
-                                                                onSelect={setSelectedRowId}
-                                                            />
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
-                                                                onClick={() => router.push(`/workflow/${run.workflow_id}/run/${run.id}`)}
-                                                            >
-                                                                <ArrowRight className="h-4 w-4" />
-                                                            </Button>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredRuns.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={20} className="py-16 text-center">
+                                                <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-2">
+                                                    <Phone className="h-7 w-7 text-muted-foreground/30 stroke-1" />
+                                                    <p className="text-sm font-medium text-foreground">No calls match this filter</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Try selecting another filter tab or clearing search criteria.
+                                                    </p>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        groupedRuns.map((group) => (
+                                            <React.Fragment key={group.dateSection}>
+                                                <TableRow className="bg-muted/20 hover:bg-muted/20 border-y border-border/50">
+                                                    <TableCell colSpan={20} className="py-2.5 px-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <Calendar className="h-3.5 w-3.5 text-muted-foreground/70" />
+                                                            <span className="font-semibold text-xs text-foreground/90">
+                                                                {group.dateSection}
+                                                            </span>
+                                                            <span className="text-xs text-muted-foreground/70 tabular-nums font-normal">
+                                                                • {group.items.length} {group.items.length === 1 ? 'call' : 'calls'}
+                                                            </span>
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
-                                            ))}
-                                        </React.Fragment>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
+                                                {group.items.map((run) => {
+                                                    const callerNumber = getCallerNumber(run);
+                                                    const calledNumber = getCalledNumber(run);
+                                                    const durationSecs = getCallDuration(run);
+                                                    const isWebMode = run.mode === 'web' || run.mode === 'webrtc' || run.mode === 'smallwebrtc';
+
+                                                    return (
+                                                        <TableRow
+                                                            key={run.id}
+                                                            className={`cursor-pointer hover:bg-muted/40 transition-colors border-b border-border/40 last:border-none ${selectedRowId === run.id ? "bg-muted/50" : ""}`}
+                                                            onClick={() => handleRowClick(run.id, run.workflow_id)}
+                                                        >
+                                                            {/* ID */}
+                                                            <TableCell className="text-xs text-muted-foreground/80 hover:text-foreground font-normal py-3 px-3.5 tabular-nums">
+                                                                #{run.id}
+                                                            </TableCell>
+
+                                                            {/* Phone Number (Caller / From) */}
+                                                            <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                {callerNumber ? (
+                                                                    <span className="text-[13px] font-medium text-foreground tabular-nums select-all">
+                                                                        {callerNumber}
+                                                                    </span>
+                                                                ) : isWebMode ? (
+                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border/40">
+                                                                        <Globe className="h-3 w-3 text-sky-500" />
+                                                                        Web User
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-xs text-muted-foreground/40 font-normal">—</span>
+                                                                )}
+                                                            </TableCell>
+
+                                                            {/* Called Number (Destination / To) */}
+                                                            <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                {calledNumber ? (
+                                                                    <span className="text-[13px] font-normal text-muted-foreground tabular-nums select-all">
+                                                                        {calledNumber}
+                                                                    </span>
+                                                                ) : isWebMode ? (
+                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/30 text-muted-foreground/80 border border-border/30">
+                                                                        <Globe className="h-3 w-3 text-muted-foreground/60" />
+                                                                        Web Agent
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-xs text-muted-foreground/40 font-normal">—</span>
+                                                                )}
+                                                            </TableCell>
+
+                                                            {/* Agent Name */}
+                                                            {!workflowId && (
+                                                                <TableCell className="py-3 px-3.5 max-w-[220px]">
+                                                                    <span
+                                                                        className="text-[13px] font-medium text-foreground truncate block hover:text-primary transition-colors"
+                                                                        title={(run as any).workflow_name || `Agent #${run.workflow_id}`}
+                                                                    >
+                                                                        {(run as any).workflow_name || `Agent #${run.workflow_id}`}
+                                                                    </span>
+                                                                </TableCell>
+                                                            )}
+
+                                                            {/* Status */}
+                                                            <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                {run.is_completed ? (
+                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                                        Completed
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+                                                                        <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
+                                                                        In Progress
+                                                                    </span>
+                                                                )}
+                                                            </TableCell>
+
+                                                            {/* Time */}
+                                                            <TableCell
+                                                                className="text-[13px] text-muted-foreground whitespace-nowrap py-3 px-3.5 tabular-nums"
+                                                                title={formatDateTime(run.created_at, organizationTimezone)}
+                                                            >
+                                                                {formatTimeOnly(run.created_at)}
+                                                            </TableCell>
+
+                                                            {/* Call Type */}
+                                                            <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                <CallTypeCell mode={run.mode} callType={run.call_type} />
+                                                            </TableCell>
+
+                                                            {/* Duration */}
+                                                            <TableCell className="text-[13px] font-medium text-foreground whitespace-nowrap py-3 px-3.5 tabular-nums">
+                                                                {formatCallDuration(durationSecs)}
+                                                            </TableCell>
+
+                                                            {/* Disposition */}
+                                                            <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                {(() => {
+                                                                    const rawDisp =
+                                                                        (run.gathered_context?.mapped_call_disposition as string | undefined) ||
+                                                                        ((run as any).disposition as string | undefined) ||
+                                                                        (run.gathered_context?.call_disposition as string | undefined) ||
+                                                                        (run.gathered_context?.disposition as string | undefined);
+                                                                    if (rawDisp) {
+                                                                        const { label: dispLabel, className: dispClass } = getDispositionBadge(rawDisp);
+                                                                        return (
+                                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs ${dispClass}`}>
+                                                                                {dispLabel}
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                    return <span className="text-xs text-muted-foreground/40 font-normal">—</span>;
+                                                                })()}
+                                                            </TableCell>
+
+                                                            {/* Usage Cell: Hidden per user preference (DO NOT REMOVE) */}
+                                                            <TableCell className={showUsageColumn ? "py-3 px-3.5" : "hidden"}>
+                                                                <RunUsagePills
+                                                                    usageInfo={run.usage_info}
+                                                                    costInfo={run.cost_info}
+                                                                    logs={(run as any).logs}
+                                                                    showEmpty
+                                                                />
+                                                            </TableCell>
+
+                                                            {/* Actions */}
+                                                            <TableCell className="text-right pr-4 py-3 px-3.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                                <div className="inline-flex items-center gap-1 justify-end">
+                                                                    <MediaPreviewButton
+                                                                        recordingUrl={run.recording_url}
+                                                                        transcriptUrl={run.transcript_url}
+                                                                        runId={run.id}
+                                                                        onOpenPreview={mediaPreview.openPreview}
+                                                                        onSelect={setSelectedRowId}
+                                                                    />
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                                                                        onClick={() => router.push(`/workflow/${run.workflow_id}/run/${run.id}`)}
+                                                                        title="View Call Details"
+                                                                    >
+                                                                        <ArrowRight className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </React.Fragment>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </div>
 
                     {/* Pagination */}
                     {totalPages > 1 && (
-                        <div className="flex items-center justify-between mt-6">
+                        <div className="flex items-center justify-between mt-6 px-1">
                             <p className="text-xs text-muted-foreground">
-                                Page {currentPage} of {totalPages}
+                                Page <span className="font-semibold text-foreground">{currentPage}</span> of{" "}
+                                <span className="font-semibold text-foreground">{totalPages}</span>
                             </p>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 text-xs font-semibold rounded-lg"
+                                    className="h-8 text-xs font-medium rounded-lg border-border/70 gap-1.5 shadow-2xs"
                                     onClick={() => onPageChange(currentPage - 1)}
                                     disabled={currentPage === 1}
                                 >
-                                    <ChevronLeft className="h-4 w-4 mr-1" />
+                                    <ChevronLeft className="h-3.5 w-3.5" />
                                     Previous
                                 </Button>
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 text-xs font-semibold rounded-lg"
+                                    className="h-8 text-xs font-medium rounded-lg border-border/70 gap-1.5 shadow-2xs"
                                     onClick={() => onPageChange(currentPage + 1)}
                                     disabled={currentPage === totalPages}
                                 >
                                     Next
-                                    <ChevronRight className="h-4 w-4 ml-1" />
+                                    <ChevronRight className="h-3.5 w-3.5" />
                                 </Button>
                             </div>
                         </div>

@@ -263,6 +263,26 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
             }
         }
 
+        // Check if Talkar service is reachable / in maintenance
+        const talkarServiceUrl = process.env.TALKAR_SERVICE_URL || "http://host.docker.internal:8002";
+        try {
+            const healthRes = await fetch(`${talkarServiceUrl}/health`, {
+                method: "GET",
+                signal: AbortSignal.timeout(3000),
+            });
+            if (!healthRes.ok) {
+                return {
+                    success: false,
+                    error: "Demo voice services are temporarily paused for maintenance. Please check back shortly."
+                };
+            }
+        } catch {
+            return {
+                success: false,
+                error: "Demo voice services are temporarily paused for maintenance. Please check back shortly."
+            };
+        }
+
         // Make the API request to the Dograh backend
         // We use the public URL because 127.0.0.1 inside a Docker container points to the container itself, not the host!
         const url = `https://talkar.in/api/v1/public/agent/workflow/${workflowId}`;

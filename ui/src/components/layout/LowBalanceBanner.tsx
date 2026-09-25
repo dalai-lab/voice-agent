@@ -30,7 +30,6 @@ export function LowBalanceBanner() {
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/handler") ||
-    pathname.startsWith("/onboardingdemo") ||
     pathname === "/"
   ) {
     return null;

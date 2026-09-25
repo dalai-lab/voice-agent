@@ -38,6 +38,7 @@ import { copyTextToClipboard } from '@/lib/clipboard';
 import { formatDateTime } from '@/lib/dateTime';
 import { downloadFile, getSignedUrl } from '@/lib/files';
 import { cn } from '@/lib/utils';
+import { useTalkarCustomer } from '@/context/TalkarCustomerContext';
 
 interface WorkflowRunResponse {
     mode: string;
@@ -568,17 +569,19 @@ function RunMetricsSection({
     costInfo,
     logs,
     gatheredContext,
+    isAdmin = true,
 }: {
     costInfo: WorkflowRunResponse['cost_info'];
     logs: WorkflowRunLogs | null;
     gatheredContext: Record<string, string | number | boolean | object> | null;
+    isAdmin?: boolean;
 }) {
     const metrics = getTranscriptMetrics(logs, gatheredContext);
 
     return (
         <div className="border border-border bg-card/30 backdrop-blur-md rounded-xl p-5 shadow-xs space-y-4 text-left">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Session Metrics</span>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className={`grid grid-cols-2 ${isAdmin ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
                 <div className="space-y-1">
                     <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Duration</div>
                     <div className="text-lg font-black text-foreground">{formatDuration(costInfo?.call_duration_seconds)}</div>
@@ -595,10 +598,12 @@ function RunMetricsSection({
                     <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Tool Calls</div>
                     <div className="text-lg font-black text-foreground">{metrics.toolCalls}</div>
                 </div>
-                <div className="space-y-1 border-l border-border/40 pl-4">
-                    <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Visited Nodes</div>
-                    <div className="text-lg font-black text-foreground">{metrics.visitedNodes}</div>
-                </div>
+                {isAdmin && (
+                    <div className="space-y-1 border-l border-border/40 pl-4">
+                        <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Visited Nodes</div>
+                        <div className="text-lg font-black text-foreground">{metrics.visitedNodes}</div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -607,9 +612,11 @@ function RunMetricsSection({
 function BusinessJsonViewer({
     title,
     context,
+    isAdmin = true,
 }: {
     title: string;
     context: Record<string, string | number | boolean | object> | null;
+    isAdmin?: boolean;
 }) {
     const [viewMode, setViewMode] = useState<'cards' | 'json'>('cards');
     const [copied, setCopied] = useState(false);
@@ -637,7 +644,13 @@ function BusinessJsonViewer({
         );
     }
 
-    const entries = Object.entries(context);
+    const entries = Object.entries(context).filter(([key]) => {
+        if (!isAdmin) {
+            const lower = key.toLowerCase();
+            if (lower.includes('node') || lower.includes('visited')) return false;
+        }
+        return true;
+    });
 
     return (
         <div className="border border-border/70 bg-card/60 backdrop-blur-md rounded-xl p-5 shadow-xs space-y-3.5 text-left">
@@ -723,6 +736,9 @@ export default function WorkflowRunPage() {
     const [workflowRun, setWorkflowRun] = useState<WorkflowRunResponse | null>(null);
     const [workflowName, setWorkflowName] = useState<string | null>(null);
     const customizeButtonRef = useRef<HTMLButtonElement>(null);
+
+    const { isTalkarCustomer, isAdminBypass } = useTalkarCustomer();
+    const isAdmin = isAdminBypass || (typeof window !== 'undefined' && document.cookie.includes('talkar_admin_bypass=true')) || (!isTalkarCustomer && !(typeof window !== 'undefined' && document.cookie.includes('talkar_customer=true')));
 
     // Redirect if not authenticated
     useEffect(() => {
@@ -922,27 +938,32 @@ export default function WorkflowRunPage() {
                             costInfo={workflowRun?.cost_info ?? null}
                             logs={workflowRun?.logs ?? null}
                             gatheredContext={workflowRun?.gathered_context ?? null}
+                            isAdmin={isAdmin}
                         />
 
                         <div className="space-y-6">
                             <BusinessJsonViewer
                                 title="Gathered Call Context"
                                 context={workflowRun?.gathered_context ?? null}
+                                isAdmin={isAdmin}
                             />
                             {workflowRun?.extracted_data && Object.keys(workflowRun.extracted_data).length > 0 && (
                                 <BusinessJsonViewer
                                     title="Post-Call Intelligence"
                                     context={workflowRun.extracted_data as Record<string, string | number | boolean | object>}
+                                    isAdmin={isAdmin}
                                 />
                             )}
                             <BusinessJsonViewer
                                 title="Initial Session Context"
                                 context={workflowRun?.initial_context ?? null}
+                                isAdmin={isAdmin}
                             />
                             {workflowRun?.annotations && Object.keys(workflowRun.annotations).length > 0 && (
                                 <BusinessJsonViewer
                                     title="QA & Evaluation Results"
                                     context={workflowRun.annotations as Record<string, string | number | boolean | object>}
+                                    isAdmin={isAdmin}
                                 />
                             )}
                         </div>

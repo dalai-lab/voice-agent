@@ -35,14 +35,35 @@ export function CallTypeCell({
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <span className="inline-flex items-center gap-1">
-                    <ChannelIcon className="h-4 w-4 text-muted-foreground" />
-                    <DirectionIcon
-                        className={`h-3.5 w-3.5 ${isInbound ? "text-emerald-600" : "text-blue-600"}`}
-                    />
+                <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border cursor-default select-none whitespace-nowrap transition-colors ${channel === "web"
+                            ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
+                            : channel === "chat"
+                                ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
+                                : isInbound
+                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                    : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                        }`}
+                >
+                    {channel === "web" ? (
+                        <>
+                            <Globe className="h-3 w-3" />
+                            <span>Web</span>
+                        </>
+                    ) : channel === "chat" ? (
+                        <>
+                            <MessageSquare className="h-3 w-3" />
+                            <span>Chat</span>
+                        </>
+                    ) : (
+                        <>
+                            <DirectionIcon className="h-3 w-3" />
+                            <span>{directionLabel}</span>
+                        </>
+                    )}
                 </span>
             </TooltipTrigger>
-            <TooltipContent sideOffset={4}>
+            <TooltipContent sideOffset={4} className="text-xs font-medium">
                 {directionLabel} · {channelLabel}
             </TooltipContent>
         </Tooltip>

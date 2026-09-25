@@ -18,6 +18,7 @@ import SpinLoader from "@/components/SpinLoader";
 import { AppSidebar } from "./AppSidebar";
 import { NotificationBell } from "./NotificationBell";
 import { LowBalanceBanner } from "./LowBalanceBanner";
+import { TalkarMaintenanceBlockage } from "./TalkarMaintenanceBlockage";
 
 function AppHeader() {
   const { toggleSidebar } = useSidebar();
@@ -291,7 +292,7 @@ function TalkarRouteGuard({ children }: { children: ReactNode }) {
 
 function TalkarLayoutGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { isLoading, isAdminBypass } = useTalkarCustomer();
+  const { isLoading, isAdminBypass, isServiceDown, checkHealth } = useTalkarCustomer();
 
   const isPublicRoute =
     pathname === "/" ||
@@ -299,9 +300,13 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
     pathname.startsWith("/integrations") ||
     pathname.startsWith("/handler") ||
     pathname.startsWith("/auth") ||
-    pathname.startsWith("/onboardingdemo") ||
     pathname.startsWith("/privacy-policy") ||
     pathname.startsWith("/terms-of-service");
+
+  // Full-level blockage when Talkar billing/backend is down
+  if (isServiceDown && !isPublicRoute) {
+    return <TalkarMaintenanceBlockage onRetry={checkHealth} />;
+  }
 
   // Keep showing the initial Talkar SpinLoader until we know whether the user is an admin or customer
   if (isLoading && !isPublicRoute && !isAdminBypass) {
@@ -323,11 +328,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   stickyTabs,
 }) => {
   const pathname = usePathname();
-
-  // Pure demo route: bypass all auth and layout guards
-  if (pathname.startsWith("/onboardingdemo")) {
-    return <>{children}</>;
-  }
 
   // Hide sidebar for root (/), public marketing routes (/use-cases, /integrations), /handler routes (Stack Auth routes), and /auth routes
   // TALKAR PATCH: Hide sidebar on /onboarding to strictly lock navigation during onboarding flow

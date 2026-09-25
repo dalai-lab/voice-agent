@@ -152,6 +152,7 @@ services:
       DEPLOYMENT_MODE: "${DEPLOYMENT_MODE:-talkar}"
       CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:3010,http://localhost,https://admin.talkar.in,http://localhost:8000}"
       TALKAR_SERVICE_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8002}"
+      TALKAR_BILLING_API_TOKEN: "${TALKAR_BILLING_API_TOKEN:-}"
       AUTH_PROVIDER: "${AUTH_PROVIDER:-local}"
       STACK_AUTH_PROJECT_ID: "${STACK_AUTH_PROJECT_ID:-}"
       STACK_PUBLISHABLE_CLIENT_KEY: "${STACK_PUBLISHABLE_CLIENT_KEY:-}"

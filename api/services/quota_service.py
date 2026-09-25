@@ -516,19 +516,23 @@ async def _authorize_oss_managed_v2_correlation(
 async def _authorize_talkar_workflow_run_start(organization_id: int) -> QuotaCheckResult:
     try:
         import os
-        talkar_billing_token = os.getenv("TALKAR_BILLING_API_TOKEN", "")
+        talkar_billing_token = os.getenv("TALKAR_BILLING_API_TOKEN", "").strip()
+        request_headers: dict = {"Content-Type": "application/json"}
+        if talkar_billing_token:
+            request_headers["Authorization"] = f"Bearer {talkar_billing_token}"
+
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 f"{TALKAR_SERVICE_URL}/billing/check-quota",
                 json={"organization_id": organization_id},
-                headers={"Authorization": f"Bearer {talkar_billing_token}"},
+                headers=request_headers,
                 timeout=3.0
             )
             if resp.status_code == 200 and resp.json().get("has_quota"):
                 return QuotaCheckResult(has_quota=True)
             return QuotaCheckResult(
-                has_quota=False, 
-                error_code="insufficient_quota", 
+                has_quota=False,
+                error_code="insufficient_quota",
                 error_message="Talkar wallet balance is exhausted."
             )
     except Exception as e:

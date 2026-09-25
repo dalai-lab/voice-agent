@@ -1,17 +1,33 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Script from "next/script";
+import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import { useOrgConfig } from "@/context/OrgConfigContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from "@/components/ui/table";
-import { AlertTriangle, Plus, CreditCard, ReceiptText, ShieldCheck, Sparkles, Check, ArrowRight } from "lucide-react";
-import { useAuth } from "@/lib/auth";
-import { useSearchParams } from "next/navigation";
-import Script from "next/script";
-import { useOrgConfig } from "@/context/OrgConfigContext";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Wallet,
+  CreditCard,
+  ArrowUpRight,
+  ShieldCheck,
+  Check,
+  Download,
+  AlertCircle,
+  Clock,
+  PhoneCall,
+  Zap,
+  RefreshCw,
+  Building2,
+  ChevronRight,
+  Sparkles
+} from "lucide-react";
 
 export default function WalletPage() {
   const { user } = useAuth();
@@ -90,11 +106,13 @@ export default function WalletPage() {
     }).catch(console.error);
   }, [resolvedOrgId]);
 
+  const currentPlan = subscription?.tier || plan || "starter";
+  const isCustomPlan = subscription?.is_custom;
+
   useEffect(() => {
     if (subscription) {
       const isActivationNeeded = customerStatus === "pending_deposit" || customerStatus === "pending_plan_selection" || isActivation;
       if (isActivationNeeded) {
-        // During activation: pre-fill with the plan minimum so user doesn't get blocked
         const p = subscription.plan || "starter";
         const min = isCustomPlan
           ? (subscription.custom_activation_deposit_paise ?? 600000) / 100
@@ -103,26 +121,25 @@ export default function WalletPage() {
           setTopupAmount(String(min));
         }
       }
-      // For active/suspended users, don't force a minimum — let them type any amount >= ₹500
     }
-  }, [subscription, customerStatus]);
+  }, [subscription, customerStatus, isCustomPlan]);
 
-  const balanceRupees = wallet && typeof wallet.balance_paise === 'number' ? (wallet.balance_paise / 100).toFixed(2) : "0.00";
-  const isZero = !wallet || wallet.balance_paise === 0 || wallet.balance_paise === undefined;
-  const isLow = wallet?.balance_paise > 0 && wallet?.balance_paise < 50000;
+  const balancePaise = wallet && typeof wallet.balance_paise === 'number' ? wallet.balance_paise : 0;
+  const balanceRupeesNumber = balancePaise / 100;
+  const balanceRupees = balanceRupeesNumber.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const isZero = balancePaise === 0;
+  const isLow = balancePaise > 0 && balancePaise < 50000;
 
-  const currentPlan = subscription?.tier || plan || "starter";
-  const isCustomPlan = subscription?.is_custom;
-  
-  // Minimum top-up depends on account status:
-  // - Pending activation: must hit the full plan activation deposit
-  // - Active/suspended (regular top-up): just ₹500 minimum
   const isActivationNeeded = customerStatus === "pending_deposit" || customerStatus === "pending_plan_selection" || isActivation;
   const minTopup = isActivationNeeded
     ? (isCustomPlan
         ? (subscription?.custom_activation_deposit_paise ?? 600000) / 100
         : PLAN_MINIMUMS[currentPlan] ?? 6000)
-    : 500; // Regular top-up floor: ₹500
+    : 500;
+
+  const currentMinuteRate = subscription?.per_minute_rate_paise ? subscription.per_minute_rate_paise / 100 : (currentPlan === "pro" ? 4 : 6);
+  const parsedTopupAmount = parseInt(topupAmount) || 0;
+  const estimatedMinutes = parsedTopupAmount > 0 && currentMinuteRate > 0 ? Math.floor(parsedTopupAmount / currentMinuteRate) : 0;
 
   const handleTopup = async (isMock = false, isLiveTest = false) => {
     if (!resolvedOrgId) return;
@@ -152,9 +169,12 @@ export default function WalletPage() {
 
       const handleTopupSuccess = async (newBalance: number) => {
         setWallet((prev: any) => ({ ...prev, balance_paise: newBalance }));
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("talkar:wallet-updated"));
+        }
         setTopupAmount("");
         setIsProcessing(false);
-        alert(isMock ? "Mock Top-Up Successful!" : "Wallet successfully topped up!");
+        alert(isMock ? "Test deposit completed." : "Funds added to wallet successfully.");
         
         if (isActivation && plan) {
           const activateRes = await fetch(`${TALKAR}/customers/by-org/${dograhOrgId}/select-tier`, {
@@ -190,7 +210,7 @@ export default function WalletPage() {
         });
         if (!confirmRes.ok) {
           const err = await confirmRes.json().catch(() => ({}));
-          throw new Error(err.detail || "Mock bypass failed.");
+          throw new Error(err.detail || "Mock confirmation failed.");
         }
         const result = await confirmRes.json();
         await handleTopupSuccess(result.new_balance_paise);
@@ -198,7 +218,7 @@ export default function WalletPage() {
       }
 
       if (!rzpKey) {
-        alert("Razorpay key missing. Please configure your environment or use the Dev bypass.");
+        alert("Payment gateway configuration missing. Please verify Razorpay keys.");
         setIsProcessing(false);
         return;
       }
@@ -207,7 +227,8 @@ export default function WalletPage() {
         key: rzpKey,
         amount: order.amount_paise,
         currency: order.currency,
-        name: "Talkar Wallet Top-Up",
+        name: "Talkar AI Voice",
+        description: `Wallet top-up of ₹${amount.toLocaleString()}`,
         order_id: order.razorpay_order_id,
         handler: async (response: any) => {
           const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
@@ -249,7 +270,7 @@ export default function WalletPage() {
   const handleSaveAutoRecharge = async () => {
     if (!resolvedOrgId) return;
     if (autoRechargeEnabled && !hasSavedCard) {
-      alert("Please save and verify a card before enabling auto-recharge.");
+      alert("Please add and verify a card before enabling auto-recharge.");
       return;
     }
     const dograhOrgId = resolvedOrgId;
@@ -265,7 +286,7 @@ export default function WalletPage() {
         })
       });
       if (res.ok) {
-        alert("Auto-recharge settings saved!");
+        alert("Auto-recharge settings updated successfully.");
       } else {
         const errorData = await res.json();
         alert(errorData.detail || "Failed to save settings");
@@ -313,7 +334,7 @@ export default function WalletPage() {
         });
         if (!confirmRes.ok) throw new Error("Mock failed");
         setHasSavedCard(true);
-        alert("Mock Card Added!");
+        alert("Test payment method verified.");
         return;
       }
 
@@ -322,7 +343,7 @@ export default function WalletPage() {
       const rzpKey = statusData.razorpay_key_id;
 
       if (!rzpKey) {
-        alert("Razorpay key missing.");
+        alert("Payment gateway key missing.");
         return;
       }
 
@@ -330,8 +351,8 @@ export default function WalletPage() {
         key: rzpKey,
         amount: session.amount_paise,
         currency: "INR",
-        name: "Save Card",
-        description: "Verify card registration (refunded automatically)",
+        name: "Verify Payment Method",
+        description: "Zero-charge authorization for automated reloads",
         order_id: session.razorpay_order_id,
         customer_id: customer.razorpay_customer_id,
         recurring: "1",
@@ -348,7 +369,7 @@ export default function WalletPage() {
           });
           if (confirmRes.ok) {
             setHasSavedCard(true);
-            alert("Card successfully registered for auto-recharge!");
+            alert("Card authorized successfully.");
           }
         },
         prefill: {
@@ -363,7 +384,7 @@ export default function WalletPage() {
     }
   };
 
-  const handleUpgradeRequest = async (requestedTier: string, isMock = false) => {
+  const handleUpgradeRequest = async (requestedTier: string) => {
     if (!resolvedOrgId) return;
     const dograhOrgId = resolvedOrgId;
     
@@ -377,627 +398,720 @@ export default function WalletPage() {
       
       if (!orderRes.ok) {
         const err = await orderRes.json().catch(() => ({}));
-        throw new Error(err.detail || "Failed to create upgrade order");
+        throw new Error(err.detail || "Failed to switch plan");
       }
       
       const order = await orderRes.json();
       
       if (order.status === "upgraded_from_wallet") {
-        alert(`Successfully upgraded to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}!`);
+        alert(`Plan switched to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}.`);
         fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
       }
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "An error occurred during upgrade");
+      alert(err.message || "An error occurred during plan update");
     } finally {
       setIsRequestingUpgrade(false);
     }
   };
 
   const filteredTransactions = transactions.filter(tx => filter === "all" || tx.type === filter);
-  const itemsPerPage = 20;
+  const itemsPerPage = 15;
   const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
   const currentTransactions = filteredTransactions.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
+  const quickPresets = [2000, 5000, 10000, 25000];
+
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6 bg-background text-foreground pb-12">
+    <div className="max-w-6xl mx-auto px-6 py-8 space-y-8 bg-background text-foreground font-sans">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
 
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-border/40">
-        <div className="space-y-0.5">
-          <h1 className="text-xl font-bold tracking-tight text-foreground">Wallet & Billing</h1>
-          <p className="text-xs text-muted-foreground">Manage call balances, configuration plan levels, and view historical deductions.</p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Wallet & Billing</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Manage your call balance, voice tier rates, auto-reload settings, and invoices.
+          </p>
         </div>
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-orange-500/30 bg-orange-500/5 text-orange-600 dark:text-orange-400 text-[10px] font-semibold uppercase tracking-wider">
-          <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Secure Payments
+
+        <div className="flex items-center gap-2">
+          {process.env.NODE_ENV !== "production" && (
+            <Button
+              onClick={() => handleTopup(true)}
+              variant="outline"
+              size="sm"
+              className="text-xs font-medium border-border/80 text-muted-foreground hover:text-foreground"
+            >
+              Dev Test Deposit
+            </Button>
+          )}
+          <Button
+            onClick={() => {
+              const el = document.getElementById("add-funds-card");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }}
+            className="text-xs font-medium bg-foreground text-background hover:bg-foreground/90 rounded-lg px-3.5 h-9 shadow-xs"
+          >
+            Add Funds
+          </Button>
         </div>
       </div>
 
-      {/* Warning Alerts (Theme-Compliant) */}
+      {/* Alerts */}
       {isActivation && (
-        <div className="border border-orange-500/20 bg-orange-500/10 dark:bg-orange-500/5 p-4 rounded-lg flex items-start gap-3 animate-in slide-in-from-top-2 duration-300 text-orange-800 dark:text-orange-400">
-          <ShieldCheck className="w-5 h-5 flex-shrink-0 mt-0.5" />
+        <div className="border border-border bg-card p-4 rounded-xl flex items-start gap-3.5 shadow-2xs">
+          <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0 mt-0.5">
+            <ShieldCheck className="w-4 h-4" />
+          </div>
           <div>
-            <h3 className="font-bold text-xs">Workspace Activation Pending</h3>
-            <p className="text-xs opacity-90 mt-0.5">
-              Add at least ₹2,000 to your wallet to activate your workspace and choose your call tier.
+            <h4 className="text-xs font-semibold text-foreground">Activation Deposit Required</h4>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+              Add at least ₹{minTopup.toLocaleString()} to initialize your voice lines and complete workspace onboarding.
             </p>
           </div>
         </div>
       )}
 
       {isZero && !isActivation && (
-        <div className="border border-rose-500/20 bg-rose-500/10 dark:bg-rose-500/5 p-4 rounded-lg flex items-start gap-3 animate-in slide-in-from-top-2 duration-300 text-rose-800 dark:text-rose-400">
-          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+        <div className="border border-rose-500/20 bg-rose-500/5 dark:bg-rose-500/10 p-4 rounded-xl flex items-start gap-3.5 text-rose-800 dark:text-rose-300">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-bold text-xs">Zero Wallet Balance — Operations Blocked</h3>
-            <p className="text-xs opacity-90 mt-0.5">
-              Your wallet balance is empty. All call routing services are blocked. Top up immediately to reactivate your lines.
+            <h4 className="text-xs font-semibold">Zero Balance — Inbound & Outbound Calling Paused</h4>
+            <p className="text-xs opacity-90 mt-0.5 leading-relaxed">
+              Your wallet is empty. Add funds to immediately resume real-time agent call handling.
             </p>
           </div>
         </div>
       )}
 
       {isLow && !isZero && (
-        <div className="border border-orange-500/20 bg-orange-500/10 dark:bg-orange-500/5 p-4 rounded-lg flex items-start gap-3 text-orange-800 dark:text-orange-400">
-          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+        <div className="border border-amber-500/20 bg-amber-500/5 dark:bg-amber-500/10 p-4 rounded-xl flex items-start gap-3.5 text-amber-800 dark:text-amber-300">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-bold text-xs">Low Balance Warning</h3>
-            <p className="text-xs opacity-90 mt-0.5">
-              Your wallet is running low (under ₹500). Top up soon or enable auto-recharge to prevent calling service interruptions.
+            <h4 className="text-xs font-semibold">Low Balance Notice</h4>
+            <p className="text-xs opacity-90 mt-0.5 leading-relaxed">
+              Your balance is under ₹500. Maintain a healthy reserve to prevent sudden line suspensions during live peak volume.
             </p>
           </div>
         </div>
       )}
 
-      {/* Top Grid: Balance Hero & Topup */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Balance Display */}
-        <div className="bg-card border border-border/50 rounded-lg p-5 flex flex-col justify-between shadow-2xs">
-          <div className="space-y-3">
-            <div className="flex items-center gap-1.5 text-muted-foreground text-xs uppercase tracking-wider font-semibold">
-              <CreditCard className="w-3.5 h-3.5 text-primary" />
-              Current Balance
-            </div>
-            <div className="text-3xl font-extrabold text-foreground tracking-tight pt-1">
-              ₹{balanceRupees}
-            </div>
+      {/* Overview Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Balance */}
+        <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-xs font-medium">Available Balance</span>
+            <Wallet className="h-4 w-4 text-muted-foreground/80" />
           </div>
-          
-          <div className="text-xs text-muted-foreground border-t border-border/30 pt-3 mt-4 leading-relaxed space-y-1">
-            {usage && (
-              <div>
-                Current month: <span className="text-foreground font-semibold">{usage.total_minutes} mins</span> spent (₹{(usage.total_spend_paise / 100).toFixed(2)})
-              </div>
-            )}
-            <div>
-              <span className="text-orange-500 font-semibold">Reserve Policy:</span> A ₹500 minimum balance is required to keep your account active. Below this, calls are blocked. Additionally, a dynamic reserve (5 mins of your active tier's per-minute rate) is held per concurrent call.
+          <div>
+            <div className="text-2xl font-bold tracking-tight text-foreground">
+              <span className="text-sm font-normal text-muted-foreground mr-1">₹</span>
+              {balanceRupees}
             </div>
-            <div>
-              <span className="text-emerald-500 font-semibold">Effective Capacity:</span> Based on your current balance and active tier rate, you can support a maximum of <span className="font-bold text-foreground">{Math.floor((Number(balanceRupees) - 500) > 0 ? (Number(balanceRupees) - 500) / (subscription?.tier === "pro" ? 120 : 90) : 0)} concurrent calls</span>.
-            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {balanceRupeesNumber >= 500 ? "Active for live calls" : "Min. ₹500 required"}
+            </p>
           </div>
         </div>
 
-        {/* Add Credits Panel */}
-        <div className="md:col-span-2 bg-card border border-border/50 rounded-lg p-5 shadow-2xs space-y-4">
+        {/* Card 2: Voice Tier */}
+        <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-xs font-medium">Active Plan</span>
+            <PhoneCall className="h-4 w-4 text-muted-foreground/80" />
+          </div>
           <div>
-            <h2 className="text-sm font-bold text-foreground">Add Credits</h2>
-            <p className="text-muted-foreground text-xs">Top up securely via cards, netbanking, or UPI payments.</p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {[2000, 5000, 10000].map(amt => (
-              <button 
-                key={amt}
-                type="button"
-                onClick={() => setTopupAmount(amt.toString())}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-all ${
-                  topupAmount === amt.toString() 
-                    ? "border-primary bg-primary/10 text-primary" 
-                    : "border-border/80 hover:bg-accent text-foreground"
-                }`}
-              >
-                ₹{amt.toLocaleString()}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 max-w-xl">
-            <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₹</span>
-              <Input 
-                type="number" 
-                min={minTopup.toString()}
-                className="h-10 bg-background border-border text-foreground rounded-md focus:border-primary px-6 text-xs transition-all w-full" 
-                placeholder={`Custom amount (minimum ₹${minTopup})`}
-                value={topupAmount}
-                onChange={(e) => setTopupAmount(e.target.value)}
-              />
+            <div className="text-2xl font-bold tracking-tight text-foreground capitalize">
+              {subscription?.tier === "custom" ? (subscription?.custom_plan_label || "Custom") : currentPlan}
             </div>
-            <div className="flex gap-2 shrink-0">
-              <Button onClick={() => handleTopup(false)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} className="bg-primary text-primary-foreground hover:bg-primary/95 rounded-md h-10 px-4 text-xs font-semibold shadow-xs">
-                {isProcessing ? "Processing..." : "Add Credits"}
-              </Button>
-              {process.env.NODE_ENV !== "production" && (
-                <Button onClick={() => handleTopup(true)} disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing} variant="outline" className="border-amber-500 text-amber-600 hover:bg-amber-50 rounded-md h-10 px-4 text-xs font-semibold shadow-xs">
-                  Dev Bypass
-                </Button>
-              )}
+            <p className="text-[11px] text-muted-foreground mt-1">
+              ₹{currentMinuteRate.toFixed(2)}/min · {subscription?.tier === "pro" ? "10 lines" : "2 lines"}
+            </p>
+          </div>
+        </div>
+
+        {/* Card 3: Monthly Usage */}
+        <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-xs font-medium">Current Month Usage</span>
+            <Clock className="h-4 w-4 text-muted-foreground/80" />
+          </div>
+          <div>
+            <div className="text-2xl font-bold tracking-tight text-foreground">
+              {usage?.total_minutes ?? 0} <span className="text-xs font-normal text-muted-foreground">mins</span>
             </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              ₹{((usage?.total_spend_paise ?? 0) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2 })} spent
+            </p>
+          </div>
+        </div>
+
+        {/* Card 4: Auto-Reload */}
+        <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-xs font-medium">Auto-Reload</span>
+            <RefreshCw className="h-4 w-4 text-muted-foreground/80" />
+          </div>
+          <div>
+            <div className="text-2xl font-bold tracking-tight text-foreground">
+              {autoRechargeEnabled ? "Enabled" : "Off"}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1 truncate">
+              {autoRechargeEnabled ? `Triggers at ₹${Number(threshold).toLocaleString()}` : "Manual reload only"}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Middle Grid: Auto-Recharge & Active Plan */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Auto Recharge Card */}
-        <div className="bg-card border border-border/50 rounded-lg p-5 shadow-2xs space-y-4">
+      {/* Main Grid: Add Funds & Auto-Recharge side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left: Add Funds */}
+        <div id="add-funds-card" className="lg:col-span-7 rounded-xl border border-border/70 bg-card p-5 sm:p-6 shadow-2xs space-y-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-primary animate-pulse" />
-                Auto-Recharge
-              </h2>
-              <p className="text-muted-foreground text-xs">Keep calling services active when credits are low.</p>
-            </div>
-            <Switch checked={autoRechargeEnabled} onCheckedChange={setAutoRechargeEnabled} />
-          </div>
-
-          {autoRechargeEnabled && (
-            <div className="space-y-4 pt-4 border-t border-border/30 animate-in fade-in duration-200">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Trigger threshold</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₹</span>
-                    <Input type="number" className="h-9 bg-background border-border text-foreground rounded-md focus:border-primary px-6 text-xs" value={threshold} onChange={e => setThreshold(e.target.value)} />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Top-up size</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₹</span>
-                    <Input type="number" className="h-9 bg-background border-border text-foreground rounded-md focus:border-primary px-6 text-xs" value={rechargeAmount} onChange={e => setRechargeAmount(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-
-              {hasSavedCard ? (
-                <div className="p-3 border border-emerald-500/20 bg-emerald-500/5 rounded-lg flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400">
-                  <span className="font-semibold flex items-center gap-1.5">
-                    <Check className="w-3.5 h-3.5" /> Card on File Enabled
-                  </span>
-                  <button type="button" onClick={() => handleAddCard(false)} className="text-[9px] hover:underline uppercase tracking-wider font-bold">Update</button>
-                </div>
-              ) : (
-                <div className="p-3 border border-orange-500/20 bg-orange-500/5 rounded-lg flex items-center justify-between text-xs text-orange-700 dark:text-orange-400 gap-4">
-                  <span className="font-semibold">Payment method required</span>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleAddCard(false)} className="bg-primary text-primary-foreground hover:bg-primary/95 text-[9px] font-bold rounded px-2.5 py-0.5">Save Card</Button>
-                  </div>
-                </div>
-              )}
-              
-              <Button 
-                className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90 border border-border/50 rounded-md h-9 text-xs font-semibold" 
-                onClick={handleSaveAutoRecharge} 
-                disabled={isSavingRecharge || (autoRechargeEnabled && !hasSavedCard)}
-              >
-                 {isSavingRecharge ? "Saving Parameters..." : (autoRechargeEnabled && !hasSavedCard ? "Save Card Required to Enable" : "Save Settings")}
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Current Tier Info */}
-        <div className="bg-card border border-border/50 rounded-lg p-5 shadow-2xs flex flex-col justify-between">
-          <div className="space-y-1">
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-              <ReceiptText className="w-4 h-4 text-primary" />
-              Active Voice Tier
-            </h2>
-            <p className="text-muted-foreground text-xs">The current usage configuration plan active on your workspace.</p>
-          </div>
-
-          {subscription && subscription.status !== "not_provisioned" ? (
-            <div className="space-y-4 border-t border-border/30 pt-4 mt-4">
-              <div className="flex justify-between items-center pb-3 border-b border-border/30">
-                <div>
-                  <span className="text-[9px] text-muted-foreground block uppercase font-mono tracking-wider">Active Engine</span>
-                  <p className="text-base font-bold text-foreground mt-0.5">
-                    {subscription.tier === "custom" ? (subscription.custom_plan_label || "Custom Engine") :
-                     subscription.tier === "pro" ? "Pro Engine" :
-                     subscription.tier === "growth" ? "Growth Engine" :
-                     subscription.tier === "elite" ? "Apex Omni Prime" :
-                     "Echo-Lite Engine"}
-                  </p>
-                </div>
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border border-orange-500/20 bg-orange-500/5 text-orange-600 dark:text-orange-400 uppercase tracking-wider">
-                  {subscription.tier || "Starter"}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider block font-semibold">Usage Rate</span>
-                  <p className="font-bold text-foreground mt-0.5">₹{subscription.per_minute_rate_paise ? (subscription.per_minute_rate_paise / 100).toFixed(2) : "25.00"} / min</p>
-                </div>
-                <div>
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-wider block font-semibold">Active Channels</span>
-                  <p className="font-bold text-foreground mt-0.5">
-                    {subscription.tier === "custom" ? "Configured by Talkar" :
-                     subscription.tier === "pro" ? "10 call lines" : 
-                     subscription.tier === "elite" ? "50 call lines" : "2 call lines"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="py-8 text-center text-muted-foreground text-xs">
-              Plan routing credentials loaded.
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Upgrade Plan Options — hidden for custom-plan customers */}
-      <div className="bg-card border border-border/50 rounded-lg p-5 shadow-2xs space-y-6">
-        <div>
-          <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-            <ReceiptText className="w-4 h-4 text-primary" />
-            {isCustomPlan ? (subscription?.custom_plan_label || "Custom Plan") : "Change Call Tier"}
-          </h2>
-          <p className="text-muted-foreground text-xs">
-            {isCustomPlan
-              ? "Your plan is custom-configured by Talkar. Contact support to make any adjustments."
-              : "Switch your call rate and capacity configurations."}
-          </p>
-        </div>
-
-        {!isCustomPlan && (
-          <div className="grid md:grid-cols-3 gap-4">
-          {/* Starter Plan Card */}
-          <div 
-            onClick={() => {
-              if (subscription?.tier !== 'starter') {
-                setSelectedTierToSwitch('starter');
-              }
-            }}
-            className={`p-4 border rounded-lg space-y-3 transition-all flex flex-col justify-between ${
-              subscription?.tier === 'starter' 
-                ? 'border-foreground bg-foreground/[0.02] cursor-default' 
-                : 'border-border/50 bg-background hover:border-foreground/30 cursor-pointer'
-            }`}
-          >
-            <div className="space-y-3">
-              <div className="flex justify-between items-start gap-2">
-                <div>
-                  <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
-                    Starter Engine
-                    {subscription?.tier === 'starter' && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                        Current
-                      </span>
-                    )}
-                  </h3>
-                  <p className="text-[10px] text-muted-foreground">Ideal for getting started — answer calls, book appointments, and qualify leads.</p>
-                </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/20 text-muted-foreground font-mono shrink-0">
-                  ₹6 / min
-                </span>
-              </div>
-              <p className="text-muted-foreground text-xs leading-relaxed">A fast, lightweight agent optimized for direct customer interactions, routing calls, and responding to common questions.</p>
-              <ul className="space-y-1 text-xs text-foreground/90 pt-3 border-t border-border/30">
-                <li className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>2 active concurrent call channels</span>
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>Includes 1 phone line</span>
-                </li>
-              </ul>
-            </div>
-            {subscription?.tier !== 'starter' && (
-              <div className="pt-3">
-                <Button variant="outline" className="w-full text-xs font-semibold h-8 rounded-md pointer-events-none">
-                  Switch to Starter
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Growth Plan Card */}
-          <div 
-            onClick={() => {
-              if (subscription?.tier !== 'growth') {
-                setSelectedTierToSwitch('growth');
-              }
-            }}
-            className={`p-4 border rounded-lg space-y-3 transition-all flex flex-col justify-between ${
-              subscription?.tier === 'growth' 
-                ? 'border-foreground bg-foreground/[0.02] cursor-default' 
-                : 'border-border/50 bg-background hover:border-foreground/30 cursor-pointer'
-            }`}
-          >
-            <div className="space-y-3">
-              <div className="flex justify-between items-start gap-2">
-                <div>
-                  <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
-                    Growth Engine
-                    {subscription?.tier === 'growth' && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                        Current
-                      </span>
-                    )}
-                  </h3>
-                  <p className="text-[10px] text-muted-foreground">Indian-optimised multilingual voice.</p>
-                </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/20 text-muted-foreground font-mono shrink-0">
-                  ₹6 / min
-                </span>
-              </div>
-              <p className="text-muted-foreground text-xs leading-relaxed">Same speed and LLM as Starter but powered by Talkar Voice Engine — ultra-low-latency TTS with 100+ Indian language voices.</p>
-              <ul className="space-y-1 text-xs text-foreground/90 pt-3 border-t border-border/30">
-                <li className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>2 active concurrent call channels</span>
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>100+ Indian language voices</span>
-                </li>
-              </ul>
-            </div>
-            {subscription?.tier !== 'growth' && (
-              <div className="pt-3">
-                <Button variant="outline" className="w-full text-xs font-semibold h-8 rounded-md pointer-events-none">
-                  Switch to Growth
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Pro Plan Card */}
-          <div 
-            onClick={() => {
-              if (subscription?.tier !== 'pro') {
-                setSelectedTierToSwitch('pro');
-              }
-            }}
-            className={`p-4 border rounded-lg space-y-3 transition-all flex flex-col justify-between ${
-              subscription?.tier === 'pro' 
-                ? 'border-foreground bg-foreground/[0.02] cursor-default' 
-                : 'border-border/50 bg-background hover:border-foreground/30 cursor-pointer'
-            }`}
-          >
-            <div className="space-y-3">
-              <div className="flex justify-between items-start gap-2">
-                <div>
-                  <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
-                    Pro Engine
-                    {subscription?.tier === 'pro' && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                        Current
-                      </span>
-                    )}
-                  </h3>
-                  <p className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold">Recommended Engine</p>
-                </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-orange-500/20 bg-orange-500/5 text-orange-600 dark:text-orange-400 font-mono shrink-0">
-                  ₹4 / min
-                </span>
-              </div>
-              <p className="text-muted-foreground text-xs leading-relaxed">Higher deposit unlocks lower per-minute rates and more concurrent channels. Combines deep conversational understanding with high-fidelity, emotional voice tones.</p>
-              <ul className="space-y-1 text-xs text-foreground/90 pt-3 border-t border-border/30">
-                <li className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>10 active concurrent call lines</span>
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>Includes 2 premium phone lines</span>
-                </li>
-              </ul>
-            </div>
-            {subscription?.tier !== 'pro' && (
-              <div className="pt-3">
-                <Button variant="secondary" className="w-full text-xs font-semibold h-8 rounded-md pointer-events-none">
-                  Switch to Pro
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-        )}
-      </div>
-
-      {/* Switch Plan Confirmation Modal */}
-      {selectedTierToSwitch && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-card border border-border/80 rounded-lg max-w-sm w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="space-y-1.5">
-              <h3 className="text-sm font-bold text-foreground">Confirm Plan Switch</h3>
-              <p className="text-muted-foreground text-xs">
-                Are you sure you want to switch your plan from <span className="font-semibold text-foreground uppercase">{subscription?.tier || "starter"}</span> to <span className="font-semibold text-foreground uppercase text-primary">{selectedTierToSwitch}</span>?
+              <h2 className="text-base font-semibold text-foreground">Add Funds</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Top up your workspace balance using UPI, credit cards, or net banking.
               </p>
             </div>
-            
-            <div className="bg-muted/30 p-3 rounded-lg text-xs space-y-2 border border-border/30 text-muted-foreground">
-              <div className="flex justify-between">
-                <span>New Call Rate:</span>
-                <span className="font-semibold text-foreground">₹{selectedTierToSwitch === "pro" ? "4.00" : "6.00"} / min</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Required Wallet Balance:</span>
-                <span className="font-semibold text-foreground">₹{selectedTierToSwitch === "pro" ? "8,000" : "6,000"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Current Wallet Balance:</span>
-                <span className="font-semibold text-foreground">₹{balanceRupees}</span>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Select Preset Amount</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {quickPresets.map((amt) => {
+                const isSelected = topupAmount === String(amt);
+                return (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setTopupAmount(String(amt))}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all text-center ${
+                      isSelected
+                        ? "border-foreground bg-foreground text-background shadow-xs"
+                        : "border-border/80 hover:border-foreground/40 bg-background text-foreground"
+                    }`}
+                  >
+                    ₹{amt.toLocaleString()}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Custom Input */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Or Enter Custom Amount</label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">₹</span>
+              <Input
+                type="number"
+                min={minTopup}
+                value={topupAmount}
+                onChange={(e) => setTopupAmount(e.target.value)}
+                placeholder={`Minimum ₹${minTopup}`}
+                className="pl-8 h-10 rounded-lg text-sm bg-background border-border"
+              />
+            </div>
+          </div>
+
+          {/* Estimated Talk Time Banner */}
+          {estimatedMinutes > 0 && (
+            <div className="rounded-lg bg-muted/40 border border-border/50 p-3 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Estimated Call Capacity</span>
+              <span className="font-semibold text-foreground">
+                ~{estimatedMinutes.toLocaleString()} minutes <span className="text-muted-foreground font-normal">at ₹{currentMinuteRate}/min</span>
+              </span>
+            </div>
+          )}
+
+          {/* Submit */}
+          <div className="pt-2 flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={() => handleTopup(false)}
+              disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing}
+              className="w-full sm:flex-1 h-10 rounded-lg text-xs font-semibold bg-foreground text-background hover:bg-foreground/90 shadow-xs"
+            >
+              {isProcessing ? "Opening Checkout..." : `Pay ₹${parsedTopupAmount > 0 ? parsedTopupAmount.toLocaleString() : "0"} Securely`}
+            </Button>
+          </div>
+        </div>
+
+        {/* Right: Auto-Recharge Settings */}
+        <div className="lg:col-span-5 rounded-xl border border-border/70 bg-card p-5 sm:p-6 shadow-2xs space-y-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Auto-Reload</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Automatically recharge your account when it falls below a threshold.
+              </p>
+            </div>
+            <Switch
+              checked={autoRechargeEnabled}
+              onCheckedChange={setAutoRechargeEnabled}
+            />
+          </div>
+
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Trigger when balance drops below</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
+                <Input
+                  type="number"
+                  disabled={!autoRechargeEnabled}
+                  value={threshold}
+                  onChange={(e) => setThreshold(e.target.value)}
+                  className="pl-7 h-9 text-xs rounded-lg bg-background"
+                />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button 
-                onClick={() => setSelectedTierToSwitch(null)} 
-                variant="outline" 
-                className="h-8 text-xs font-semibold rounded-md"
-                disabled={isRequestingUpgrade}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={async () => {
-                  await handleUpgradeRequest(selectedTierToSwitch);
-                  setSelectedTierToSwitch(null);
-                }} 
-                className="h-8 text-xs font-bold rounded-md bg-foreground text-background hover:bg-foreground/90"
-                disabled={isRequestingUpgrade}
-              >
-                {isRequestingUpgrade ? "Switching..." : "Confirm & Switch"}
-              </Button>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Amount to recharge</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
+                <Input
+                  type="number"
+                  disabled={!autoRechargeEnabled}
+                  value={rechargeAmount}
+                  onChange={(e) => setRechargeAmount(e.target.value)}
+                  className="pl-7 h-9 text-xs rounded-lg bg-background"
+                />
+              </div>
+            </div>
+
+            {/* Saved Card Section */}
+            <div className="pt-2 border-t border-border/50">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Payment Method</span>
+                {hasSavedCard ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                    <Check className="h-3 w-3" /> Card on file
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleAddCard(false)}
+                    className="text-xs font-medium text-foreground hover:underline"
+                  >
+                    + Add Card
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <Button
+              onClick={handleSaveAutoRecharge}
+              disabled={isSavingRecharge || (autoRechargeEnabled && !hasSavedCard)}
+              variant="outline"
+              className="w-full h-9 rounded-lg text-xs font-medium border-border/80"
+            >
+              {isSavingRecharge ? "Saving..." : "Save Auto-Reload Settings"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Plan Selection Section */}
+      {!isCustomPlan && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Calling Plans & Capacity</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Choose the tier that matches your call volume and language requirements.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Starter Plan */}
+            <div
+              className={`rounded-xl border p-5 flex flex-col justify-between space-y-4 transition-all ${
+                subscription?.tier === "starter"
+                  ? "border-foreground bg-foreground/[0.02]"
+                  : "border-border/70 bg-card hover:border-foreground/30"
+              }`}
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-foreground">Starter</h3>
+                  {subscription?.tier === "starter" ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-foreground/[0.08] text-foreground">
+                      Current Plan
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold text-muted-foreground">₹6 / min</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Best for initial inbound coverage, appointment booking, and qualifying leads.
+                </p>
+                <div className="pt-2 border-t border-border/40 space-y-2 text-xs">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Check className="h-3.5 w-3.5 text-foreground" />
+                    <span>2 concurrent calling channels</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Check className="h-3.5 w-3.5 text-foreground" />
+                    <span>1 dedicated phone number</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Check className="h-3.5 w-3.5 text-foreground" />
+                    <span>Standard English & Hindi</span>
+                  </div>
+                </div>
+              </div>
+
+              {subscription?.tier !== "starter" && (
+                <Button
+                  onClick={() => setSelectedTierToSwitch("starter")}
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs font-medium rounded-lg"
+                >
+                  Switch to Starter
+                </Button>
+              )}
+            </div>
+
+            {/* Growth Plan */}
+            <div
+              className={`rounded-xl border p-5 flex flex-col justify-between space-y-4 transition-all ${
+                subscription?.tier === "growth"
+                  ? "border-foreground bg-foreground/[0.02]"
+                  : "border-border/70 bg-card hover:border-foreground/30"
+              }`}
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-foreground">Growth</h3>
+                  {subscription?.tier === "growth" ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-foreground/[0.08] text-foreground">
+                      Current Plan
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold text-muted-foreground">₹6 / min</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Engineered for Indian multilingual conversations with ultra-low voice latency.
+                </p>
+                <div className="pt-2 border-t border-border/40 space-y-2 text-xs">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Check className="h-3.5 w-3.5 text-foreground" />
+                    <span>2 concurrent calling channels</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Check className="h-3.5 w-3.5 text-foreground" />
+                    <span>100+ Indian regional language accents</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Check className="h-3.5 w-3.5 text-foreground" />
+                    <span>Instant interruption handling</span>
+                  </div>
+                </div>
+              </div>
+
+              {subscription?.tier !== "growth" && (
+                <Button
+                  onClick={() => setSelectedTierToSwitch("growth")}
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs font-medium rounded-lg"
+                >
+                  Switch to Growth
+                </Button>
+              )}
+            </div>
+
+            {/* Pro Plan */}
+            <div
+              className={`rounded-xl border p-5 flex flex-col justify-between space-y-4 transition-all ${
+                subscription?.tier === "pro"
+                  ? "border-foreground bg-foreground/[0.02]"
+                  : "border-border/70 bg-card hover:border-foreground/30"
+              }`}
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-sm font-semibold text-foreground">Pro</h3>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-sm bg-foreground text-background font-medium">
+                      High Volume
+                    </span>
+                  </div>
+                  {subscription?.tier === "pro" ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-foreground/[0.08] text-foreground">
+                      Current Plan
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      ₹4 / min
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Best rates and high concurrent lines for scaled outbound or high-traffic inbound.
+                </p>
+                <div className="pt-2 border-t border-border/40 space-y-2 text-xs">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Check className="h-3.5 w-3.5 text-foreground" />
+                    <span>10 concurrent calling channels</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Check className="h-3.5 w-3.5 text-foreground" />
+                    <span>2 premium phone numbers included</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Check className="h-3.5 w-3.5 text-foreground" />
+                    <span>Lowest calling rate (₹4/min)</span>
+                  </div>
+                </div>
+              </div>
+
+              {subscription?.tier !== "pro" && (
+                <Button
+                  onClick={() => setSelectedTierToSwitch("pro")}
+                  size="sm"
+                  className="w-full text-xs font-medium rounded-lg bg-foreground text-background hover:bg-foreground/90"
+                >
+                  Switch to Pro
+                </Button>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Transaction History Card */}
-      <div className="bg-card border border-border/50 rounded-lg p-5 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-bold text-foreground">Deduction Ledger</h2>
-            <p className="text-muted-foreground text-xs">Audit log of payments, deposits, and call deductions.</p>
-          </div>
-          <select 
-            className="h-9 w-[180px] rounded-md border border-border bg-background px-3 py-1.5 text-xs shadow-xs text-foreground focus:outline-none focus:border-primary transition-colors"
-            value={filter}
-            onChange={(e) => { setFilter(e.target.value); setPage(1); }}
-          >
-            <option value="all">All Ledgers</option>
-            <option value="top_up">Deposits</option>
-            <option value="call_deduction">Call Usage</option>
-            <option value="refund">Refunds</option>
-            <option value="grant">Grants</option>
-          </select>
-        </div>
+      {/* Activity & Invoices Tabs */}
+      <div className="rounded-xl border border-border/70 bg-card p-5 sm:p-6 shadow-2xs space-y-5">
+        <Tabs defaultValue="transactions">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
+            <TabsList className="bg-muted/40 p-1 rounded-lg">
+              <TabsTrigger value="transactions" className="rounded-md text-xs font-medium">
+                Activity
+              </TabsTrigger>
+              <TabsTrigger value="invoices" className="rounded-md text-xs font-medium">
+                Tax Invoices
+              </TabsTrigger>
+            </TabsList>
 
-        <div className="overflow-hidden border border-border/40 rounded-lg bg-background">
-          <Table>
-            <TableHeader className="bg-muted/40">
-              <TableRow className="border-b border-border/40 hover:bg-transparent">
-                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4">Timestamp</TableHead>
-                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4">Description</TableHead>
-                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4 text-right">Transaction Size</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {currentTransactions.map(tx => (
-                <TableRow key={tx.id} className="border-b border-border/30 hover:bg-muted/10 transition-colors">
-                  <TableCell className="text-foreground text-xs py-3 px-4">{new Date(tx.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-foreground text-xs py-3 px-4">{tx.description}</TableCell>
-                  <TableCell className={`text-right font-bold text-xs py-3 px-4 ${tx.amount_paise > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
-                    {tx.amount_paise > 0 ? "+" : ""}₹{(Math.abs(tx.amount_paise) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {currentTransactions.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground text-xs py-8">
-                    No records found matching the selection.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        {totalPages > 1 && (
-          <div className="flex items-center justify-end space-x-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="border-border/80 hover:bg-accent text-foreground rounded text-xs"
-            >
-              Previous
-            </Button>
-            <div className="text-xs text-muted-foreground px-2">
-              Page {page} of {totalPages}
+            <div className="flex items-center gap-2">
+              <select
+                className="h-8 rounded-lg border border-border/80 bg-background px-2.5 text-xs text-foreground focus:outline-none"
+                value={filter}
+                onChange={(e) => {
+                  setFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="all">All Transactions</option>
+                <option value="top_up">Deposits</option>
+                <option value="call_deduction">Call Usage</option>
+                <option value="refund">Refunds</option>
+                <option value="grant">Promotional Grants</option>
+              </select>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="border-border/80 hover:bg-accent text-foreground rounded text-xs"
-            >
-              Next
-            </Button>
           </div>
-        )}
+
+          {/* Transactions Tab */}
+          <TabsContent value="transactions" className="space-y-4 pt-2">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border/40 hover:bg-transparent">
+                    <TableHead className="text-xs font-medium text-muted-foreground py-3">Date</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground py-3">Description</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground py-3 text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentTransactions.map((tx) => (
+                    <TableRow key={tx.id} className="border-border/30 hover:bg-muted/20">
+                      <TableCell className="text-xs text-muted-foreground py-3">
+                        {new Date(tx.created_at).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric"
+                        })}
+                      </TableCell>
+                      <TableCell className="text-xs font-medium text-foreground py-3">
+                        {tx.description}
+                      </TableCell>
+                      <TableCell
+                        className={`text-xs font-semibold text-right py-3 ${
+                          tx.amount_paise > 0
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-foreground"
+                        }`}
+                      >
+                        {tx.amount_paise > 0 ? "+" : "-"}₹
+                        {(Math.abs(tx.amount_paise) / 100).toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {currentTransactions.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-8">
+                        No transactions recorded yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2 border-t border-border/40 text-xs">
+                <span className="text-muted-foreground">
+                  Page {page} of {totalPages}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="h-7 text-xs"
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="h-7 text-xs"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Invoices Tab */}
+          <TabsContent value="invoices" className="space-y-4 pt-2">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border/40 hover:bg-transparent">
+                    <TableHead className="text-xs font-medium text-muted-foreground py-3">Date</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground py-3">Invoice Number</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground py-3">Amount</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground py-3">Status</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground py-3 text-right">Receipt</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((inv) => (
+                    <TableRow key={inv.id} className="border-border/30 hover:bg-muted/20">
+                      <TableCell className="text-xs text-muted-foreground py-3">
+                        {new Date(inv.created_at).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric"
+                        })}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-foreground py-3">
+                        {inv.invoice_number}
+                      </TableCell>
+                      <TableCell className="text-xs font-semibold text-foreground py-3">
+                        ₹{(inv.amount_paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell className="text-xs py-3">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          {inv.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right py-3">
+                        <a
+                          href={`/invoice/${inv.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>PDF</span>
+                        </a>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {invoices.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">
+                        No invoices generated yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
-      {/* Invoices Card */}
-      <div className="bg-card border border-border/50 rounded-lg p-5 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-bold text-foreground">Invoices & Receipts</h2>
-            <p className="text-muted-foreground text-xs">Download PDF receipts for your wallet deposits.</p>
+      {/* Switch Plan Confirmation Modal */}
+      {selectedTierToSwitch && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-card border border-border rounded-xl max-w-sm w-full p-6 shadow-xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-foreground">Confirm Plan Switch</h3>
+              <p className="text-xs text-muted-foreground">
+                Switching to the <span className="font-semibold text-foreground capitalize">{selectedTierToSwitch}</span> plan updates your per-minute rate and concurrency limits immediately.
+              </p>
+            </div>
+
+            <div className="bg-muted/40 p-3 rounded-lg text-xs space-y-2 border border-border/40 text-muted-foreground">
+              <div className="flex justify-between">
+                <span>New Call Rate:</span>
+                <span className="font-semibold text-foreground">
+                  ₹{selectedTierToSwitch === "pro" ? "4.00" : "6.00"} / min
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Concurrent Channels:</span>
+                <span className="font-semibold text-foreground">
+                  {selectedTierToSwitch === "pro" ? "10 call lines" : "2 call lines"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Available Balance:</span>
+                <span className="font-semibold text-foreground">₹{balanceRupees}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                onClick={() => setSelectedTierToSwitch(null)}
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs font-medium rounded-lg"
+                disabled={isRequestingUpgrade}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  await handleUpgradeRequest(selectedTierToSwitch);
+                  setSelectedTierToSwitch(null);
+                }}
+                size="sm"
+                className="h-8 text-xs font-semibold rounded-lg bg-foreground text-background hover:bg-foreground/90"
+                disabled={isRequestingUpgrade}
+              >
+                {isRequestingUpgrade ? "Updating..." : "Confirm Switch"}
+              </Button>
+            </div>
           </div>
         </div>
-
-        <div className="overflow-hidden border border-border/40 rounded-lg bg-background">
-          <Table>
-            <TableHeader className="bg-muted/40">
-              <TableRow className="border-b border-border/40 hover:bg-transparent">
-                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4">Date</TableHead>
-                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4">Invoice #</TableHead>
-                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4">Amount</TableHead>
-                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4">Status</TableHead>
-                <TableHead className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider py-3 px-4 text-right">Download</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoices.map(inv => (
-                <TableRow key={inv.id} className="border-b border-border/30 hover:bg-muted/10 transition-colors">
-                  <TableCell className="text-foreground text-xs py-3 px-4">{new Date(inv.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-foreground text-xs py-3 px-4 font-mono">{inv.invoice_number}</TableCell>
-                  <TableCell className="text-foreground text-xs py-3 px-4 font-bold">
-                    ₹{(inv.amount_paise / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </TableCell>
-                  <TableCell className="text-foreground text-xs py-3 px-4">
-                    <span className="px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] uppercase font-bold tracking-wider">
-                      {inv.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right py-3 px-4">
-                    <a 
-                      href={`/invoice/${inv.id}`} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border hover:bg-muted/50 text-xs font-semibold text-foreground transition-colors"
-                    >
-                      <ReceiptText className="w-3.5 h-3.5" /> PDF
-                    </a>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {invoices.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground text-xs py-8">
-                    No invoices found. Top up your wallet to generate one.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

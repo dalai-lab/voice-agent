@@ -17,6 +17,8 @@ import React from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { SidebarTeamSwitcher } from "@/components/layout/SidebarTeamSwitcher";
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { SidebarWalletWidget } from "@/components/layout/SidebarWalletWidget";
+import { useRealtimeWallet } from "@/hooks/useRealtimeWallet";
 import ThemeToggle from "@/components/ThemeSwitcher";
 import { Button } from "@/components/ui/button";
 import {
@@ -249,6 +251,7 @@ export function AppSidebar() {
   // independently and leave the sidebar unfiltered when the Talkar service is slow.
   const { isTalkarCustomer, isAdminBypass } = useTalkarCustomer();
   const dograhOrgId = orgContext?.organization_id;
+  const wallet = useRealtimeWallet();
 
   const [crmLinks, setCrmLinks] = React.useState<Array<{ name: string; url: string }>>([]);
 
@@ -449,6 +452,11 @@ export function AppSidebar() {
           >
             {item.title}
           </span>
+          {item.url === "/wallet" && !isCollapsed && (
+            <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-sans font-medium bg-sidebar-accent/70 border border-sidebar-border/60 text-sidebar-foreground shrink-0 shadow-2xs">
+              <span>{wallet.currency}{wallet.balanceRupees}</span>
+            </span>
+          )}
           {item.url.startsWith("http") && !isCollapsed && (
             <PhosphorIcons.ArrowSquareOut className="ml-auto h-3 w-3 opacity-60 shrink-0" />
           )}
@@ -684,9 +692,12 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter
-        className={cn("border-t border-sidebar-border bg-sidebar", isCollapsed ? "p-2" : "p-4")}
+        className={cn("border-t border-sidebar-border bg-sidebar", isCollapsed ? "p-2 space-y-2" : "p-3 space-y-2.5")}
         translate="no"
       >
+        {/* Real-time Wallet & Money Status (AAA-Grade Minimal) */}
+        <SidebarWalletWidget isCollapsed={isCollapsed} />
+
         <div className="space-y-2">
           {provider !== "stack" && (
             <div className={cn("flex items-center gap-2 justify-between", isCollapsed && "flex-col gap-3")}>

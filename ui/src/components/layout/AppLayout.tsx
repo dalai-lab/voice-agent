@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Menu, RefreshCw, ShieldAlert } from "lucide-react";
+import { AlertTriangle, AlertCircle, CheckCircle2, Menu, RefreshCw, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React, { ReactNode, useEffect, useRef } from "react";
@@ -16,8 +16,8 @@ import { useAuth } from "@/lib/auth";
 import SpinLoader from "@/components/SpinLoader";
 
 import { AppSidebar } from "./AppSidebar";
-
 import { NotificationBell } from "./NotificationBell";
+import { LowBalanceBanner } from "./LowBalanceBanner";
 
 function AppHeader() {
   const { toggleSidebar } = useSidebar();
@@ -137,58 +137,57 @@ function TalkarStatusGate() {
 
   if (talkarStatus === 'agent_building') {
     return (
-      <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-900 border-b border-indigo-500/30 text-white text-center py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3">
-        <div className="w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
-        Your Talkar Agent is currently being built by our experts. Feel free to explore the dashboard in the meantime!
+      <div className="border-b border-border/60 bg-muted/40 text-foreground text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2.5">
+        <div className="w-3.5 h-3.5 rounded-full border-2 border-foreground/30 border-t-foreground animate-spin shrink-0" />
+        <span>Your Talkar Agent is currently being configured. Feel free to explore the dashboard in the meantime.</span>
       </div>
     );
   }
 
   if (talkarStatus === 'under_review') {
     return (
-      <div className="bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 border-b border-slate-500/30 text-white text-center py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3">
-        <div className="w-4 h-4 rounded-full border-2 border-slate-300 border-t-transparent animate-spin" />
-        Your application is under review. We&apos;ll notify you within 48 hours. Feel free to explore in the meantime!
+      <div className="border-b border-border/60 bg-muted/40 text-foreground text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2.5">
+        <div className="w-3.5 h-3.5 rounded-full border-2 border-foreground/30 border-t-foreground animate-spin shrink-0" />
+        <span>Your application is under review. Our team will reach out within 24 hours.</span>
       </div>
     );
   }
 
   if (talkarStatus === 'approved') {
     return (
-      <div className="bg-gradient-to-r from-green-600 via-emerald-600 to-green-600 border-b border-green-500/30 text-white text-center py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3">
-        <span className="text-lg">✅</span>
-        Your integration fee has been quoted! Please complete your payment to begin development.
-        <a href="/onboarding" className="ml-2 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs transition-colors">Pay Now →</a>
+      <div className="border-b border-emerald-500/20 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200 text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2">
+        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        <span>Your integration quote is ready. Complete payment to begin live deployment.</span>
+        <Link href="/onboarding" className="ml-1 font-semibold underline underline-offset-4 hover:opacity-80">Pay Now →</Link>
       </div>
     );
   }
 
   if (talkarStatus === 'pending_deposit') {
     return (
-      <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 border-b border-orange-400/30 text-white text-center py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3">
-        <span className="text-lg">💰</span>
-        Activate your agent! Please add credits to your wallet to get started.
-        <a href="/wallet" className="ml-2 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs transition-colors">Go to Wallet →</a>
+      <div className="border-b border-amber-500/20 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2">
+        <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+        <span>Workspace activation pending. Add credits to your wallet to activate your agent.</span>
+        <Link href="/wallet" className="ml-1 font-semibold underline underline-offset-4 hover:opacity-80">Go to Wallet →</Link>
       </div>
     );
   }
 
   if (talkarStatus === 'pending_plan_selection') {
     return (
-      <div className="bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-600 border-b border-green-400/30 text-white text-center py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3">
-        <span className="text-lg">🚀</span>
-        Your AI Agent is ready! Please choose a plan to activate it.
-        <a href="/onboarding/select-plan" className="ml-2 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs transition-colors">Choose Plan →</a>
+      <div className="border-b border-primary/20 bg-primary/10 text-foreground text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2">
+        <span>Your agent is ready. Please choose a calling plan to complete activation.</span>
+        <Link href="/onboarding/select-plan" className="ml-1 font-semibold underline underline-offset-4 hover:opacity-80">Choose Plan →</Link>
       </div>
     );
   }
 
   if (talkarStatus === 'suspended') {
     return (
-      <div className="bg-gradient-to-r from-red-700 via-red-600 to-red-700 border-b border-red-500/40 text-white py-3 text-sm font-medium z-50 sticky top-0 shadow-lg flex items-center justify-center gap-3 px-4">
-        <span className="text-lg">⛔</span>
-        <span>Your account has been suspended due to zero balance. Top up your wallet to instantly reactivate.</span>
-        <a href="/wallet" className="ml-2 shrink-0 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs transition-colors font-semibold">Add Credits →</a>
+      <div className="border-b border-rose-500/20 bg-rose-500/10 text-rose-900 dark:text-rose-200 text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2">
+        <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+        <span>Calling services suspended due to zero wallet balance. Top up to reactivate immediately.</span>
+        <Link href="/wallet" className="ml-1 font-semibold underline underline-offset-4 hover:opacity-80">Add Credits →</Link>
       </div>
     );
   }
@@ -300,6 +299,7 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
     pathname.startsWith("/integrations") ||
     pathname.startsWith("/handler") ||
     pathname.startsWith("/auth") ||
+    pathname.startsWith("/onboardingdemo") ||
     pathname.startsWith("/privacy-policy") ||
     pathname.startsWith("/terms-of-service");
 
@@ -323,6 +323,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   stickyTabs,
 }) => {
   const pathname = usePathname();
+
+  // Pure demo route: bypass all auth and layout guards
+  if (pathname.startsWith("/onboardingdemo")) {
+    return <>{children}</>;
+  }
 
   // Hide sidebar for root (/), public marketing routes (/use-cases, /integrations), /handler routes (Stack Auth routes), and /auth routes
   // TALKAR PATCH: Hide sidebar on /onboarding to strictly lock navigation during onboarding flow
@@ -352,6 +357,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 <SidebarInset className="flex-1">
                   <TalkarStatusGate />
                   <BackendStatusBanner />
+                  <LowBalanceBanner />
                   {!isWorkflowEditor && <AppHeader />}
                   {/* Optional header area for specific pages */}
                   {headerActions && (
@@ -388,6 +394,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             <div className="app-surface w-full flex-1">
               <TalkarStatusGate />
               <BackendStatusBanner />
+              <LowBalanceBanner />
               <TalkarRouteGuard>
                 {children}
               </TalkarRouteGuard>

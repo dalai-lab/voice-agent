@@ -1,37 +1,58 @@
-// Dark token overrides for the embedded Stack Auth form so it blends into the
-// auth card surface (zinc-900 background, zinc-100 foreground, the warm CTA
-// accent on the primary button, zinc-800 borders/inputs). Stack's theme parser
-// does not accept OKLCH strings, so keep these values in hex.
+// Dark & light token overrides for the embedded Stack Auth form so it blends
+// seamlessly into the auth card surface. Stack's theme parser does not accept
+// OKLCH strings, so hex values are used.
 
 import type { StackTheme } from "@stackframe/stack";
 import type { ComponentProps } from "react";
 
 type ThemeConfig = NonNullable<ComponentProps<typeof StackTheme>["theme"]>;
 
-const colors = {
-  background: "#121318", // cohesive dark background for the card/fields
-  foreground: "#fafafa",
-  card: "#121318",
-  cardForeground: "#fafafa",
-  popover: "#121318",
-  popoverForeground: "#fafafa",
-  primary: "#FF5500", // Talkar orange
+const darkColors = {
+  background: "#09090b", // Deep zinc matte background
+  foreground: "#f4f4f5", // Zinc-100 crisp text
+  card: "#09090b",
+  cardForeground: "#f4f4f5",
+  popover: "#121215",
+  popoverForeground: "#f4f4f5",
+  primary: "#fe6905", // Talkar signature orange
   primaryForeground: "#ffffff",
-  secondary: "#1f2029",
-  secondaryForeground: "#fafafa",
-  muted: "#1f2029",
-  mutedForeground: "#a1a1aa",
-  accent: "#FF5500",
-  accentForeground: "#ffffff",
+  secondary: "#18181b", // Zinc-900 subtle surfaces
+  secondaryForeground: "#f4f4f5",
+  muted: "#18181b",
+  mutedForeground: "#71717a", // Zinc-500
+  accent: "#18181b",
+  accentForeground: "#f4f4f5",
   destructive: "#ef4444",
   destructiveForeground: "#fafafa",
-  border: "#27272a",
-  input: "#1f2029", // dark input background
-  ring: "#FF5500",
+  border: "#27272a", // Crisp Zinc-800 hairline border
+  input: "#27272a", // Subtle dark border
+  ring: "#fe6905",
+};
+
+const lightColors = {
+  background: "#ffffff",
+  foreground: "#09090b",
+  card: "#ffffff",
+  cardForeground: "#09090b",
+  popover: "#ffffff",
+  popoverForeground: "#09090b",
+  primary: "#fe6905",
+  primaryForeground: "#ffffff",
+  secondary: "#f4f4f5",
+  secondaryForeground: "#09090b",
+  muted: "#f4f4f5",
+  mutedForeground: "#71717a",
+  accent: "#f4f4f5",
+  accentForeground: "#09090b",
+  destructive: "#ef4444",
+  destructiveForeground: "#ffffff",
+  border: "#e4e4e7",
+  input: "#e4e4e7",
+  ring: "#fe6905",
 };
 
 export const stackAuthDarkTheme: ThemeConfig = {
-  light: colors,
-  dark: colors,
-  radius: "0.75rem",
+  light: lightColors,
+  dark: darkColors,
+  radius: "0.5rem",
 };

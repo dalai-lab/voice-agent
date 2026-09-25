@@ -20,14 +20,13 @@ export function BackButton() {
   };
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
+    <button
+      type="button"
       onClick={handleBack}
-      className="-ml-2 gap-2 text-muted-foreground hover:text-foreground"
+      className="group inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors py-1 px-2 -ml-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/60 mb-3 cursor-pointer"
     >
-      <ArrowLeft className="h-4 w-4" />
-      Go Back
-    </Button>
+      <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+      <span>Back</span>
+    </button>
   );
 }

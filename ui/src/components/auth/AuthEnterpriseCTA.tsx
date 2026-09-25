@@ -1,13 +1,5 @@
 "use client";
 
-// Enterprise call-to-action rendered inside the auth brand panel. Opens the
-// SAME in-app Enterprise lead modal used post-login (not the marketing site's
-// /contact page). The visitor is typically NOT authenticated here: the modal
-// requires a work email in that case, and submitLead persists the lead through
-// the user_onboarding service's public contact-sales endpoint instead of the
-// token-gated /leads/enterprise. Shared by the Stack Auth handler and the
-// local/OSS auth pages.
-
 import posthog from "posthog-js";
 import { useState } from "react";
 
@@ -28,9 +20,9 @@ export function AuthEnterpriseCTA() {
       <Button
         variant="outline"
         onClick={openModal}
-        className="w-full h-9 rounded-lg border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10 hover:text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
+        className="w-full h-10 rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium shadow-xs transition-colors cursor-pointer"
       >
-        Enterprise Enquiry
+        Enterprise & Custom Inquiries &rarr;
       </Button>
       <EnterpriseModal open={open} onOpenChange={setOpen} source="auth_page" />
     </>

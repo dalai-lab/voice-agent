@@ -2,7 +2,10 @@ import { StackHandler, StackTheme } from "@stackframe/stack";
 
 import { AuthEnterpriseCTA } from "@/components/auth/AuthEnterpriseCTA";
 import { AuthShell } from "@/components/auth/AuthShell";
-import { getAuthProvider } from "@/lib/auth/config";
+import { StackForgotPasswordForm } from "@/components/auth/stack/StackForgotPasswordForm";
+import { StackSignInForm } from "@/components/auth/stack/StackSignInForm";
+import { StackSignUpForm } from "@/components/auth/stack/StackSignUpForm";
+import { getAuthProvider, getSignupEnabled, getStackConfig } from "@/lib/auth/config";
 
 import { BackButton } from "./BackButton";
 import { stackAuthDarkTheme } from "./stack-theme";
@@ -39,10 +42,6 @@ export default async function Handler(props: unknown) {
     );
   }
 
-  // Lazily import the real StackServerApp only when needed
-  const { getStackServerApp } = await import("@/lib/auth/server");
-  const app = await getStackServerApp();
-
   // Resolve the first route segment to decide layout. `params` is async in
   // Next 15; awaiting it here does not consume it for StackHandler below.
   let segment = "";
@@ -54,8 +53,6 @@ export default async function Handler(props: unknown) {
     segment = "";
   }
   const normalizedSegment = segment.toLowerCase().replace(/-/g, "");
-  const isAuthForm = segment !== "" && !FULL_PAGE_ROUTES.has(normalizedSegment);
-  const showBackButton = !new Set(["signin", "login"]).has(normalizedSegment);
 
   // Redirect customers away from the old account settings page to the new platform settings
   if (normalizedSegment === "accountsettings") {
@@ -68,10 +65,58 @@ export default async function Handler(props: unknown) {
     }
   }
 
+  const stackConfig = await getStackConfig();
+  const signupEnabled = await getSignupEnabled();
+
+  // Custom native Stack API authentication forms
+  if (normalizedSegment === "signin" || normalizedSegment === "login") {
+    return (
+      <AuthShell enterpriseSlot={<AuthEnterpriseCTA />}>
+        <StackSignInForm
+          projectId={stackConfig?.projectId || ""}
+          publishableClientKey={stackConfig?.publishableClientKey || ""}
+          signupEnabled={signupEnabled}
+        />
+      </AuthShell>
+    );
+  }
+
+  if (normalizedSegment === "signup" || normalizedSegment === "register") {
+    return (
+      <AuthShell enterpriseSlot={<AuthEnterpriseCTA />}>
+        <StackSignUpForm
+          projectId={stackConfig?.projectId || ""}
+          publishableClientKey={stackConfig?.publishableClientKey || ""}
+        />
+      </AuthShell>
+    );
+  }
+
+  if (normalizedSegment === "forgotpassword") {
+    return (
+      <AuthShell enterpriseSlot={<AuthEnterpriseCTA />}>
+        <BackButton />
+        <StackForgotPasswordForm
+          projectId={stackConfig?.projectId || ""}
+          publishableClientKey={stackConfig?.publishableClientKey || ""}
+        />
+      </AuthShell>
+    );
+  }
+
+  // Lazily import the real StackServerApp only for machine/callback routes
+  const { getStackServerApp } = await import("@/lib/auth/server");
+  const app = await getStackServerApp();
+
+  const isAuthForm = segment !== "" && !FULL_PAGE_ROUTES.has(normalizedSegment);
+  const showBackButton = !new Set(["signin", "login"]).has(normalizedSegment);
+
   const handler = (
-    <StackTheme theme={stackAuthDarkTheme}>
-      <StackHandler fullPage={!isAuthForm} app={app!} routeProps={props} />
-    </StackTheme>
+    <div className="stack-auth-container w-full">
+      <StackTheme theme={stackAuthDarkTheme}>
+        <StackHandler fullPage={!isAuthForm} app={app!} routeProps={props} />
+      </StackTheme>
+    </div>
   );
 
   if (isAuthForm) {

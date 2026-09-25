@@ -56,10 +56,20 @@ async function resolveAuthConfig(): Promise<ResolvedAuthConfig> {
     // Backend not reachable — fall through without caching so we retry next request.
   }
 
-  // Unknown (backend unreachable). Return the local fallback for THIS request but
-  // do NOT cache it: caching here would pin the entire UI to local auth until a
-  // container restart if the first resolution loses the startup race with the api
-  // service. Leaving it uncached means the next request retries and self-heals.
+  // Fallback to environment variables if backend health endpoint is unreachable
+  const envProvider = process.env.AUTH_PROVIDER || process.env.NEXT_PUBLIC_AUTH_PROVIDER;
+  const envProjectId = process.env.STACK_AUTH_PROJECT_ID || process.env.NEXT_PUBLIC_STACK_AUTH_PROJECT_ID;
+  const envKey = process.env.STACK_PUBLISHABLE_CLIENT_KEY || process.env.NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY;
+
+  if (envProvider === "stack" && envProjectId && envKey) {
+    return {
+      authProvider: "stack",
+      stackConfig: { projectId: envProjectId, publishableClientKey: envKey },
+      signupEnabled: true,
+    };
+  }
+
+  // Unknown (backend unreachable and no env config). Return local fallback.
   return { authProvider: "local", stackConfig: null, signupEnabled: true };
 }
 

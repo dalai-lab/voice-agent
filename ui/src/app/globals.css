@@ -701,3 +701,353 @@
   animation: smoothWordBlurIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, filter, opacity;
 }
+
+/* ==========================================================================
+   STACK AUTH MODERN MINIMAL UI OVERRIDES
+   ========================================================================== */
+
+.stack-auth-container {
+  width: 100%;
+}
+
+.stack-auth-container .stack-scope,
+.stack-scope.flex-col {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* --- Heading & Subtitle --- */
+.stack-auth-container h2,
+.stack-scope h2 {
+  font-size: 1.35rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.25 !important;
+  margin-bottom: 0.35rem !important;
+  color: #09090b !important;
+}
+
+.dark .stack-auth-container h2,
+.dark .stack-scope h2 {
+  color: #fafafa !important;
+}
+
+.stack-auth-container .text-center.mb-6,
+.stack-scope .text-center.mb-6 {
+  margin-bottom: 1.5rem !important;
+}
+
+.stack-auth-container .text-center.mb-6 p,
+.stack-scope .text-center.mb-6 p {
+  font-size: 0.8125rem !important;
+  color: #71717a !important;
+  letter-spacing: -0.01em !important;
+}
+
+.dark .stack-auth-container .text-center.mb-6 p,
+.dark .stack-scope .text-center.mb-6 p {
+  color: #a1a1aa !important;
+}
+
+.stack-auth-container .text-center.mb-6 a,
+.stack-scope .text-center.mb-6 a {
+  font-weight: 500 !important;
+  color: #09090b !important;
+  text-decoration: underline !important;
+  text-decoration-color: rgba(9, 9, 11, 0.25) !important;
+  text-underline-offset: 3px !important;
+  transition: all 0.15s ease !important;
+}
+
+.dark .stack-auth-container .text-center.mb-6 a,
+.dark .stack-scope .text-center.mb-6 a {
+  color: #fafafa !important;
+  text-decoration-color: rgba(250, 250, 250, 0.3) !important;
+}
+
+.stack-auth-container .text-center.mb-6 a:hover,
+.stack-scope .text-center.mb-6 a:hover {
+  color: #fe6905 !important;
+  text-decoration-color: #fe6905 !important;
+}
+
+/* --- Segmented Control Tabs (Email / Password) --- */
+.stack-auth-container [role="tablist"],
+.stack-scope [role="tablist"] {
+  display: flex !important;
+  height: 2.375rem !important;
+  padding: 3px !important;
+  gap: 2px !important;
+  background-color: #f4f4f5 !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border-radius: 0.55rem !important;
+  margin-bottom: 1.25rem !important;
+}
+
+.dark .stack-auth-container [role="tablist"],
+.dark .stack-scope [role="tablist"] {
+  background-color: #18181b !important;
+  border-color: #27272a !important;
+}
+
+.stack-auth-container [role="tab"],
+.stack-scope [role="tab"] {
+  flex: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 0.4rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+  color: #71717a !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer !important;
+}
+
+.dark .stack-auth-container [role="tab"],
+.dark .stack-scope [role="tab"] {
+  color: #a1a1aa !important;
+}
+
+.stack-auth-container [role="tab"]:hover,
+.stack-scope [role="tab"]:hover {
+  color: #09090b !important;
+}
+
+.dark .stack-auth-container [role="tab"]:hover,
+.dark .stack-scope [role="tab"]:hover {
+  color: #f4f4f5 !important;
+}
+
+.stack-auth-container [role="tab"][data-state="active"],
+.stack-scope [role="tab"][data-state="active"] {
+  background-color: #ffffff !important;
+  color: #09090b !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
+}
+
+.dark .stack-auth-container [role="tab"][data-state="active"],
+.dark .stack-scope [role="tab"][data-state="active"] {
+  background-color: #27272a !important;
+  color: #fafafa !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+/* --- Labels & Inputs --- */
+.stack-auth-container label,
+.stack-scope label {
+  display: block !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  color: #3f3f46 !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: 0.375rem !important;
+}
+
+.dark .stack-auth-container label,
+.dark .stack-scope label {
+  color: #a1a1aa !important;
+}
+
+.stack-auth-container input,
+.stack-scope input {
+  height: 2.625rem !important;
+  border-radius: 0.5rem !important;
+  border: 1px solid #e4e4e7 !important;
+  background-color: #ffffff !important;
+  padding: 0 0.875rem !important;
+  font-size: 0.875rem !important;
+  color: #09090b !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.dark .stack-auth-container input,
+.dark .stack-scope input {
+  border-color: #27272a !important;
+  background-color: #121215 !important;
+  color: #f4f4f5 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2) !important;
+}
+
+.stack-auth-container input:hover,
+.stack-scope input:hover {
+  border-color: #d4d4d8 !important;
+}
+
+.dark .stack-auth-container input:hover,
+.dark .stack-scope input:hover {
+  border-color: #3f3f46 !important;
+}
+
+.stack-auth-container input:focus,
+.stack-scope input:focus {
+  border-color: #fe6905 !important;
+  box-shadow: 0 0 0 3px rgba(254, 105, 5, 0.14) !important;
+  outline: none !important;
+}
+
+.dark .stack-auth-container input:focus,
+.dark .stack-scope input:focus {
+  border-color: #fe6905 !important;
+  box-shadow: 0 0 0 3px rgba(254, 105, 5, 0.25) !important;
+}
+
+.stack-auth-container input::placeholder,
+.stack-scope input::placeholder {
+  color: #a1a1aa !important;
+}
+
+.stack-auth-container div:has(> input),
+.stack-scope div:has(> input) {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* --- Primary Submit Button --- */
+.stack-auth-container button[type="submit"],
+.stack-scope button[type="submit"] {
+  height: 2.625rem !important;
+  width: 100% !important;
+  border-radius: 0.5rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+  color: #ffffff !important;
+  background: linear-gradient(180deg, #ff6a14 0%, #fe5500 100%) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(254, 85, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.25) !important;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer !important;
+  margin-top: 1.25rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.stack-auth-container button[type="submit"]:hover,
+.stack-scope button[type="submit"]:hover {
+  background: linear-gradient(180deg, #ff792a 0%, #ef5000 100%) !important;
+  box-shadow: 0 2px 8px 0 rgba(254, 85, 0, 0.35), 0 1px 2px 0 rgba(0, 0, 0, 0.1), inset 0 1px 0 0 rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-0.5px) !important;
+}
+
+.stack-auth-container button[type="submit"]:active,
+.stack-scope button[type="submit"]:active {
+  transform: translateY(0.5px) !important;
+  box-shadow: 0 1px 2px 0 rgba(254, 85, 0, 0.2), inset 0 1px 1px 0 rgba(0, 0, 0, 0.15) !important;
+}
+
+.stack-auth-container button[type="submit"]:disabled,
+.stack-scope button[type="submit"]:disabled {
+  opacity: 0.65 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
+/* --- OAuth & Secondary Buttons --- */
+.stack-auth-container button:not([type="submit"]):not([role="tab"]),
+.stack-scope button:not([type="submit"]):not([role="tab"]) {
+  height: 2.625rem !important;
+  border-radius: 0.5rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e4e4e7 !important;
+  color: #09090b !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.15s ease !important;
+  cursor: pointer !important;
+}
+
+.dark .stack-auth-container button:not([type="submit"]):not([role="tab"]),
+.dark .stack-scope button:not([type="submit"]):not([role="tab"]) {
+  background-color: #141417 !important;
+  border-color: #27272a !important;
+  color: #f4f4f5 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2) !important;
+}
+
+.stack-auth-container button:not([type="submit"]):not([role="tab"]):hover,
+.stack-scope button:not([type="submit"]):not([role="tab"]):hover {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+.dark .stack-auth-container button:not([type="submit"]):not([role="tab"]):hover,
+.dark .stack-scope button:not([type="submit"]):not([role="tab"]):hover {
+  background-color: #1c1c21 !important;
+  border-color: #3f3f46 !important;
+}
+
+/* --- Password Toggle & Utility Buttons --- */
+.stack-auth-container button.absolute,
+.stack-scope button.absolute {
+  height: 100% !important;
+  width: auto !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+  color: #71717a !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.stack-auth-container button.absolute:hover,
+.stack-scope button.absolute:hover {
+  background: transparent !important;
+  color: #09090b !important;
+}
+
+.dark .stack-auth-container button.absolute:hover,
+.dark .stack-scope button.absolute:hover {
+  color: #fafafa !important;
+}
+
+.stack-auth-container button.underline,
+.stack-scope button.underline {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  height: auto !important;
+  margin-top: 0.5rem !important;
+  color: #71717a !important;
+  font-size: 0.8125rem !important;
+  text-decoration: underline !important;
+}
+
+.stack-auth-container button.underline:hover,
+.stack-scope button.underline:hover {
+  color: #09090b !important;
+}
+
+.dark .stack-auth-container button.underline:hover,
+.dark .stack-scope button.underline:hover {
+  color: #fafafa !important;
+}
+
+/* --- Separator Divider --- */
+.stack-auth-container .my-6,
+.stack-scope .my-6 {
+  margin-top: 1.25rem !important;
+  margin-bottom: 1.25rem !important;
+}
+
+.stack-auth-container .my-6 .text-zinc-500,
+.stack-scope .my-6 .text-zinc-500 {
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #a1a1aa !important;
+}

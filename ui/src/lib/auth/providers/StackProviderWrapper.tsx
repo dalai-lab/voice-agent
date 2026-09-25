@@ -8,7 +8,7 @@ import { AuthContext } from './AuthProvider';
 // Create a singleton StackClientApp instance to prevent multiple initializations
 let stackClientAppInstance: StackClientApp<true, string> | null = null;
 
-function getStackClientApp(
+export function getStackClientApp(
   projectId: string,
   publishableClientKey: string,
 ): StackClientApp<true, string> {

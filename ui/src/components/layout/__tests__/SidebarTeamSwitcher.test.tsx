@@ -157,6 +157,7 @@ function makeAuthValue(user: AuthUser | null): AuthContextType {
     logout: async () => {},
     provider: "stack",
     getSelectedTeam: () => null,
+    organizationId: undefined,
   };
 }
 

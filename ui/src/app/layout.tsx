@@ -101,7 +101,7 @@ export const metadata: Metadata = {
     ],
   },
   verification: {
-    google: "yx-w4K06OOtIwQ-2jps_1mvz4oftuT84Z26_r1ZliZc",
+    google: "2KpAIkVZSgDoMxf7Yu0D0jC8VKJhNnObl_zv4GLWx3A",
   },
 };
 
@@ -114,7 +114,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <meta name="google-site-verification" content="yx-w4K06OOtIwQ-2jps_1mvz4oftuT84Z26_r1ZliZc" />
+        <meta name="google-site-verification" content="2KpAIkVZSgDoMxf7Yu0D0jC8VKJhNnObl_zv4GLWx3A" />
         {/* Schema.org JSON-LD for Google Search & Knowledge Graph */}
         <script
           type="application/ld+json"

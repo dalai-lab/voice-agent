@@ -12,6 +12,7 @@ export interface NodeEditFormProps {
     values: Record<string, unknown>;
     onChange: (next: Record<string, unknown>) => void;
     context: RendererContext;
+    crossNodeVariableInjectionEnabled?: boolean;
 }
 
 const COLUMN_SPAN_CLASS: Record<number, string> = {
@@ -38,7 +39,7 @@ const COLUMN_SPAN_CLASS: Record<number, string> = {
  * format), so `display_options` references work directly. Sub-objects from
  * grouped fields (e.g. `pre_call_fetch`) live as separate flat fields here.
  */
-export function NodeEditForm({ spec, values, onChange, context }: NodeEditFormProps) {
+export function NodeEditForm({ spec, values, onChange, context, crossNodeVariableInjectionEnabled }: NodeEditFormProps) {
     const setProp = useCallback(
         (propName: string, propValue: unknown) => {
             onChange({ ...values, [propName]: propValue });
@@ -66,6 +67,7 @@ export function NodeEditForm({ spec, values, onChange, context }: NodeEditFormPr
                                 value={values[p.name]}
                                 onChange={(v) => setProp(p.name, v)}
                                 context={context}
+                                crossNodeVariableInjectionEnabled={crossNodeVariableInjectionEnabled}
                             />
                         </div>
                     ))}
@@ -83,6 +85,7 @@ export function NodeEditForm({ spec, values, onChange, context }: NodeEditFormPr
                                         value={values[p.name]}
                                         onChange={(v) => setProp(p.name, v)}
                                         context={context}
+                                        crossNodeVariableInjectionEnabled={crossNodeVariableInjectionEnabled}
                                     />
                                 </div>
                             ))}
@@ -108,6 +111,7 @@ export function NodeEditForm({ spec, values, onChange, context }: NodeEditFormPr
                             value={values[p.name]}
                             onChange={(v) => setProp(p.name, v)}
                             context={context}
+                            crossNodeVariableInjectionEnabled={crossNodeVariableInjectionEnabled}
                         />
                     </div>
                 );

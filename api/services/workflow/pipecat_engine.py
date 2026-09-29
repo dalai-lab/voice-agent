@@ -87,6 +87,7 @@ class PipecatEngine:
         context_compaction_enabled: bool = False,
         enable_dtmf: bool = False,
         enable_callbacks: bool = False,
+        cross_node_variable_injection_enabled: bool = False,
     ):
         self.task = task
         self.llm = llm
@@ -113,6 +114,7 @@ class PipecatEngine:
         self._dtmf_subscription_task: asyncio.Task | None = None
         self._enable_dtmf: bool = enable_dtmf
         self._enable_callbacks: bool = enable_callbacks
+        self._cross_node_variable_injection_enabled: bool = cross_node_variable_injection_enabled
         self._dtmf_buffer: str = ""
         self._dtmf_timer_task: asyncio.Task | None = None
         self._dtmf_timeout_seconds: float = 3.0
@@ -340,10 +342,13 @@ class PipecatEngine:
         when the LLM calls the transition function *out* of a node, which is
         after the node's prompt has already been rendered and used.
         """
-        render_ctx: dict = {
-            **self._call_context_vars,
-            "gathered_context": dict(self._gathered_context),
-        }
+        if self._cross_node_variable_injection_enabled:
+            render_ctx: dict = {
+                **self._call_context_vars,
+                "gathered_context": dict(self._gathered_context),
+            }
+        else:
+            render_ctx = self._call_context_vars
         return render_template(prompt, render_ctx)
 
     async def _create_transition_func(
@@ -688,17 +693,18 @@ class PipecatEngine:
 
     async def _setup_llm_context(self, node: Node) -> None:
         """Common method to set up LLM context"""
-        # Flush any in-flight background variable extraction tasks from the
-        # previous node before rendering this node's prompt.  This guarantees
-        # that {{gathered_context.*}} references in the prompt resolve to
-        # finalized values rather than a partial in-flight extraction result.
-        #
-        # Cost: zero when extraction is already done (asyncio.gather on
-        # completed tasks returns immediately).  When extraction is still
-        # running (e.g., the transition speech was very short), this adds
-        # one await — but the extraction LLM call was already in flight, so
-        # the actual delay is only the *remaining* tail of that call.
-        await self._await_pending_extractions()
+        if self._cross_node_variable_injection_enabled:
+            # Flush any in-flight background variable extraction tasks from the
+            # previous node before rendering this node's prompt.  This guarantees
+            # that {{gathered_context.*}} references in the prompt resolve to
+            # finalized values rather than a partial in-flight extraction result.
+            #
+            # Cost: zero when extraction is already done (asyncio.gather on
+            # completed tasks returns immediately).  When extraction is still
+            # running (e.g., the transition speech was very short), this adds
+            # one await — but the extraction LLM call was already in flight, so
+            # the actual delay is only the *remaining* tail of that call.
+            await self._await_pending_extractions()
 
         # Set OTel span name for tracing
         try:

@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { ArrowLeft, BookA, Brain, CalendarIcon, Clipboard, Download, ExternalLink, FileDown, Fingerprint, Loader2, Mic, Pause, PhoneOff, Play, Plus, Rocket, Settings, Trash2Icon, Upload, Variable, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BookA, Brain, CalendarIcon, Clipboard, Download, ExternalLink, FileDown, Fingerprint, Loader2, Mic, Pause, PhoneOff, Play, Plus, Rocket, Settings, Trash2Icon, Upload, Variable, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -312,6 +312,9 @@ function GeneralSection({
     const [contextCompactionEnabled, setContextCompactionEnabled] = useState(
         workflowConfigurations.context_compaction_enabled,
     );
+    const [crossNodeVariableInjectionEnabled, setCrossNodeVariableInjectionEnabled] = useState(
+        workflowConfigurations.cross_node_variable_injection_enabled,
+    );
     const [includeTranscriptEndTimestamps, setIncludeTranscriptEndTimestamps] = useState(
         workflowConfigurations.transcript_configuration?.include_end_timestamps ?? false,
     );
@@ -345,6 +348,7 @@ function GeneralSection({
             provisionalVadPauseSecs !== workflowConfigurations.provisional_vad_pause_secs ||
             turnStopStrategy !== workflowConfigurations.turn_stop_strategy ||
             contextCompactionEnabled !== workflowConfigurations.context_compaction_enabled ||
+            crossNodeVariableInjectionEnabled !== workflowConfigurations.cross_node_variable_injection_enabled ||
             dtmfEnabled !== enableDtmf ||
             includeTranscriptEndTimestamps !==
             (workflowConfigurations.transcript_configuration?.include_end_timestamps ?? false) ||
@@ -353,7 +357,7 @@ function GeneralSection({
             callbacksEnabled !== enableCallbacks ||
             resumeMode !== callbackResumeMode
         );
-    }, [name, workflowName, ambientNoiseConfig, maxCallDuration, maxUserIdleTimeout, smartTurnStopSecs, turnStartStrategy, turnStartMinWords, provisionalVadPauseSecs, turnStopStrategy, contextCompactionEnabled, includeTranscriptEndTimestamps, workflowConfigurations, dtmfEnabled, enableDtmf, callbacksEnabled, enableCallbacks, externalPbxFieldMappings, resumeMode, callbackResumeMode]);
+    }, [name, workflowName, ambientNoiseConfig, maxCallDuration, maxUserIdleTimeout, smartTurnStopSecs, turnStartStrategy, turnStartMinWords, provisionalVadPauseSecs, turnStopStrategy, contextCompactionEnabled, crossNodeVariableInjectionEnabled, includeTranscriptEndTimestamps, workflowConfigurations, dtmfEnabled, enableDtmf, callbacksEnabled, enableCallbacks, externalPbxFieldMappings, resumeMode, callbackResumeMode]);
 
     useUnsavedChanges("general", isDirty);
 
@@ -430,6 +434,7 @@ function GeneralSection({
                     provisional_vad_pause_secs: provisionalVadPauseSecs,
                     turn_stop_strategy: turnStopStrategy,
                     context_compaction_enabled: contextCompactionEnabled,
+                    cross_node_variable_injection_enabled: crossNodeVariableInjectionEnabled,
                     transcript_configuration: {
                         ...(workflowConfigurations.transcript_configuration ?? {}),
                         include_end_timestamps: includeTranscriptEndTimestamps,
@@ -847,6 +852,41 @@ function GeneralSection({
                             onCheckedChange={setContextCompactionEnabled}
                         />
                     </div>
+                </div>
+
+                <Separator />
+
+                {/* Cross-Node Variable Injection Section */}
+                <div className="space-y-4">
+                    <div>
+                        <h3 className="text-sm font-medium">Cross-Node Variable Injection</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            When enabled, allows you to reference variables extracted from earlier nodes in prompts using <code>{`{{ gathered_context.* }}`}</code> syntax.
+                        </p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="cross-node-variable-injection-enabled" className="text-sm">
+                            Enable Cross-Node Variable Injection
+                        </Label>
+                        <Switch
+                            id="cross-node-variable-injection-enabled"
+                            checked={crossNodeVariableInjectionEnabled}
+                            onCheckedChange={setCrossNodeVariableInjectionEnabled}
+                        />
+                    </div>
+                    {crossNodeVariableInjectionEnabled && (
+                        <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
+                            <div className="flex">
+                                <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 mr-2 shrink-0" />
+                                <div className="text-xs text-amber-600/90 dark:text-amber-500/90">
+                                    <p className="font-semibold mb-1">Timing Warning</p>
+                                    <p>
+                                        When this is enabled, the agent will <strong>wait synchronously</strong> for any pending background extraction tasks from the previous node to finish before generating its next reply. This ensures variables like <code>{`{{gathered_context.name}}`}</code> are fully resolved before being spoken, but it may artificially delay the agent&apos;s response time if your extraction model is slow.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <Separator />

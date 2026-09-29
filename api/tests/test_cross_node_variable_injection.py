@@ -98,18 +98,21 @@ def test_format_prompt_includes_gathered_context_value():
         call_context_vars={"caller_name": "Alice"},
         gathered_context={"arrival_date": "2025-01-15"},
     )
+    engine._cross_node_variable_injection_enabled = True
     result = engine._format_prompt("Date: {{gathered_context.arrival_date}}")
     assert result == "Date: 2025-01-15"
 
 
 def test_format_prompt_gathered_context_empty_renders_empty():
     engine = make_minimal_engine(gathered_context={})
+    engine._cross_node_variable_injection_enabled = True
     result = engine._format_prompt("Date: {{gathered_context.arrival_date}}")
     assert result == "Date: "
 
 
 def test_format_prompt_gathered_context_fallback():
     engine = make_minimal_engine(gathered_context={})
+    engine._cross_node_variable_injection_enabled = True
     result = engine._format_prompt("Date: {{gathered_context.arrival_date | Not provided}}")
     assert result == "Date: Not provided"
 
@@ -120,6 +123,7 @@ def test_format_prompt_initial_context_not_overwritten():
         call_context_vars={"first_name": "Alice"},
         gathered_context={"first_name": "Bob"},
     )
+    engine._cross_node_variable_injection_enabled = True
     assert engine._format_prompt("{{first_name}}") == "Alice"
     assert engine._format_prompt("{{gathered_context.first_name}}") == "Bob"
 
@@ -156,6 +160,7 @@ def test_format_prompt_gathered_context_snapshot_isolates_concurrent_mutation():
         return real_render_template(template, context)
 
     with patch.object(engine_module, "render_template", side_effect=mutating_render_template):
+        engine._cross_node_variable_injection_enabled = True
         result = engine._format_prompt("{{gathered_context.x}}")
 
     # The render output should use the snapshot ("original"), not the mutated value
@@ -178,6 +183,7 @@ def test_format_prompt_call_context_gathered_context_overwritten_by_live():
         },
         gathered_context={"guest_name": "NewName"},  # current run's live extraction
     )
+    engine._cross_node_variable_injection_enabled = True
     result = engine._format_prompt("{{gathered_context.guest_name}}")
     assert result == "NewName"
 
@@ -227,3 +233,55 @@ async def test_await_pending_extractions_called_before_prompt_render():
     assert any("Alice" in r for r in captured_rendered), (
         f"Expected 'Alice' in rendered prompts, got: {captured_rendered}"
     )
+
+
+def test_format_prompt_cross_variable_off_does_not_inject_gathered_context():
+    """When flag is OFF, gathered_context is NOT injected into render context."""
+    engine = make_minimal_engine(
+        call_context_vars={"caller_name": "Alice"},
+        gathered_context={"arrival_date": "2025-01-15"},
+    )
+    assert engine._cross_node_variable_injection_enabled is False
+    result = engine._format_prompt("Date: {{gathered_context.arrival_date}}")
+    assert result == "Date: "  # empty — not injected
+
+
+def test_format_prompt_cross_variable_on_injects_gathered_context():
+    """When flag is ON, gathered_context IS injected."""
+    engine = make_minimal_engine(
+        call_context_vars={"caller_name": "Alice"},
+        gathered_context={"arrival_date": "2025-01-15"},
+    )
+    engine._cross_node_variable_injection_enabled = True
+    result = engine._format_prompt("Date: {{gathered_context.arrival_date}}")
+    assert result == "Date: 2025-01-15"
+
+
+@pytest.mark.asyncio
+async def test_setup_llm_context_does_not_await_when_flag_off():
+    """When flag is OFF, _await_pending_extractions is NOT called."""
+    engine = make_minimal_engine()
+    assert engine._cross_node_variable_injection_enabled is False
+
+    with patch.object(engine, "_await_pending_extractions", new_callable=AsyncMock) as mock_await:
+        with patch.object(engine, "_update_llm_context", new_callable=AsyncMock):
+            with patch.object(engine, "_register_transition_function_with_llm", new_callable=AsyncMock):
+                node = engine.workflow.nodes[engine.workflow.start_node_id]
+                await engine._setup_llm_context(node)
+
+    mock_await.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_setup_llm_context_awaits_when_flag_on():
+    """When flag is ON, _await_pending_extractions IS called."""
+    engine = make_minimal_engine()
+    engine._cross_node_variable_injection_enabled = True
+
+    with patch.object(engine, "_await_pending_extractions", new_callable=AsyncMock) as mock_await:
+        with patch.object(engine, "_update_llm_context", new_callable=AsyncMock):
+            with patch.object(engine, "_register_transition_function_with_llm", new_callable=AsyncMock):
+                node = engine.workflow.nodes[engine.workflow.start_node_id]
+                await engine._setup_llm_context(node)
+
+    mock_await.assert_called_once()

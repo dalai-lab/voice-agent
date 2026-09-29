@@ -911,6 +911,10 @@ async def _run_pipeline_impl(
         logger.info("Disabling context_compaction_enabled for realtime workflow run")
         context_compaction_enabled = False
 
+    cross_node_variable_injection_enabled = (workflow.workflow_configurations or {}).get(
+        "cross_node_variable_injection_enabled", False
+    )
+
     engine = PipecatEngine(
         llm=llm,
         inference_llm=inference_llm,
@@ -929,6 +933,7 @@ async def _run_pipeline_impl(
         context_compaction_enabled=context_compaction_enabled,
         enable_dtmf=workflow.enable_dtmf,
         enable_callbacks=workflow.enable_callbacks,
+        cross_node_variable_injection_enabled=cross_node_variable_injection_enabled,
     )
 
     # Create pipeline components

@@ -65,6 +65,9 @@ export const ConfigurationsDialog = ({
     const [contextCompactionEnabled, setContextCompactionEnabled] = useState<boolean>(
         resolvedWorkflowConfigurations.context_compaction_enabled
     );
+    const [crossNodeVariableInjectionEnabled, setCrossNodeVariableInjectionEnabled] = useState<boolean>(
+        resolvedWorkflowConfigurations.cross_node_variable_injection_enabled
+    );
     const [externalPbxFieldMappings, setExternalPbxFieldMappings] = useState<ExternalPBXFieldMapping[]>(
         resolvedWorkflowConfigurations.external_pbx_field_mappings
     );
@@ -93,6 +96,7 @@ export const ConfigurationsDialog = ({
                 turn_stop_strategy: turnStopStrategy,
                 transcript_configuration: resolvedWorkflowConfigurations.transcript_configuration,
                 context_compaction_enabled: contextCompactionEnabled,
+                cross_node_variable_injection_enabled: crossNodeVariableInjectionEnabled,
                 external_pbx_field_mappings: externalPbxFieldMappings,
             }, name);
             onOpenChange(false);
@@ -117,6 +121,7 @@ export const ConfigurationsDialog = ({
             setProvisionalVadPauseSecs(nextWorkflowConfigurations.provisional_vad_pause_secs);
             setTurnStopStrategy(nextWorkflowConfigurations.turn_stop_strategy);
             setContextCompactionEnabled(nextWorkflowConfigurations.context_compaction_enabled);
+            setCrossNodeVariableInjectionEnabled(nextWorkflowConfigurations.cross_node_variable_injection_enabled);
             setExternalPbxFieldMappings(nextWorkflowConfigurations.external_pbx_field_mappings);
         }
     }, [open, workflowName, workflowConfigurations]);
@@ -363,6 +368,37 @@ export const ConfigurationsDialog = ({
                                 onCheckedChange={setContextCompactionEnabled}
                             />
                         </div>
+                    </div>
+
+                    {/* Cross-Node Variable Injection Section */}
+                    <div className="space-y-4 border-t pt-4">
+                        <div>
+                            <h3 className="text-sm font-semibold mb-1">Cross-Node Variable Injection</h3>
+                            <p className="text-xs text-muted-foreground">
+                                Allow later nodes to read variables extracted by earlier nodes using{" "}
+                                <code className="font-mono text-xs">{"{{gathered_context.variable_name}}"}</code>.
+                                When enabled, the agent waits for in-progress extraction to complete before
+                                starting the next node — this may add a brief delay on transitions.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="cross-node-variable-injection-enabled" className="text-sm">
+                                Enable Cross-Node Variable Injection
+                            </Label>
+                            <Switch
+                                id="cross-node-variable-injection-enabled"
+                                checked={crossNodeVariableInjectionEnabled}
+                                onCheckedChange={setCrossNodeVariableInjectionEnabled}
+                            />
+                        </div>
+
+                        {crossNodeVariableInjectionEnabled && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                                ⚠ Enabled — node transitions may be slightly delayed while extraction
+                                from the previous node completes.
+                            </p>
+                        )}
                     </div>
 
                     {/* Call Management Section */}

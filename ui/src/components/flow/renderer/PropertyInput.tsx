@@ -38,6 +38,7 @@ export interface PropertyInputProps {
     value: unknown;
     onChange: (value: unknown) => void;
     context: RendererContext;
+    crossNodeVariableInjectionEnabled?: boolean;
 }
 
 /**
@@ -50,10 +51,10 @@ export interface PropertyInputProps {
  * always renders. NodeEditForm filters out hidden properties before
  * mounting them.
  */
-export function PropertyInput({ spec, value, onChange, context }: PropertyInputProps) {
+export function PropertyInput({ spec, value, onChange, context, crossNodeVariableInjectionEnabled }: PropertyInputProps) {
     switch (spec.type) {
         case "string":
-            return <StringWidget spec={spec} value={value} onChange={onChange} />;
+            return <StringWidget spec={spec} value={value} onChange={onChange} crossNodeVariableInjectionEnabled={crossNodeVariableInjectionEnabled} />;
         case "number":
             return <NumberWidget spec={spec} value={value} onChange={onChange} />;
         case "boolean":
@@ -82,6 +83,7 @@ export function PropertyInput({ spec, value, onChange, context }: PropertyInputP
                     value={value}
                     onChange={onChange}
                     recordings={context.recordings}
+                    crossNodeVariableInjectionEnabled={crossNodeVariableInjectionEnabled}
                 />
             );
         case "tool_refs":
@@ -150,6 +152,7 @@ interface WidgetProps {
     spec: PropertySpec;
     value: unknown;
     onChange: (v: unknown) => void;
+    crossNodeVariableInjectionEnabled?: boolean;
 }
 
 const PROMPT_VARIABLE_HINT_SPECS = new Set(["prompt", "greeting", "extraction_prompt"]);
@@ -171,10 +174,10 @@ function VariableHint() {
     );
 }
 
-function StringWidget({ spec, value, onChange }: WidgetProps) {
+function StringWidget({ spec, value, onChange, crossNodeVariableInjectionEnabled }: WidgetProps) {
     const v = (value as string | undefined) ?? "";
     const isMultiline = spec.editor === "textarea";
-    const showVariableHint = isMultiline && PROMPT_VARIABLE_HINT_SPECS.has(spec.name);
+    const showVariableHint = isMultiline && PROMPT_VARIABLE_HINT_SPECS.has(spec.name) && (crossNodeVariableInjectionEnabled ?? false);
 
     return (
         <div className="grid gap-2">
@@ -426,8 +429,9 @@ function MentionWidget({
     value,
     onChange,
     recordings,
+    crossNodeVariableInjectionEnabled
 }: WidgetProps & { recordings: RecordingResponseSchema[] }) {
-    const showVariableHint = PROMPT_VARIABLE_HINT_SPECS.has(spec.name);
+    const showVariableHint = PROMPT_VARIABLE_HINT_SPECS.has(spec.name) && (crossNodeVariableInjectionEnabled ?? false);
     return (
         <div className="grid gap-2">
             <StackedLabel spec={spec} />

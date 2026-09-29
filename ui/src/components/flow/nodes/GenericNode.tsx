@@ -6,6 +6,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useWorkflow } from "@/app/workflow/[workflowId]/contexts/WorkflowContext";
+import { useWorkflowStore } from "@/app/workflow/[workflowId]/stores/workflowStore";
 import type { NodeSpec } from "@/client/types.gen";
 import { DocumentBadges } from "@/components/flow/DocumentBadges";
 import { NodeEditForm, useNodeSpecs } from "@/components/flow/renderer";
@@ -505,6 +506,7 @@ export const GenericNode = memo(({ data, selected, id, type }: GenericNodeProps)
         additionalData,
     });
     const { saveWorkflow, tools, documents, recordings } = useWorkflow();
+    const { workflowConfigurations } = useWorkflowStore();
     const { bySpecName } = useNodeSpecs();
     const { config: appConfig } = useAppConfig();
     const spec = bySpecName.get(type);
@@ -728,6 +730,7 @@ export const GenericNode = memo(({ data, selected, id, type }: GenericNodeProps)
                                                 : undefined,
                                     })),
                             }}
+                            crossNodeVariableInjectionEnabled={workflowConfigurations?.cross_node_variable_injection_enabled}
                         />
                         {type === "trigger" && (
                             <TriggerWebhookUrls

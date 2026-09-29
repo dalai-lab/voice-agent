@@ -132,6 +132,7 @@ export type WorkflowConfigurations = WorkflowConfigurationBase & {
     voicemail_detection?: VoicemailDetectionConfiguration;
     transcript_configuration: TranscriptConfiguration;
     context_compaction_enabled: boolean;  // Summarize context on node transitions to remove stale tool calls
+    cross_node_variable_injection_enabled: boolean;
     text_chat_inactivity_timeout_seconds?: number;  // End inactive text chats after this many seconds
     external_pbx_field_mappings: ExternalPBXFieldMapping[];
     model_overrides?: ModelOverrides;  // Per-workflow model configuration overrides
@@ -154,6 +155,7 @@ const FALLBACK_WORKFLOW_CONFIGURATIONS: WorkflowConfigurations = {
     dictionary: '',
     transcript_configuration: DEFAULT_TRANSCRIPT_CONFIGURATION,
     context_compaction_enabled: false,
+    cross_node_variable_injection_enabled: false,
     external_pbx_field_mappings: [],
 };
 
@@ -206,6 +208,10 @@ export function resolveWorkflowConfigurations(
             configurations?.context_compaction_enabled
             ?? defaults?.context_compaction_enabled
             ?? FALLBACK_WORKFLOW_CONFIGURATIONS.context_compaction_enabled,
+        cross_node_variable_injection_enabled:
+            configurations?.cross_node_variable_injection_enabled
+            ?? (defaults as any)?.cross_node_variable_injection_enabled
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.cross_node_variable_injection_enabled,
         text_chat_inactivity_timeout_seconds:
             configurations?.text_chat_inactivity_timeout_seconds
             ?? defaults?.text_chat_inactivity_timeout_seconds,

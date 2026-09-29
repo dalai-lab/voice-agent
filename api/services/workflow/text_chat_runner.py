@@ -596,6 +596,9 @@ async def execute_text_chat_pending_turn(
     context_compaction_enabled = (workflow.workflow_configurations or {}).get(
         "context_compaction_enabled", False
     )
+    cross_node_variable_injection_enabled = (workflow.workflow_configurations or {}).get(
+        "cross_node_variable_injection_enabled", False
+    )
     engine = PipecatEngine(
         llm=llm,
         inference_llm=inference_llm,
@@ -613,6 +616,7 @@ async def execute_text_chat_pending_turn(
         embeddings_api_version=embeddings_api_version,
         has_recordings=has_recordings,
         context_compaction_enabled=context_compaction_enabled,
+        cross_node_variable_injection_enabled=cross_node_variable_injection_enabled,
     )
     engine._gathered_context = dict(base_checkpoint["gathered_context"])
 

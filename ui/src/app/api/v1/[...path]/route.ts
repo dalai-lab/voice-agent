@@ -22,7 +22,9 @@ function trimTrailingSlash(url: string) {
 
 function buildBackendUrl(request: NextRequest) {
   const backendUrl = trimTrailingSlash(getServerBackendUrl());
-  return `${backendUrl}${request.nextUrl.pathname}${request.nextUrl.search}`;
+  const finalUrl = `${backendUrl}${request.nextUrl.pathname}${request.nextUrl.search}`;
+  console.log("PROXY URL:", finalUrl, "SEARCH:", request.nextUrl.search);
+  return finalUrl;
 }
 
 function createRequestHeaders(request: NextRequest) {

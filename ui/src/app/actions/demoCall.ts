@@ -190,8 +190,10 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
         const realIp = headersList.get("x-real-ip");
         const ip = forwardedFor?.split(",")[0] || realIp || "unknown-ip";
 
+        const isRetry = formData.get("isRetry") === "true";
+
         // Check Rate Limit (Bypass if IP is unknown for local testing, though unlikely in prod)
-        if (ip !== "unknown-ip") {
+        if (ip !== "unknown-ip" && !isRetry) {
             const allowed = await checkRateLimit(ip);
             if (!allowed) {
                 return { 
@@ -345,6 +347,7 @@ export async function pollDemoCallResult(
 ): Promise<{
     ready: boolean;
     extractedData?: Record<string, unknown>;
+    call_disposition?: string;
     error?: string;
 }> {
     try {
@@ -365,10 +368,14 @@ export async function pollDemoCallResult(
         const data = await response.json();
 
         if (!data.is_completed) {
-            return { ready: false };
+            return { ready: false, call_disposition: data.call_disposition ?? undefined };
         }
 
-        return { ready: true, extractedData: data.extracted_data ?? {} };
+        return {
+            ready: true,
+            extractedData: data.extracted_data ?? {},
+            call_disposition: data.call_disposition ?? undefined,
+        };
     } catch (error) {
         console.error("[DemoCall] pollDemoCallResult error:", error);
         return { ready: false, error: "Unexpected error while polling." };

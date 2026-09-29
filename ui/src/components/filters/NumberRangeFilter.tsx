@@ -77,8 +77,12 @@ export const NumberRangeFilter: React.FC<NumberRangeFilterProps> = ({
             type="number"
             placeholder={`Min ${unit || 'value'}`}
             value={localMin}
-            onChange={(e) => setLocalMin(e.target.value)}
-            onBlur={handleMinBlur}
+            onChange={(e) => {
+              setLocalMin(e.target.value);
+              const newValue = e.target.value === "" ? null : Number(e.target.value);
+              onChange({ ...value, min: newValue });
+            }}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
             min={min}
             max={max}
             step={step}
@@ -94,8 +98,12 @@ export const NumberRangeFilter: React.FC<NumberRangeFilterProps> = ({
             type="number"
             placeholder={`Max ${unit || 'value'}`}
             value={localMax}
-            onChange={(e) => setLocalMax(e.target.value)}
-            onBlur={handleMaxBlur}
+            onChange={(e) => {
+              setLocalMax(e.target.value);
+              const newValue = e.target.value === "" ? null : Number(e.target.value);
+              onChange({ ...value, max: newValue });
+            }}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
             min={min}
             max={max}
             step={step}

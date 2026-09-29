@@ -57,6 +57,7 @@ function RunsView() {
         try {
             setLoading(true);
             // Prepare filter data for API
+            console.log("FETCHING RUNS WITH FILTERS:", filters);
             let filterParam = undefined;
             if (filters && filters.length > 0) {
                 const filterData = filters.map(filter => ({
@@ -65,6 +66,7 @@ function RunsView() {
                     value: filter.value
                 }));
                 filterParam = JSON.stringify(filterData);
+                console.log("FILTER PARAM JSON:", filterParam);
             }
 
             const response = await client.get<{ runs: WorkflowRunResponseSchema[], total_pages: number, total_count: number, page: number }>({

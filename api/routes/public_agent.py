@@ -53,6 +53,7 @@ class RunExtractionResponse(BaseModel):
     run_id: int
     is_completed: bool
     extracted_data: dict | None = None
+    call_disposition: str | None = None  # e.g. "failed", "busy", "no_answer", "completed"
 
 
 @dataclass
@@ -511,10 +512,15 @@ async def get_run_extraction(
     if not extracted and run.gathered_context and isinstance(run.gathered_context, dict):
         extracted = run.gathered_context.get("extracted_variables", {})
 
+    call_disposition = None
+    if run.gathered_context and isinstance(run.gathered_context, dict):
+        call_disposition = run.gathered_context.get("call_disposition")
+
     return RunExtractionResponse(
         run_id=run.id,
         is_completed=run.is_completed,
         extracted_data=extracted,
+        call_disposition=call_disposition,
     )
 
 

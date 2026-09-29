@@ -35,8 +35,11 @@ export const TextFilter: React.FC<TextFilterProps> = ({
       <Input
         type="text"
         value={localValue}
-        onChange={(e) => setLocalValue(e.target.value)}
-        onBlur={handleBlur}
+        onChange={(e) => {
+          setLocalValue(e.target.value);
+          onChange({ value: e.target.value });
+        }}
+        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
         placeholder={placeholder}
         maxLength={maxLength}
         className={error ? "border-red-500" : ""}

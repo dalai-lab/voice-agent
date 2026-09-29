@@ -313,7 +313,21 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({
   );
 
   return (
-    <div className="w-full space-y-3 mb-6">
+    <div 
+      className="w-full space-y-3 mb-6"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+          // If we are inside an input that might want to handle enter natively, we could check,
+          // but our inputs (NumberRange, Text, etc.) will blur on Enter now. 
+          // We can just call apply filters if valid.
+          const canApply = (activeFilters.length > 0 && allFiltersValid) || (activeFilters.length === 0 && hasAppliedFilters);
+          if (canApply && !isExecuting) {
+            e.preventDefault();
+            onApplyFilters();
+          }
+        }
+      }}
+    >
       {/* Controls Bar */}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <div className="flex flex-wrap items-center gap-2 flex-1">

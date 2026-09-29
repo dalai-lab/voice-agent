@@ -1,6 +1,6 @@
 "use client";
 
-import { initiateDemoCall, runLiveExtraction } from "@/app/actions/demoCall";
+import { initiateDemoCall, runLiveExtraction, pollDemoCallResult } from "@/app/actions/demoCall";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Check,
@@ -606,18 +606,22 @@ export function DemoCallForm() {
     );
   };
 
-  const handleInitiateCall = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleInitiateCall = async (e?: React.FormEvent, isRetry = false) => {
+    if (e) e.preventDefault();
     if (!phone || !name) return;
 
-    setCallingState("calling");
-    setErrorMessage("");
-    setExtractedData(null);
-    setLiveFields({});
-    setLiveTurns([]);
-    setTurnIds([]);
-    setTurnCount(0);
-    setCallDuration(0);
+    if (isRetry) {
+      setErrorMessage("Telephony issue detected. Reconnecting automatically...");
+    } else {
+      setCallingState("calling");
+      setErrorMessage("");
+      setExtractedData(null);
+      setLiveFields({});
+      setLiveTurns([]);
+      setTurnIds([]);
+      setTurnCount(0);
+      setCallDuration(0);
+    }
 
     try {
       const formData = new FormData();
@@ -626,6 +630,7 @@ export function DemoCallForm() {
       formData.set("useCase", useCase);
       if (jobDescription) formData.set("jobDescription", jobDescription);
       if (resumeText) formData.set("resumeText", resumeText);
+      if (isRetry) formData.set("isRetry", "true");
 
       const result = await initiateDemoCall(null, formData as any);
       if (!result?.success) {
@@ -655,7 +660,14 @@ export function DemoCallForm() {
         if (!evt.data) return;
         const msg = JSON.parse(evt.data);
 
-        if (msg.type === "ended" || msg.type === "timeout") {
+        if (msg.type === "timeout") {
+          es.close();
+          sseRef.current = null;
+          handleInitiateCall(undefined, true);
+          return;
+        }
+
+        if (msg.type === "ended") {
           es.close();
           sseRef.current = null;
           if (finalLinesRef.length > 0) {
@@ -734,9 +746,31 @@ export function DemoCallForm() {
 
       pollIntervalRef.current = setInterval(async () => {
         try {
-          const res = await fetch(`/api/demo-stream/${runId}`.replace("/stream", ""), { method: "HEAD" });
+          const poll = await pollDemoCallResult(runId);
+          const disposition = poll.call_disposition;
+
+          if (disposition === "busy") {
+            clearInterval(pollIntervalRef.current);
+            clearTimers();
+            setCallingState("error");
+            setErrorMessage(
+              "Your phone appears to be busy or in Do Not Disturb mode. Please disable DND and try again."
+            );
+          } else if (disposition === "no_answer") {
+            clearInterval(pollIntervalRef.current);
+            clearTimers();
+            setCallingState("error");
+            setErrorMessage(
+              "The call wasn't answered. Please try again when you're ready to receive the demo call."
+            );
+          } else if (disposition === "failed") {
+            clearInterval(pollIntervalRef.current);
+            clearTimers();
+            // Auto-retry silently for pure telephony failures (no limit consumed)
+            handleInitiateCall(undefined, true);
+          }
         } catch { /* ignore */ }
-      }, 5000);
+      }, 4000);
     } catch (err: any) {
       setCallingState("error");
       setErrorMessage(err?.message || "Unexpected error. Please try again.");

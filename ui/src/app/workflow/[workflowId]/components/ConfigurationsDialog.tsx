@@ -68,6 +68,9 @@ export const ConfigurationsDialog = ({
     const [crossNodeVariableInjectionEnabled, setCrossNodeVariableInjectionEnabled] = useState<boolean>(
         resolvedWorkflowConfigurations.cross_node_variable_injection_enabled
     );
+    const [llmConnectionWarmupEnabled, setLlmConnectionWarmupEnabled] = useState<boolean>(
+        resolvedWorkflowConfigurations.llm_connection_warmup_enabled
+    );
     const [externalPbxFieldMappings, setExternalPbxFieldMappings] = useState<ExternalPBXFieldMapping[]>(
         resolvedWorkflowConfigurations.external_pbx_field_mappings
     );
@@ -97,6 +100,7 @@ export const ConfigurationsDialog = ({
                 transcript_configuration: resolvedWorkflowConfigurations.transcript_configuration,
                 context_compaction_enabled: contextCompactionEnabled,
                 cross_node_variable_injection_enabled: crossNodeVariableInjectionEnabled,
+                llm_connection_warmup_enabled: llmConnectionWarmupEnabled,
                 external_pbx_field_mappings: externalPbxFieldMappings,
             }, name);
             onOpenChange(false);
@@ -122,6 +126,7 @@ export const ConfigurationsDialog = ({
             setTurnStopStrategy(nextWorkflowConfigurations.turn_stop_strategy);
             setContextCompactionEnabled(nextWorkflowConfigurations.context_compaction_enabled);
             setCrossNodeVariableInjectionEnabled(nextWorkflowConfigurations.cross_node_variable_injection_enabled);
+            setLlmConnectionWarmupEnabled(nextWorkflowConfigurations.llm_connection_warmup_enabled);
             setExternalPbxFieldMappings(nextWorkflowConfigurations.external_pbx_field_mappings);
         }
     }, [open, workflowName, workflowConfigurations]);
@@ -397,6 +402,38 @@ export const ConfigurationsDialog = ({
                             <p className="text-xs text-amber-600 dark:text-amber-400">
                                 ⚠ Enabled — node transitions may be slightly delayed while extraction
                                 from the previous node completes.
+                            </p>
+                        )}
+                    </div>
+
+
+                    {/* LLM Connection Warmup Section */}
+                    <div className="space-y-4 border-t pt-4">
+                        <div>
+                            <h3 className="text-sm font-semibold mb-1">LLM Connection Warmup</h3>
+                            <p className="text-xs text-muted-foreground">
+                                Pre-warms the LLM provider's HTTP/TLS connection during the greeting,
+                                eliminating the ~800ms cold-start delay on the first user turn.
+                                Disable only if your provider bills per-request or applies strict
+                                rate limits on idle connections.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="llm-connection-warmup-enabled" className="text-sm font-medium">
+                                Enable LLM Connection Warmup
+                            </Label>
+                            <Switch
+                                id="llm-connection-warmup-enabled"
+                                checked={llmConnectionWarmupEnabled}
+                                onCheckedChange={setLlmConnectionWarmupEnabled}
+                            />
+                        </div>
+
+                        {!llmConnectionWarmupEnabled && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                                ⚠ Disabled — the first user turn may experience an additional ~800ms
+                                delay while the LLM connection is established.
                             </p>
                         )}
                     </div>

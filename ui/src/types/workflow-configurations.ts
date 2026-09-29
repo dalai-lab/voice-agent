@@ -133,6 +133,7 @@ export type WorkflowConfigurations = WorkflowConfigurationBase & {
     transcript_configuration: TranscriptConfiguration;
     context_compaction_enabled: boolean;  // Summarize context on node transitions to remove stale tool calls
     cross_node_variable_injection_enabled: boolean;
+    llm_connection_warmup_enabled: boolean;
     text_chat_inactivity_timeout_seconds?: number;  // End inactive text chats after this many seconds
     external_pbx_field_mappings: ExternalPBXFieldMapping[];
     model_overrides?: ModelOverrides;  // Per-workflow model configuration overrides
@@ -156,6 +157,7 @@ const FALLBACK_WORKFLOW_CONFIGURATIONS: WorkflowConfigurations = {
     transcript_configuration: DEFAULT_TRANSCRIPT_CONFIGURATION,
     context_compaction_enabled: false,
     cross_node_variable_injection_enabled: false,
+    llm_connection_warmup_enabled: true,
     external_pbx_field_mappings: [],
 };
 
@@ -212,6 +214,10 @@ export function resolveWorkflowConfigurations(
             configurations?.cross_node_variable_injection_enabled
             ?? (defaults as any)?.cross_node_variable_injection_enabled
             ?? FALLBACK_WORKFLOW_CONFIGURATIONS.cross_node_variable_injection_enabled,
+        llm_connection_warmup_enabled:
+            configurations?.llm_connection_warmup_enabled
+            ?? (defaults as any)?.llm_connection_warmup_enabled
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.llm_connection_warmup_enabled,
         text_chat_inactivity_timeout_seconds:
             configurations?.text_chat_inactivity_timeout_seconds
             ?? defaults?.text_chat_inactivity_timeout_seconds,

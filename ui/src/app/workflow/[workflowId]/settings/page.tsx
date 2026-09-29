@@ -315,6 +315,9 @@ function GeneralSection({
     const [crossNodeVariableInjectionEnabled, setCrossNodeVariableInjectionEnabled] = useState(
         workflowConfigurations.cross_node_variable_injection_enabled,
     );
+    const [llmConnectionWarmupEnabled, setLlmConnectionWarmupEnabled] = useState(
+        workflowConfigurations.llm_connection_warmup_enabled,
+    );
     const [includeTranscriptEndTimestamps, setIncludeTranscriptEndTimestamps] = useState(
         workflowConfigurations.transcript_configuration?.include_end_timestamps ?? false,
     );
@@ -349,6 +352,7 @@ function GeneralSection({
             turnStopStrategy !== workflowConfigurations.turn_stop_strategy ||
             contextCompactionEnabled !== workflowConfigurations.context_compaction_enabled ||
             crossNodeVariableInjectionEnabled !== workflowConfigurations.cross_node_variable_injection_enabled ||
+            llmConnectionWarmupEnabled !== workflowConfigurations.llm_connection_warmup_enabled ||
             dtmfEnabled !== enableDtmf ||
             includeTranscriptEndTimestamps !==
             (workflowConfigurations.transcript_configuration?.include_end_timestamps ?? false) ||
@@ -357,7 +361,7 @@ function GeneralSection({
             callbacksEnabled !== enableCallbacks ||
             resumeMode !== callbackResumeMode
         );
-    }, [name, workflowName, ambientNoiseConfig, maxCallDuration, maxUserIdleTimeout, smartTurnStopSecs, turnStartStrategy, turnStartMinWords, provisionalVadPauseSecs, turnStopStrategy, contextCompactionEnabled, crossNodeVariableInjectionEnabled, includeTranscriptEndTimestamps, workflowConfigurations, dtmfEnabled, enableDtmf, callbacksEnabled, enableCallbacks, externalPbxFieldMappings, resumeMode, callbackResumeMode]);
+    }, [name, workflowName, ambientNoiseConfig, maxCallDuration, maxUserIdleTimeout, smartTurnStopSecs, turnStartStrategy, turnStartMinWords, provisionalVadPauseSecs, turnStopStrategy, contextCompactionEnabled, crossNodeVariableInjectionEnabled, llmConnectionWarmupEnabled, includeTranscriptEndTimestamps, workflowConfigurations, dtmfEnabled, enableDtmf, callbacksEnabled, enableCallbacks, externalPbxFieldMappings, resumeMode, callbackResumeMode]);
 
     useUnsavedChanges("general", isDirty);
 
@@ -435,6 +439,7 @@ function GeneralSection({
                     turn_stop_strategy: turnStopStrategy,
                     context_compaction_enabled: contextCompactionEnabled,
                     cross_node_variable_injection_enabled: crossNodeVariableInjectionEnabled,
+                    llm_connection_warmup_enabled: llmConnectionWarmupEnabled,
                     transcript_configuration: {
                         ...(workflowConfigurations.transcript_configuration ?? {}),
                         include_end_timestamps: includeTranscriptEndTimestamps,
@@ -886,6 +891,36 @@ function GeneralSection({
                                 </div>
                             </div>
                         </div>
+                    )}
+                </div>
+
+                <Separator />
+
+                {/* LLM Connection Warmup Section */}
+                <div className="space-y-4">
+                    <div>
+                        <h3 className="text-sm font-medium">LLM Connection Warmup</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            Pre-warms the LLM provider's HTTP/TLS connection during the greeting,
+                            eliminating the ~800ms cold-start delay on the first user turn.
+                            Disable only if your provider bills per-request or applies strict
+                            rate limits.
+                        </p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="llm-connection-warmup-enabled" className="text-sm">
+                            Enable LLM Connection Warmup
+                        </Label>
+                        <Switch
+                            id="llm-connection-warmup-enabled"
+                            checked={llmConnectionWarmupEnabled}
+                            onCheckedChange={setLlmConnectionWarmupEnabled}
+                        />
+                    </div>
+                    {!llmConnectionWarmupEnabled && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                            ⚠ Disabled — the first user turn may experience ~800ms additional latency.
+                        </p>
                     )}
                 </div>
 

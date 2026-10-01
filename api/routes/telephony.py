@@ -65,6 +65,8 @@ class InitiateCallRequest(BaseModel):
     # Optional caller-ID phone number to dial out from. Must belong to the
     # resolved telephony configuration; otherwise the provider picks one.
     from_phone_number_id: int | None = None
+    # Optional per-call context variable overrides (for test calls from the UI).
+    context_variables: dict[str, str] | None = None
 
 
 def _get_execution_user_id(workflow) -> int:
@@ -188,6 +190,7 @@ async def initiate_call(
                     "called_number": phone_number,
                     "provider": provider.PROVIDER_NAME,
                     "telephony_configuration_id": telephony_configuration_id,
+                    **(request.context_variables or {}),
                 },
                 use_draft=True,
                 include_template_context=True,

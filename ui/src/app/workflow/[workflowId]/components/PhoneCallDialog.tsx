@@ -371,7 +371,9 @@ export const PhoneCallDialog = ({
                     phone_number: phoneNumber,
                     telephony_configuration_id: selectedConfigId ? Number(selectedConfigId) : null,
                     from_phone_number_id: selectedFromPhoneNumberId ? Number(selectedFromPhoneNumberId) : null,
-                },
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    context_variables: Object.keys(callVars).length > 0 ? callVars : undefined,
+                } as any,
             });
 
             if (response.error) {

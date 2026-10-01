@@ -29,6 +29,7 @@ import { VersionHistoryPanel, WorkflowVersion } from './components/VersionHistor
 import type { WorkflowRuntimeNodeTransition } from './components/workflow-tester/types';
 import { WorkflowEditorHeader } from "./components/WorkflowEditorHeader";
 import { WorkflowTesterPanel } from './components/WorkflowTesterPanel';
+import { scanAndMergeInitialContextVars } from './components/workflow-tester/utils/scanContextVars';
 import { WorkflowProvider } from "./contexts/WorkflowContext";
 import { useWorkflowState } from "./hooks/useWorkflowState";
 import { layoutNodes } from './utils/layoutNodes';
@@ -126,6 +127,10 @@ function RenderWorkflow({
         initialWorkflowConfigurations,
         user,
     });
+
+    const defaultContextVars = useMemo(() => {
+        return scanAndMergeInitialContextVars(nodes, edges, templateContextVariables);
+    }, [nodes, edges, templateContextVariables]);
 
     // Single generic component for every node type. Seed with core node types
     // so the initial render is stable before specs load, then merge in any
@@ -663,7 +668,7 @@ function RenderWorkflow({
                             <aside className="hidden h-full w-[400px] shrink-0 border-l border-border xl:block">
                                 <WorkflowTesterPanel
                                     workflowId={workflowId}
-                                    initialContextVariables={templateContextVariables}
+                                    defaultContextVars={defaultContextVars}
                                     disabled={testerDisabledReason !== null}
                                     disabledReason={testerDisabledReason}
                                     showWebCallOnboarding={shouldShowWebCallOnboarding}
@@ -679,7 +684,7 @@ function RenderWorkflow({
                         <SheetContent side="right" className="w-full max-w-none p-0 sm:max-w-xl xl:hidden">
                             <WorkflowTesterPanel
                                 workflowId={workflowId}
-                                initialContextVariables={templateContextVariables}
+                                defaultContextVars={defaultContextVars}
                                 disabled={testerDisabledReason !== null}
                                 disabledReason={testerDisabledReason}
                                 showWebCallOnboarding={shouldShowWebCallOnboarding}
@@ -714,6 +719,7 @@ function RenderWorkflow({
                     onOpenChange={setIsPhoneCallDialogOpen}
                     workflowId={workflowId}
                     user={user}
+                    defaultContextVars={defaultContextVars}
                 />
             </div>
         </WorkflowProvider>

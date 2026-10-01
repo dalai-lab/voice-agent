@@ -22,10 +22,12 @@ import { ManualTextChatPanel } from "./workflow-tester/ManualTextChatPanel";
 import { ChatModeToggle, DisabledNotice, EmptyState } from "./workflow-tester/shared";
 import type { WorkflowRuntimeNodeTransition } from "./workflow-tester/types";
 import { extractSdkErrorMessage, getErrorMessage } from "./workflow-tester/utils";
+import { ContextVarOverridePanel } from "./workflow-tester/ContextVarOverridePanel";
+import type { ContextVarInfo } from "./workflow-tester/utils/scanContextVars";
 
 interface WorkflowTesterPanelProps {
     workflowId: number;
-    initialContextVariables?: Record<string, string>;
+    defaultContextVars?: ContextVarInfo;
     disabled: boolean;
     disabledReason: string | null;
     showWebCallOnboarding?: boolean;
@@ -37,7 +39,7 @@ interface WorkflowTesterPanelProps {
 
 export function WorkflowTesterPanel({
     workflowId,
-    initialContextVariables,
+    defaultContextVars,
     disabled,
     disabledReason,
     showWebCallOnboarding = false,
@@ -57,6 +59,21 @@ export function WorkflowTesterPanel({
     const [voiceRunId, setVoiceRunId] = useState<number | null>(null);
     const [creatingVoiceRun, setCreatingVoiceRun] = useState(false);
     const [tokenReady, setTokenReady] = useState(false);
+    
+    const [overrideVars, setOverrideVars] = useState<Record<string, string>>({});
+    const [chatSnapshotVars, setChatSnapshotVars] = useState<Record<string, string>>({});
+    const [voiceRunSnapshotVars, setVoiceRunSnapshotVars] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        setOverrideVars(defaultContextVars?.mergedVars ?? {});
+    }, [defaultContextVars]);
+
+    useEffect(() => {
+        if (!chatActive) {
+            setChatSnapshotVars(overrideVars);
+        }
+    }, [overrideVars, chatActive]);
+
     const runTestButtonRef = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
@@ -99,6 +116,7 @@ export function WorkflowTesterPanel({
     const createVoiceRun = useCallback(async () => {
         if (!accessToken || disabled) return;
         setCreatingVoiceRun(true);
+        setVoiceRunSnapshotVars(overrideVars);
         try {
             const response = await createWorkflowRunApiV1WorkflowWorkflowIdRunsPost({
                 path: { workflow_id: workflowId },
@@ -125,7 +143,7 @@ export function WorkflowTesterPanel({
         } finally {
             setCreatingVoiceRun(false);
         }
-    }, [accessToken, disabled, markActionCompleted, workflowId]);
+    }, [accessToken, disabled, markActionCompleted, workflowId, overrideVars]);
 
     const authUnavailableReason = tokenReady && !accessToken
         ? "Authentication is required before testing can start."
@@ -189,13 +207,20 @@ export function WorkflowTesterPanel({
                             <EmbeddedVoiceTester
                                 workflowId={workflowId}
                                 workflowRunId={voiceRunId}
-                                initialContextVariables={initialContextVariables}
+                                initialContextVariables={voiceRunSnapshotVars}
                                 accessToken={accessToken}
                                 onReset={() => setVoiceRunId(null)}
                                 onNodeTransition={onRuntimeNodeTransition}
                             />
                         ) : (
                             <>
+                                <ContextVarOverridePanel 
+                                    vars={overrideVars}
+                                    onChange={setOverrideVars}
+                                    scannedKeys={defaultContextVars?.scannedKeys ?? []}
+                                    savedKeys={defaultContextVars?.savedKeys ?? []}
+                                    disabled={creatingVoiceRun || testerBlocked}
+                                />
                                 <EmptyState
                                     icon={<PhosphorIcons.Phone className="h-5 w-5" />}
                                     title="Call this agent in the browser"
@@ -245,16 +270,27 @@ export function WorkflowTesterPanel({
                         </div>
 
                         {chatMode === "manual" ? (
-                            <ManualTextChatPanel
-                                key={chatSessionKey}
-                                workflowId={workflowId}
-                                ready={tokenReady && !!accessToken}
-                                initialContextVariables={initialContextVariables}
-                                disabled={testerBlocked}
-                                disabledReason={effectiveDisabledReason}
-                                onActiveChange={setChatActive}
-                                onNodeTransition={onRuntimeNodeTransition}
-                            />
+                            <>
+                                {!chatActive && (
+                                    <ContextVarOverridePanel 
+                                        vars={overrideVars}
+                                        onChange={setOverrideVars}
+                                        scannedKeys={defaultContextVars?.scannedKeys ?? []}
+                                        savedKeys={defaultContextVars?.savedKeys ?? []}
+                                        disabled={testerBlocked}
+                                    />
+                                )}
+                                <ManualTextChatPanel
+                                    key={chatSessionKey}
+                                    workflowId={workflowId}
+                                    ready={tokenReady && !!accessToken}
+                                    initialContextVariables={chatSnapshotVars}
+                                    disabled={testerBlocked}
+                                    disabledReason={effectiveDisabledReason}
+                                    onActiveChange={setChatActive}
+                                    onNodeTransition={onRuntimeNodeTransition}
+                                />
+                            </>
                         ) : (
                             <AiSimulatorPlaceholder disabledReason={effectiveDisabledReason} />
                         )}

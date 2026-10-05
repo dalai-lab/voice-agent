@@ -6,9 +6,18 @@ export type RealtimeFeedbackMessageType =
     | "function-call"
     | "node-transition"
     | "ttfb-metric"
+    | "latency-measured"
+    | "latency-breakdown"
     | "pipeline-error"
     | "interrupt-warning"
     | "user-dtmf";
+
+export interface LatencyBreakdown {
+    user_turn_secs?: number;
+    ttfb?: Array<{ processor: string; duration_secs: number }>;
+    text_aggregation_secs?: number;
+    function_calls?: Array<{ name: string; duration_secs: number }>;
+}
 
 export interface RealtimeFeedbackMessage {
     id: string;
@@ -27,6 +36,8 @@ export interface RealtimeFeedbackMessage {
     previousNode?: string;
     allowInterrupt?: boolean;
     ttfbSeconds?: number;
+    latencySeconds?: number;
+    latencyBreakdown?: LatencyBreakdown;
     processor?: string;
     model?: string;
     fatal?: boolean;
@@ -51,6 +62,8 @@ export interface RealtimeFeedbackEvent {
         previous_node_name?: string;
         allow_interrupt?: boolean;
         ttfb_seconds?: number;
+        latency_seconds?: number;
+        latency_breakdown?: LatencyBreakdown;
         processor?: string;
         model?: string;
         error?: string;
@@ -69,6 +82,8 @@ interface ConversationItemBase {
     timestamp?: string;
     turnId?: string;
     reasoningDurationMs?: number;
+    e2eLatencyMs?: number;
+    latencyBreakdown?: LatencyBreakdown;
 }
 
 export interface ConversationMessageItem extends ConversationItemBase {

@@ -15,8 +15,8 @@ function feedbackEventText(event: RealtimeFeedbackEvent) {
     );
 }
 
-function liveFeedbackItem(message: RealtimeFeedbackMessage, reasoningDurationMs?: number): ConversationItem | null {
-    if (message.type === "ttfb-metric") {
+function liveFeedbackItem(message: RealtimeFeedbackMessage, reasoningDurationMs?: number, e2eLatencyMs?: number, latencyBreakdown?: import("../types").LatencyBreakdown): ConversationItem | null {
+    if (message.type === "ttfb-metric" || message.type === "latency-measured" || message.type === "latency-breakdown") {
         return null;
     }
 
@@ -51,6 +51,8 @@ function liveFeedbackItem(message: RealtimeFeedbackMessage, reasoningDurationMs?
             text: message.text,
             final: message.final,
             reasoningDurationMs,
+            e2eLatencyMs,
+            latencyBreakdown,
         };
     }
 
@@ -65,6 +67,8 @@ function liveFeedbackItem(message: RealtimeFeedbackMessage, reasoningDurationMs?
             result: message.result,
             status: message.status ?? "completed",
             reasoningDurationMs,
+            e2eLatencyMs,
+            latencyBreakdown,
         };
     }
 
@@ -112,16 +116,70 @@ function liveFeedbackItem(message: RealtimeFeedbackMessage, reasoningDurationMs?
 export function conversationItemsFromLiveFeedback(messages: RealtimeFeedbackMessage[]) {
     const items: ConversationItem[] = [];
     let pendingReasoningDurationMs: number | undefined;
+    let pendingE2ELatencyMs: number | undefined;
+    let pendingLatencyBreakdown: import("../types").LatencyBreakdown | undefined;
 
     messages.forEach((message) => {
         if (message.type === "ttfb-metric") {
             if (message.ttfbSeconds !== undefined) {
-                pendingReasoningDurationMs = message.ttfbSeconds * 1000;
+                const ms = message.ttfbSeconds * 1000;
+                let attached = false;
+                for (let i = items.length - 1; i >= 0; i--) {
+                    const item = items[i];
+                    if (item.kind === "message" && item.role === "user") break;
+                    if ((item.kind === "message" && item.role === "assistant") || item.kind === "tool-call") {
+                        if (item.reasoningDurationMs === undefined) {
+                            items[i] = { ...item, reasoningDurationMs: ms };
+                            attached = true;
+                        }
+                        break;
+                    }
+                }
+                if (!attached) pendingReasoningDurationMs = ms;
             }
             return;
         }
 
-        const item = liveFeedbackItem(message, pendingReasoningDurationMs);
+        if (message.type === "latency-measured") {
+            if (message.latencySeconds !== undefined) {
+                const ms = message.latencySeconds * 1000;
+                let attached = false;
+                for (let i = items.length - 1; i >= 0; i--) {
+                    const item = items[i];
+                    if (item.kind === "message" && item.role === "user") break;
+                    if ((item.kind === "message" && item.role === "assistant") || item.kind === "tool-call") {
+                        if (item.e2eLatencyMs === undefined) {
+                            items[i] = { ...item, e2eLatencyMs: ms };
+                            attached = true;
+                        }
+                        break;
+                    }
+                }
+                if (!attached) pendingE2ELatencyMs = ms;
+            }
+            return;
+        }
+
+        if (message.type === "latency-breakdown") {
+            if (message.latencyBreakdown !== undefined) {
+                let attached = false;
+                for (let i = items.length - 1; i >= 0; i--) {
+                    const item = items[i];
+                    if (item.kind === "message" && item.role === "user") break;
+                    if ((item.kind === "message" && item.role === "assistant") || item.kind === "tool-call") {
+                        if (item.latencyBreakdown === undefined) {
+                            items[i] = { ...item, latencyBreakdown: message.latencyBreakdown };
+                            attached = true;
+                        }
+                        break;
+                    }
+                }
+                if (!attached) pendingLatencyBreakdown = message.latencyBreakdown;
+            }
+            return;
+        }
+
+        const item = liveFeedbackItem(message, pendingReasoningDurationMs, pendingE2ELatencyMs, pendingLatencyBreakdown);
         if (!item) {
             return;
         }
@@ -130,6 +188,8 @@ export function conversationItemsFromLiveFeedback(messages: RealtimeFeedbackMess
 
         if (item.kind === "message" || item.kind === "tool-call") {
             pendingReasoningDurationMs = undefined;
+            pendingE2ELatencyMs = undefined;
+            pendingLatencyBreakdown = undefined;
         }
     });
 
@@ -140,13 +200,67 @@ export function conversationItemsFromRealtimeFeedbackEvents(events: RealtimeFeed
     const items: ConversationItem[] = [];
     const toolCallIndexById = new Map<string, number>();
     let pendingReasoningDurationMs: number | undefined;
+    let pendingE2ELatencyMs: number | undefined;
+    let pendingLatencyBreakdown: import("../types").LatencyBreakdown | undefined;
     let currentBotItemIndex: number | null = null;
     let currentBotTurn: number | null = null;
 
     events.forEach((event, index) => {
         if (event.type === "rtf-ttfb-metric") {
             if (event.payload.ttfb_seconds !== undefined) {
-                pendingReasoningDurationMs = event.payload.ttfb_seconds * 1000;
+                const ms = event.payload.ttfb_seconds * 1000;
+                let attached = false;
+                for (let i = items.length - 1; i >= 0; i--) {
+                    const item = items[i];
+                    if (item.kind === "message" && item.role === "user") break;
+                    if ((item.kind === "message" && item.role === "assistant") || item.kind === "tool-call") {
+                        if (item.reasoningDurationMs === undefined) {
+                            items[i] = { ...item, reasoningDurationMs: ms };
+                            attached = true;
+                        }
+                        break;
+                    }
+                }
+                if (!attached) pendingReasoningDurationMs = ms;
+            }
+            return;
+        }
+
+        if (event.type === "rtf-latency-measured") {
+            if (event.payload.latency_seconds !== undefined) {
+                const ms = event.payload.latency_seconds * 1000;
+                let attached = false;
+                for (let i = items.length - 1; i >= 0; i--) {
+                    const item = items[i];
+                    if (item.kind === "message" && item.role === "user") break;
+                    if ((item.kind === "message" && item.role === "assistant") || item.kind === "tool-call") {
+                        if (item.e2eLatencyMs === undefined) {
+                            items[i] = { ...item, e2eLatencyMs: ms };
+                            attached = true;
+                        }
+                        break;
+                    }
+                }
+                if (!attached) pendingE2ELatencyMs = ms;
+            }
+            return;
+        }
+
+        if (event.type === "rtf-latency-breakdown") {
+            if (event.payload.latency_breakdown !== undefined) {
+                let attached = false;
+                for (let i = items.length - 1; i >= 0; i--) {
+                    const item = items[i];
+                    if (item.kind === "message" && item.role === "user") break;
+                    if ((item.kind === "message" && item.role === "assistant") || item.kind === "tool-call") {
+                        if (item.latencyBreakdown === undefined) {
+                            items[i] = { ...item, latencyBreakdown: event.payload.latency_breakdown };
+                            attached = true;
+                        }
+                        break;
+                    }
+                }
+                if (!attached) pendingLatencyBreakdown = event.payload.latency_breakdown;
             }
             return;
         }
@@ -204,10 +318,14 @@ export function conversationItemsFromRealtimeFeedbackEvents(events: RealtimeFeed
                 text,
                 final: event.payload.final,
                 reasoningDurationMs: pendingReasoningDurationMs,
+                e2eLatencyMs: pendingE2ELatencyMs,
+                latencyBreakdown: pendingLatencyBreakdown,
             });
             currentBotItemIndex = items.length - 1;
             currentBotTurn = event.turn;
             pendingReasoningDurationMs = undefined;
+            pendingE2ELatencyMs = undefined;
+            pendingLatencyBreakdown = undefined;
             return;
         }
 
@@ -225,11 +343,15 @@ export function conversationItemsFromRealtimeFeedbackEvents(events: RealtimeFeed
                 arguments: event.payload.arguments,
                 status: "running",
                 reasoningDurationMs: pendingReasoningDurationMs,
+                e2eLatencyMs: pendingE2ELatencyMs,
+                latencyBreakdown: pendingLatencyBreakdown,
             });
             if (toolCallId) {
                 toolCallIndexById.set(toolCallId, items.length - 1);
             }
             pendingReasoningDurationMs = undefined;
+            pendingE2ELatencyMs = undefined;
+            pendingLatencyBreakdown = undefined;
             return;
         }
 
@@ -258,8 +380,12 @@ export function conversationItemsFromRealtimeFeedbackEvents(events: RealtimeFeed
                 result: event.payload.result,
                 status: "completed",
                 reasoningDurationMs: pendingReasoningDurationMs,
+                e2eLatencyMs: pendingE2ELatencyMs,
+                latencyBreakdown: pendingLatencyBreakdown,
             });
             pendingReasoningDurationMs = undefined;
+            pendingE2ELatencyMs = undefined;
+            pendingLatencyBreakdown = undefined;
             return;
         }
 

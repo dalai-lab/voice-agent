@@ -226,6 +226,8 @@ def stt_uses_external_turns(user_config) -> bool:
         return dograh_stt_uses_flux_language(getattr(user_config.stt, "language", None))
     if user_config.stt.provider == ServiceProviders.CARTESIA.value:
         return user_config.stt.model == "ink-2"
+    if user_config.stt.provider == ServiceProviders.SARVAM.value:
+        return True
     return False
 
 
@@ -415,6 +417,7 @@ def create_stt_service(
             settings=SarvamSTTSettings(
                 model=user_config.stt.model,
                 language=pipecat_language,
+                vad_signals=True,
             ),
             sample_rate=audio_config.transport_in_sample_rate,
         )

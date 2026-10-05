@@ -415,6 +415,7 @@ def create_stt_service(
             settings=SarvamSTTSettings(
                 model=user_config.stt.model,
                 language=pipecat_language,
+                negative_frames_count=10,  # Tuning: faster silence detection (default is higher, causing ~900ms delay)
             ),
             sample_rate=audio_config.transport_in_sample_rate,
         )

@@ -513,7 +513,9 @@ async def _authorize_oss_managed_v2_correlation(
     return QuotaCheckResult(has_quota=True)
 
 
-async def _authorize_talkar_workflow_run_start(organization_id: int) -> QuotaCheckResult:
+async def _authorize_talkar_workflow_run_start(
+    organization_id: int, mode: str | None = None
+) -> QuotaCheckResult:
     try:
         import os
         talkar_billing_token = os.getenv("TALKAR_BILLING_API_TOKEN", "").strip()
@@ -522,9 +524,13 @@ async def _authorize_talkar_workflow_run_start(organization_id: int) -> QuotaChe
             request_headers["Authorization"] = f"Bearer {talkar_billing_token}"
 
         async with httpx.AsyncClient() as client:
+            json_payload = {"organization_id": organization_id}
+            if mode:
+                json_payload["mode"] = mode
+                
             resp = await client.post(
                 f"{TALKAR_SERVICE_URL}/billing/check-quota",
-                json={"organization_id": organization_id},
+                json=json_payload,
                 headers=request_headers,
                 timeout=3.0
             )
@@ -800,7 +806,10 @@ async def authorize_workflow_run_start(
         )
 
         if DEPLOYMENT_MODE == "talkar":
-            return await _authorize_talkar_workflow_run_start(organization_id)
+            run_mode = None
+            if workflow_run_id is not None and "workflow_run" in locals() and workflow_run:
+                run_mode = workflow_run.mode
+            return await _authorize_talkar_workflow_run_start(organization_id, run_mode)
 
         if DEPLOYMENT_MODE != "oss":
             return await _authorize_hosted_workflow_run_start(

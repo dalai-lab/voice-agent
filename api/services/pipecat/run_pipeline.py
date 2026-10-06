@@ -1207,34 +1207,6 @@ async def _run_pipeline_impl(
             except Exception as e:
                 logger.error(f"Failed to append latency to logs buffer: {e}")
 
-        @task.user_bot_latency_observer.event_handler("on_latency_breakdown")
-        async def on_latency_breakdown(observer, breakdown):
-            message = {
-                "type": RealtimeFeedbackType.LATENCY_BREAKDOWN.value,
-                "payload": {
-                    "user_turn_secs": breakdown.user_turn_secs,
-                    "ttfb": [{"processor": t.processor, "duration_secs": t.duration_secs} for t in breakdown.ttfb],
-                    "text_aggregation_secs": breakdown.text_aggregation.duration_secs if breakdown.text_aggregation else None,
-                    "function_calls": [{"name": f.function_name, "duration_secs": f.duration_secs} for f in breakdown.function_calls],
-                },
-            }
-            if ws_sender:
-                try:
-                    ws_message = message
-                    if in_memory_logs_buffer.current_node_id:
-                        ws_message = {
-                            **message,
-                            "node_id": in_memory_logs_buffer.current_node_id,
-                            "node_name": in_memory_logs_buffer.current_node_name,
-                        }
-                    await ws_sender(ws_message)
-                except Exception as e:
-                    logger.debug(f"Failed to send latency breakdown via WebSocket: {e}")
-            try:
-                await in_memory_logs_buffer.append(message)
-            except Exception as e:
-                logger.error(f"Failed to append latency breakdown to logs buffer: {e}")
-
     # Register turn log handlers for all call types (WebRTC and telephony)
     register_turn_log_handlers(
         transcript_log_coordinator,

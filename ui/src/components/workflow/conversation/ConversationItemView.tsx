@@ -23,8 +23,6 @@ export function ConversationItemView({ item, actions }: ConversationItemViewProp
                 final={item.final}
                 tone={item.tone}
                 reasoningDurationMs={item.reasoningDurationMs}
-                e2eLatencyMs={item.e2eLatencyMs}
-                latencyBreakdown={item.latencyBreakdown}
                 containerClassName={isUser && actions ? "min-w-0 flex-1 justify-end" : undefined}
             />
         );

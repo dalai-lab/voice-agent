@@ -571,35 +571,6 @@ export const useWebSocketRTC = ({ workflowId, workflowRunId, accessToken, initia
                             break;
                         }
 
-                        case 'rtf-latency-measured': {
-                            const { latency_seconds } = message.payload;
-                            setFeedbackMessages(prev => [...prev, {
-                                id: `latency-${Date.now()}`,
-                                type: 'latency-measured',
-                                text: `${(latency_seconds * 1000).toFixed(0)}ms`,
-                                latencySeconds: latency_seconds,
-                                timestamp: new Date().toISOString(),
-                            }]);
-                            break;
-                        }
-
-                        case 'rtf-latency-breakdown': {
-                            const { user_turn_secs, ttfb, text_aggregation_secs, function_calls } = message.payload;
-                            setFeedbackMessages(prev => [...prev, {
-                                id: `latency-breakdown-${Date.now()}`,
-                                type: 'latency-breakdown',
-                                text: 'Latency Breakdown',
-                                latencyBreakdown: {
-                                    user_turn_secs,
-                                    ttfb,
-                                    text_aggregation_secs,
-                                    function_calls,
-                                },
-                                timestamp: new Date().toISOString(),
-                            }]);
-                            break;
-                        }
-
                         case 'rtf-pipeline-error': {
                             const { error, fatal, processor: errorProcessor } = message.payload;
                             setFeedbackMessages(prev => [...prev, {

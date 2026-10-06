@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Brain, Zap, Activity, Mic, Wrench, ChevronDown, ChevronRight } from "lucide-react";
+import { Brain } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import type { LatencyBreakdown } from "./types";
 
 interface MessageBubbleProps {
     role: "user" | "assistant";
@@ -12,8 +10,6 @@ interface MessageBubbleProps {
     final?: boolean;
     tone?: "default" | "muted";
     reasoningDurationMs?: number;
-    e2eLatencyMs?: number;
-    latencyBreakdown?: LatencyBreakdown;
     containerClassName?: string;
 }
 
@@ -23,88 +19,19 @@ export function MessageBubble({
     final = true,
     tone = "default",
     reasoningDurationMs,
-    e2eLatencyMs,
-    latencyBreakdown,
     containerClassName,
 }: MessageBubbleProps) {
     const isUser = role === "user";
     const isMuted = tone === "muted";
-    const [metricsExpanded, setMetricsExpanded] = useState(false);
 
     return (
         <div className={cn("flex", isUser ? "justify-end" : "justify-start", containerClassName)}>
             <div className="flex max-w-[85%] flex-col gap-1">
-                {!isUser && (reasoningDurationMs !== undefined || e2eLatencyMs !== undefined || latencyBreakdown !== undefined) ? (
-                    <div className="flex flex-col gap-1 px-1 text-xs text-muted-foreground">
-                        <button
-                            onClick={() => setMetricsExpanded(!metricsExpanded)}
-                            className="flex items-center gap-1.5 hover:text-foreground transition-colors w-fit select-none"
-                        >
-                            {metricsExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                            <span>
-                                ⏱️ Response Time:{" "}
-                                {e2eLatencyMs !== undefined
-                                    ? `${(e2eLatencyMs / 1000).toFixed(1)}s`
-                                    : reasoningDurationMs !== undefined
-                                      ? `${(reasoningDurationMs / 1000).toFixed(1)}s`
-                                      : "Details"}
-                            </span>
-                        </button>
-
-                        {metricsExpanded && (
-                            <div className="flex flex-col gap-1 mt-1 border-l-2 border-border/50 pl-2 ml-1.5 mb-1 animate-in fade-in slide-in-from-top-1">
-                                {(reasoningDurationMs !== undefined || e2eLatencyMs !== undefined) && latencyBreakdown === undefined && (
-                                    <div className="flex flex-col gap-1">
-                                        {reasoningDurationMs !== undefined && (
-                                            <div className="flex items-center gap-1.5">
-                                                <Brain className="h-3 w-3" />
-                                                <span className="font-medium">Reasoning Delay:</span>
-                                                <span>{Math.round(reasoningDurationMs)}ms</span>
-                                            </div>
-                                        )}
-                                        {e2eLatencyMs !== undefined && (
-                                            <div className="flex items-center gap-1.5">
-                                                <Zap className="h-3 w-3" />
-                                                <span className="font-medium">E2E:</span>
-                                                <span>{Math.round(e2eLatencyMs)}ms</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                {latencyBreakdown !== undefined && (
-                                    <div className="flex flex-col gap-1 mt-1 border-t border-border/50 pt-2">
-                                        {latencyBreakdown.user_turn_secs !== undefined && latencyBreakdown.user_turn_secs !== null && (
-                                            <div className="flex items-center gap-1.5">
-                                                <Mic className="h-3 w-3" />
-                                                <span className="font-medium">VAD+STT:</span>
-                                                <span>{Math.round(latencyBreakdown.user_turn_secs * 1000)}ms</span>
-                                            </div>
-                                        )}
-                                        {latencyBreakdown.ttfb && latencyBreakdown.ttfb.length > 0 && latencyBreakdown.ttfb.map((t, i) => (
-                                            <div key={i} className="flex items-center gap-1.5">
-                                                <Brain className="h-3 w-3" />
-                                                <span className="font-medium">TTFB ({t.processor.replace(/Service#\d+$/, "")}):</span>
-                                                <span>{Math.round(t.duration_secs * 1000)}ms</span>
-                                            </div>
-                                        ))}
-                                        {latencyBreakdown.text_aggregation_secs !== undefined && latencyBreakdown.text_aggregation_secs !== null && (
-                                            <div className="flex items-center gap-1.5">
-                                                <Activity className="h-3 w-3" />
-                                                <span className="font-medium">TTS Aggregation:</span>
-                                                <span>{Math.round(latencyBreakdown.text_aggregation_secs * 1000)}ms</span>
-                                            </div>
-                                        )}
-                                        {latencyBreakdown.function_calls && latencyBreakdown.function_calls.length > 0 && latencyBreakdown.function_calls.map((f, i) => (
-                                            <div key={i} className="flex items-center gap-1.5">
-                                                <Wrench className="h-3 w-3" />
-                                                <span className="font-medium">Tool ({f.name}):</span>
-                                                <span>{Math.round(f.duration_secs * 1000)}ms</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                {!isUser && reasoningDurationMs !== undefined ? (
+                    <div className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
+                        <Brain className="h-3 w-3" />
+                        <span className="font-medium">Reasoning Delay:</span>
+                        <span>{Math.round(reasoningDurationMs)}ms</span>
                     </div>
                 ) : null}
                 <div

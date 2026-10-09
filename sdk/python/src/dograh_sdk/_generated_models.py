@@ -612,7 +612,7 @@ class WorkflowConfigurationDefaults(BaseModel):
     )
     ambient_noise_configuration: AmbientNoiseConfigurationDefaults | None = None
     max_call_duration: Annotated[
-        int | None, Field(gt=0, le=1200, title='Max Call Duration')
+        int | None, Field(gt=0, le=2400, title='Max Call Duration')
     ] = 300
     max_user_idle_timeout: Annotated[
         float | None, Field(title='Max User Idle Timeout')

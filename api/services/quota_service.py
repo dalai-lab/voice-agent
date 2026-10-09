@@ -514,19 +514,56 @@ async def _authorize_oss_managed_v2_correlation(
 
 
 async def _authorize_talkar_workflow_run_start(
-    organization_id: int, mode: str | None = None
+    organization_id: int,
+    mode: str | None = None,
+    workflow_run_id: int | None = None,
 ) -> QuotaCheckResult:
     try:
         import os
-        talkar_billing_token = os.getenv("TALKAR_BILLING_API_TOKEN", "").strip()
+        from api.services.call_concurrency.rate_limiter import rate_limiter
+
+        concurrent_calls = 1
+        try:
+            from api.services.call_concurrency.service import call_concurrency
+            group_id = await call_concurrency.get_concurrency_group_id(organization_id)
+            slot_position = None
+            if workflow_run_id is not None:
+                slot_position = await rate_limiter.get_workflow_slot_position(workflow_run_id)
+
+            if slot_position is not None:
+                # Use the call's exact 1-based position (rank + 1) in the concurrency set.
+                # This prevents burst incoming calls from evaluating against aggregate peak
+                # active_calls simultaneously and starving valid calls funded by available balance.
+                concurrent_calls = slot_position
+            else:
+                active_count = await rate_limiter.get_concurrent_count(group_id)
+                concurrent_calls = active_count + 1
+        except Exception as e:
+            logger.warning(
+                f"Failed to query concurrency rate_limiter for org {organization_id}: {e}"
+            )
+            concurrent_calls = 1
+
+        if concurrent_calls < 1:
+            concurrent_calls = 1
+
+        talkar_billing_token = os.getenv(
+            "TALKAR_BILLING_API_TOKEN",
+            "change-me-in-production-billing-token",
+        ).strip()
         request_headers: dict = {"Content-Type": "application/json"}
         if talkar_billing_token:
             request_headers["Authorization"] = f"Bearer {talkar_billing_token}"
 
         async with httpx.AsyncClient() as client:
-            json_payload = {"organization_id": organization_id}
+            json_payload = {
+                "organization_id": organization_id,
+                "active_calls": concurrent_calls,
+            }
             if mode:
                 json_payload["mode"] = mode
+            if workflow_run_id:
+                json_payload["workflow_run_id"] = workflow_run_id
                 
             resp = await client.post(
                 f"{TALKAR_SERVICE_URL}/billing/check-quota",
@@ -809,7 +846,9 @@ async def authorize_workflow_run_start(
             run_mode = None
             if workflow_run_id is not None and "workflow_run" in locals() and workflow_run:
                 run_mode = workflow_run.mode
-            return await _authorize_talkar_workflow_run_start(organization_id, run_mode)
+            return await _authorize_talkar_workflow_run_start(
+                organization_id, run_mode, workflow_run_id
+            )
 
         if DEPLOYMENT_MODE != "oss":
             return await _authorize_hosted_workflow_run_start(

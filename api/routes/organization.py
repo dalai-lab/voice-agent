@@ -490,7 +490,7 @@ async def migrate_model_configuration_v2(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=exc.args[0])
 
-    if DEPLOYMENT_MODE != "oss":
+    if DEPLOYMENT_MODE not in ("oss", "talkar"):
         try:
             await ensure_hosted_mps_billing_account_v2(
                 organization_id,

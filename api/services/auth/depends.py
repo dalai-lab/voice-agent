@@ -165,7 +165,7 @@ async def get_user(
                 # TALKAR PATCH: Create customer record in talkar-service for
                 # new Stack Auth signups (mirrors the same call in auth.py /signup)
                 try:
-                    from api.constants import DEPLOYMENT_MODE, TALKAR_SERVICE_URL
+                    from api.constants import DEPLOYMENT_MODE, TALKAR_SERVICE_URL, TALKAR_BILLING_API_TOKEN
                     if DEPLOYMENT_MODE == "talkar":
                         import httpx
                         stack_email = stack_user.get("primary_email", "")
@@ -173,9 +173,13 @@ async def get_user(
                             stack_user.get("display_name")
                             or (stack_email.split("@")[0] if stack_email else "")
                         )
+                        headers = {}
+                        if TALKAR_BILLING_API_TOKEN:
+                            headers["Authorization"] = f"Bearer {TALKAR_BILLING_API_TOKEN}"
                         async with httpx.AsyncClient() as client:
                             res = await client.post(
                                 f"{TALKAR_SERVICE_URL}/customers/",
+                                headers=headers,
                                 json={
                                     "email": stack_email,
                                     "contact_name": stack_name,

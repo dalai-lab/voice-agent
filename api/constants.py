@@ -43,6 +43,7 @@ REDIS_URL = os.environ["REDIS_URL"]
 
 DEPLOYMENT_MODE = os.getenv("DEPLOYMENT_MODE", "talkar")
 TALKAR_SERVICE_URL = os.getenv("TALKAR_SERVICE_URL", "http://host.docker.internal:8002")
+TALKAR_BILLING_API_TOKEN = os.getenv("TALKAR_BILLING_API_TOKEN", "change-me-in-production-billing-token")
 CORS_ALLOWED_ORIGINS = [
     o.strip() for o in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()
 ]

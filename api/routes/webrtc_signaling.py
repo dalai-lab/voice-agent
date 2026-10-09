@@ -51,6 +51,7 @@ from api.services.pipecat.ws_sender_registry import (
 )
 from api.services.quota_service import authorize_workflow_run_start
 from api.services.workflow.embed_session_service import validate_embed_origin
+from api.services.workflow_run_failure import mark_workflow_run_failed
 
 router = APIRouter(prefix="/ws")
 
@@ -481,27 +482,6 @@ class SignalingManager:
         set_current_run_id(workflow_run_id)
         set_current_org_id(organization_id)
 
-        # Check Dograh quota before initiating the call (apply per-workflow
-        # model_overrides so we evaluate the keys this workflow will use).
-        quota_result = await authorize_workflow_run_start(
-            workflow_id=workflow_id,
-            organization_id=organization_id,
-            workflow_run_id=workflow_run_id,
-            actor_user=user,
-        )
-        if not quota_result.has_quota:
-            # Send error response for quota issues
-            await ws.send_json(
-                {
-                    "type": "error",
-                    "payload": {
-                        "error_type": quota_result.error_code,
-                        "message": quota_result.error_message,
-                    },
-                }
-            )
-            return
-
         if pc_id in self._peer_connections:
             if self._peer_connection_owners.get(pc_id) != connection_key:
                 await ws.send_json(
@@ -572,6 +552,45 @@ class SignalingManager:
                     # TALKAR PATCH: Redis down — fail open, never block calls on infra outage
                     logger.warning(f"Redis concurrency check failed, failing open for org {organization_id}: {e}")
                     concurrency_slot = None
+
+            # Check Dograh quota before initiating the call (apply per-workflow
+            # model_overrides so we evaluate the keys this workflow will use).
+            # Placed after slot acquisition & binding to ensure consistent lifecycle
+            # ordering across transports (acquire -> bind -> quota) and allow quota
+            # calculation to resolve the workflow run's slot position.
+            try:
+                quota_result = await authorize_workflow_run_start(
+                    workflow_id=workflow_id,
+                    organization_id=organization_id,
+                    workflow_run_id=workflow_run_id,
+                    actor_user=user,
+                )
+            except Exception:
+                if concurrency_bound:
+                    await call_concurrency.release_workflow_run_slot(workflow_run_id)
+                elif concurrency_slot is not None:
+                    await call_concurrency.release_slot(concurrency_slot)
+                raise
+
+            if not quota_result.has_quota:
+                if concurrency_bound:
+                    await call_concurrency.release_workflow_run_slot(workflow_run_id)
+                elif concurrency_slot is not None:
+                    await call_concurrency.release_slot(concurrency_slot)
+                await mark_workflow_run_failed(
+                    workflow_run_id, quota_result.error_message or "Quota exceeded"
+                )
+                # Send error response for quota issues
+                await ws.send_json(
+                    {
+                        "type": "error",
+                        "payload": {
+                            "error_type": quota_result.error_code,
+                            "message": quota_result.error_message,
+                        },
+                    }
+                )
+                return
 
             # Create new connection using correct SmallWebRTC API
             # Generate ICE servers with time-limited TURN credentials for this user

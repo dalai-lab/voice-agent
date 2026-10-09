@@ -41,7 +41,7 @@ def _is_usage_not_ready_error(exc: Exception) -> bool:
 
 async def report_workflow_run_platform_usage(workflow_run) -> None:
     """Report hosted platform usage for a completed workflow run to MPS."""
-    if DEPLOYMENT_MODE == "oss":
+    if DEPLOYMENT_MODE in ("oss", "talkar"):
         return
 
     if getattr(workflow_run, "mode", None) == WorkflowRunMode.TEXTCHAT.value:
@@ -117,6 +117,9 @@ async def report_workflow_run_platform_usage(workflow_run) -> None:
 
 async def report_completed_workflow_run_platform_usage(workflow_run_id: int) -> None:
     """Load a completed workflow run and report platform usage to MPS."""
+    if DEPLOYMENT_MODE in ("oss", "talkar"):
+        return
+
     workflow_run = await db_client.get_workflow_run_by_id(workflow_run_id)
     if not workflow_run:
         logger.warning(

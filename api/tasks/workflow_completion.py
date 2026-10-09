@@ -1,6 +1,7 @@
 from loguru import logger
 from pipecat.utils.run_context import set_current_run_id
 
+from api.constants import DEPLOYMENT_MODE, TALKAR_SERVICE_URL
 from api.services.workflow_run_billing import (
     report_completed_workflow_run_platform_usage,
 )
@@ -32,18 +33,18 @@ async def process_workflow_completion(
     except Exception as e:
         logger.error(f"Error running integrations for workflow {workflow_run_id}: {e}")
 
-    # Notify MPS after completion. MPS owns credit accounting.
-    try:
-        await report_completed_workflow_run_platform_usage(workflow_run_id)
-    except Exception as e:
-        logger.error(
-            f"Error reporting platform usage for workflow {workflow_run_id}: {e}"
-        )
+    # Notify MPS after completion. MPS owns credit accounting in hosted SaaS mode only.
+    if DEPLOYMENT_MODE not in ("oss", "talkar"):
+        try:
+            await report_completed_workflow_run_platform_usage(workflow_run_id)
+        except Exception as e:
+            logger.error(
+                f"Error reporting platform usage for workflow {workflow_run_id}: {e}"
+            )
 
     # TALKAR PATCH: Deduct from Talkar wallet
     try:
         import httpx
-        from api.constants import DEPLOYMENT_MODE, TALKAR_SERVICE_URL
         if DEPLOYMENT_MODE == "talkar":
             from api.db import db_client
             workflow_run = await db_client.get_workflow_run_by_id(workflow_run_id)
@@ -63,15 +64,24 @@ async def process_workflow_completion(
                     org_id = getattr(workflow, "organization_id", None)
                     
                     if org_id:
+                        import os
+                        talkar_billing_token = os.getenv(
+                            "TALKAR_BILLING_API_TOKEN",
+                            "change-me-in-production-billing-token",
+                        ).strip()
+                        headers = {"Content-Type": "application/json"}
+                        if talkar_billing_token:
+                            headers["Authorization"] = f"Bearer {talkar_billing_token}"
                         async with httpx.AsyncClient() as client:
                             res = await client.post(
                                 f"{TALKAR_SERVICE_URL}/billing/deduct",
                                 json={
                                     "workflow_run_id": workflow_run_id,
                                     "duration_seconds": duration_seconds,
-                                    "organization_id": org_id
+                                    "organization_id": org_id,
                                 },
-                                timeout=15.0
+                                headers=headers,
+                                timeout=15.0,
                             )
                             res.raise_for_status()
     except Exception as e:

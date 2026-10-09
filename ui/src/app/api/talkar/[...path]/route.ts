@@ -28,6 +28,10 @@ async function proxy(request: NextRequest, method: string, path: string) {
   if (userEmail) {
     headers["X-Talkar-Email"] = userEmail;
   }
+  const userId = (user as any)?.id;
+  if (userId) {
+    headers["X-Talkar-User-Id"] = String(userId);
+  }
 
   const fetchOptions: any = {
     method,

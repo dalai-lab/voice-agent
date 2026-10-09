@@ -53,9 +53,27 @@ class WorkflowRunSlotAlreadyBoundError(Exception):
 class CallConcurrencyService:
     def __init__(self):
         self.default_concurrent_limit = int(DEFAULT_ORG_CONCURRENCY_LIMIT)
+        self._limit_memory_cache: dict[int, int] = {}
+        self._group_memory_cache: dict[int, int] = {}
 
     async def get_org_concurrent_limit(self, organization_id: int) -> int:
-        """Get the concurrent call limit for an organization."""
+        """Get the concurrent call limit for an organization.
+
+        Reads from database and caches in Redis/memory. On database errors or timeouts,
+        falls back to the cached limit (preventing failing open to 10 slots for blocked orgs).
+        If no cached limit exists and DB fails, fails closed (returns 0).
+        """
+        redis_client = None
+        try:
+            if hasattr(rate_limiter, "_get_redis"):
+                redis_res = rate_limiter._get_redis()
+                if asyncio.iscoroutine(redis_res):
+                    redis_client = await redis_res
+                else:
+                    redis_client = redis_res
+        except Exception:
+            redis_client = None
+
         try:
             config = await db_client.get_configuration(
                 organization_id,
@@ -64,12 +82,113 @@ class CallConcurrencyService:
             if config and config.value:
                 value = config.value.get("value")
                 if value is not None:
-                    return int(value)
+                    limit_int = int(value)
+                    self._limit_memory_cache[organization_id] = limit_int
+                    if redis_client and hasattr(redis_client, "set"):
+                        try:
+                            set_res = redis_client.set(
+                                f"org_concurrent_limit:{organization_id}",
+                                str(limit_int),
+                                ex=86400,
+                            )
+                            if asyncio.iscoroutine(set_res):
+                                await set_res
+                        except Exception:
+                            pass
+                    return limit_int
+            # Healthy DB query, but no custom limit configured for this org
+            return self.default_concurrent_limit
         except Exception as e:
-            logger.warning(
-                f"Error getting concurrent limit for org {organization_id}: {e}"
+            logger.error(
+                f"Error getting concurrent limit for org {organization_id} from DB: {e}. "
+                "Falling back to cached limit."
             )
-        return self.default_concurrent_limit
+            # 1. Fallback to Redis cache
+            if redis_client and hasattr(redis_client, "get"):
+                try:
+                    cached_val = redis_client.get(f"org_concurrent_limit:{organization_id}")
+                    if asyncio.iscoroutine(cached_val):
+                        cached_val = await cached_val
+                    if isinstance(cached_val, (str, int, bytes)):
+                        return int(cached_val)
+                except Exception:
+                    pass
+
+            # 2. Fallback to in-memory cache
+            if organization_id in self._limit_memory_cache:
+                return self._limit_memory_cache[organization_id]
+
+            # 3. Fail closed: Do NOT return default 10 slots on DB error
+            logger.error(
+                f"Failing closed (limit=0) for org {organization_id} due to DB error and missing cache"
+            )
+            return 0
+
+    async def get_concurrency_group_id(self, organization_id: int) -> int:
+        """Get the concurrency group ID for an organization (shares Redis counter across sub-orgs)."""
+        redis_client = None
+        try:
+            if hasattr(rate_limiter, "_get_redis"):
+                redis_res = rate_limiter._get_redis()
+                if asyncio.iscoroutine(redis_res):
+                    redis_client = await redis_res
+                else:
+                    redis_client = redis_res
+        except Exception:
+            redis_client = None
+
+        try:
+            config = await db_client.get_configuration(
+                organization_id,
+                OrganizationConfigurationKey.CONCURRENCY_GROUP_ID.value,
+            )
+            if config and config.value:
+                val = config.value.get("value")
+                if val is not None:
+                    group_int = int(val)
+                    self._group_memory_cache[organization_id] = group_int
+                    if redis_client and hasattr(redis_client, "set"):
+                        try:
+                            set_res = redis_client.set(
+                                f"org_concurrency_group:{organization_id}",
+                                str(group_int),
+                                ex=86400,
+                            )
+                            if asyncio.iscoroutine(set_res):
+                                await set_res
+                        except Exception:
+                            pass
+                    return group_int
+            return organization_id
+        except Exception as e:
+            logger.debug(
+                f"No concurrency group ID found for org {organization_id}, attempting fallback: {e}"
+            )
+            if redis_client and hasattr(redis_client, "get"):
+                try:
+                    cached_val = redis_client.get(f"org_concurrency_group:{organization_id}")
+                    if asyncio.iscoroutine(cached_val):
+                        cached_val = await cached_val
+                    if isinstance(cached_val, (str, int, bytes)):
+                        return int(cached_val)
+                except Exception:
+                    pass
+
+            if organization_id in self._group_memory_cache:
+                return self._group_memory_cache[organization_id]
+
+            return organization_id
+
+    async def get_effective_org_concurrent_limit(self, organization_id: int) -> int:
+        """Get the effective concurrent call limit for an organization,
+        evaluating both its individual limit and its group (master) limit.
+        """
+        group_id = await self.get_concurrency_group_id(organization_id)
+        org_limit = await self.get_org_concurrent_limit(organization_id)
+        if group_id != organization_id:
+            group_limit = await self.get_org_concurrent_limit(group_id)
+            return min(org_limit, group_limit)
+        return org_limit
 
     async def get_fleet_active_calls(self) -> int:
         """Total active calls across every org — the fleet-wide autoscaling
@@ -89,34 +208,67 @@ class CallConcurrencyService:
         scope_max_concurrent: int | None = None,
         retry_interval: float = 1,
     ) -> CallConcurrencySlot:
-        """Acquire a slot in the org-wide concurrency counter.
+        """Acquire a slot in the org-wide (or fleet group-wide) concurrency counter.
 
         ``scope_key``/``scope_max_concurrent`` additionally bound a secondary
         counter (e.g. ``campaign:<id>``) so a source can cap its own
         concurrency without measuring — or being starved by — unrelated calls
         in the same org.
         """
-        max_concurrent = await self.get_org_concurrent_limit(organization_id)
+        group_id = await self.get_concurrency_group_id(organization_id)
+        max_concurrent = await self.get_effective_org_concurrent_limit(organization_id)
         if scope_max_concurrent is not None:
             scope_max_concurrent = int(scope_max_concurrent)
+
+        if max_concurrent <= 0:
+            current_count = await rate_limiter.get_concurrent_count(group_id)
+            scope_note = (
+                f", scope={scope_key} (limit={scope_max_concurrent})"
+                if scope_key
+                else ""
+            )
+            logger.warning(
+                f"Concurrent call limit reached for org {organization_id} (group {group_id}): "
+                f"source={source}, active_calls={current_count}/{max_concurrent}"
+                f"{scope_note}, waited=0.0s"
+            )
+            properties = {
+                "event_source": "dograh",
+                "organization_id": organization_id,
+                "concurrency_group_id": group_id,
+                "source": source,
+                "max_concurrent": max_concurrent,
+                "active_calls": current_count,
+                "waited_seconds": 0.0,
+            }
+            if scope_key:
+                properties["scope_key"] = scope_key
+                properties["scope_max_concurrent"] = scope_max_concurrent
+            await self._notify_limit_reached(organization_id, properties)
+            raise CallConcurrencyLimitError(
+                organization_id=organization_id,
+                source=source,
+                wait_time=0.0,
+                max_concurrent=max_concurrent,
+            )
 
         wait_start = time.time()
         while True:
             acquisition = await rate_limiter.try_acquire_concurrent_slot_details(
-                organization_id,
+                group_id,
                 max_concurrent,
                 scope_key=scope_key,
                 scope_max_concurrent=scope_max_concurrent,
             )
             if acquisition:
                 logger.info(
-                    f"Acquired concurrent call slot for org {organization_id}: "
+                    f"Acquired concurrent call slot for org {organization_id} (group {group_id}): "
                     f"source={source}, active_calls="
                     f"{acquisition.active_count}/{max_concurrent}, "
                     f"slot_id={acquisition.slot_id}"
                 )
                 return CallConcurrencySlot(
-                    organization_id=organization_id,
+                    organization_id=group_id,
                     slot_id=acquisition.slot_id,
                     max_concurrent=max_concurrent,
                     source=source,
@@ -125,20 +277,21 @@ class CallConcurrencyService:
 
             wait_time = time.time() - wait_start
             if wait_time >= timeout:
-                current_count = await rate_limiter.get_concurrent_count(organization_id)
+                current_count = await rate_limiter.get_concurrent_count(group_id)
                 scope_note = (
                     f", scope={scope_key} (limit={scope_max_concurrent})"
                     if scope_key
                     else ""
                 )
                 logger.warning(
-                    f"Concurrent call limit reached for org {organization_id}: "
+                    f"Concurrent call limit reached for org {organization_id} (group {group_id}): "
                     f"source={source}, active_calls={current_count}/{max_concurrent}"
                     f"{scope_note}, waited={wait_time:.1f}s"
                 )
                 properties = {
                     "event_source": "dograh",
                     "organization_id": organization_id,
+                    "concurrency_group_id": group_id,
                     "source": source,
                     "max_concurrent": max_concurrent,
                     "active_calls": current_count,
@@ -194,8 +347,10 @@ class CallConcurrencyService:
             )
 
     async def bind_workflow_run(
-        self, slot: CallConcurrencySlot, workflow_run_id: int
+        self, slot: CallConcurrencySlot | None, workflow_run_id: int
     ) -> None:
+        if slot is None:
+            return
         stored = await rate_limiter.store_workflow_slot_mapping_if_absent(
             workflow_run_id,
             slot.organization_id,

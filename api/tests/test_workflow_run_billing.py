@@ -134,6 +134,23 @@ async def test_report_workflow_run_platform_usage_skips_oss(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_report_workflow_run_platform_usage_skips_talkar(monkeypatch):
+    workflow_run = _make_workflow_run()
+    report_usage = AsyncMock()
+
+    monkeypatch.setattr(workflow_run_billing_mod, "DEPLOYMENT_MODE", "talkar")
+    monkeypatch.setattr(
+        workflow_run_billing_mod.mps_service_key_client,
+        "report_platform_usage",
+        report_usage,
+    )
+
+    await report_workflow_run_platform_usage(workflow_run)
+
+    report_usage.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_report_workflow_run_platform_usage_skips_text_chat(monkeypatch):
     workflow_run = _make_workflow_run()
     workflow_run.mode = WorkflowRunMode.TEXTCHAT.value
@@ -191,3 +208,26 @@ async def test_report_completed_workflow_run_platform_usage_loads_run(monkeypatc
 
     get_run.assert_awaited_once_with(workflow_run.id)
     report_usage.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_report_completed_workflow_run_platform_usage_skips_talkar(monkeypatch):
+    get_run = AsyncMock()
+    report_usage = AsyncMock()
+
+    monkeypatch.setattr(workflow_run_billing_mod, "DEPLOYMENT_MODE", "talkar")
+    monkeypatch.setattr(
+        workflow_run_billing_mod.db_client,
+        "get_workflow_run_by_id",
+        get_run,
+    )
+    monkeypatch.setattr(
+        workflow_run_billing_mod.mps_service_key_client,
+        "report_platform_usage",
+        report_usage,
+    )
+
+    await report_completed_workflow_run_platform_usage(123)
+
+    get_run.assert_not_awaited()
+    report_usage.assert_not_awaited()

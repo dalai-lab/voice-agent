@@ -1,3 +1,4 @@
+import os
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -10,9 +11,9 @@ from api.constants import (
 
 DEFAULT_MAX_CALL_DURATION_SECONDS = 300
 # Hard ceiling on configurable call duration. Must stay <= the concurrency
-# rate limiter's stale_call_timeout (20 min): a call running past that has
+# rate limiter's stale_call_timeout (40 min / 2400s): a call running past that has
 # its slot purged as stale and the org concurrency limit under-counts.
-MAX_CALL_DURATION_SECONDS = 1200
+MAX_CALL_DURATION_SECONDS = int(os.getenv("MAX_CALL_DURATION_SECONDS", "1800"))
 DEFAULT_MAX_USER_IDLE_TIMEOUT_SECONDS = 10.0
 DEFAULT_SMART_TURN_STOP_SECS = 2.0
 DEFAULT_TURN_START_STRATEGY = "default"

@@ -118,6 +118,7 @@ class OrganizationConfigurationKey(Enum):
     )
     TALKAR_ORG_TYPE = "TALKAR_ORG_TYPE"
     WORKFLOW_TIMEOUT_SECONDS = "WORKFLOW_TIMEOUT_SECONDS"
+    CONCURRENCY_GROUP_ID = "CONCURRENCY_GROUP_ID"
     ORGANIZATION_PREFERENCES = "ORGANIZATION_PREFERENCES"  # Org-level defaults such as timezone/test call number
     MODEL_CONFIGURATION_PREFERENCES = "MODEL_CONFIGURATION_PREFERENCES"  # Deprecated; read fallback for old org preferences
 

@@ -55,7 +55,7 @@ class CampaignCallDispatcher:
 
     async def get_org_concurrent_limit(self, organization_id: int) -> int:
         """Get the concurrent call limit for an organization."""
-        return await call_concurrency.get_org_concurrent_limit(organization_id)
+        return await call_concurrency.get_effective_org_concurrent_limit(organization_id)
 
     async def process_batch(self, campaign_id: int, batch_size: int = 10, callbacks_only: bool = False) -> int:
         """

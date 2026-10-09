@@ -1,3 +1,4 @@
+import os
 import time
 import uuid
 from dataclasses import dataclass
@@ -26,7 +27,11 @@ class RateLimiter:
 
     def __init__(self):
         self.redis_client: aioredis.Redis | None = None
-        self.stale_call_timeout = 1200  # 20 minutes in seconds
+        # Default to 2400 seconds (40 minutes) to provide a safe buffer beyond
+        # max call duration (up to 1800s / 30 mins) while preventing premature slot eviction
+        self.stale_call_timeout = int(
+            os.getenv("STALE_CALL_TIMEOUT_SECONDS", "2400")
+        )
 
     async def _get_redis(self) -> Any:
         """Get or create Redis connection"""
@@ -306,7 +311,11 @@ class RateLimiter:
         return await redis_client.zcount(FLEET_CONCURRENT_KEY, stale_cutoff, "+inf")
 
     async def store_workflow_slot_mapping(
-        self, workflow_run_id: int, organization_id: int, slot_id: str
+        self,
+        workflow_run_id: int,
+        organization_id: int,
+        slot_id: str,
+        ttl: int | None = None,
     ) -> bool:
         """
         Store the mapping between workflow_run_id and its concurrent slot.
@@ -314,6 +323,7 @@ class RateLimiter:
         """
         redis_client = await self._get_redis()
         mapping_key = f"workflow_slot_mapping:{workflow_run_id}"
+        expire_seconds = ttl if ttl is not None else self.stale_call_timeout
 
         try:
             # Store as a hash with TTL
@@ -321,7 +331,7 @@ class RateLimiter:
                 mapping_key, mapping={"org_id": organization_id, "slot_id": slot_id}
             )
             # Set expiry to match stale timeout
-            await redis_client.expire(mapping_key, self.stale_call_timeout)
+            await redis_client.expire(mapping_key, expire_seconds)
             return True
         except Exception as e:
             logger.error(f"Error storing workflow slot mapping: {e}")
@@ -333,6 +343,7 @@ class RateLimiter:
         organization_id: int,
         slot_id: str,
         scope_key: str | None = None,
+        ttl: int | None = None,
     ) -> bool:
         """
         Store the workflow_run_id -> concurrent slot mapping only if no mapping
@@ -341,6 +352,7 @@ class RateLimiter:
         """
         redis_client = await self._get_redis()
         mapping_key = f"workflow_slot_mapping:{workflow_run_id}"
+        expire_seconds = ttl if ttl is not None else self.stale_call_timeout
 
         lua_script = """
         local key = KEYS[1]
@@ -368,7 +380,7 @@ class RateLimiter:
                 mapping_key,
                 organization_id,
                 slot_id,
-                self.stale_call_timeout,
+                expire_seconds,
                 scope_key or "",
             )
             return bool(stored)
@@ -413,6 +425,47 @@ class RateLimiter:
         except Exception as e:
             logger.error(f"Error deleting workflow slot mapping: {e}")
             return False
+
+    async def get_slot_position(
+        self, organization_id: int, slot_id: str
+    ) -> int | None:
+        """Get the 1-based position (rank + 1) of a slot in the concurrency sorted set.
+
+        Prunes stale calls first so expired slots do not inflate the position.
+        Returns None if slot_id is not present or on Redis errors.
+        """
+        if not slot_id:
+            return None
+
+        redis_client = await self._get_redis()
+        concurrent_key = f"concurrent_calls:{organization_id}"
+
+        try:
+            stale_cutoff = time.time() - self.stale_call_timeout
+            await redis_client.zremrangebyscore(concurrent_key, 0, stale_cutoff)
+            rank = await redis_client.zrank(concurrent_key, slot_id)
+            if rank is not None:
+                return rank + 1
+            return None
+        except Exception as e:
+            logger.error(
+                f"Error getting slot position for org {organization_id}, slot {slot_id}: {e}"
+            )
+            return None
+
+    async def get_workflow_slot_position(
+        self, workflow_run_id: int
+    ) -> int | None:
+        """Get the 1-based concurrency position for a workflow run's slot.
+
+        Returns the position among active calls in the organization's concurrency group,
+        or None if no live mapping/slot exists.
+        """
+        mapping = await self.get_workflow_slot_mapping(workflow_run_id)
+        if not mapping:
+            return None
+        org_id, slot_id, _ = mapping
+        return await self.get_slot_position(org_id, slot_id)
 
     # ======== FROM NUMBER POOL METHODS ========
 

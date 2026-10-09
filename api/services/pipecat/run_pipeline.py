@@ -672,13 +672,44 @@ async def _run_pipeline_impl(
         if "max_call_duration" in run_configs:
             max_call_duration_seconds = run_configs["max_call_duration"]
             
-    # D-09 FIX: Enforce org-level Talkar WORKFLOW_TIMEOUT_SECONDS over workflow config
+    # Enforce org-level Talkar WORKFLOW_TIMEOUT_SECONDS over workflow config
     from api.enums import OrganizationConfigurationKey
-    org_timeout_cfg = await db_client.get_configuration(workflow.organization_id, OrganizationConfigurationKey.WORKFLOW_TIMEOUT_SECONDS.value)
-    if org_timeout_cfg and org_timeout_cfg.value:
+    org_timeout_cfg = await db_client.get_configuration(
+        workflow.organization_id, OrganizationConfigurationKey.WORKFLOW_TIMEOUT_SECONDS.value
+    )
+    if not org_timeout_cfg:
+        group_cfg = await db_client.get_configuration(
+            workflow.organization_id, OrganizationConfigurationKey.CONCURRENCY_GROUP_ID.value
+        )
+        if group_cfg and group_cfg.value:
+            master_org_id = (
+                group_cfg.value.get("value")
+                if isinstance(group_cfg.value, dict)
+                else group_cfg.value
+            )
+            if master_org_id:
+                try:
+                    org_timeout_cfg = await db_client.get_configuration(
+                        int(master_org_id),
+                        OrganizationConfigurationKey.WORKFLOW_TIMEOUT_SECONDS.value,
+                    )
+                except (ValueError, TypeError):
+                    pass
+
+    if org_timeout_cfg and org_timeout_cfg.value is not None:
         try:
-            max_call_duration_seconds = int(org_timeout_cfg.value.get("value", max_call_duration_seconds))
-        except (ValueError, TypeError):
+            if isinstance(org_timeout_cfg.value, dict):
+                timeout_val = org_timeout_cfg.value.get("value", max_call_duration_seconds)
+            else:
+                timeout_val = org_timeout_cfg.value
+            org_timeout_seconds = int(timeout_val)
+            if org_timeout_seconds > 0:
+                max_call_duration_seconds = (
+                    min(max_call_duration_seconds, org_timeout_seconds)
+                    if max_call_duration_seconds > 0
+                    else org_timeout_seconds
+                )
+        except (ValueError, TypeError, AttributeError):
             pass
 
     if run_configs:
@@ -1251,8 +1282,21 @@ async def _run_pipeline_impl(
         dtmf_listener_task = asyncio.create_task(_dtmf_queue_listener())
 
     try:
-        # Run the pipeline
-        await run_pipeline_worker(task)
+        # Run the pipeline with a hard ceiling watchdog
+        # max_call_duration_seconds + 30s grace period for callback variable extraction and hangup
+        hard_timeout = (
+            max_call_duration_seconds + 30.0 if max_call_duration_seconds > 0 else None
+        )
+        if hard_timeout:
+            try:
+                await asyncio.wait_for(run_pipeline_worker(task), timeout=hard_timeout)
+            except (TimeoutError, asyncio.TimeoutError):
+                logger.error(
+                    f"Hard call duration timeout ({hard_timeout}s) exceeded for run {workflow_run_id}. Force terminating pipeline."
+                )
+                await task.cancel(reason="max_call_duration_exceeded")
+        else:
+            await run_pipeline_worker(task)
         logger.info(f"Task completed for run {workflow_run_id}")
     except asyncio.CancelledError:
         logger.warning("Received CancelledError in _run_pipeline")

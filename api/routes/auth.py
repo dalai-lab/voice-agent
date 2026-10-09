@@ -78,11 +78,16 @@ async def signup(request: SignupRequest):
 
     # TALKAR PATCH: SOT 111 - Trigger Talkar backend to create customer record
     if DEPLOYMENT_MODE == "talkar":
+        from api.constants import TALKAR_BILLING_API_TOKEN
         import httpx
         try:
+            headers = {}
+            if TALKAR_BILLING_API_TOKEN:
+                headers["Authorization"] = f"Bearer {TALKAR_BILLING_API_TOKEN}"
             async with httpx.AsyncClient() as client:
                 res = await client.post(
                     f"{TALKAR_SERVICE_URL}/customers/",
+                    headers=headers,
                     json={
                         "email": request.email,
                         "contact_name": request.name or request.email.split('@')[0],

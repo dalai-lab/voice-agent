@@ -173,3 +173,49 @@ async def test_agent_stream_rejects_when_concurrency_limit_reached():
         reason="Concurrent call limit reached",
     )
     db_client.create_workflow_run.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_agent_stream_fails_open_when_redis_down():
+    """Verify that when Redis is down during concurrency acquisition, agent_stream fails open without AttributeError."""
+    from api.routes.agent_stream import agent_stream_websocket
+
+    websocket = _FakeWebSocket()
+    workflow = SimpleNamespace(
+        id=11,
+        user_id=22,
+        organization_id=33,
+        template_context_variables={},
+        released_definition=SimpleNamespace(id=55, template_context_variables={}),
+        current_definition=None,
+    )
+    workflow_run = SimpleNamespace(id=501)
+    provider_instance = SimpleNamespace(handle_external_websocket=AsyncMock())
+    spec = SimpleNamespace(provider_cls=lambda _config: provider_instance)
+
+    with (
+        patch("api.routes.agent_stream.telephony_registry") as registry,
+        patch("api.routes.agent_stream.db_client") as db_client,
+        patch("api.routes.agent_stream.call_concurrency") as mock_concurrency,
+        patch(
+            "api.routes.agent_stream.authorize_workflow_run_start",
+            new=AsyncMock(return_value=SimpleNamespace(has_quota=True, error_message="")),
+        ),
+    ):
+        registry.get_optional.return_value = spec
+        db_client.get_workflow_by_uuid_unscoped = AsyncMock(return_value=workflow)
+        db_client.create_workflow_run = AsyncMock(return_value=workflow_run)
+        db_client.update_workflow_run = AsyncMock()
+        mock_concurrency.acquire_org_slot = AsyncMock(
+            side_effect=ConnectionError("Redis connection refused")
+        )
+        mock_concurrency.bind_workflow_run = AsyncMock()
+        mock_concurrency.release_slot = AsyncMock()
+        mock_concurrency.unregister_active_call = AsyncMock()
+
+        await agent_stream_websocket(websocket, "cloudonix", "agent-uuid")
+
+    db_client.create_workflow_run.assert_awaited_once()
+    mock_concurrency.bind_workflow_run.assert_not_called()
+    provider_instance.handle_external_websocket.assert_awaited_once()
+

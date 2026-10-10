@@ -219,14 +219,16 @@ async def initiate_call(
                 )
             workflow_run_name = workflow_run.name
 
-        await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run_id)
+        if concurrency_slot is not None:
+            await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run_id)
     except WorkflowRunSlotAlreadyBoundError:
         raise HTTPException(
             status_code=409,
             detail="Workflow run already has an active call",
         )
     except Exception:
-        await call_concurrency.release_slot(concurrency_slot)
+        if concurrency_slot is not None:
+            await call_concurrency.release_slot(concurrency_slot)
         raise
 
     # Check Dograh quota after the run exists so hosted v2 can mint and store
@@ -915,7 +917,8 @@ async def handle_inbound_run(request: Request):
                 telephony_configuration_id=telephony_configuration_id,
                 from_phone_number_id=phone_row.id,
             )
-            await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run_id)
+            if concurrency_slot is not None:
+                await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run_id)
 
             quota_result = await authorize_workflow_run_start(
                 workflow_id=workflow_id,
@@ -958,7 +961,7 @@ async def handle_inbound_run(request: Request):
                     workflow_run_id, f"Inbound call failed to start: {e}"
                 )
                 await call_concurrency.release_workflow_run_slot(workflow_run_id)
-            else:
+            elif concurrency_slot is not None:
                 await call_concurrency.release_slot(concurrency_slot)
             raise
 
@@ -1092,7 +1095,8 @@ async def handle_inbound_telephony(
                 ],
                 from_phone_number_id=workflow_context.get("from_phone_number_id"),
             )
-            await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run_id)
+            if concurrency_slot is not None:
+                await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run_id)
 
             quota_result = await authorize_workflow_run_start(
                 workflow_id=workflow_id,
@@ -1134,7 +1138,7 @@ async def handle_inbound_telephony(
                     workflow_run_id, f"Inbound call failed to start: {e}"
                 )
                 await call_concurrency.release_workflow_run_slot(workflow_run_id)
-            else:
+            elif concurrency_slot is not None:
                 await call_concurrency.release_slot(concurrency_slot)
             raise
 

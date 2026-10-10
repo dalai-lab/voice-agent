@@ -344,8 +344,9 @@ class CampaignCallDispatcher:
                 organization_id=campaign.organization_id,
                 definition_id=run_inputs.definition_id,
             )
-            await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run.id)
-            slot_bound = True
+            if concurrency_slot is not None:
+                await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run.id)
+                slot_bound = True
 
             # Store from_number mapping for cleanup on call completion
             await rate_limiter.store_workflow_from_number_mapping(
@@ -358,7 +359,7 @@ class CampaignCallDispatcher:
             # Release slot and from_number on error
             if slot_bound and workflow_run:
                 await call_concurrency.release_workflow_run_slot(workflow_run.id)
-            else:
+            elif concurrency_slot is not None:
                 await call_concurrency.release_slot(concurrency_slot)
             if from_number:
                 await rate_limiter.release_from_number(

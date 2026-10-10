@@ -482,3 +482,62 @@ async def test_smallwebrtc_run_reaching_telephony_websocket_closes_without_runni
     assert mock_db.update_workflow_run.await_count == 0
     assert provider_lookup.await_count == 0
     mock_concurrency.unregister_active_call.assert_not_awaited()
+
+
+def test_telephony_outbound_fails_open_when_redis_down():
+    """Verify that when Redis is down during concurrency slot acquisition, the call fails open and initiates normally without AttributeError."""
+    app = _make_test_app()
+    client = TestClient(app)
+
+    workflow = _workflow()
+    provider = _provider()
+
+    with (
+        patch("api.routes.telephony.db_client") as mock_db,
+        patch(
+            "api.routes.telephony.authorize_workflow_run_start",
+            new=AsyncMock(
+                return_value=SimpleNamespace(has_quota=True, error_message="")
+            ),
+        ),
+        patch("api.routes.telephony.call_concurrency") as mock_concurrency,
+        patch(
+            "api.routes.telephony.get_default_telephony_provider",
+            new=AsyncMock(return_value=provider),
+        ),
+        patch(
+            "api.routes.telephony.get_backend_endpoints",
+            new=AsyncMock(return_value=("https://api.example.com", "wss://ignored")),
+        ),
+    ):
+        # Simulate Redis connection failure
+        mock_concurrency.acquire_org_slot = AsyncMock(
+            side_effect=ConnectionError("Redis connection refused")
+        )
+        mock_concurrency.bind_workflow_run = AsyncMock()
+        mock_concurrency.release_slot = AsyncMock()
+
+        mock_db.get_default_telephony_configuration = AsyncMock(
+            return_value=SimpleNamespace(id=55)
+        )
+        mock_db.get_workflow = AsyncMock(return_value=workflow)
+        mock_db.get_draft_version = AsyncMock(return_value=None)
+        mock_db.create_workflow_run = AsyncMock(
+            return_value=SimpleNamespace(
+                id=501,
+                name="WR-TEL-OUT-00000001",
+                initial_context={},
+            )
+        )
+        mock_db.update_workflow_run = AsyncMock()
+
+        response = client.post(
+            "/telephony/initiate-call",
+            json={"workflow_id": workflow.id, "phone_number": "+15551234567"},
+        )
+
+    # Call should succeed (200), not crash with 500 / AttributeError
+    assert response.status_code == 200
+    mock_concurrency.bind_workflow_run.assert_not_called()
+    provider.initiate_call.assert_awaited_once()
+

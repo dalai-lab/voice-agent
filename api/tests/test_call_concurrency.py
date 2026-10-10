@@ -5,8 +5,13 @@ import pytest
 from api.services.call_concurrency import (
     CallConcurrencyLimitError,
     CallConcurrencyService,
+    CallConcurrencySlot,
 )
-from api.services.call_concurrency.rate_limiter import ConcurrentSlotAcquisition
+from api.services.call_concurrency.rate_limiter import (
+    FLEET_CONCURRENT_KEY,
+    ConcurrentSlotAcquisition,
+    RateLimiter,
+)
 
 
 @pytest.mark.asyncio
@@ -441,8 +446,114 @@ async def test_authorize_talkar_uses_slot_position_to_prevent_burst_self_starvat
             sent_payload = mock_client.post.call_args.kwargs["json"]
             assert sent_payload["organization_id"] == 200
             assert sent_payload["workflow_run_id"] == run_id
-            # Each call must send its own slot position, NOT aggregate count!
             assert sent_payload["active_calls"] == expected_position
+
+
+@pytest.mark.asyncio
+async def test_bind_workflow_run_none_slot_safely_noops():
+    """When concurrency slot is None (failing open due to Redis outage), bind_workflow_run must not raise AttributeError."""
+    service = CallConcurrencyService()
+    # Must complete cleanly without raising AttributeError: 'NoneType' object has no attribute 'organization_id'
+    await service.bind_workflow_run(None, 501)
+
+
+@pytest.mark.asyncio
+async def test_bind_workflow_run_redis_error_fails_open():
+    """When Redis fails during store_workflow_slot_mapping_if_absent, bind_workflow_run should fail open rather than raising WorkflowRunSlotAlreadyBoundError."""
+    service = CallConcurrencyService()
+    slot = CallConcurrencySlot(
+        organization_id=10,
+        slot_id="slot-1",
+        max_concurrent=5,
+        source="test",
+    )
+    with patch(
+        "api.services.call_concurrency.service.rate_limiter.store_workflow_slot_mapping_if_absent",
+        new=AsyncMock(return_value=None),
+    ):
+        # When store returns None (Redis error), it should return cleanly
+        await service.bind_workflow_run(slot, 501)
+
+
+@pytest.mark.asyncio
+async def test_release_slot_none_returns_false():
+    """Releasing a None slot must return False without error."""
+    service = CallConcurrencyService()
+    assert await service.release_slot(None) is False
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_release_concurrent_slot_empty_slot_id():
+    rl = RateLimiter()
+    assert await rl.release_concurrent_slot(100, "") is False
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_release_concurrent_slot_calls_atomic_eval_unscoped():
+    rl = RateLimiter()
+    mock_redis = AsyncMock()
+    mock_redis.eval = AsyncMock(return_value=1)
+
+    with patch.object(rl, "_get_redis", AsyncMock(return_value=mock_redis)):
+        result = await rl.release_concurrent_slot(123, "slot-456")
+
+    assert result is True
+    mock_redis.eval.assert_awaited_once()
+    args, _ = mock_redis.eval.call_args
+    script, num_keys, k1, k2, k3, a1, a2 = args
+    assert "redis.call('ZREM', key, slot_id)" in script
+    assert "redis.call('ZREM', fleet_key, fleet_member)" in script
+    assert num_keys == 3
+    assert k1 == "concurrent_calls:123"
+    assert k2 == ""
+    assert k3 == FLEET_CONCURRENT_KEY
+    assert a1 == "slot-456"
+    assert a2 == "123:slot-456"
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_release_concurrent_slot_calls_atomic_eval_scoped():
+    rl = RateLimiter()
+    mock_redis = AsyncMock()
+    mock_redis.eval = AsyncMock(return_value=1)
+
+    with patch.object(rl, "_get_redis", AsyncMock(return_value=mock_redis)):
+        result = await rl.release_concurrent_slot(123, "slot-456", scope_key="campaign:99")
+
+    assert result is True
+    mock_redis.eval.assert_awaited_once()
+    args, _ = mock_redis.eval.call_args
+    _, num_keys, k1, k2, k3, a1, a2 = args
+    assert num_keys == 3
+    assert k1 == "concurrent_calls:123"
+    assert k2 == "concurrent_calls:campaign:99"
+    assert k3 == FLEET_CONCURRENT_KEY
+    assert a1 == "slot-456"
+    assert a2 == "123:slot-456"
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_release_concurrent_slot_returns_false_when_not_found():
+    rl = RateLimiter()
+    mock_redis = AsyncMock()
+    mock_redis.eval = AsyncMock(return_value=0)
+
+    with patch.object(rl, "_get_redis", AsyncMock(return_value=mock_redis)):
+        result = await rl.release_concurrent_slot(123, "slot-456")
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_release_concurrent_slot_returns_none_on_redis_error():
+    rl = RateLimiter()
+    mock_redis = AsyncMock()
+    mock_redis.eval = AsyncMock(side_effect=Exception("Redis connection lost"))
+
+    with patch.object(rl, "_get_redis", AsyncMock(return_value=mock_redis)):
+        result = await rl.release_concurrent_slot(123, "slot-456")
+
+    assert result is None
 
 
 # ---------------------------------------------------------------------------

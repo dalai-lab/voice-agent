@@ -517,6 +517,7 @@ async def _authorize_talkar_workflow_run_start(
     organization_id: int,
     mode: str | None = None,
     workflow_run_id: int | None = None,
+    workflow_id: int | None = None,
 ) -> QuotaCheckResult:
     try:
         import os
@@ -564,6 +565,8 @@ async def _authorize_talkar_workflow_run_start(
                 json_payload["mode"] = mode
             if workflow_run_id:
                 json_payload["workflow_run_id"] = workflow_run_id
+            if workflow_id:
+                json_payload["workflow_id"] = workflow_id
                 
             resp = await client.post(
                 f"{TALKAR_SERVICE_URL}/billing/check-quota",
@@ -847,7 +850,7 @@ async def authorize_workflow_run_start(
             if workflow_run_id is not None and "workflow_run" in locals() and workflow_run:
                 run_mode = workflow_run.mode
             return await _authorize_talkar_workflow_run_start(
-                organization_id, run_mode, workflow_run_id
+                organization_id, run_mode, workflow_run_id, getattr(workflow, "id", None)
             )
 
         if DEPLOYMENT_MODE != "oss":

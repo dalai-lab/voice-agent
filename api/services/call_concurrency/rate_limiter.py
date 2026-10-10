@@ -253,19 +253,47 @@ class RateLimiter:
 
         redis_client = await self._get_redis()
         concurrent_key = f"concurrent_calls:{organization_id}"
+        scope_concurrent_key = f"concurrent_calls:{scope_key}" if scope_key else ""
+        fleet_member = f"{organization_id}:{slot_id}"
+
+        lua_script = """
+        local key = KEYS[1]
+        local scope_key = KEYS[2]
+        local fleet_key = KEYS[3]
+        local slot_id = ARGV[1]
+        local fleet_member = ARGV[2]
+
+        local removed = redis.call('ZREM', key, slot_id)
+        local fleet_removed = redis.call('ZREM', fleet_key, fleet_member)
+
+        local scope_removed = 0
+        if scope_key ~= '' then
+            scope_removed = redis.call('ZREM', scope_key, slot_id)
+        end
+
+        if removed == 1 or fleet_removed == 1 or scope_removed == 1 then
+            return 1
+        else
+            return 0
+        end
+        """
 
         try:
-            removed = await redis_client.zrem(concurrent_key, slot_id)
-            await redis_client.zrem(
-                FLEET_CONCURRENT_KEY, f"{organization_id}:{slot_id}"
+            result = await redis_client.eval(
+                lua_script,
+                3,
+                concurrent_key,
+                scope_concurrent_key,
+                FLEET_CONCURRENT_KEY,
+                slot_id,
+                fleet_member,
             )
-            if scope_key:
-                await redis_client.zrem(f"concurrent_calls:{scope_key}", slot_id)
-            if removed:
+            is_removed = result in (1, "1", b"1", True)
+            if is_removed:
                 logger.debug(
                     f"Released concurrent slot {slot_id} for org {organization_id}"
                 )
-            return bool(removed)
+            return is_removed
         except Exception as e:
             logger.error(f"Error releasing concurrent slot: {e}")
             return None
@@ -386,7 +414,7 @@ class RateLimiter:
             return bool(stored)
         except Exception as e:
             logger.error(f"Error storing workflow slot mapping if absent: {e}")
-            return False
+            return None
 
     async def get_workflow_slot_mapping(
         self, workflow_run_id: int

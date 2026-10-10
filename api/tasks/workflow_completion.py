@@ -62,6 +62,7 @@ async def process_workflow_completion(
                     
                     workflow = getattr(workflow_run, "workflow", None)
                     org_id = getattr(workflow, "organization_id", None)
+                    workflow_id = getattr(workflow, "id", None) or getattr(workflow_run, "workflow_id", None)
                     
                     if org_id:
                         import os
@@ -72,6 +73,7 @@ async def process_workflow_completion(
                         headers = {"Content-Type": "application/json"}
                         if talkar_billing_token:
                             headers["Authorization"] = f"Bearer {talkar_billing_token}"
+                        run_mode = getattr(workflow_run, "mode", None)
                         async with httpx.AsyncClient() as client:
                             res = await client.post(
                                 f"{TALKAR_SERVICE_URL}/billing/deduct",
@@ -79,6 +81,8 @@ async def process_workflow_completion(
                                     "workflow_run_id": workflow_run_id,
                                     "duration_seconds": duration_seconds,
                                     "organization_id": org_id,
+                                    "mode": run_mode,
+                                    "workflow_id": workflow_id,
                                 },
                                 headers=headers,
                                 timeout=15.0,

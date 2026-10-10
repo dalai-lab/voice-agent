@@ -685,6 +685,11 @@ class ARIConnection:
                 )
                 await self._delete_channel(channel_id)
                 return
+            except Exception as e:
+                logger.warning(
+                    f"Redis concurrency check failed, failing open for org {self.organization_id}: {e}"
+                )
+                concurrency_slot = None
 
             # 3. Create workflow run
             call_id = channel_id
@@ -713,7 +718,8 @@ class ARIConnection:
                 organization_id=self.organization_id,
                 definition_id=run_inputs.definition_id,
             )
-            await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run.id)
+            if concurrency_slot is not None:
+                await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run.id)
 
             logger.info(
                 f"[ARI org={self.organization_id}] Created inbound workflow run "
@@ -756,7 +762,7 @@ class ARIConnection:
                     workflow_run.id, f"Inbound call failed to start: {e}"
                 )
                 await call_concurrency.release_workflow_run_slot(workflow_run.id)
-            elif concurrency_slot:
+            elif concurrency_slot is not None:
                 await call_concurrency.release_slot(concurrency_slot)
             logger.error(
                 f"[ARI org={self.organization_id}] Error handling inbound StasisStart "

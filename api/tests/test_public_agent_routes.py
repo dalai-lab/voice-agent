@@ -616,3 +616,65 @@ def test_workflow_uuid_route_rejects_archived_workflows():
     assert response.status_code == 404
     assert response.json()["detail"] == "Workflow is not active"
     assert not mock_db.create_workflow_run.called
+
+
+def test_public_agent_fails_open_when_redis_down():
+    """Verify that when Redis is down, public agent trigger fails open and initiates the call normally without AttributeError."""
+    app = _make_test_app()
+    client = TestClient(app)
+
+    workflow = _active_workflow(trigger_path="trigger-uuid-123")
+    provider = _provider()
+
+    with (
+        patch("api.routes.public_agent.db_client") as mock_db,
+        patch("api.routes.public_agent.call_concurrency") as mock_concurrency,
+        patch(
+            "api.routes.public_agent.authorize_workflow_run_start",
+            new=AsyncMock(
+                return_value=SimpleNamespace(has_quota=True, error_message="")
+            ),
+        ),
+        patch(
+            "api.routes.public_agent.get_default_telephony_provider",
+            new=AsyncMock(return_value=provider),
+        ),
+    ):
+        mock_concurrency.acquire_org_slot = AsyncMock(
+            side_effect=ConnectionError("Redis connection refused")
+        )
+        mock_concurrency.bind_workflow_run = AsyncMock()
+        mock_concurrency.release_slot = AsyncMock()
+
+        mock_db.validate_api_key = AsyncMock(
+            return_value=SimpleNamespace(id=7, organization_id=11, created_by=22)
+        )
+        mock_db.get_agent_trigger_by_path = AsyncMock(
+            return_value=SimpleNamespace(
+                workflow_id=workflow.id,
+                organization_id=11,
+                state="active",
+            )
+        )
+        mock_db.get_workflow = AsyncMock(return_value=workflow)
+        mock_db.get_default_telephony_configuration = AsyncMock(
+            return_value=SimpleNamespace(id=55)
+        )
+        mock_db.create_workflow_run = AsyncMock(
+            return_value=SimpleNamespace(
+                id=501,
+                name="WR-PUB-00000001",
+                initial_context={},
+            )
+        )
+
+        response = client.post(
+            "/public/agent/trigger-uuid-123",
+            headers={"X-API-Key": "test-api-key"},
+            json={"phone_number": "+15551234567"},
+        )
+
+    assert response.status_code == 200
+    mock_concurrency.bind_workflow_run.assert_not_called()
+    provider.initiate_call.assert_awaited_once()
+

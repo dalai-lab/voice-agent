@@ -357,7 +357,7 @@ class CallConcurrencyService:
             slot.slot_id,
             scope_key=slot.scope_key,
         )
-        if stored:
+        if stored is True or stored is None:
             return
 
         await self.release_slot(slot)

@@ -296,9 +296,11 @@ async def _execute_resolved_target(
             organization_id=target.organization_id,
             definition_id=run_inputs.definition_id,
         )
-        await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run.id)
+        if concurrency_slot is not None:
+            await call_concurrency.bind_workflow_run(concurrency_slot, workflow_run.id)
     except Exception:
-        await call_concurrency.release_slot(concurrency_slot)
+        if concurrency_slot is not None:
+            await call_concurrency.release_slot(concurrency_slot)
         raise
 
     logger.info(

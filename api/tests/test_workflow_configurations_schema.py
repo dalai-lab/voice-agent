@@ -8,7 +8,22 @@ from api.constants import (
 )
 from api.schemas.workflow_configurations import (
     DEFAULT_MAX_CALL_DURATION_SECONDS,
+    DEFAULT_TURN_SILENCE_TIMEOUT_SECS,
+    DEFAULT_USER_TURN_STOP_TIMEOUT,
+    DEFAULT_VAD_CONFIDENCE,
+    DEFAULT_VAD_MIN_VOLUME,
+    DEFAULT_VAD_STOP_SECS,
     MAX_CALL_DURATION_SECONDS,
+    MAX_TURN_SILENCE_TIMEOUT_SECS,
+    MAX_USER_TURN_STOP_TIMEOUT,
+    MAX_VAD_CONFIDENCE,
+    MAX_VAD_MIN_VOLUME,
+    MAX_VAD_STOP_SECS,
+    MIN_TURN_SILENCE_TIMEOUT_SECS,
+    MIN_USER_TURN_STOP_TIMEOUT,
+    MIN_VAD_CONFIDENCE,
+    MIN_VAD_MIN_VOLUME,
+    MIN_VAD_STOP_SECS,
     TextChatInactivityTimeoutConstraints,
     WorkflowConfigurationDefaults,
 )
@@ -144,3 +159,107 @@ def test_external_pbx_field_mapping_rejects_invalid_field_names():
                 {"context_path": "qualified", "destination_field": "invalid-field"}
             ]
         )
+
+
+def test_vad_min_volume_default_and_bounds():
+    config = WorkflowConfigurationDefaults()
+    assert config.vad_min_volume == DEFAULT_VAD_MIN_VOLUME
+
+    # Accepts boundary values
+    assert WorkflowConfigurationDefaults(vad_min_volume=MIN_VAD_MIN_VOLUME).vad_min_volume == MIN_VAD_MIN_VOLUME
+    assert WorkflowConfigurationDefaults(vad_min_volume=MAX_VAD_MIN_VOLUME).vad_min_volume == MAX_VAD_MIN_VOLUME
+
+    # Rejects out-of-bounds
+    with pytest.raises(ValidationError):
+        WorkflowConfigurationDefaults(vad_min_volume=MIN_VAD_MIN_VOLUME - 0.01)
+    with pytest.raises(ValidationError):
+        WorkflowConfigurationDefaults(vad_min_volume=MAX_VAD_MIN_VOLUME + 0.01)
+
+
+def test_vad_confidence_default_and_bounds():
+    config = WorkflowConfigurationDefaults()
+    assert config.vad_confidence == DEFAULT_VAD_CONFIDENCE
+
+    # Accepts boundary values
+    assert WorkflowConfigurationDefaults(vad_confidence=MIN_VAD_CONFIDENCE).vad_confidence == MIN_VAD_CONFIDENCE
+    assert WorkflowConfigurationDefaults(vad_confidence=MAX_VAD_CONFIDENCE).vad_confidence == MAX_VAD_CONFIDENCE
+
+    # Rejects out-of-bounds
+    with pytest.raises(ValidationError):
+        WorkflowConfigurationDefaults(vad_confidence=MIN_VAD_CONFIDENCE - 0.01)
+    with pytest.raises(ValidationError):
+        WorkflowConfigurationDefaults(vad_confidence=MAX_VAD_CONFIDENCE + 0.01)
+
+
+def test_vad_stop_secs_default_and_bounds():
+    config = WorkflowConfigurationDefaults()
+    assert config.vad_stop_secs == DEFAULT_VAD_STOP_SECS
+
+    # Accepts boundary values
+    assert WorkflowConfigurationDefaults(vad_stop_secs=MIN_VAD_STOP_SECS).vad_stop_secs == MIN_VAD_STOP_SECS
+    assert WorkflowConfigurationDefaults(vad_stop_secs=MAX_VAD_STOP_SECS).vad_stop_secs == MAX_VAD_STOP_SECS
+
+    # Rejects out-of-bounds
+    with pytest.raises(ValidationError):
+        WorkflowConfigurationDefaults(vad_stop_secs=MIN_VAD_STOP_SECS - 0.01)
+    with pytest.raises(ValidationError):
+        WorkflowConfigurationDefaults(vad_stop_secs=MAX_VAD_STOP_SECS + 0.01)
+
+
+def test_user_turn_stop_timeout_default_and_bounds():
+    config = WorkflowConfigurationDefaults()
+    assert config.user_turn_stop_timeout == DEFAULT_USER_TURN_STOP_TIMEOUT
+
+    # Accepts boundary values
+    assert WorkflowConfigurationDefaults(user_turn_stop_timeout=MIN_USER_TURN_STOP_TIMEOUT).user_turn_stop_timeout == MIN_USER_TURN_STOP_TIMEOUT
+    assert WorkflowConfigurationDefaults(user_turn_stop_timeout=MAX_USER_TURN_STOP_TIMEOUT).user_turn_stop_timeout == MAX_USER_TURN_STOP_TIMEOUT
+
+    # Rejects out-of-bounds
+    with pytest.raises(ValidationError):
+        WorkflowConfigurationDefaults(user_turn_stop_timeout=MIN_USER_TURN_STOP_TIMEOUT - 0.1)
+    with pytest.raises(ValidationError):
+        WorkflowConfigurationDefaults(user_turn_stop_timeout=MAX_USER_TURN_STOP_TIMEOUT + 0.1)
+
+
+def test_turn_silence_timeout_secs_default_and_bounds():
+    config = WorkflowConfigurationDefaults()
+    assert config.turn_silence_timeout_secs == DEFAULT_TURN_SILENCE_TIMEOUT_SECS
+
+    # Accepts boundary values
+    assert WorkflowConfigurationDefaults(turn_silence_timeout_secs=MIN_TURN_SILENCE_TIMEOUT_SECS).turn_silence_timeout_secs == MIN_TURN_SILENCE_TIMEOUT_SECS
+    assert WorkflowConfigurationDefaults(turn_silence_timeout_secs=MAX_TURN_SILENCE_TIMEOUT_SECS).turn_silence_timeout_secs == MAX_TURN_SILENCE_TIMEOUT_SECS
+
+    # Rejects out-of-bounds
+    with pytest.raises(ValidationError):
+        WorkflowConfigurationDefaults(turn_silence_timeout_secs=MIN_TURN_SILENCE_TIMEOUT_SECS - 0.05)
+    with pytest.raises(ValidationError):
+        WorkflowConfigurationDefaults(turn_silence_timeout_secs=MAX_TURN_SILENCE_TIMEOUT_SECS + 0.05)
+
+
+def test_boost_affirmations_default():
+    config = WorkflowConfigurationDefaults()
+    assert config.boost_affirmations is True
+
+    # Accepts override
+    assert WorkflowConfigurationDefaults(boost_affirmations=False).boost_affirmations is False
+
+
+def test_vad_and_turn_settings_null_values_treated_as_unset():
+    config = WorkflowConfigurationDefaults.model_validate(
+        {
+            "vad_min_volume": None,
+            "vad_confidence": None,
+            "vad_stop_secs": None,
+            "user_turn_stop_timeout": None,
+            "turn_silence_timeout_secs": None,
+            "boost_affirmations": None,
+        }
+    )
+    assert config.vad_min_volume == DEFAULT_VAD_MIN_VOLUME
+    assert config.vad_confidence == DEFAULT_VAD_CONFIDENCE
+    assert config.vad_stop_secs == DEFAULT_VAD_STOP_SECS
+    assert config.user_turn_stop_timeout == DEFAULT_USER_TURN_STOP_TIMEOUT
+    assert config.turn_silence_timeout_secs == DEFAULT_TURN_SILENCE_TIMEOUT_SECS
+    assert config.boost_affirmations is True
+    # Verify sparse dump drops nulls
+    assert config.model_dump(exclude_unset=True) == {}

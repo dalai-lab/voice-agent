@@ -21,6 +21,29 @@ DEFAULT_PROVISIONAL_VAD_PAUSE_SECS = 1.5
 DEFAULT_TURN_STOP_STRATEGY = "transcription"
 DEFAULT_CONTEXT_COMPACTION_ENABLED = False
 
+# Constants for Turn Detection & Voice Sensitivity
+DEFAULT_VAD_MIN_VOLUME: float = 0.20
+MIN_VAD_MIN_VOLUME: float = 0.05
+MAX_VAD_MIN_VOLUME: float = 0.80
+
+DEFAULT_VAD_CONFIDENCE: float = 0.50
+MIN_VAD_CONFIDENCE: float = 0.30
+MAX_VAD_CONFIDENCE: float = 0.90
+
+DEFAULT_VAD_STOP_SECS: float = 0.25
+MIN_VAD_STOP_SECS: float = 0.10
+MAX_VAD_STOP_SECS: float = 1.00
+
+DEFAULT_USER_TURN_STOP_TIMEOUT: float = 3.5
+MIN_USER_TURN_STOP_TIMEOUT: float = 1.0
+MAX_USER_TURN_STOP_TIMEOUT: float = 15.0
+
+DEFAULT_EXTERNAL_TURN_USER_STOP_TIMEOUT: float = 4.0
+
+DEFAULT_TURN_SILENCE_TIMEOUT_SECS: float = 0.8
+MIN_TURN_SILENCE_TIMEOUT_SECS: float = 0.3
+MAX_TURN_SILENCE_TIMEOUT_SECS: float = 3.0
+
 
 class ExternalPBXFieldMapping(BaseModel):
     """Map one gathered-context value to a provider-native field."""
@@ -87,6 +110,40 @@ class WorkflowConfigurationDefaults(BaseModel):
     external_pbx_field_mappings: list[ExternalPBXFieldMapping] = Field(
         default_factory=list,
         max_length=100,
+    )
+    vad_min_volume: float = Field(
+        default=DEFAULT_VAD_MIN_VOLUME,
+        ge=MIN_VAD_MIN_VOLUME,
+        le=MAX_VAD_MIN_VOLUME,
+        description="Audio loudness threshold for detecting human voice. Lower detects whispers and quiet 'yes'.",
+    )
+    vad_confidence: float = Field(
+        default=DEFAULT_VAD_CONFIDENCE,
+        ge=MIN_VAD_CONFIDENCE,
+        le=MAX_VAD_CONFIDENCE,
+        description="Silero VAD speech probability threshold.",
+    )
+    vad_stop_secs: float = Field(
+        default=DEFAULT_VAD_STOP_SECS,
+        ge=MIN_VAD_STOP_SECS,
+        le=MAX_VAD_STOP_SECS,
+        description="Silence duration before VAD marks speech ended.",
+    )
+    user_turn_stop_timeout: float = Field(
+        default=DEFAULT_USER_TURN_STOP_TIMEOUT,
+        ge=MIN_USER_TURN_STOP_TIMEOUT,
+        le=MAX_USER_TURN_STOP_TIMEOUT,
+        description="Safety timeout (seconds) to force user turn completion if transcriber/analyzer stalls.",
+    )
+    turn_silence_timeout_secs: float = Field(
+        default=DEFAULT_TURN_SILENCE_TIMEOUT_SECS,
+        ge=MIN_TURN_SILENCE_TIMEOUT_SECS,
+        le=MAX_TURN_SILENCE_TIMEOUT_SECS,
+        description="Silence duration after user speech before bot generates response.",
+    )
+    boost_affirmations: bool = Field(
+        default=True,
+        description="Inject acoustic keyterm boosts for short affirmations ('yes', 'no', 'yeah', 'correct').",
     )
 
 

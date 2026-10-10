@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { AlertTriangle, ArrowLeft, BookA, Brain, CalendarIcon, Clipboard, Download, ExternalLink, FileDown, Fingerprint, Loader2, Mic, Pause, PhoneOff, Play, Plus, Rocket, Settings, Trash2Icon, Upload, Variable, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BookA, Brain, CalendarIcon, ChevronRight, Clipboard, Download, ExternalLink, FileDown, Fingerprint, HelpCircle, Loader2, Mic, Pause, PhoneOff, Play, Plus, Rocket, Settings, Trash2Icon, Upload, Variable, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -27,9 +27,11 @@ import {
 import { FlowEdge, FlowNode } from "@/components/flow/types";
 import { LLMConfigSelector } from "@/components/LLMConfigSelector";
 import SpinLoader from "@/components/SpinLoader";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -38,6 +40,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SETTINGS_DOCUMENTATION_URLS } from "@/constants/documentation";
 import { useOrgConfig } from "@/context/OrgConfigContext";
 import { UnsavedChangesProvider, useUnsavedChanges, useUnsavedChangesContext } from "@/context/UnsavedChangesContext";
@@ -47,16 +50,26 @@ import { useAuth } from "@/lib/auth";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import logger from "@/lib/logger";
 import { fetchModelConfigurationPricing } from "@/lib/modelConfigurationPricing";
+import { cn } from "@/lib/utils";
 import {
     type AmbientNoiseConfiguration,
     DEFAULT_PROVISIONAL_VAD_PAUSE_SECS,
+    DEFAULT_TURN_SILENCE_TIMEOUT_SECS,
     DEFAULT_TURN_START_MIN_WORDS,
+    DEFAULT_USER_TURN_STOP_TIMEOUT,
+    DEFAULT_VAD_CONFIDENCE,
+    DEFAULT_VAD_MIN_VOLUME,
+    DEFAULT_VAD_STOP_SECS,
     DEFAULT_VOICEMAIL_DETECTION_CONFIGURATION,
+    detectVoiceSensitivityPreset,
     type ExternalPBXFieldMapping,
+    getPacingLabel,
     resolveWorkflowConfigurations,
     TURN_START_STRATEGY_OPTIONS,
     type TurnStartStrategy,
     type TurnStopStrategy,
+    VOICE_SENSITIVITY_PRESETS,
+    type VoiceSensitivityPreset,
     type VoicemailDetectionConfiguration,
     type WorkflowConfigurations,
 } from "@/types/workflow-configurations";
@@ -309,6 +322,33 @@ function GeneralSection({
     const [turnStopStrategy, setTurnStopStrategy] = useState<TurnStopStrategy>(
         workflowConfigurations.turn_stop_strategy,
     );
+    const [vadMinVolume, setVadMinVolume] = useState<number>(
+        workflowConfigurations.vad_min_volume ?? DEFAULT_VAD_MIN_VOLUME
+    );
+    const [vadConfidence, setVadConfidence] = useState<number>(
+        workflowConfigurations.vad_confidence ?? DEFAULT_VAD_CONFIDENCE
+    );
+    const [vadStopSecs, setVadStopSecs] = useState<number>(
+        workflowConfigurations.vad_stop_secs ?? DEFAULT_VAD_STOP_SECS
+    );
+    const [userTurnStopTimeout, setUserTurnStopTimeout] = useState<number>(
+        workflowConfigurations.user_turn_stop_timeout ?? DEFAULT_USER_TURN_STOP_TIMEOUT
+    );
+    const [turnSilenceTimeoutSecs, setTurnSilenceTimeoutSecs] = useState<number>(
+        workflowConfigurations.turn_silence_timeout_secs ?? DEFAULT_TURN_SILENCE_TIMEOUT_SECS
+    );
+    const [boostAffirmations, setBoostAffirmations] = useState<boolean>(
+        workflowConfigurations.boost_affirmations ?? true
+    );
+    const [advancedAcousticsOpen, setAdvancedAcousticsOpen] = useState(false);
+    const [sensitivityPreset, setSensitivityPreset] = useState<VoiceSensitivityPreset>(() =>
+        detectVoiceSensitivityPreset(
+            workflowConfigurations.vad_min_volume,
+            workflowConfigurations.vad_confidence,
+            workflowConfigurations.turn_silence_timeout_secs,
+            workflowConfigurations.user_turn_stop_timeout
+        )
+    );
     const [contextCompactionEnabled, setContextCompactionEnabled] = useState(
         workflowConfigurations.context_compaction_enabled,
     );
@@ -350,6 +390,12 @@ function GeneralSection({
             turnStartMinWords !== workflowConfigurations.turn_start_min_words ||
             provisionalVadPauseSecs !== workflowConfigurations.provisional_vad_pause_secs ||
             turnStopStrategy !== workflowConfigurations.turn_stop_strategy ||
+            vadMinVolume !== workflowConfigurations.vad_min_volume ||
+            vadConfidence !== workflowConfigurations.vad_confidence ||
+            vadStopSecs !== workflowConfigurations.vad_stop_secs ||
+            userTurnStopTimeout !== workflowConfigurations.user_turn_stop_timeout ||
+            turnSilenceTimeoutSecs !== workflowConfigurations.turn_silence_timeout_secs ||
+            boostAffirmations !== workflowConfigurations.boost_affirmations ||
             contextCompactionEnabled !== workflowConfigurations.context_compaction_enabled ||
             crossNodeVariableInjectionEnabled !== workflowConfigurations.cross_node_variable_injection_enabled ||
             llmConnectionWarmupEnabled !== workflowConfigurations.llm_connection_warmup_enabled ||
@@ -361,7 +407,36 @@ function GeneralSection({
             callbacksEnabled !== enableCallbacks ||
             resumeMode !== callbackResumeMode
         );
-    }, [name, workflowName, ambientNoiseConfig, maxCallDuration, maxUserIdleTimeout, smartTurnStopSecs, turnStartStrategy, turnStartMinWords, provisionalVadPauseSecs, turnStopStrategy, contextCompactionEnabled, crossNodeVariableInjectionEnabled, llmConnectionWarmupEnabled, includeTranscriptEndTimestamps, workflowConfigurations, dtmfEnabled, enableDtmf, callbacksEnabled, enableCallbacks, externalPbxFieldMappings, resumeMode, callbackResumeMode]);
+    }, [
+        name,
+        workflowName,
+        ambientNoiseConfig,
+        maxCallDuration,
+        maxUserIdleTimeout,
+        smartTurnStopSecs,
+        turnStartStrategy,
+        turnStartMinWords,
+        provisionalVadPauseSecs,
+        turnStopStrategy,
+        vadMinVolume,
+        vadConfidence,
+        vadStopSecs,
+        userTurnStopTimeout,
+        turnSilenceTimeoutSecs,
+        boostAffirmations,
+        contextCompactionEnabled,
+        crossNodeVariableInjectionEnabled,
+        llmConnectionWarmupEnabled,
+        includeTranscriptEndTimestamps,
+        workflowConfigurations,
+        dtmfEnabled,
+        enableDtmf,
+        callbacksEnabled,
+        enableCallbacks,
+        externalPbxFieldMappings,
+        resumeMode,
+        callbackResumeMode,
+    ]);
 
     useUnsavedChanges("general", isDirty);
 
@@ -437,6 +512,12 @@ function GeneralSection({
                     turn_start_min_words: turnStartMinWords,
                     provisional_vad_pause_secs: provisionalVadPauseSecs,
                     turn_stop_strategy: turnStopStrategy,
+                    vad_min_volume: vadMinVolume,
+                    vad_confidence: vadConfidence,
+                    vad_stop_secs: vadStopSecs,
+                    user_turn_stop_timeout: userTurnStopTimeout,
+                    turn_silence_timeout_secs: turnSilenceTimeoutSecs,
+                    boost_affirmations: boostAffirmations,
                     context_compaction_enabled: contextCompactionEnabled,
                     cross_node_variable_injection_enabled: crossNodeVariableInjectionEnabled,
                     llm_connection_warmup_enabled: llmConnectionWarmupEnabled,
@@ -676,33 +757,174 @@ function GeneralSection({
                 <Separator />
 
                 {/* Turn Detection */}
-                <div className="space-y-4">
+                <div className="space-y-5">
                     <div>
                         <h3 className="text-sm font-medium">Turn Detection</h3>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                            Configure how the agent detects when the user has finished speaking.
+                            Configure voice sensitivity, conversational pacing, and speech end detection.
                         </p>
                     </div>
+
+                    {/* Presets */}
                     <div className="space-y-2">
-                        <Label htmlFor="turn_stop_strategy" className="text-xs">Detection Strategy</Label>
-                        <Select
-                            value={turnStopStrategy}
-                            onValueChange={(value: TurnStopStrategy) => setTurnStopStrategy(value)}
-                        >
-                            <SelectTrigger id="turn_stop_strategy">
-                                <SelectValue placeholder="Select strategy" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="transcription">Transcription-based</SelectItem>
-                                <SelectItem value="turn_analyzer">Smart Turn Analyzer</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                            {turnStopStrategy === "transcription"
-                                ? "Best for short responses (1-2 word statements). Ends turn when transcription indicates completion."
-                                : "Best for longer responses with natural pauses. Uses ML model to detect end of turn."}
-                        </p>
+                        <div className="flex items-center justify-between">
+                            <Label className="text-xs font-medium flex items-center gap-1.5">
+                                Voice Sensitivity & Pacing Presets
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                        Quickly configure voice detection sensitivity and pause timeouts for common phone call environments.
+                                    </TooltipContent>
+                                </Tooltip>
+                            </Label>
+                            {sensitivityPreset === "custom" && (
+                                <Badge variant="outline" className="text-[10px] text-muted-foreground border-dashed">
+                                    Custom Tuned
+                                </Badge>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                            {(Object.entries(VOICE_SENSITIVITY_PRESETS) as [Exclude<VoiceSensitivityPreset, "custom">, typeof VOICE_SENSITIVITY_PRESETS[keyof typeof VOICE_SENSITIVITY_PRESETS]][]).map(([key, preset]) => {
+                                const isSelected = sensitivityPreset === key;
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => {
+                                            setSensitivityPreset(key);
+                                            setVadMinVolume(preset.vad_min_volume);
+                                            setVadConfidence(preset.vad_confidence);
+                                            setTurnSilenceTimeoutSecs(preset.turn_silence_timeout_secs);
+                                            setUserTurnStopTimeout(preset.user_turn_stop_timeout);
+                                        }}
+                                        className={cn(
+                                            "flex flex-col text-left p-3 rounded-lg border transition-all text-xs cursor-pointer",
+                                            isSelected
+                                                ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/20"
+                                                : "border-border hover:border-muted-foreground/30 hover:bg-muted/30"
+                                        )}
+                                    >
+                                        <div className="flex items-center justify-between w-full mb-1">
+                                            <span className="font-semibold text-xs text-foreground">{preset.label}</span>
+                                            <Badge
+                                                variant={key === "sensitive" ? "success" : key === "balanced" ? "secondary" : "outline"}
+                                                className="text-[10px] px-1.5 py-0 h-4"
+                                            >
+                                                {preset.badge}
+                                            </Badge>
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                                            {preset.description}
+                                        </p>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
+
+                    {/* Conversational Pacing Slider */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="turn_silence_timeout_secs" className="text-xs font-medium flex items-center gap-1.5">
+                                Silence Before Responding
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                        How long the agent pauses after speech before answering. Shorter pauses feel snappier, while longer pauses allow callers who pause mid-sentence to keep speaking.
+                                    </TooltipContent>
+                                </Tooltip>
+                            </Label>
+                            <span className="text-xs font-mono font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
+                                {turnSilenceTimeoutSecs.toFixed(2)}s ({getPacingLabel(turnSilenceTimeoutSecs)})
+                            </span>
+                        </div>
+                        <input
+                            id="turn_silence_timeout_secs"
+                            type="range"
+                            min="0.3"
+                            max="2.5"
+                            step="0.05"
+                            value={turnSilenceTimeoutSecs}
+                            onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                setTurnSilenceTimeoutSecs(val);
+                                setSensitivityPreset("custom");
+                            }}
+                            className="w-full accent-primary h-2 bg-muted rounded-lg cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
+                            <span>0.3s (Snappy)</span>
+                            <span>0.8s (Natural)</span>
+                            <span>2.5s (Relaxed)</span>
+                        </div>
+                    </div>
+
+                    {/* Safety Watchdog Timeout & Detection Strategy */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="user_turn_stop_timeout" className="text-xs font-medium flex items-center gap-1.5">
+                                    Safety Watchdog Timeout
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-xs">
+                                            Hard ceiling timeout (seconds). Forces the agent to reply if the speech recognizer hangs or fails to emit an end-of-speech token (e.g. on quiet 1-word responses or line static).
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </Label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    id="user_turn_stop_timeout"
+                                    type="number"
+                                    step="0.5"
+                                    min="1.0"
+                                    max="15.0"
+                                    value={userTurnStopTimeout}
+                                    onChange={(e) => {
+                                        const val = parseFloat(e.target.value);
+                                        if (!isNaN(val) && val >= 1.0 && val <= 15.0) {
+                                            setUserTurnStopTimeout(val);
+                                            setSensitivityPreset("custom");
+                                        }
+                                    }}
+                                />
+                                <span className="text-xs text-muted-foreground shrink-0">sec</span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                                Prevents dead air when callers say short words (1.0s–15.0s).
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="turn_stop_strategy" className="text-xs font-medium">Detection Strategy</Label>
+                            <Select
+                                value={turnStopStrategy}
+                                onValueChange={(value: TurnStopStrategy) => setTurnStopStrategy(value)}
+                            >
+                                <SelectTrigger id="turn_stop_strategy">
+                                    <SelectValue placeholder="Select strategy" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="transcription">Transcription-based</SelectItem>
+                                    <SelectItem value="turn_analyzer">Smart Turn Analyzer</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-[11px] text-muted-foreground">
+                                {turnStopStrategy === "transcription"
+                                    ? "Ends turn when transcription indicates completion."
+                                    : "Uses ML model to detect semantic end of turn."}
+                            </p>
+                        </div>
+                    </div>
+
                     {turnStopStrategy === "turn_analyzer" && (
                         <div className="space-y-2">
                             <Label htmlFor="smart_turn_stop_secs" className="text-xs">
@@ -725,6 +947,149 @@ function GeneralSection({
                             </p>
                         </div>
                     )}
+
+                    {/* Boost Short Affirmations Switch */}
+                    <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/20">
+                        <div className="space-y-0.5 pr-4">
+                            <div className="flex items-center gap-1.5">
+                                <Label htmlFor="boost_affirmations" className="text-xs font-medium cursor-pointer">
+                                    Boost Short Affirmations
+                                </Label>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                        Acoustically biases recognition for short single-word answers ("Yes", "No", "Yeah", "Sure", "Okay") so callers answering quickly are never ignored.
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                                Biases speech models to prioritize short conversational confirmations.
+                            </p>
+                        </div>
+                        <Switch
+                            id="boost_affirmations"
+                            checked={boostAffirmations}
+                            onCheckedChange={(checked) => setBoostAffirmations(checked)}
+                        />
+                    </div>
+
+                    {/* Collapsible Advanced Acoustic Controls */}
+                    <Collapsible open={advancedAcousticsOpen} onOpenChange={setAdvancedAcousticsOpen} className="border rounded-lg p-3 bg-muted/10 space-y-3">
+                        <CollapsibleTrigger asChild>
+                            <button
+                                type="button"
+                                className="flex items-center justify-between w-full text-xs font-medium text-foreground hover:text-primary transition-colors cursor-pointer"
+                            >
+                                <span className="flex items-center gap-1.5">
+                                    <ChevronRight className={cn("h-4 w-4 transition-transform text-muted-foreground", advancedAcousticsOpen && "rotate-90")} />
+                                    Advanced Acoustic Controls (Silero VAD)
+                                </span>
+                                <span className="text-[11px] text-muted-foreground">
+                                    {advancedAcousticsOpen ? "Hide" : "Customize"}
+                                </span>
+                            </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-4 pt-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1">
+                                        <Label htmlFor="vad_min_volume" className="text-xs">
+                                            Volume Floor
+                                        </Label>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-xs">
+                                                RMS volume threshold (0.05 – 0.80). Lower values detect quiet speech and soft whispers over PSTN telephone connections.
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                    <Input
+                                        id="vad_min_volume"
+                                        type="number"
+                                        step="0.05"
+                                        min="0.05"
+                                        max="0.80"
+                                        value={vadMinVolume}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            if (!isNaN(val)) {
+                                                setVadMinVolume(val);
+                                                setSensitivityPreset("custom");
+                                            }
+                                        }}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">Min loudness (0.05–0.80)</p>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1">
+                                        <Label htmlFor="vad_confidence" className="text-xs">
+                                            Neural Confidence
+                                        </Label>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-xs">
+                                                Silero ML probability threshold (0.30 – 0.90). Lower catches faint voice; higher rejects background babble.
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                    <Input
+                                        id="vad_confidence"
+                                        type="number"
+                                        step="0.05"
+                                        min="0.30"
+                                        max="0.90"
+                                        value={vadConfidence}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            if (!isNaN(val)) {
+                                                setVadConfidence(val);
+                                                setSensitivityPreset("custom");
+                                            }
+                                        }}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">VAD probability (0.30–0.90)</p>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1">
+                                        <Label htmlFor="vad_stop_secs" className="text-xs">
+                                            VAD Silence Hold
+                                        </Label>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-xs">
+                                                Silence duration before VAD marks speech ended (0.10s – 1.00s). Default: 0.25s.
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                    <Input
+                                        id="vad_stop_secs"
+                                        type="number"
+                                        step="0.05"
+                                        min="0.10"
+                                        max="1.00"
+                                        value={vadStopSecs}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            if (!isNaN(val)) {
+                                                setVadStopSecs(val);
+                                            }
+                                        }}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">Silence hold (0.10–1.00s)</p>
+                                </div>
+                            </div>
+                        </CollapsibleContent>
+                    </Collapsible>
                 </div>
 
                 <Separator />

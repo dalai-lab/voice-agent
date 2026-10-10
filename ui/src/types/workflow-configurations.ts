@@ -22,6 +22,99 @@ export type TurnStartStrategy = NonNullable<GeneratedWorkflowConfigurationDefaul
 export const DEFAULT_TURN_START_MIN_WORDS = 3;
 export const DEFAULT_PROVISIONAL_VAD_PAUSE_SECS = 1.5;
 
+export const DEFAULT_VAD_MIN_VOLUME = 0.20;
+export const DEFAULT_VAD_CONFIDENCE = 0.50;
+export const DEFAULT_VAD_STOP_SECS = 0.25;
+export const DEFAULT_USER_TURN_STOP_TIMEOUT = 3.5;
+export const DEFAULT_TURN_SILENCE_TIMEOUT_SECS = 0.8;
+
+export type VoiceSensitivityPreset = "sensitive" | "balanced" | "noisy" | "custom";
+
+export interface VoiceSensitivityPresetConfig {
+    label: string;
+    description: string;
+    badge: string;
+    vad_min_volume: number;
+    vad_confidence: number;
+    turn_silence_timeout_secs: number;
+    user_turn_stop_timeout: number;
+}
+
+export const VOICE_SENSITIVITY_PRESETS: Record<Exclude<VoiceSensitivityPreset, "custom">, VoiceSensitivityPresetConfig> = {
+    sensitive: {
+        label: "High Sensitivity",
+        description: "Catches soft whispers, quiet 'yes/no' answers, and phone murmurs. Best for surveys and quick confirmations.",
+        badge: "Recommended",
+        vad_min_volume: 0.20,
+        vad_confidence: 0.50,
+        turn_silence_timeout_secs: 0.7,
+        user_turn_stop_timeout: 3.5,
+    },
+    balanced: {
+        label: "Balanced",
+        description: "Standard conversational flow for quiet offices and indoor phone calls.",
+        badge: "Default",
+        vad_min_volume: 0.35,
+        vad_confidence: 0.65,
+        turn_silence_timeout_secs: 0.9,
+        user_turn_stop_timeout: 4.5,
+    },
+    noisy: {
+        label: "Noisy Room",
+        description: "Filters office chatter, street traffic, and background noise. Requires louder, clearer speech.",
+        badge: "Noise Shield",
+        vad_min_volume: 0.55,
+        vad_confidence: 0.75,
+        turn_silence_timeout_secs: 1.2,
+        user_turn_stop_timeout: 5.0,
+    },
+};
+
+export function detectVoiceSensitivityPreset(
+    vadMinVolume?: number,
+    vadConfidence?: number,
+    turnSilenceTimeoutSecs?: number,
+    userTurnStopTimeout?: number
+): VoiceSensitivityPreset {
+    if (
+        vadMinVolume === undefined ||
+        vadConfidence === undefined ||
+        turnSilenceTimeoutSecs === undefined ||
+        userTurnStopTimeout === undefined
+    ) {
+        return "sensitive";
+    }
+
+    for (const [key, preset] of Object.entries(VOICE_SENSITIVITY_PRESETS) as [Exclude<VoiceSensitivityPreset, "custom">, VoiceSensitivityPresetConfig][]) {
+        if (
+            Math.abs(preset.vad_min_volume - vadMinVolume) < 0.001 &&
+            Math.abs(preset.vad_confidence - vadConfidence) < 0.001 &&
+            Math.abs(preset.turn_silence_timeout_secs - turnSilenceTimeoutSecs) < 0.001 &&
+            Math.abs(preset.user_turn_stop_timeout - userTurnStopTimeout) < 0.001
+        ) {
+            return key;
+        }
+    }
+
+    if (
+        Math.abs(0.20 - vadMinVolume) < 0.001 &&
+        Math.abs(0.50 - vadConfidence) < 0.001 &&
+        Math.abs(3.5 - userTurnStopTimeout) < 0.001
+    ) {
+        return "sensitive";
+    }
+
+    return "custom";
+}
+
+export function getPacingLabel(secs: number): string {
+    if (secs <= 0.5) return "Very Fast";
+    if (secs <= 0.75) return "Snappy";
+    if (secs <= 1.0) return "Natural";
+    if (secs <= 1.5) return "Deliberate";
+    return "Relaxed";
+}
+
 export const TURN_START_STRATEGY_OPTIONS: Array<{
     value: TurnStartStrategy;
     label: string;
@@ -117,6 +210,12 @@ type WorkflowConfigurationBase = Omit<
     | "context_compaction_enabled"
     | "text_chat_inactivity_timeout_seconds"
     | "external_pbx_field_mappings"
+    | "vad_min_volume"
+    | "vad_confidence"
+    | "vad_stop_secs"
+    | "user_turn_stop_timeout"
+    | "turn_silence_timeout_secs"
+    | "boost_affirmations"
 >;
 
 export type WorkflowConfigurations = WorkflowConfigurationBase & {
@@ -138,6 +237,12 @@ export type WorkflowConfigurations = WorkflowConfigurationBase & {
     external_pbx_field_mappings: ExternalPBXFieldMapping[];
     model_overrides?: ModelOverrides;  // Per-workflow model configuration overrides
     model_configuration_v2_override?: OrganizationAiModelConfigurationV2;  // Full v2 model configuration override
+    vad_min_volume: number;              // Audio loudness threshold (0.05 to 0.80)
+    vad_confidence: number;              // Silero VAD speech probability (0.30 to 0.90)
+    vad_stop_secs: number;                // Silence stop seconds before VAD marks end (0.10 to 1.00)
+    user_turn_stop_timeout: number;      // Safety turn watchdog timeout (1.0 to 15.0 seconds)
+    turn_silence_timeout_secs: number;   // Post-speech pause before bot responds (0.3 to 3.0 seconds)
+    boost_affirmations: boolean;         // Bias STT towards short confirmations ('yes', 'no', etc.)
     [key: string]: unknown;  // Allow additional properties for future configurations
 };
 
@@ -159,6 +264,12 @@ const FALLBACK_WORKFLOW_CONFIGURATIONS: WorkflowConfigurations = {
     cross_node_variable_injection_enabled: false,
     llm_connection_warmup_enabled: true,
     external_pbx_field_mappings: [],
+    vad_min_volume: DEFAULT_VAD_MIN_VOLUME,
+    vad_confidence: DEFAULT_VAD_CONFIDENCE,
+    vad_stop_secs: DEFAULT_VAD_STOP_SECS,
+    user_turn_stop_timeout: DEFAULT_USER_TURN_STOP_TIMEOUT,
+    turn_silence_timeout_secs: DEFAULT_TURN_SILENCE_TIMEOUT_SECS,
+    boost_affirmations: true,
 };
 
 export function resolveWorkflowConfigurations(
@@ -225,6 +336,30 @@ export function resolveWorkflowConfigurations(
             configurations?.external_pbx_field_mappings
             ?? defaults?.external_pbx_field_mappings
             ?? FALLBACK_WORKFLOW_CONFIGURATIONS.external_pbx_field_mappings,
+        vad_min_volume:
+            configurations?.vad_min_volume
+            ?? (defaults as any)?.vad_min_volume
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.vad_min_volume,
+        vad_confidence:
+            configurations?.vad_confidence
+            ?? (defaults as any)?.vad_confidence
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.vad_confidence,
+        vad_stop_secs:
+            configurations?.vad_stop_secs
+            ?? (defaults as any)?.vad_stop_secs
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.vad_stop_secs,
+        user_turn_stop_timeout:
+            configurations?.user_turn_stop_timeout
+            ?? (defaults as any)?.user_turn_stop_timeout
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.user_turn_stop_timeout,
+        turn_silence_timeout_secs:
+            configurations?.turn_silence_timeout_secs
+            ?? (defaults as any)?.turn_silence_timeout_secs
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.turn_silence_timeout_secs,
+        boost_affirmations:
+            configurations?.boost_affirmations
+            ?? (defaults as any)?.boost_affirmations
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.boost_affirmations,
         transcript_configuration: {
             ...DEFAULT_TRANSCRIPT_CONFIGURATION,
             ...(defaults?.transcript_configuration as Partial<TranscriptConfiguration> | undefined),

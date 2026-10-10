@@ -4,12 +4,18 @@ import contextlib
 from api.db import db_client
 from api.enums import WorkflowRunMode
 from api.schemas.workflow_configurations import (
+    DEFAULT_EXTERNAL_TURN_USER_STOP_TIMEOUT,
     DEFAULT_MAX_CALL_DURATION_SECONDS,
     DEFAULT_MAX_USER_IDLE_TIMEOUT_SECONDS,
     DEFAULT_PROVISIONAL_VAD_PAUSE_SECS,
     DEFAULT_SMART_TURN_STOP_SECS,
+    DEFAULT_TURN_SILENCE_TIMEOUT_SECS,
     DEFAULT_TURN_START_MIN_WORDS,
     DEFAULT_TURN_START_STRATEGY,
+    DEFAULT_USER_TURN_STOP_TIMEOUT,
+    DEFAULT_VAD_CONFIDENCE,
+    DEFAULT_VAD_MIN_VOLUME,
+    DEFAULT_VAD_STOP_SECS,
 )
 from api.services.call_concurrency import call_concurrency
 from api.services.configuration.registry import ServiceProviders
@@ -117,8 +123,8 @@ from pipecat.utils.run_context import set_current_org_id, set_current_run_id
 ensure_tracing()
 
 
-DEFAULT_USER_TURN_STOP_TIMEOUT = 5.0
-EXTERNAL_TURN_USER_STOP_TIMEOUT = 30.0
+DEFAULT_USER_TURN_STOP_TIMEOUT = DEFAULT_USER_TURN_STOP_TIMEOUT
+EXTERNAL_TURN_USER_STOP_TIMEOUT = DEFAULT_EXTERNAL_TURN_USER_STOP_TIMEOUT
 
 
 async def _warmup_llm_connection(llm) -> None:
@@ -164,14 +170,29 @@ async def _warmup_llm_connection(llm) -> None:
         logger.warning(f"LLM connection warmup failed for model {model}: {e}")
 
 
+def _resolve_vad_params(run_configs: dict) -> VADParams:
+    return VADParams(
+        min_volume=float(run_configs.get("vad_min_volume", DEFAULT_VAD_MIN_VOLUME)),
+        confidence=float(run_configs.get("vad_confidence", DEFAULT_VAD_CONFIDENCE)),
+        stop_secs=float(run_configs.get("vad_stop_secs", DEFAULT_VAD_STOP_SECS)),
+    )
+
+
 def _resolve_user_turn_stop_timeout(
     run_configs: dict, *, uses_external_turns: bool
 ) -> float:
     if "user_turn_stop_timeout" in run_configs:
         return float(run_configs["user_turn_stop_timeout"])
     if uses_external_turns:
-        return EXTERNAL_TURN_USER_STOP_TIMEOUT
-    return DEFAULT_USER_TURN_STOP_TIMEOUT
+        return float(
+            run_configs.get(
+                "external_turn_user_stop_timeout",
+                DEFAULT_EXTERNAL_TURN_USER_STOP_TIMEOUT,
+            )
+        )
+    return float(
+        run_configs.get("user_turn_stop_timeout", DEFAULT_USER_TURN_STOP_TIMEOUT)
+    )
 
 
 def _resolve_turn_start_min_words(run_configs: dict) -> int:
@@ -233,6 +254,12 @@ def _create_non_realtime_user_turn_stop_strategies(
     if uses_external_turns:
         return [ExternalUserTurnStopStrategy()]
 
+    silence_secs = float(
+        run_configs.get(
+            "turn_silence_timeout_secs", DEFAULT_TURN_SILENCE_TIMEOUT_SECS
+        )
+    )
+
     if run_configs.get("turn_stop_strategy") == "turn_analyzer":
         smart_turn_params = SmartTurnParams(
             stop_secs=run_configs.get(
@@ -242,13 +269,17 @@ def _create_non_realtime_user_turn_stop_strategies(
         return [
             TurnAnalyzerUserTurnStopStrategy(
                 turn_analyzer=LocalSmartTurnAnalyzerV3(params=smart_turn_params)
-            )
+            ),
+            # Safety fallback: prevents orphaned turns if ML model stalls on single words
+            SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=silence_secs + 0.6),
         ]
 
-    return [SpeechTimeoutUserTurnStopStrategy()]
+    return [SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=silence_secs)]
 
 
-def _create_realtime_user_turn_config(provider: str):
+def _create_realtime_user_turn_config(
+    provider: str, run_configs: dict | None = None
+):
     """Return user turn strategies and optional local VAD for realtime providers."""
 
     def external_provider_turn_config():
@@ -268,7 +299,7 @@ def _create_realtime_user_turn_config(provider: str):
                 ],
                 stop=[SpeechTimeoutUserTurnStopStrategy(wait_for_transcript=False)],
             ),
-            SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            SileroVADAnalyzer(params=_resolve_vad_params(run_configs or {})),
         )
 
     if provider in {
@@ -748,6 +779,7 @@ async def _run_pipeline_impl(
             audio_config,
             keyterms=keyterms,
             correlation_id=mps_correlation_id,
+            boost_affirmations=bool(run_configs.get("boost_affirmations", True)),
         )
         tts = create_tts_service(
             user_config,
@@ -964,7 +996,7 @@ async def _run_pipeline_impl(
         FunctionCallUserMuteStrategy(),
         CallbackUserMuteStrategy(should_mute_callback=engine.should_mute_user),
     ]
-    user_vad_analyzer = SileroVADAnalyzer(params=VADParams(stop_secs=0.2))
+    user_vad_analyzer = SileroVADAnalyzer(params=_resolve_vad_params(run_configs))
 
     # Configure turn strategies based on STT provider, model, and workflow configuration
     if is_realtime:
@@ -972,7 +1004,8 @@ async def _run_pipeline_impl(
         # Realtime services still need user-turn tracking even when the model
         # itself owns speech generation and interruption behavior.
         user_turn_strategies, user_vad_analyzer = _create_realtime_user_turn_config(
-            user_config.realtime.provider
+            user_config.realtime.provider,
+            run_configs=run_configs,
         )
     else:
         # Some STT services emit their own turn boundaries, so the aggregator

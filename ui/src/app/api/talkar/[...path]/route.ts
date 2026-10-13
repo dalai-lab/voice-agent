@@ -36,8 +36,9 @@ async function proxy(request: NextRequest, method: string, path: string) {
   const clientAuth = request.headers.get("authorization");
   if (clientAuth) {
     headers["Authorization"] = clientAuth;
-  } else if (process.env.TALKAR_BILLING_API_TOKEN) {
-    headers["Authorization"] = `Bearer ${process.env.TALKAR_BILLING_API_TOKEN.trim()}`;
+  } else {
+    const serviceToken = (process.env.TALKAR_BILLING_API_TOKEN || "change-me-in-production-billing-token").trim();
+    headers["Authorization"] = `Bearer ${serviceToken}`;
   }
 
   const fetchOptions: any = {

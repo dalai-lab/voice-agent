@@ -307,6 +307,7 @@ services:
       # Talkar Integration
       TALKAR_API_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8002}"
       TALKAR_SERVICE_URL: "${TALKAR_SERVICE_URL:-http://host.docker.internal:8002}"
+      TALKAR_BILLING_API_TOKEN: "${TALKAR_BILLING_API_TOKEN:-change-me-in-production-billing-token}"
 
       # Stack Auth
       AUTH_PROVIDER: "${AUTH_PROVIDER:-local}"

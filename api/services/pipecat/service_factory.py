@@ -247,19 +247,41 @@ def _validate_runtime_service_url(url: str, field_name: str) -> None:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+AFFIRMATION_KEYTERMS: list[str] = [
+    "yes",
+    "no",
+    "yeah",
+    "correct",
+    "yep",
+    "nope",
+    "sure",
+    "okay",
+]
+
+
 @_report_service_factory_failures(ErrorSource.STT, config_section="stt")
 def create_stt_service(
     user_config,
     audio_config: "AudioConfig",
     keyterms: list[str] | None = None,
     correlation_id: str | None = None,
+    boost_affirmations: bool = True,
 ):
     """Create and return appropriate STT service based on user configuration
 
     Args:
         user_config: User configuration containing STT settings
-        keyterms: Optional list of keyterms for speech recognition boosting (Deepgram only)
+        keyterms: Optional list of keyterms for speech recognition boosting
+        correlation_id: Correlation ID for tracking
+        boost_affirmations: Whether to inject affirmation keyterms ('yes', 'no', etc.)
     """
+    if boost_affirmations:
+        combined = list(keyterms or [])
+        for term in AFFIRMATION_KEYTERMS:
+            if term not in combined:
+                combined.append(term)
+        keyterms = combined
+
     logger.info(
         f"Creating STT service: provider={user_config.stt.provider}, model={user_config.stt.model}"
     )

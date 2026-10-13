@@ -148,4 +148,50 @@ describe('workflow history', () => {
     expect(useWorkflowStore.getState().history).toHaveLength(1);
     expect(useWorkflowStore.getState().isDirty).toBe(false);
   });
+  it("applies new nodes and edges in a single atomic history entry", () => {
+    const nodeA = createNode("a");
+    useWorkflowStore.getState().initializeWorkflow(1, "Initial", [nodeA], []);
+
+    const newNodes = [createNode("x", 100), createNode("y", 200)];
+    const newEdges = [createEdge("x-y", "x", "y")];
+
+    useWorkflowStore.getState().applyWorkflowCode(newNodes, newEdges, "Applied Workflow");
+
+    expect(nodeIds()).toEqual(["x", "y"]);
+    expect(useWorkflowStore.getState().edges).toEqual(newEdges);
+    expect(useWorkflowStore.getState().workflowName).toBe("Applied Workflow");
+    expect(useWorkflowStore.getState().isDirty).toBe(true);
+    expect(useWorkflowStore.getState().history).toHaveLength(2);
+
+    // Canvas undo restores pre-code state in one single step!
+    useWorkflowStore.getState().undo();
+    expect(nodeIds()).toEqual(["a"]);
+    expect(useWorkflowStore.getState().edges).toEqual([]);
+    expect(useWorkflowStore.getState().workflowName).toBe("Initial");
+
+    // Redo re-applies code state in one step!
+    useWorkflowStore.getState().redo();
+    expect(nodeIds()).toEqual(["x", "y"]);
+    expect(useWorkflowStore.getState().edges).toEqual(newEdges);
+    expect(useWorkflowStore.getState().workflowName).toBe("Applied Workflow");
+  });
+
+  it("assigns fallback coordinates to nodes missing numeric position", () => {
+    useWorkflowStore.getState().initializeWorkflow(1, "Initial", [], []);
+
+    const unpositionedNode: FlowNode = {
+      id: "orphan",
+      type: "agentNode",
+      position: undefined as unknown as { x: number; y: number },
+      data: { name: "Orphan" },
+    };
+
+    useWorkflowStore.getState().applyWorkflowCode([unpositionedNode], []);
+
+    const applied = useWorkflowStore.getState().nodes[0];
+    expect(applied.position).toBeDefined();
+    expect(typeof applied.position.x).toBe("number");
+    expect(typeof applied.position.y).toBe("number");
+    expect(applied.position.y).toBeGreaterThan(0);
+  });
 });

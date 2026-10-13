@@ -74,6 +74,14 @@ interface WorkflowActions {
   updateEdge: (edgeId: string, updates: Partial<FlowEdge>) => void;
   deleteEdge: (edgeId: string) => void;
 
+  // Code editor operations
+  applyWorkflowCode: (
+    newNodes: FlowNode[],
+    newEdges: FlowEdge[],
+    newName?: string,
+    newViewport?: { x: number; y: number; zoom: number }
+  ) => void;
+
   // Workflow metadata
   setWorkflowName: (name: string) => void;
   setTemplateContextVariables: (variables: Record<string, string>) => void;
@@ -358,6 +366,37 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     });
   },
 
+  applyWorkflowCode: (newNodes, newEdges, newName, newViewport) => {
+    const currentRf = get().rfInstance;
+    if (currentRf && newViewport) {
+      currentRf.setViewport(newViewport);
+    }
+
+    let fallbackY = 0;
+    const positionedNodes = newNodes.map((node) => {
+      if (
+        !node.position ||
+        typeof node.position.x !== 'number' ||
+        typeof node.position.y !== 'number'
+      ) {
+        fallbackY += 150;
+        return {
+          ...node,
+          position: { x: 0, y: fallbackY },
+        };
+      }
+      return node;
+    });
+
+    set((state) =>
+      commitHistory(state, {
+        nodes: positionedNodes,
+        edges: newEdges,
+        workflowName: newName && newName.trim() ? newName.trim() : state.workflowName,
+      })
+    );
+  },
+
   setWorkflowName: (workflowName) => {
     set((state) =>
       commitHistory(state, {
@@ -369,7 +408,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   },
 
   setTemplateContextVariables: (variables) => set({ templateContextVariables: variables }),
-  
+
   setWorkflowConfigurations: (configurations) => set({ workflowConfigurations: configurations }),
 
   setPostCallSchema: (schema) => set({ postCallSchema: schema }),

@@ -257,9 +257,10 @@ def test_non_realtime_can_use_turn_analyzer_stop_strategy(monkeypatch):
         uses_external_turns=False,
     )
 
-    assert len(strategies) == 1
+    assert len(strategies) == 2
     assert isinstance(strategies[0], TurnAnalyzerUserTurnStopStrategy)
     assert strategies[0]._turn_analyzer.stop_secs == 1.5
+    assert isinstance(strategies[1], SpeechTimeoutUserTurnStopStrategy)
 
 
 def test_external_turn_stt_uses_longer_stop_timeout():
@@ -284,3 +285,31 @@ def test_workflow_config_can_override_user_turn_stop_timeout():
         )
         == 12.5
     )
+
+
+def test_resolve_vad_params_defaults_and_override():
+    from api.services.pipecat.run_pipeline import _resolve_vad_params
+
+    # Default values
+    default_vad = _resolve_vad_params({})
+    assert default_vad.min_volume == 0.20
+    assert default_vad.confidence == 0.50
+    assert default_vad.stop_secs == 0.25
+
+    # Workflow overrides
+    custom_vad = _resolve_vad_params(
+        {"vad_min_volume": 0.15, "vad_confidence": 0.40, "vad_stop_secs": 0.35}
+    )
+    assert custom_vad.min_volume == 0.15
+    assert custom_vad.confidence == 0.40
+    assert custom_vad.stop_secs == 0.35
+
+
+def test_turn_silence_timeout_custom_secs():
+    strategies = _create_non_realtime_user_turn_stop_strategies(
+        {"turn_silence_timeout_secs": 1.2},
+        uses_external_turns=False,
+    )
+    assert len(strategies) == 1
+    assert isinstance(strategies[0], SpeechTimeoutUserTurnStopStrategy)
+    assert strategies[0]._user_speech_timeout == 1.2

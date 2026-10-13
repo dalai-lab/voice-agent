@@ -4,7 +4,7 @@ import * as PhosphorIcons from "@phosphor-icons/react";
 import { ReactFlowInstance } from "@xyflow/react";
 import { AlertCircle, ArrowLeft, Eye, History, LoaderCircle, Menu, MoreVertical, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -12,6 +12,8 @@ import {
     publishWorkflowApiV1WorkflowWorkflowIdPublishPost,
 } from "@/client/sdk.gen";
 import { WorkflowError } from "@/client/types.gen";
+import type { ParsedWorkflow } from "@/components/code-editor";
+import { useNodeSpecs } from "@/components/flow/renderer";
 import { FlowEdge, FlowNode } from "@/components/flow/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +30,10 @@ import {
 } from "@/components/ui/popover";
 import { useSidebar } from "@/components/ui/sidebar";
 import { copyTextToClipboard } from "@/lib/clipboard";
+
+import { useWorkflowStore } from "../stores/workflowStore";
+import { layoutNodes } from "../utils/layoutNodes";
+import { WorkflowCodeEditorDialog } from "./WorkflowCodeEditorDialog";
 
 interface WorkflowEditorHeaderProps {
     workflowName: string;
@@ -72,6 +78,39 @@ export const WorkflowEditorHeader = ({
     const [savingWorkflow, setSavingWorkflow] = useState(false);
     const [duplicating, setDuplicating] = useState(false);
     const [publishing, setPublishing] = useState(false);
+    const [isCodeEditorOpen, setIsCodeEditorOpen] = useState(false);
+
+    const { specs } = useNodeSpecs();
+    const nodes = useWorkflowStore((state) => state.nodes);
+    const edges = useWorkflowStore((state) => state.edges);
+    const applyWorkflowCode = useWorkflowStore((state) => state.applyWorkflowCode);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e") {
+                const activeTag = (document.activeElement?.tagName || "").toLowerCase();
+                if (activeTag === "input" || activeTag === "textarea") return;
+                e.preventDefault();
+                setIsCodeEditorOpen((prev) => !prev);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
+    const handleApplyCode = useCallback(
+        async (parsed: ParsedWorkflow, autoLayout: boolean) => {
+            let finalNodes = parsed.nodes;
+            if (autoLayout && rfInstance?.current) {
+                finalNodes = layoutNodes(parsed.nodes, parsed.edges, "TB", rfInstance);
+            }
+            applyWorkflowCode(finalNodes, parsed.edges, parsed.name, parsed.viewport);
+            if (parsed.name && parsed.name.trim() && parsed.name.trim() !== workflowName) {
+                await renameWorkflow(parsed.name.trim());
+            }
+        },
+        [rfInstance, applyWorkflowCode, workflowName, renameWorkflow]
+    );
     // One discriminated-union state instead of (isEditingName, nameDraft,
     // nameError, isRenaming): they're not independent — error and saving are
     // mutually exclusive, and both are meaningless in the display state. The
@@ -431,6 +470,16 @@ export const WorkflowEditorHeader = ({
                     Test Agent
                 </Button>
 
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1.5 px-3 cursor-pointer"
+                    onClick={() => setIsCodeEditorOpen(true)}
+                >
+                    <PhosphorIcons.Code className="w-4 h-4" />
+                    Code
+                </Button>
+
                 {/* Save button */}
                 {!isViewingHistoricalVersion && (
                     <Button
@@ -487,6 +536,13 @@ export const WorkflowEditorHeader = ({
                             View Intelligence
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                            onClick={() => setIsCodeEditorOpen(true)}
+                            className="text-foreground hover:bg-foreground/[0.03] cursor-pointer"
+                        >
+                            <PhosphorIcons.Code className="w-4 h-4 mr-2" />
+                            Edit Workflow Code
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                             onClick={handleDuplicate}
                             disabled={duplicating}
                             className="text-foreground hover:bg-foreground/[0.03] cursor-pointer"
@@ -516,6 +572,20 @@ export const WorkflowEditorHeader = ({
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
+
+            <WorkflowCodeEditorDialog
+                open={isCodeEditorOpen}
+                onOpenChange={setIsCodeEditorOpen}
+                workflowId={workflowId}
+                workflowName={workflowName}
+                nodes={nodes}
+                edges={edges}
+                rfInstance={rfInstance}
+                isViewingHistoricalVersion={isViewingHistoricalVersion}
+                activeVersionLabel={activeVersionLabel}
+                specs={specs}
+                onApply={handleApplyCode}
+            />
         </div>
     );
 };

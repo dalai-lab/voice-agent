@@ -80,9 +80,10 @@ async def process_workflow_completion(
                     
                     if org_id:
                         import os
-                        talkar_billing_token = os.getenv(
-                            "TALKAR_BILLING_API_TOKEN",
-                            TALKAR_BILLING_API_TOKEN,
+                        talkar_billing_token = (
+                            os.getenv("TALKAR_BILLING_API_TOKEN")
+                            or TALKAR_BILLING_API_TOKEN
+                            or "change-me-in-production-billing-token"
                         ).strip()
                         headers = {"Content-Type": "application/json"}
                         if talkar_billing_token:

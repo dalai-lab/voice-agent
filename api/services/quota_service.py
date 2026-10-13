@@ -557,9 +557,10 @@ async def _authorize_talkar_workflow_run_start(
         if concurrent_calls < 1:
             concurrent_calls = 1
 
-        talkar_billing_token = os.getenv(
-            "TALKAR_BILLING_API_TOKEN",
-            TALKAR_BILLING_API_TOKEN,
+        talkar_billing_token = (
+            os.getenv("TALKAR_BILLING_API_TOKEN")
+            or TALKAR_BILLING_API_TOKEN
+            or "change-me-in-production-billing-token"
         ).strip()
         request_headers: dict = {"Content-Type": "application/json"}
         if talkar_billing_token:

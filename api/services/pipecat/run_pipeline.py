@@ -314,15 +314,16 @@ async def run_pipeline_telephony(
     # resolving DB/config/transport state.
     register_worker_active_call(workflow_run_id)
     try:
-        await _run_pipeline_telephony_impl(
-            websocket,
-            provider_name=provider_name,
-            workflow_id=workflow_id,
-            workflow_run_id=workflow_run_id,
-            organization_id=organization_id,
-            call_id=call_id,
-            transport_kwargs=transport_kwargs,
-        )
+        async with call_concurrency.hold_slot_heartbeat(workflow_run_id):
+            await _run_pipeline_telephony_impl(
+                websocket,
+                provider_name=provider_name,
+                workflow_id=workflow_id,
+                workflow_run_id=workflow_run_id,
+                organization_id=organization_id,
+                call_id=call_id,
+                transport_kwargs=transport_kwargs,
+            )
     finally:
         try:
             await call_concurrency.unregister_active_call(workflow_run_id)
@@ -457,16 +458,17 @@ async def run_pipeline_smallwebrtc(
     # resolving DB/config/transport state.
     register_worker_active_call(workflow_run_id)
     try:
-        await _run_pipeline_smallwebrtc_impl(
-            webrtc_connection,
-            workflow_id,
-            workflow_run_id,
-            user_id,
-            call_context_vars=call_context_vars,
-            user_provider_id=user_provider_id,
-            organization_id=organization_id,
-            dtmf_queue=dtmf_queue,
-        )
+        async with call_concurrency.hold_slot_heartbeat(workflow_run_id):
+            await _run_pipeline_smallwebrtc_impl(
+                webrtc_connection,
+                workflow_id,
+                workflow_run_id,
+                user_id,
+                call_context_vars=call_context_vars,
+                user_provider_id=user_provider_id,
+                organization_id=organization_id,
+                dtmf_queue=dtmf_queue,
+            )
     finally:
         try:
             await call_concurrency.unregister_active_call(workflow_run_id)
@@ -575,18 +577,19 @@ async def _run_pipeline(
     """Run the pipeline with active-call drain accounting."""
     register_worker_active_call(workflow_run_id)
     try:
-        await _run_pipeline_impl(
-            transport,
-            workflow_id,
-            workflow_run_id,
-            user_id,
-            call_context_vars=call_context_vars,
-            audio_config=audio_config,
-            user_provider_id=user_provider_id,
-            workflow_run=workflow_run,
-            resolved_user_config=resolved_user_config,
-            organization_id=organization_id,
-        )
+        async with call_concurrency.hold_slot_heartbeat(workflow_run_id):
+            await _run_pipeline_impl(
+                transport,
+                workflow_id,
+                workflow_run_id,
+                user_id,
+                call_context_vars=call_context_vars,
+                audio_config=audio_config,
+                user_provider_id=user_provider_id,
+                workflow_run=workflow_run,
+                resolved_user_config=resolved_user_config,
+                organization_id=organization_id,
+            )
     finally:
         try:
             await call_concurrency.unregister_active_call(workflow_run_id)

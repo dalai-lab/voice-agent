@@ -176,8 +176,8 @@ async def test_agent_stream_rejects_when_concurrency_limit_reached():
 
 
 @pytest.mark.asyncio
-async def test_agent_stream_fails_open_when_redis_down():
-    """Verify that when Redis is down during concurrency acquisition, agent_stream fails open without AttributeError."""
+async def test_agent_stream_fails_closed_when_redis_down():
+    """Verify that when Redis is down during concurrency acquisition, agent_stream fails closed."""
     from api.routes.agent_stream import agent_stream_websocket
 
     websocket = _FakeWebSocket()
@@ -215,7 +215,11 @@ async def test_agent_stream_fails_open_when_redis_down():
 
         await agent_stream_websocket(websocket, "cloudonix", "agent-uuid")
 
-    db_client.create_workflow_run.assert_awaited_once()
+    db_client.create_workflow_run.assert_not_awaited()
     mock_concurrency.bind_workflow_run.assert_not_called()
-    provider_instance.handle_external_websocket.assert_awaited_once()
+    provider_instance.handle_external_websocket.assert_not_called()
+    websocket.close.assert_awaited_once_with(
+        code=1011,
+        reason="Call concurrency infrastructure temporarily unavailable",
+    )
 

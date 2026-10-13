@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from api.db import db_client
 from api.db.models import QueuedRunModel, ScheduledCallbackModel
 from api.enums import TelephonyCallStatus, WorkflowRunState
+from api.services.call_concurrency import call_concurrency
 from api.services.campaign.campaign_call_dispatcher import campaign_call_dispatcher
 from api.services.campaign.campaign_event_publisher import (
     get_campaign_event_publisher,
@@ -79,16 +80,13 @@ async def _enqueue_integrations_for_unconnected_run(
     workflow_run_id: int,
     status: str,
 ) -> None:
-    """Fire post-call integrations (e.g. webhooks) when a call ends before the
-    Pipecat pipeline ever starts.
-
-    Enqueues integrations only -- deliberately *not*
-    ``PROCESS_WORKFLOW_COMPLETION`` -- so an unconnected call still triggers the
-    configured webhooks without incurring platform-usage billing.
+    """Fire post-call integrations and workflow completion (including Talkar
+    wallet deduction / zero-duration CallLog recording) when a call ends before
+    the Pipecat pipeline ever starts.
     """
-    await enqueue_job(FunctionNames.RUN_INTEGRATIONS_POST_WORKFLOW_RUN, workflow_run_id)
+    await enqueue_job(FunctionNames.PROCESS_WORKFLOW_COMPLETION, workflow_run_id)
     logger.info(
-        f"[run {workflow_run_id}] Enqueued post-call integrations after terminal "
+        f"[run {workflow_run_id}] Enqueued post-call workflow completion after terminal "
         f"telephony status: {status}"
     )
 
@@ -145,9 +143,11 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
         )
 
         await campaign_call_dispatcher.release_call_slot(workflow_run_id)
+        await call_concurrency.unregister_active_call(workflow_run_id)
 
+        initial_context = getattr(workflow_run, "initial_context", None) or {}
         if workflow_run.campaign_id:
-            is_callback = workflow_run.initial_context and workflow_run.initial_context.get("is_callback")
+            is_callback = initial_context.get("is_callback")
             if not is_callback:
                 await circuit_breaker.record_and_evaluate(
                     workflow_run.campaign_id, is_failure=False
@@ -166,8 +166,10 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
         )
 
         await campaign_call_dispatcher.release_call_slot(workflow_run_id)
+        await call_concurrency.unregister_active_call(workflow_run_id)
 
-        is_callback = workflow_run.initial_context and workflow_run.initial_context.get("is_callback")
+        initial_context = getattr(workflow_run, "initial_context", None) or {}
+        is_callback = initial_context.get("is_callback")
 
         if workflow_run.campaign_id:
             # Check if this is a callback run before tripping circuit breaker

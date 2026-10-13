@@ -67,8 +67,14 @@ async def agent_stream_websocket(
         await websocket.close(code=1008, reason="Concurrent call limit reached")
         return
     except Exception as e:
-        logger.warning(f"Redis down, failing open for org {workflow.organization_id}: {e}")
-        concurrency_slot = None
+        logger.error(
+            f"Call concurrency service unavailable for org {workflow.organization_id}: {e}. Failing closed."
+        )
+        await websocket.close(
+            code=1011,
+            reason="Call concurrency infrastructure temporarily unavailable",
+        )
+        return
 
     numeric_suffix = int(str(uuid.uuid4()).replace("-", "")[:8], 16) % 100000000
     workflow_run_name = f"WR-AGS-{numeric_suffix:08d}"

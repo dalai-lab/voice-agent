@@ -1,5 +1,6 @@
 import asyncio
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from api.constants import DEFAULT_ORG_CONCURRENCY_LIMIT
@@ -118,14 +119,30 @@ class CallConcurrencyService:
             if organization_id in self._limit_memory_cache:
                 return self._limit_memory_cache[organization_id]
 
-            # 3. Fail closed: Do NOT return default 10 slots on DB error
-            logger.error(
-                f"Failing closed (limit=0) for org {organization_id} due to DB error and missing cache"
+            # 3. Check if org was explicitly marked blocked in Redis
+            if redis_client and hasattr(redis_client, "get"):
+                try:
+                    is_blocked = redis_client.get(f"org_blocked:{organization_id}")
+                    if asyncio.iscoroutine(is_blocked):
+                        is_blocked = await is_blocked
+                    if is_blocked:
+                        logger.warning(f"Org {organization_id} is marked blocked in Redis; returning limit 0")
+                        return 0
+                except Exception:
+                    pass
+
+            # 4. Fallback to default limit during transient DB error instead of total call outage
+            logger.warning(
+                f"DB error and missing cache for org {organization_id}; falling back to default "
+                f"limit ({self.default_concurrent_limit}) to prevent total call outage."
             )
-            return 0
+            return self.default_concurrent_limit
 
     async def get_concurrency_group_id(self, organization_id: int) -> int:
         """Get the concurrency group ID for an organization (shares Redis counter across sub-orgs)."""
+        if organization_id in self._group_memory_cache:
+            return self._group_memory_cache[organization_id]
+
         redis_client = None
         try:
             if hasattr(rate_limiter, "_get_redis"):
@@ -136,6 +153,18 @@ class CallConcurrencyService:
                     redis_client = redis_res
         except Exception:
             redis_client = None
+
+        if redis_client and hasattr(redis_client, "get"):
+            try:
+                cached_val = redis_client.get(f"org_concurrency_group:{organization_id}")
+                if asyncio.iscoroutine(cached_val):
+                    cached_val = await cached_val
+                if isinstance(cached_val, (str, int, bytes)):
+                    group_int = int(cached_val)
+                    self._group_memory_cache[organization_id] = group_int
+                    return group_int
+            except Exception:
+                pass
 
         try:
             config = await db_client.get_configuration(
@@ -164,16 +193,6 @@ class CallConcurrencyService:
             logger.debug(
                 f"No concurrency group ID found for org {organization_id}, attempting fallback: {e}"
             )
-            if redis_client and hasattr(redis_client, "get"):
-                try:
-                    cached_val = redis_client.get(f"org_concurrency_group:{organization_id}")
-                    if asyncio.iscoroutine(cached_val):
-                        cached_val = await cached_val
-                    if isinstance(cached_val, (str, int, bytes)):
-                        return int(cached_val)
-                except Exception:
-                    pass
-
             if organization_id in self._group_memory_cache:
                 return self._group_memory_cache[organization_id]
 
@@ -357,10 +376,18 @@ class CallConcurrencyService:
             slot.slot_id,
             scope_key=slot.scope_key,
         )
-        if stored is True or stored is None:
+        if stored is True:
             return
 
+        # Release slot to prevent untracked slot leak in Redis
         await self.release_slot(slot)
+        if stored is None:
+            logger.warning(
+                f"Redis error storing workflow slot mapping for run {workflow_run_id}. "
+                "Slot released to prevent concurrency pool starvation."
+            )
+            return
+
         raise WorkflowRunSlotAlreadyBoundError(workflow_run_id)
 
     async def register_active_call(
@@ -440,5 +467,59 @@ class CallConcurrencyService:
             )
         return released
 
+    async def refresh_workflow_run_slot(self, workflow_run_id: int) -> bool:
+        """Refresh the concurrent slot score in Redis for an active workflow run."""
+        mapping = await rate_limiter.get_workflow_slot_mapping(workflow_run_id)
+        if not mapping:
+            return False
+
+        org_id, slot_id, scope_key = mapping
+        return bool(
+            await rate_limiter.refresh_concurrent_slot(
+                org_id, slot_id, scope_key=scope_key, workflow_run_id=workflow_run_id
+            )
+        )
+
+    async def _slot_heartbeat_loop(
+        self, workflow_run_id: int, stop_event: asyncio.Event
+    ) -> None:
+        """Periodically refresh the slot in Redis while the pipeline is active."""
+        interval = rate_limiter.heartbeat_interval
+        while not stop_event.is_set():
+            try:
+                await asyncio.sleep(interval)
+                if stop_event.is_set():
+                    break
+                refreshed = await self.refresh_workflow_run_slot(workflow_run_id)
+                if not refreshed:
+                    logger.debug(
+                        f"Slot mapping for workflow run {workflow_run_id} no longer live; stopping heartbeat"
+                    )
+                    break
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning(
+                    f"Slot heartbeat error for workflow run {workflow_run_id}: {e}"
+                )
+
+    @asynccontextmanager
+    async def hold_slot_heartbeat(self, workflow_run_id: int):
+        """Context manager maintaining an active slot heartbeat in Redis for a pipeline run."""
+        stop_event = asyncio.Event()
+        heartbeat_task = asyncio.create_task(
+            self._slot_heartbeat_loop(workflow_run_id, stop_event)
+        )
+        try:
+            yield
+        finally:
+            stop_event.set()
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except (asyncio.CancelledError, Exception):
+                pass
+
 
 call_concurrency = CallConcurrencyService()
+

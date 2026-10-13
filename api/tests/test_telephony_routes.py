@@ -484,8 +484,8 @@ async def test_smallwebrtc_run_reaching_telephony_websocket_closes_without_runni
     mock_concurrency.unregister_active_call.assert_not_awaited()
 
 
-def test_telephony_outbound_fails_open_when_redis_down():
-    """Verify that when Redis is down during concurrency slot acquisition, the call fails open and initiates normally without AttributeError."""
+def test_telephony_outbound_fails_closed_when_redis_down():
+    """Verify that when Redis is down during concurrency slot acquisition, the call fails closed with 503."""
     app = _make_test_app()
     client = TestClient(app)
 
@@ -536,8 +536,9 @@ def test_telephony_outbound_fails_open_when_redis_down():
             json={"workflow_id": workflow.id, "phone_number": "+15551234567"},
         )
 
-    # Call should succeed (200), not crash with 500 / AttributeError
-    assert response.status_code == 200
+    # Call should fail closed (503), not initiate call without concurrency control
+    assert response.status_code == 503
     mock_concurrency.bind_workflow_run.assert_not_called()
-    provider.initiate_call.assert_awaited_once()
+    provider.initiate_call.assert_not_called()
+
 

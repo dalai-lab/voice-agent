@@ -1,3 +1,5 @@
+import asyncio
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -450,11 +452,196 @@ async def test_authorize_talkar_uses_slot_position_to_prevent_burst_self_starvat
 
 
 @pytest.mark.asyncio
+async def test_authorize_talkar_avoids_plus_one_double_count_when_slot_position_none():
+    """When workflow_run_id is provided and slot_position is None (fallback),
+    active_count must NOT add +1 because the slot was already acquired in Redis.
+    """
+    from api.services.quota_service import _authorize_talkar_workflow_run_start
+
+    with (
+        patch(
+            "api.services.call_concurrency.service.call_concurrency.get_concurrency_group_id",
+            AsyncMock(return_value=100),
+        ),
+        patch(
+            "api.services.call_concurrency.rate_limiter.rate_limiter.get_workflow_slot_position",
+            AsyncMock(return_value=None),
+        ),
+        patch(
+            "api.services.call_concurrency.rate_limiter.rate_limiter.get_concurrent_count",
+            AsyncMock(return_value=2),
+        ),
+        patch("httpx.AsyncClient") as mock_client_cls,
+    ):
+        mock_client = AsyncMock()
+        mock_resp = AsyncMock()
+        mock_resp.status_code = 200
+        mock_resp.json = MagicMock(return_value={"has_quota": True})
+        mock_client.post = AsyncMock(return_value=mock_resp)
+        mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+        result = await _authorize_talkar_workflow_run_start(
+            organization_id=200, workflow_run_id=102
+        )
+
+        assert result.has_quota is True
+        sent_payload = mock_client.post.call_args.kwargs["json"]
+        assert sent_payload["organization_id"] == 200
+        assert sent_payload["workflow_run_id"] == 102
+        # active_count is 2, MUST NOT be 3 (2 + 1)
+        assert sent_payload["active_calls"] == 2
+
+
+@pytest.mark.asyncio
+async def test_authorize_talkar_adds_plus_one_for_preflight_without_run_id():
+    """When workflow_run_id is None (preflight check), active_count must add +1
+    to account for the upcoming call that has not acquired a slot yet.
+    """
+    from api.services.quota_service import _authorize_talkar_workflow_run_start
+
+    with (
+        patch(
+            "api.services.call_concurrency.service.call_concurrency.get_concurrency_group_id",
+            AsyncMock(return_value=100),
+        ),
+        patch(
+            "api.services.call_concurrency.rate_limiter.rate_limiter.get_concurrent_count",
+            AsyncMock(return_value=2),
+        ),
+        patch("httpx.AsyncClient") as mock_client_cls,
+    ):
+        mock_client = AsyncMock()
+        mock_resp = AsyncMock()
+        mock_resp.status_code = 200
+        mock_resp.json = MagicMock(return_value={"has_quota": True})
+        mock_client.post = AsyncMock(return_value=mock_resp)
+        mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+        result = await _authorize_talkar_workflow_run_start(
+            organization_id=200, workflow_run_id=None
+        )
+
+        assert result.has_quota is True
+        sent_payload = mock_client.post.call_args.kwargs["json"]
+        assert sent_payload["organization_id"] == 200
+        assert "workflow_run_id" not in sent_payload
+        # Preflight check without run_id: 2 + 1 = 3
+        assert sent_payload["active_calls"] == 3
+
+
+@pytest.mark.asyncio
+async def test_get_concurrency_group_id_serves_from_memory_cache_first():
+    """Verify that get_concurrency_group_id returns cached values without querying Redis or DB."""
+    service = CallConcurrencyService()
+    service._group_memory_cache[999] = 1234
+    group_id = await service.get_concurrency_group_id(999)
+    assert group_id == 1234
+
+
+@pytest.mark.asyncio
 async def test_bind_workflow_run_none_slot_safely_noops():
-    """When concurrency slot is None (failing open due to Redis outage), bind_workflow_run must not raise AttributeError."""
+    """When concurrency slot is None (e.g. failing open or disabled), bind_workflow_run must not raise AttributeError."""
     service = CallConcurrencyService()
     # Must complete cleanly without raising AttributeError: 'NoneType' object has no attribute 'organization_id'
     await service.bind_workflow_run(None, 501)
+
+
+@pytest.mark.asyncio
+async def test_authorize_talkar_fails_closed_when_billing_returns_500():
+    """When Talkar billing returns HTTP 500, quota check fails closed with billing_service_unavailable."""
+    from api.services.quota_service import _authorize_talkar_workflow_run_start
+
+    with (
+        patch(
+            "api.services.call_concurrency.service.call_concurrency.get_concurrency_group_id",
+            AsyncMock(return_value=100),
+        ),
+        patch(
+            "api.services.call_concurrency.rate_limiter.rate_limiter.get_concurrent_count",
+            AsyncMock(return_value=1),
+        ),
+        patch("httpx.AsyncClient") as mock_client_cls,
+    ):
+        mock_client = AsyncMock()
+        mock_resp = AsyncMock()
+        mock_resp.status_code = 500
+        mock_resp.text = "Internal Server Error"
+        mock_client.post = AsyncMock(return_value=mock_resp)
+        mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+        result = await _authorize_talkar_workflow_run_start(
+            organization_id=200, workflow_run_id=None
+        )
+
+        assert result.has_quota is False
+        assert result.error_code == "billing_service_unavailable"
+        assert "temporarily unavailable" in result.error_message
+
+
+@pytest.mark.asyncio
+async def test_authorize_talkar_fails_closed_when_billing_times_out():
+    """When Talkar billing request times out or raises an exception, quota check fails closed."""
+    import httpx
+    from api.services.quota_service import _authorize_talkar_workflow_run_start
+
+    with (
+        patch(
+            "api.services.call_concurrency.service.call_concurrency.get_concurrency_group_id",
+            AsyncMock(return_value=100),
+        ),
+        patch(
+            "api.services.call_concurrency.rate_limiter.rate_limiter.get_concurrent_count",
+            AsyncMock(return_value=1),
+        ),
+        patch("httpx.AsyncClient") as mock_client_cls,
+    ):
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(side_effect=httpx.ConnectTimeout("Connection timed out"))
+        mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+        result = await _authorize_talkar_workflow_run_start(
+            organization_id=200, workflow_run_id=None
+        )
+
+        assert result.has_quota is False
+        assert result.error_code == "billing_service_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_authorize_talkar_extracts_specific_reasons_on_quota_rejection():
+    """When Talkar returns 200 with has_quota=False and reason=concurrency_limit_exceeded, specific error_code is preserved."""
+    from api.services.quota_service import _authorize_talkar_workflow_run_start
+
+    with (
+        patch(
+            "api.services.call_concurrency.service.call_concurrency.get_concurrency_group_id",
+            AsyncMock(return_value=100),
+        ),
+        patch(
+            "api.services.call_concurrency.rate_limiter.rate_limiter.get_concurrent_count",
+            AsyncMock(return_value=2),
+        ),
+        patch("httpx.AsyncClient") as mock_client_cls,
+    ):
+        mock_client = AsyncMock()
+        mock_resp = AsyncMock()
+        mock_resp.status_code = 200
+        mock_resp.json = MagicMock(return_value={
+            "has_quota": False,
+            "reason": "concurrency_limit_exceeded",
+            "active_calls": 3,
+            "concurrent_call_limit": 2,
+        })
+        mock_client.post = AsyncMock(return_value=mock_resp)
+        mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+        result = await _authorize_talkar_workflow_run_start(
+            organization_id=200, workflow_run_id=None
+        )
+
+        assert result.has_quota is False
+        assert result.error_code == "concurrency_limit_exceeded"
+        assert "Concurrent call limit reached" in result.error_message
 
 
 @pytest.mark.asyncio
@@ -740,3 +927,92 @@ async def test_workflow_slot_mapping_round_trips_scope_key():
     finally:
         await redis_client.delete(mapping_key)
         await rl.close()
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_refresh_concurrent_slot_calls_atomic_lua():
+    rl = RateLimiter()
+    mock_redis = AsyncMock()
+    mock_redis.eval = AsyncMock(return_value=1)
+    rl._get_redis = AsyncMock(return_value=mock_redis)
+
+    res = await rl.refresh_concurrent_slot(
+        123, "slot-abc", scope_key="campaign:5", workflow_run_id=999
+    )
+    assert res is True
+    mock_redis.eval.assert_awaited_once()
+    args = mock_redis.eval.await_args[0]
+    assert args[1] == 4
+    assert args[2] == "concurrent_calls:123"
+    assert args[3] == "concurrent_calls:campaign:5"
+    assert args[4] == "concurrent_calls_fleet"
+    assert args[5] == "workflow_slot_mapping:999"
+    assert args[7] == "slot-abc"
+    assert args[8] == "123:slot-abc"
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_refresh_concurrent_slot_returns_false_when_slot_missing():
+    rl = RateLimiter()
+    mock_redis = AsyncMock()
+    mock_redis.eval = AsyncMock(return_value=0)
+    rl._get_redis = AsyncMock(return_value=mock_redis)
+
+    res = await rl.refresh_concurrent_slot(123, "slot-abc")
+    assert res is False
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_uses_heartbeat_stale_timeout_for_fast_cleanup():
+    rl = RateLimiter()
+    mock_redis = AsyncMock()
+    mock_redis.zremrangebyscore = AsyncMock()
+    mock_redis.zcard = AsyncMock(return_value=1)
+    rl._get_redis = AsyncMock(return_value=mock_redis)
+
+    count = await rl.get_concurrent_count(123)
+    assert count == 1
+    mock_redis.zremrangebyscore.assert_awaited_once()
+    concurrent_key, min_score, max_score = mock_redis.zremrangebyscore.await_args[0]
+    assert concurrent_key == "concurrent_calls:123"
+    assert min_score == 0
+    expected_cutoff = time.time() - rl.heartbeat_stale_timeout
+    assert abs(max_score - expected_cutoff) < 2.0
+
+
+@pytest.mark.asyncio
+async def test_service_refresh_workflow_run_slot():
+    service = CallConcurrencyService()
+    with patch("api.services.call_concurrency.service.rate_limiter") as mock_rl:
+        mock_rl.get_workflow_slot_mapping = AsyncMock(
+            return_value=(123, "slot-999", "campaign:7")
+        )
+        mock_rl.refresh_concurrent_slot = AsyncMock(return_value=True)
+
+        res = await service.refresh_workflow_run_slot(501)
+        assert res is True
+        mock_rl.get_workflow_slot_mapping.assert_awaited_once_with(501)
+        mock_rl.refresh_concurrent_slot.assert_awaited_once_with(
+            123, "slot-999", scope_key="campaign:7", workflow_run_id=501
+        )
+
+
+@pytest.mark.asyncio
+async def test_hold_slot_heartbeat_runs_and_cancels_cleanly():
+    service = CallConcurrencyService()
+    refreshes = []
+
+    async def fake_refresh(run_id):
+        refreshes.append(run_id)
+        return True
+
+    service.refresh_workflow_run_slot = AsyncMock(side_effect=fake_refresh)
+
+    with patch("api.services.call_concurrency.service.rate_limiter") as mock_rl:
+        mock_rl.heartbeat_interval = 0.02
+        async with service.hold_slot_heartbeat(501):
+            await asyncio.sleep(0.06)
+
+    assert len(refreshes) >= 2
+    assert all(r == 501 for r in refreshes)
+

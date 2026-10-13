@@ -32,7 +32,7 @@ const TIERS = [
     id: "pro",
     name: "Pro",
     icon: <Rocket className="w-8 h-8 text-purple-500 mb-4" />,
-    price: "₹4",
+    price: "₹18",
     priceUnit: "per minute",
     description: "For growing businesses needing higher volume and better AI.",
     depositRequired: "₹8,000 wallet minimum",

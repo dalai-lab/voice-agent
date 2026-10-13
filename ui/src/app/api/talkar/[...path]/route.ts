@@ -33,6 +33,13 @@ async function proxy(request: NextRequest, method: string, path: string) {
     headers["X-Talkar-User-Id"] = String(userId);
   }
 
+  const clientAuth = request.headers.get("authorization");
+  if (clientAuth) {
+    headers["Authorization"] = clientAuth;
+  } else if (process.env.TALKAR_BILLING_API_TOKEN) {
+    headers["Authorization"] = `Bearer ${process.env.TALKAR_BILLING_API_TOKEN.trim()}`;
+  }
+
   const fetchOptions: any = {
     method,
     headers,

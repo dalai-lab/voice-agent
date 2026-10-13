@@ -618,8 +618,8 @@ def test_workflow_uuid_route_rejects_archived_workflows():
     assert not mock_db.create_workflow_run.called
 
 
-def test_public_agent_fails_open_when_redis_down():
-    """Verify that when Redis is down, public agent trigger fails open and initiates the call normally without AttributeError."""
+def test_public_agent_fails_closed_when_redis_down():
+    """Verify that when Redis is down, public agent trigger fails closed with 503."""
     app = _make_test_app()
     client = TestClient(app)
 
@@ -674,7 +674,7 @@ def test_public_agent_fails_open_when_redis_down():
             json={"phone_number": "+15551234567"},
         )
 
-    assert response.status_code == 200
+    assert response.status_code == 503
     mock_concurrency.bind_workflow_run.assert_not_called()
-    provider.initiate_call.assert_awaited_once()
+    provider.initiate_call.assert_not_called()
 

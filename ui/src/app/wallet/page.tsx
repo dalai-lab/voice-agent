@@ -137,7 +137,7 @@ export default function WalletPage() {
         : PLAN_MINIMUMS[currentPlan] ?? 6000)
     : 500;
 
-  const currentMinuteRate = subscription?.per_minute_rate_paise ? subscription.per_minute_rate_paise / 100 : (currentPlan === "pro" ? 4 : 6);
+  const currentMinuteRate = subscription?.per_minute_rate_paise ? subscription.per_minute_rate_paise / 100 : (currentPlan === "pro" ? 18 : 6);
   const parsedTopupAmount = parseInt(topupAmount) || 0;
   const estimatedMinutes = parsedTopupAmount > 0 && currentMinuteRate > 0 ? Math.floor(parsedTopupAmount / currentMinuteRate) : 0;
 
@@ -415,7 +415,19 @@ export default function WalletPage() {
     }
   };
 
-  const filteredTransactions = transactions.filter(tx => filter === "all" || tx.type === filter);
+  const filterTypeMap: Record<string, string[]> = {
+    top_up: ["top_up", "credit", "manual_credit"],
+    call_deduction: ["call_deduction", "deduction", "manual_deduct"],
+    grant: ["grant", "manual_credit", "credit"],
+    refund: ["refund"],
+  };
+
+  const filteredTransactions = transactions.filter(tx => {
+    if (filter === "all") return true;
+    const allowed = filterTypeMap[filter];
+    if (allowed) return allowed.includes(tx.type);
+    return tx.type === filter;
+  });
   const itemsPerPage = 15;
   const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
   const currentTransactions = filteredTransactions.slice((page - 1) * itemsPerPage, page * itemsPerPage);
@@ -849,7 +861,7 @@ export default function WalletPage() {
                     </span>
                   ) : (
                     <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                      ₹4 / min
+                      ₹18 / min
                     </span>
                   )}
                 </div>
@@ -867,7 +879,7 @@ export default function WalletPage() {
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Check className="h-3.5 w-3.5 text-foreground" />
-                    <span>Lowest calling rate (₹4/min)</span>
+                    <span>Premium ElevenLabs voice rate (₹18/min)</span>
                   </div>
                 </div>
               </div>
@@ -1072,7 +1084,7 @@ export default function WalletPage() {
               <div className="flex justify-between">
                 <span>New Call Rate:</span>
                 <span className="font-semibold text-foreground">
-                  ₹{selectedTierToSwitch === "pro" ? "4.00" : "6.00"} / min
+                  ₹{selectedTierToSwitch === "pro" ? "18.00" : "6.00"} / min
                 </span>
               </div>
               <div className="flex justify-between">

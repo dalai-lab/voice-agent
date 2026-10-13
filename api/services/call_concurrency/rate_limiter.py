@@ -32,6 +32,14 @@ class RateLimiter:
         self.stale_call_timeout = int(
             os.getenv("STALE_CALL_TIMEOUT_SECONDS", "2400")
         )
+        self.heartbeat_interval = int(
+            os.getenv("SLOT_HEARTBEAT_INTERVAL_SECONDS", "10")
+        )
+        # Heartbeat-aware stale threshold: slots not refreshed within 120s are considered dead/crashed
+        # (120s safely allows PSTN carrier ringing up to 60-90s before answer while quickly recovering crashed workers)
+        self.heartbeat_stale_timeout = int(
+            os.getenv("SLOT_HEARTBEAT_STALE_TIMEOUT_SECONDS", "120")
+        )
 
     async def _get_redis(self) -> Any:
         """Get or create Redis connection"""
@@ -162,7 +170,7 @@ class RateLimiter:
         concurrent_key = f"concurrent_calls:{organization_id}"
         scope_concurrent_key = f"concurrent_calls:{scope_key}" if scope_key else ""
         now = time.time()
-        stale_cutoff = now - self.stale_call_timeout
+        stale_cutoff = now - self.heartbeat_stale_timeout
 
         # Lua script for atomic operation across the org counter and the
         # optional scope counter (empty scope key = org-only acquisition).
@@ -298,6 +306,86 @@ class RateLimiter:
             logger.error(f"Error releasing concurrent slot: {e}")
             return None
 
+    async def refresh_concurrent_slot(
+        self,
+        organization_id: int,
+        slot_id: str,
+        *,
+        scope_key: str | None = None,
+        workflow_run_id: int | None = None,
+    ) -> bool:
+        """Refresh a concurrent call slot's timestamp score in Redis.
+
+        Ensures active calls stay valid while allowing crashed / killed workers
+        to be pruned within heartbeat_stale_timeout (60s).
+        """
+        if not slot_id:
+            return False
+
+        redis_client = await self._get_redis()
+        concurrent_key = f"concurrent_calls:{organization_id}"
+        scope_concurrent_key = f"concurrent_calls:{scope_key}" if scope_key else ""
+        fleet_member = f"{organization_id}:{slot_id}"
+        mapping_key = (
+            f"workflow_slot_mapping:{workflow_run_id}" if workflow_run_id else ""
+        )
+        now = time.time()
+        expire_seconds = self.stale_call_timeout
+
+        lua_script = """
+        local key = KEYS[1]
+        local scope_key = KEYS[2]
+        local fleet_key = KEYS[3]
+        local mapping_key = KEYS[4]
+        local now = tonumber(ARGV[1])
+        local slot_id = ARGV[2]
+        local fleet_member = ARGV[3]
+        local expire_seconds = tonumber(ARGV[4])
+
+        local score = redis.call('ZSCORE', key, slot_id)
+        if not score then
+            return 0
+        end
+
+        -- Update score to current time; XX ensures we only update existing members
+        redis.call('ZADD', key, 'XX', now, slot_id)
+        redis.call('EXPIRE', key, 3600)
+
+        if fleet_key ~= '' then
+            redis.call('ZADD', fleet_key, 'XX', now, fleet_member)
+            redis.call('EXPIRE', fleet_key, 3600)
+        end
+
+        if scope_key ~= '' then
+            redis.call('ZADD', scope_key, 'XX', now, slot_id)
+            redis.call('EXPIRE', scope_key, 3600)
+        end
+
+        if mapping_key ~= '' and redis.call('EXISTS', mapping_key) == 1 then
+            redis.call('EXPIRE', mapping_key, expire_seconds)
+        end
+
+        return 1
+        """
+
+        try:
+            result = await redis_client.eval(
+                lua_script,
+                4,
+                concurrent_key,
+                scope_concurrent_key,
+                FLEET_CONCURRENT_KEY,
+                mapping_key,
+                now,
+                slot_id,
+                fleet_member,
+                expire_seconds,
+            )
+            return result in (1, "1", b"1", True)
+        except Exception as e:
+            logger.error(f"Error refreshing concurrent slot: {e}")
+            return False
+
     async def get_concurrent_count(self, organization_id: int) -> int:
         """
         Get current number of active concurrent calls for an organization.
@@ -308,7 +396,7 @@ class RateLimiter:
 
         try:
             # Clean up stale entries first
-            stale_cutoff = time.time() - self.stale_call_timeout
+            stale_cutoff = time.time() - self.heartbeat_stale_timeout
             await redis_client.zremrangebyscore(concurrent_key, 0, stale_cutoff)
 
             # Get current count
@@ -325,7 +413,7 @@ class RateLimiter:
         acquire/release paths maintain alongside the per-org counters — no
         keyspace scan, no per-org fan-out, and scrape cost is independent of
         whatever else lives in this (shared) Redis. Counting by score (not
-        ZCARD) excludes slots older than stale_call_timeout without writing, so
+        ZCARD) excludes slots older than heartbeat_stale_timeout without writing, so
         an orphaned call can't keep the metric high and block scale-down,
         matching the org counters' stale semantics.
 
@@ -335,7 +423,7 @@ class RateLimiter:
         turns it into a 503) rather than masquerade as an idle fleet.
         """
         redis_client = await self._get_redis()
-        stale_cutoff = time.time() - self.stale_call_timeout
+        stale_cutoff = time.time() - self.heartbeat_stale_timeout
         return await redis_client.zcount(FLEET_CONCURRENT_KEY, stale_cutoff, "+inf")
 
     async def store_workflow_slot_mapping(
@@ -469,7 +557,7 @@ class RateLimiter:
         concurrent_key = f"concurrent_calls:{organization_id}"
 
         try:
-            stale_cutoff = time.time() - self.stale_call_timeout
+            stale_cutoff = time.time() - self.heartbeat_stale_timeout
             await redis_client.zremrangebyscore(concurrent_key, 0, stale_cutoff)
             rank = await redis_client.zrank(concurrent_key, slot_id)
             if rank is not None:

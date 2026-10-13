@@ -89,6 +89,50 @@ async def test_public_embed_offer_rejects_when_org_concurrency_limit_reached():
 
 
 @pytest.mark.asyncio
+async def test_webrtc_signaling_fails_closed_when_redis_unavailable():
+    """When Redis throws an unexpected exception during slot acquisition, WebRTC fails closed with concurrency_service_unavailable."""
+    manager = SignalingManager()
+    ws = _FakeWebSocket()
+    user = SimpleNamespace(id=7)
+
+    with (
+        patch("api.routes.webrtc_signaling.db_client") as mock_db,
+        patch(
+            "api.routes.webrtc_signaling.authorize_workflow_run_start",
+            new=AsyncMock(),
+        ) as mock_authorize,
+        patch("api.routes.webrtc_signaling.call_concurrency") as mock_concurrency,
+    ):
+        mock_db.get_workflow_organization_id = AsyncMock(return_value=11)
+        mock_concurrency.acquire_org_slot = AsyncMock(
+            side_effect=RuntimeError("Redis connection refused")
+        )
+
+        await manager._handle_offer(
+            ws,
+            _offer_payload(),
+            workflow_id=33,
+            workflow_run_id=501,
+            user=user,
+            organization_id=11,
+            connection_key="conn-1",
+            enforce_call_concurrency=True,
+            call_concurrency_source="public_embed",
+        )
+
+    ws.send_json.assert_awaited_once_with(
+        {
+            "type": "error",
+            "payload": {
+                "error_type": "concurrency_service_unavailable",
+                "message": "Call concurrency infrastructure temporarily unavailable",
+            },
+        }
+    )
+    mock_authorize.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_public_embed_renegotiation_does_not_acquire_another_slot():
     manager = SignalingManager()
     ws = _FakeWebSocket()

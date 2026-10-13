@@ -276,8 +276,13 @@ async def _execute_resolved_target(
             detail="Concurrent call limit reached",
         )
     except Exception as e:
-        logger.warning(f"Redis down, failing open for org {target.organization_id}: {e}")
-        concurrency_slot = None
+        logger.error(
+            f"Call concurrency service unavailable for org {target.organization_id}: {e}. Failing closed."
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Call concurrency infrastructure temporarily unavailable. Please try again shortly.",
+        )
 
     try:
         run_inputs = await prepare_workflow_run_inputs(

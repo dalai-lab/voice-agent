@@ -59,7 +59,7 @@ async def test_initialized_no_answer_enqueues_workflow_completion():
         "call_id": "call-123",
     }
     mock_enqueue.assert_awaited_once_with(
-        FunctionNames.RUN_INTEGRATIONS_POST_WORKFLOW_RUN, 123
+        FunctionNames.PROCESS_WORKFLOW_COMPLETION, 123
     )
     mock_dispatcher.release_call_slot.assert_awaited_once_with(123)
 

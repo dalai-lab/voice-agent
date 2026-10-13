@@ -549,9 +549,17 @@ class SignalingManager:
                     )
                     return
                 except Exception as e:
-                    # TALKAR PATCH: Redis down — fail open, never block calls on infra outage
-                    logger.warning(f"Redis concurrency check failed, failing open for org {organization_id}: {e}")
-                    concurrency_slot = None
+                    logger.error(f"Redis concurrency check failed for org {organization_id}: {e}. Failing closed.")
+                    await ws.send_json(
+                        {
+                            "type": "error",
+                            "payload": {
+                                "error_type": "concurrency_service_unavailable",
+                                "message": "Call concurrency infrastructure temporarily unavailable",
+                            },
+                        }
+                    )
+                    return
 
             # Check Dograh quota before initiating the call (apply per-workflow
             # model_overrides so we evaluate the keys this workflow will use).

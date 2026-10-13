@@ -686,10 +686,11 @@ class ARIConnection:
                 await self._delete_channel(channel_id)
                 return
             except Exception as e:
-                logger.warning(
-                    f"Redis concurrency check failed, failing open for org {self.organization_id}: {e}"
+                logger.error(
+                    f"Redis concurrency check failed for org {self.organization_id}: {e}. Failing closed."
                 )
-                concurrency_slot = None
+                await self._delete_channel(channel_id)
+                return
 
             # 3. Create workflow run
             call_id = channel_id

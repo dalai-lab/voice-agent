@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
-from api.constants import DEPLOYMENT_MODE, TALKAR_SERVICE_URL
+from api.constants import DEPLOYMENT_MODE, TALKAR_SERVICE_URL, TALKAR_BILLING_API_TOKEN
 from api.db import db_client
 from api.db.models import UserModel
 from api.errors.failure import (
@@ -536,7 +536,16 @@ async def _authorize_talkar_workflow_run_start(
                 # This prevents burst incoming calls from evaluating against aggregate peak
                 # active_calls simultaneously and starving valid calls funded by available balance.
                 concurrent_calls = slot_position
+            elif workflow_run_id is not None:
+                # The slot for this workflow_run_id was already acquired and registered in Redis
+                # before this quota check. Therefore, active_count already includes this call.
+                # Do NOT add +1, as that double-counts the current call and causes false
+                # concurrency_limit_exceeded rejections (e.g. 2nd call on limit=2 evaluated as 3).
+                active_count = await rate_limiter.get_concurrent_count(group_id)
+                concurrent_calls = max(1, active_count)
             else:
+                # Pre-flight check where no workflow_run_id / slot has been acquired yet.
+                # This call will be the (active_count + 1)-th call once acquired.
                 active_count = await rate_limiter.get_concurrent_count(group_id)
                 concurrent_calls = active_count + 1
         except Exception as e:
@@ -550,7 +559,7 @@ async def _authorize_talkar_workflow_run_start(
 
         talkar_billing_token = os.getenv(
             "TALKAR_BILLING_API_TOKEN",
-            "change-me-in-production-billing-token",
+            TALKAR_BILLING_API_TOKEN,
         ).strip()
         request_headers: dict = {"Content-Type": "application/json"}
         if talkar_billing_token:
@@ -574,12 +583,29 @@ async def _authorize_talkar_workflow_run_start(
                 headers=request_headers,
                 timeout=3.0
             )
-            if resp.status_code == 200 and resp.json().get("has_quota"):
-                return QuotaCheckResult(has_quota=True)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("has_quota"):
+                    return QuotaCheckResult(has_quota=True)
+                reason = data.get("reason", "insufficient_quota")
+                error_msg = "Talkar wallet balance is exhausted."
+                if reason == "concurrency_limit_exceeded":
+                    error_msg = f"Concurrent call limit reached ({data.get('active_calls', 0)}/{data.get('concurrent_call_limit', 0)})."
+                elif reason == "insufficient_reserve":
+                    error_msg = "Insufficient wallet reserve for active concurrent calls."
+                elif reason == "master_suspended":
+                    error_msg = "Master account is suspended."
+                return QuotaCheckResult(
+                    has_quota=False,
+                    error_code=reason,
+                    error_message=error_msg,
+                )
+            from loguru import logger
+            logger.error(f"Talkar billing returned HTTP {resp.status_code}: {resp.text}")
             return QuotaCheckResult(
                 has_quota=False,
-                error_code="insufficient_quota",
-                error_message="Talkar wallet balance is exhausted."
+                error_code="billing_service_unavailable",
+                error_message="Talkar billing and quota verification is temporarily unavailable. Calls are paused for safety.",
             )
     except Exception as e:
         from loguru import logger

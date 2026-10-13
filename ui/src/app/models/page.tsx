@@ -50,7 +50,7 @@ const AI_MODELS: ModelEngine[] = [
     tierKey: "pro",
     name: "Pro Engine",
     subtitle: "Natural speech & emotive client interactions",
-    rateRupees: "4.00",
+    rateRupees: "18.00",
     description: "Combines deep conversational understanding with high-fidelity, emotional voice tones. Speaks with natural human cadence.",
     benefits: [
       "10 parallel active calls",

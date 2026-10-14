@@ -62,6 +62,68 @@ export default function OnboardingPage() {
   // Upload State
   const [uploadProgress, setUploadProgress] = useState({ gst: 0, reg: 0 });
   const [uploadedFiles, setUploadedFiles] = useState<{ gst: File | null; reg: File | null }>({ gst: null, reg: null });
+  const [switchingBillingType, setSwitchingBillingType] = useState(false);
+
+  const handleSwitchToIndependent = async () => {
+    if (!dograhOrgId) return;
+    setSwitchingBillingType(true);
+    try {
+      const res = await fetch(`${TALKAR_API}/customers/by-org/${dograhOrgId}/billing-account-type`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account_type: "independent" }),
+      });
+      if (res.ok) {
+        setCustomerData((prev: any) => ({
+          ...prev,
+          is_sub_org: false,
+          account_type: "independent",
+          billing_org_id: null,
+          master_customer_id: null,
+        }));
+        setStatus("pending_approval");
+        setActiveStep(1);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Failed to switch to independent billing.");
+      }
+    } catch {
+      alert("Error switching billing account type.");
+    } finally {
+      setSwitchingBillingType(false);
+    }
+  };
+
+  const handleSwitchToShared = async () => {
+    if (!dograhOrgId) return;
+    setSwitchingBillingType(true);
+    try {
+      const res = await fetch(`${TALKAR_API}/customers/by-org/${dograhOrgId}/billing-account-type`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account_type: "shared" }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCustomerData((prev: any) => ({
+          ...prev,
+          is_sub_org: true,
+          account_type: "shared",
+          billing_org_id: data.billing_org_id,
+          master_customer_id: data.billing_org_id,
+        }));
+        setStatus("new_agent_brief");
+        setBriefStep(1);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Failed to link to shared wallet.");
+      }
+    } catch {
+      alert("Error linking to shared billing account.");
+    } finally {
+      setSwitchingBillingType(false);
+    }
+  };
 
   useEffect(() => {
     if (!dograhOrgId && !email) {
@@ -102,22 +164,45 @@ export default function OnboardingPage() {
           } else if (data.status === "agent_building" && !data.has_onboarding_form) {
             setStatus("new_agent_brief");
           }
+
+          // Fetch existing master info if available to provide linking / independent context
+          if (email) {
+            fetch(`${TALKAR_API}/customers/existing?contact_email=${encodeURIComponent(email)}`)
+              .then(r => r.ok ? r.json() : null)
+              .then(ex => {
+                if (ex && !cancelled) {
+                  setCustomerData((prev: any) => ({
+                    ...prev,
+                    has_existing_master: true,
+                    existing_master: ex,
+                    existing_company_name: ex.company_name,
+                  }));
+                }
+              })
+              .catch(() => {});
+          }
         } else if (res.status === 404 && dograhOrgId && email) {
           // New org in Dograh; check if this user already has a master account
           const existingRes = await fetch(`${TALKAR_API}/customers/existing?contact_email=${encodeURIComponent(email)}`);
           if (existingRes.ok) {
             const existingData = await existingRes.json();
             if (cancelled) return;
-            // Link to existing master account and skip full business onboarding
-            setCustomerData({ master_customer_id: existingData.customer_id });
+            // Link to existing master account and provide quick brief by default
+            setCustomerData({
+              master_customer_id: existingData.customer_id,
+              existing_master: existingData,
+              has_existing_master: true,
+              existing_company_name: existingData.company_name,
+              is_sub_org: true,
+            });
             setStatus("new_agent_brief");
           } else {
             // Completely new user
-            if (!cancelled) setStatus("new");
+            if (!cancelled) setStatus("pending_approval");
           }
         } else {
           // Unknown error or no dograhOrgId
-          if (!cancelled) setStatus("new");
+          if (!cancelled) setStatus("pending_approval");
         }
       } catch (err) {
         console.error("Failed to fetch onboarding status", err);
@@ -413,8 +498,37 @@ export default function OnboardingPage() {
       <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12 lg:py-20 z-10">
         
         {/* ── 3. PENDING APPROVAL: Premium Split-Screen Wizard ── */}
-        {status === "pending_approval" && (
+        {(status === "pending_approval" || status === "new") && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-start">
+            
+            {/* Optional Banner to switch to Shared Wallet if returning customer has an established account */}
+            {(customerData?.has_existing_master || customerData?.existing_master) && (
+              <div className="lg:col-span-12 bg-gradient-to-r from-blue-50/90 to-indigo-50/80 border border-blue-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-blue-100 text-blue-800 border-blue-300 font-semibold text-xs">
+                      Independent Billing Account
+                    </Badge>
+                    <span className="text-xs text-blue-700 font-medium">
+                      Separate legal entity & GST invoices
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-900/80 leading-relaxed">
+                    Configuring an independent business entity with its own dedicated wallet and invoicing. Want this workspace to share your existing wallet ({customerData?.existing_company_name || "Primary Account"}) instead?
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={switchingBillingType}
+                  onClick={handleSwitchToShared}
+                  className="border-blue-300 text-blue-900 hover:bg-blue-100/90 font-medium text-xs whitespace-nowrap bg-white/90 shadow-xs"
+                >
+                  {switchingBillingType ? "Linking..." : "Switch to Shared Wallet →"}
+                </Button>
+              </div>
+            )}
             
             {/* LEFT COLUMN: Progress & Navigation Timeline */}
             <div className="lg:col-span-4 space-y-8 lg:sticky lg:top-28">
@@ -774,6 +888,33 @@ export default function OnboardingPage() {
               <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-600 font-mono text-[10px] px-3 py-1 rounded-full">
                 Step {briefStep} of 2
               </Badge>
+            </div>
+
+            {/* Shared vs Independent Billing Selector Banner */}
+            <div className="bg-gradient-to-r from-amber-50/90 to-orange-50/80 border border-amber-200/90 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-semibold text-xs">
+                    Shared Wallet
+                  </Badge>
+                  <span className="text-xs text-amber-700 font-medium">
+                    Linked to primary company billing
+                  </span>
+                </div>
+                <p className="text-xs text-amber-900/80 leading-relaxed max-w-xl">
+                  This workspace draws call credits from your master organization wallet. Need separate GST invoicing, a dedicated credit card, or an isolated budget for this business entity?
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={switchingBillingType}
+                onClick={handleSwitchToIndependent}
+                className="border-amber-300 text-amber-900 hover:bg-amber-100/90 font-medium text-xs whitespace-nowrap bg-white/90 shadow-xs"
+              >
+                {switchingBillingType ? "Updating..." : "Set Up Independent Billing →"}
+              </Button>
             </div>
 
             <form onSubmit={handleSubmitBrief} className="space-y-10">

@@ -76,6 +76,10 @@ class TestServiceFactoryCamb:
             "pipecat.services.dograh.llm",
             "pipecat.services.dograh.stt",
             "pipecat.services.dograh.tts",
+            "pipecat.services.dograh.flux",
+            "pipecat.services.dograh.flux.stt",
+            "pipecat.services.camb",
+            "pipecat.services.camb.tts",
             "pipecat.utils.text.xml_function_tag_filter",
         ]
         mocks = {}

@@ -14,6 +14,7 @@ from api.services.call_concurrency import (
 from api.services.call_concurrency.rate_limiter import rate_limiter
 from api.services.campaign.circuit_breaker import circuit_breaker
 from api.services.campaign.errors import (
+    CampaignQuotaExceededError,
     ConcurrentSlotAcquisitionError,
     PhoneNumberPoolExhaustedError,
 )
@@ -217,6 +218,20 @@ class CampaignCallDispatcher:
                 # Re-raise to propagate to process_campaign_batch
                 raise
 
+            except CampaignQuotaExceededError as e:
+                logger.warning(
+                    f"Quota check failed for campaign {campaign_id}; "
+                    "returning claimed queued runs that were not dispatched: "
+                    f"{e}"
+                )
+                await self._return_unprocessed_claims(
+                    queued_runs,
+                    processed_run_ids,
+                    reason="quota_exceeded",
+                )
+                # Re-raise to propagate to process_campaign_batch
+                raise
+
             except Exception as e:
                 logger.warning(f"Error processing queued run {queued_run.id}: {e}")
 
@@ -393,20 +408,33 @@ class CampaignCallDispatcher:
         )
         if not quota_result.has_quota:
             error_message = quota_result.error_message or "Quota exceeded"
+            error_code = quota_result.error_code or "insufficient_quota"
             logger.warning(
                 f"Campaign {campaign.id} quota check failed for workflow run "
-                f"{workflow_run.id}: {error_message}"
+                f"{workflow_run.id}: [{error_code}] {error_message}"
             )
             await db_client.update_workflow_run(
                 run_id=workflow_run.id,
                 is_completed=True,
                 state=WorkflowRunState.COMPLETED.value,
-                gathered_context={"error": error_message},
+                gathered_context={"error": error_message, "error_code": error_code},
+                queued_run_id=None,
             )
 
             await self.release_call_slot(workflow_run.id)
 
-            raise ValueError(error_message)
+            # Revert the current queued run so it remains in queued state and is NOT failed
+            await db_client.update_queued_run(
+                queued_run_id=queued_run.id,
+                state="queued",
+            )
+
+            raise CampaignQuotaExceededError(
+                organization_id=campaign.organization_id,
+                campaign_id=campaign.id,
+                error_code=error_code,
+                error_message=error_message,
+            )
 
         # Initiate call via telephony provider
         try:

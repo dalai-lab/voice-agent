@@ -19,6 +19,8 @@ from api.schemas.workflow import WorkflowRunResponseSchema
 from api.services.workflow.run_usage_response import format_public_cost_info
 from api.utils.recording_artifacts import get_recording_storage_key
 
+_UNSET = object()
+
 
 class WorkflowRunClient(BaseDBClient):
     async def create_workflow_run(
@@ -420,6 +422,7 @@ class WorkflowRunClient(BaseDBClient):
         annotations: dict | None = None,
         extra: dict | None = None,
         extracted_data: dict | None = None,
+        queued_run_id: Any = _UNSET,
     ) -> WorkflowRunModel:
         async with self.async_session() as session:
             # Use SELECT FOR UPDATE to lock the row during the update
@@ -463,6 +466,8 @@ class WorkflowRunClient(BaseDBClient):
                 run.extra = {**run.extra, **extra}
             if extracted_data is not None:
                 run.extracted_data = extracted_data
+            if queued_run_id is not _UNSET:
+                run.queued_run_id = queued_run_id
             if is_completed:
                 run.is_completed = is_completed
             if state:

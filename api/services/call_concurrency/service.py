@@ -198,6 +198,24 @@ class CallConcurrencyService:
 
             return organization_id
 
+    async def is_org_custom_concurrency_cap(self, organization_id: int) -> bool | None:
+        """Check whether an organization has an explicitly configured custom concurrency cap.
+        Returns:
+            - True: Explicit custom limit/cap configured
+            - False: Explicitly un-customized / default inherited limit
+            - None: Configuration missing or not annotated
+        """
+        try:
+            config = await db_client.get_configuration(
+                organization_id,
+                OrganizationConfigurationKey.CONCURRENT_CALL_LIMIT.value,
+            )
+            if config and isinstance(config.value, dict):
+                return config.value.get("is_custom_cap")
+            return None
+        except Exception:
+            return None
+
     async def get_effective_org_concurrent_limit(self, organization_id: int) -> int:
         """Get the effective concurrent call limit for an organization,
         evaluating both its individual limit and its group (master) limit.
@@ -206,6 +224,16 @@ class CallConcurrencyService:
         org_limit = await self.get_org_concurrent_limit(organization_id)
         if group_id != organization_id:
             group_limit = await self.get_org_concurrent_limit(group_id)
+            if org_limit == 0 or group_limit == 0:
+                return 0
+
+            # Prevent sub-org concurrency freeze on master upgrades:
+            # If the sub-org has no explicit custom cap and the group limit is higher,
+            # allow the sub-org to share the upgraded group limit.
+            is_custom = await self.is_org_custom_concurrency_cap(organization_id)
+            if is_custom is False and group_limit > org_limit:
+                return group_limit
+
             return min(org_limit, group_limit)
         return org_limit
 

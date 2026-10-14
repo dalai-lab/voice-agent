@@ -25,3 +25,23 @@ class PhoneNumberPoolExhaustedError(Exception):
             f"All phone numbers are in use for org {organization_id}. "
             f"No available from_number in pool."
         )
+
+
+class CampaignQuotaExceededError(Exception):
+    """Raised when a campaign call cannot be dispatched due to exhausted quota, wallet depletion, or concurrency limit."""
+
+    def __init__(
+        self,
+        organization_id: int,
+        campaign_id: int,
+        error_code: str,
+        error_message: str,
+    ):
+        self.organization_id = organization_id
+        self.campaign_id = campaign_id
+        self.error_code = error_code
+        self.error_message = error_message
+        super().__init__(
+            f"Quota check failed for campaign {campaign_id} (org {organization_id}): [{error_code}] {error_message}"
+        )
+

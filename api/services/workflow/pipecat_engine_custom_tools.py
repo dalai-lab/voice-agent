@@ -182,7 +182,7 @@ class CustomToolManager:
 
             schemas: list[FunctionSchema] = []
 
-            if self._engine._enable_callbacks:
+            if getattr(self._engine, "_enable_callbacks", False) is True:
                 self._register_schedule_callback_handler()
                 logger.debug("Registered native schedule_callback tool handler")
                 for tool_def in get_schedule_callback_tools():
@@ -289,7 +289,7 @@ class CustomToolManager:
         try:
             tools = await db_client.get_tools_by_uuids(tool_uuids, organization_id)
 
-            if self._engine._enable_callbacks:
+            if getattr(self._engine, "_enable_callbacks", False) is True:
                 self._register_schedule_callback_handler()
                 logger.debug("Registered native schedule_callback tool handler")
 

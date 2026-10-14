@@ -18,8 +18,22 @@ async function proxy(request: NextRequest, method: string, path: string) {
   const search = request.nextUrl.search;
   const targetUrl = `${TALKAR_INTERNAL_URL}/${path}${search}`;
 
+  const isHealthCheck = path === "health" || path.startsWith("health/");
+
   const user = await getServerUser();
   const userEmail = (user as any)?.primaryEmail || (user as any)?.email;
+
+  const clientAuth = request.headers.get("authorization");
+
+  // Security: Unauthenticated browser requests must NOT be proxied to Talkar,
+  // preventing global admin privilege escalation and unauthorized service access.
+  // Only public health checks are allowed without an authenticated user or client token.
+  if (!isHealthCheck && !userEmail && !clientAuth) {
+    return NextResponse.json(
+      { detail: "Authentication required to access Talkar services." },
+      { status: 401 }
+    );
+  }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -33,10 +47,11 @@ async function proxy(request: NextRequest, method: string, path: string) {
     headers["X-Talkar-User-Id"] = String(userId);
   }
 
-  const clientAuth = request.headers.get("authorization");
+  // Security: Only inject TALKAR_BILLING_API_TOKEN when authenticated user context is present.
+  // Never inject the service token on unauthenticated requests.
   if (clientAuth) {
     headers["Authorization"] = clientAuth;
-  } else {
+  } else if (userEmail) {
     const serviceToken = (process.env.TALKAR_BILLING_API_TOKEN || "change-me-in-production-billing-token").trim();
     headers["Authorization"] = `Bearer ${serviceToken}`;
   }
@@ -53,8 +68,16 @@ async function proxy(request: NextRequest, method: string, path: string) {
 
   try {
     const upstream = await fetch(targetUrl, fetchOptions);
-    const data = await upstream.json();
-    return NextResponse.json(data, { status: upstream.status });
+    const contentType = upstream.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await upstream.json();
+      return NextResponse.json(data, { status: upstream.status });
+    }
+    const text = await upstream.text();
+    return new NextResponse(text, {
+      status: upstream.status,
+      headers: { "Content-Type": contentType || "text/plain" },
+    });
   } catch (err) {
     console.error(`[talkar-proxy] Failed to reach ${targetUrl}:`, err);
     return NextResponse.json(

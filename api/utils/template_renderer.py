@@ -181,6 +181,8 @@ def _resolve_template_value(
     if filter_name is not None and value in (None, ""):
         if filter_name == "fallback":
             return filter_value if filter_value is not None else variable_path.title()
+        if filter_name == "default":
+            return filter_value if filter_value is not None else ""
         return filter_name
 
     return value
@@ -246,6 +248,9 @@ def _render_string(
 def render_url_template(
     url: str,
     context: Dict[str, Any],
+    initial_context: Optional[Dict[str, Any]] = None,
+    gathered_context: Optional[Dict[str, Any]] = None,
+    param_type_map: Optional[Dict[str, Any]] = None,
 ) -> tuple[str, set[str]]:
     """Render URL placeholders with shared template semantics and URL safety.
 
@@ -264,6 +269,40 @@ def render_url_template(
     if not url or "{{" not in url:
         return url, set()
 
+    merged_context = dict(context)
+    if initial_context is not None:
+        merged_context["initial_context"] = {
+            **merged_context.get("initial_context", {}),
+            **initial_context,
+        }
+    if gathered_context is not None:
+        merged_context["gathered_context"] = {
+            **merged_context.get("gathered_context", {}),
+            **gathered_context,
+        }
+
+    if param_type_map is not None:
+        import re
+        for ph in re.findall(r"\{\{([^}]+)\}\}", url):
+            ph_clean = ph.split("|")[0].strip()
+            base = ph_clean.split(".")[0]
+            if (
+                not ph_clean.startswith("initial_context.")
+                and not ph_clean.startswith("gathered_context.")
+                and not ph_clean.startswith("current_time")
+                and not ph_clean.startswith("current_weekday")
+            ):
+                if base not in param_type_map:
+                    raise ValueError(f"URL placeholder '{base}' is not a configured parameter.")
+                if param_type_map.get(base) in ("array", "list"):
+                    raise ValueError(
+                        f"Array parameters cannot be used in URL path templates: '{base}'."
+                    )
+                if param_type_map.get(base) == "object" and "." not in ph_clean:
+                    raise ValueError(
+                        f"Object parameters cannot be used in URL path templates: '{base}'."
+                    )
+
     consumed_params = set()
 
     def _format_url_value(
@@ -277,10 +316,14 @@ def render_url_template(
             raise ValueError(
                 f"URL template variable '{variable_path}' resolved to an empty string."
             )
-        if isinstance(value, list):
-            raise ValueError("Arrays cannot be rendered directly into a URL.")
-        if isinstance(value, dict):
-            raise ValueError("Objects cannot be rendered directly into a URL.")
+        if isinstance(value, list) or (param_type_map and param_type_map.get(variable_path) in ("array", "list")):
+            raise ValueError(
+                f"Array parameters cannot be used in URL path templates: '{variable_path}'. Arrays cannot be rendered directly into a URL."
+            )
+        if (isinstance(value, dict) and "." not in variable_path) or (param_type_map and param_type_map.get(variable_path) == "object"):
+            raise ValueError(
+                f"Object parameters cannot be used in URL path templates: '{variable_path}'. Objects cannot be rendered directly into a URL."
+            )
 
         base_param_name = variable_path.split(".")[0]
         if not variable_path.startswith("initial_context.") and not variable_path.startswith("gathered_context.") and not variable_path.startswith("current_time") and not variable_path.startswith("current_weekday"):
@@ -291,7 +334,7 @@ def render_url_template(
 
     rendered_url = _render_string(
         url,
-        context,
+        merged_context,
         value_formatter=_format_url_value,
         replace_escaped_newlines=False,
     )

@@ -581,6 +581,7 @@ class TestProcessStatusUpdateCircuitBreaker:
         mock_workflow_run.state = "running"
         mock_workflow_run.logs = {"telephony_status_callbacks": []}
         mock_workflow_run.gathered_context = {}
+        mock_workflow_run.initial_context = {}
 
         status = StatusCallbackRequest(
             call_id="call-123",
@@ -631,6 +632,7 @@ class TestProcessStatusUpdateCircuitBreaker:
         mock_workflow_run.state = "running"
         mock_workflow_run.logs = {"telephony_status_callbacks": []}
         mock_workflow_run.gathered_context = {}
+        mock_workflow_run.initial_context = {}
 
         status = StatusCallbackRequest(
             call_id="call-456",

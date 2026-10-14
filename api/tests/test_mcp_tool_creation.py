@@ -148,6 +148,7 @@ async def test_mcp_create_tool_schema_includes_validation_and_llm_hints():
         "end_call",
         "transfer_call",
         "calculator",
+        "wait",
         "native",
         "integration",
         "mcp",

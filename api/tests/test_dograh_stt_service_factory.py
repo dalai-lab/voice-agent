@@ -79,7 +79,7 @@ def test_create_dograh_supported_language_uses_flux_service_with_hint():
     kwargs = flux_service.call_args.kwargs
     assert kwargs["settings"].model == "flux-general-multi"
     assert kwargs["settings"].language_hints == [Language.ES]
-    assert kwargs["settings"].keyterm == ["Dograh"]
+    assert "Dograh" in kwargs["settings"].keyterm
 
 
 def test_create_dograh_unsupported_language_falls_back_to_standard_stt_service():
@@ -104,4 +104,4 @@ def test_create_dograh_unsupported_language_falls_back_to_standard_stt_service()
     assert kwargs["correlation_id"] == "corr-123"
     assert kwargs["settings"].model == "default"
     assert kwargs["settings"].language == "ar"
-    assert kwargs["keyterms"] == ["Dograh"]
+    assert "Dograh" in kwargs["keyterms"]

@@ -8,6 +8,7 @@ from api.services.campaign.campaign_event_publisher import (
     get_campaign_event_publisher,
 )
 from api.services.campaign.errors import (
+    CampaignQuotaExceededError,
     ConcurrentSlotAcquisitionError,
     PhoneNumberPoolExhaustedError,
 )
@@ -15,6 +16,14 @@ from api.services.campaign.source_sync_factory import get_sync_service
 
 PHONE_NUMBER_POOL_EXHAUSTED_COUNTER_KEY = "phone_number_pool_exhausted_attempts"
 MAX_PHONE_NUMBER_POOL_EXHAUSTED_ATTEMPTS = 3
+CAMPAIGN_QUOTA_RETRY_COUNTER_KEY = "quota_exhausted_attempts"
+MAX_CAMPAIGN_QUOTA_RETRY_ATTEMPTS = 5
+TRANSIENT_QUOTA_ERROR_CODES = {
+    "concurrency_limit_exceeded",
+    "sub_org_concurrency_limit_exceeded",
+    "insufficient_reserve",
+    "billing_service_unavailable",
+}
 
 
 async def sync_campaign_source(ctx: dict, campaign_id: int) -> None:
@@ -125,6 +134,10 @@ async def process_campaign_batch(
                 campaign_id=campaign_id,
                 key=PHONE_NUMBER_POOL_EXHAUSTED_COUNTER_KEY,
             )
+            await db_client.reset_campaign_metadata_counter(
+                campaign_id=campaign_id,
+                key=CAMPAIGN_QUOTA_RETRY_COUNTER_KEY,
+            )
 
         # Publish batch completed event - orchestrator will handle next batch scheduling
         publisher = await get_campaign_event_publisher()
@@ -224,6 +237,88 @@ async def process_campaign_batch(
                 "attempt": attempt,
                 "max_attempts": MAX_PHONE_NUMBER_POOL_EXHAUSTED_ATTEMPTS,
             },
+        )
+        raise
+
+    except CampaignQuotaExceededError as e:
+        is_transient = e.error_code in TRANSIENT_QUOTA_ERROR_CODES
+        attempt = 0
+        if is_transient:
+            attempt = await db_client.increment_campaign_metadata_counter(
+                campaign_id=campaign_id,
+                key=CAMPAIGN_QUOTA_RETRY_COUNTER_KEY,
+            )
+            logger.warning(
+                f"Transient quota error for campaign {campaign_id}: {e}; "
+                f"attempt={attempt}/{MAX_CAMPAIGN_QUOTA_RETRY_ATTEMPTS}"
+            )
+
+        publisher = await get_campaign_event_publisher()
+
+        if is_transient and attempt < MAX_CAMPAIGN_QUOTA_RETRY_ATTEMPTS:
+            await db_client.append_campaign_log(
+                campaign_id=campaign_id,
+                level="warning",
+                event="campaign_quota_transient_retry",
+                message=(
+                    f"Transient quota check failure for campaign {campaign_id} (org {e.organization_id}): "
+                    f"[{e.error_code}] {e.error_message}; retrying attempt {attempt}/{MAX_CAMPAIGN_QUOTA_RETRY_ATTEMPTS}"
+                ),
+                details={
+                    "error_code": e.error_code,
+                    "error_message": e.error_message,
+                    "organization_id": e.organization_id,
+                    "attempt": attempt,
+                    "max_attempts": MAX_CAMPAIGN_QUOTA_RETRY_ATTEMPTS,
+                },
+            )
+            await publisher.publish_batch_completed(
+                campaign_id=campaign_id,
+                processed_count=0,
+                failed_count=0,
+                batch_size=batch_size,
+            )
+            return
+
+        # Persistent depletion or transient retries exhausted -> PAUSE campaign safely
+        logger.warning(
+            f"Pausing campaign {campaign_id} due to wallet depletion/quota exhaustion: "
+            f"[{e.error_code}] {e.error_message}"
+        )
+
+        campaign = await db_client.get_campaign_by_id(campaign_id)
+        new_meta = dict(campaign.orchestrator_metadata or {}) if campaign else {}
+        new_meta["paused_reason"] = (
+            "wallet_depleted"
+            if e.error_code in ("insufficient_quota", "insufficient_credits", "quota_exceeded", "insufficient_reserve")
+            else "quota_exceeded"
+        )
+
+        await db_client.update_campaign(
+            campaign_id=campaign_id,
+            state="paused",
+            orchestrator_metadata=new_meta,
+        )
+        await db_client.append_campaign_log(
+            campaign_id=campaign_id,
+            level="warning",
+            event="campaign_paused_quota_exhausted",
+            message=(
+                f"Campaign {campaign_id} paused due to wallet depletion/quota exhaustion: [{e.error_code}] {e.error_message}. "
+                "No contact leads were marked as failed. Top up wallet or resolve billing to resume."
+            ),
+            details={
+                "error_code": e.error_code,
+                "error_message": e.error_message,
+                "organization_id": e.organization_id,
+                "attempt": attempt if is_transient else None,
+            },
+        )
+
+        await publisher.publish_batch_failed(
+            campaign_id=campaign_id,
+            error=f"Campaign paused due to quota check failure: [{e.error_code}] {e.error_message}",
+            processed_count=0,
         )
         raise
 

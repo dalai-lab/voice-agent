@@ -194,6 +194,7 @@ def test_format_prompt_call_context_gathered_context_overwritten_by_live():
 async def test_await_pending_extractions_called_before_prompt_render():
     """_setup_llm_context must await pending extractions before rendering the prompt."""
     engine = make_minimal_engine()
+    engine._cross_node_variable_injection_enabled = True
 
     extraction_done_before_render = False
     render_called = False

@@ -133,6 +133,7 @@ def mock_engine():
     engine._workflow_run_id = 1
     engine._call_context_vars = {"customer_name": "John Doe"}
     engine._organization_id = None
+    engine._enable_callbacks = False
     engine._get_organization_id = PipecatEngine._get_organization_id.__get__(engine)
     engine.llm = Mock()
     engine.llm.register_function = Mock()

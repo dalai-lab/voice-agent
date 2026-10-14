@@ -13,6 +13,14 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
+import {
   Wallet,
   CreditCard,
   ArrowUpRight,
@@ -26,7 +34,9 @@ import {
   RefreshCw,
   Building2,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Sliders,
+  Users
 } from "lucide-react";
 
 export default function WalletPage() {
@@ -61,25 +71,24 @@ export default function WalletPage() {
   const [resolvedOrgId, setResolvedOrgId] = useState<number | null>(null);
   const [customerStatus, setCustomerStatus] = useState<string | null>(null);
 
+  // Sub-Org Limits & Sub-Orgs Management (Issue 5 / Caveat 4)
+  const [subOrgLimits, setSubOrgLimits] = useState<any>(null);
+  const [subOrgs, setSubOrgs] = useState<any[]>([]);
+  const [editingSubOrg, setEditingSubOrg] = useState<any | null>(null);
+  const [editCapRupees, setEditCapRupees] = useState<string>("");
+  const [editConcurrencyLimit, setEditConcurrencyLimit] = useState<string>("");
+  const [isSavingLimits, setIsSavingLimits] = useState(false);
+  const [saveLimitsSuccess, setSaveLimitsSuccess] = useState(false);
+
   useEffect(() => {
     if (!user) return;
 
     if (orgContext?.organization_id) {
       setResolvedOrgId(orgContext.organization_id);
-      return;
+    } else {
+      setResolvedOrgId(null);
     }
-
-    if (email) {
-      fetch(`${TALKAR}/customers/status?contact_email=${encodeURIComponent(email)}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (data && data.dograh_org_id) {
-            setResolvedOrgId(data.dograh_org_id);
-          }
-        })
-        .catch(console.error);
-    }
-  }, [user, orgContext?.organization_id, email]);
+  }, [user, orgContext?.organization_id]);
 
   useEffect(() => {
     if (!resolvedOrgId) return;
@@ -103,11 +112,76 @@ export default function WalletPage() {
       setThreshold(String((walletData.auto_recharge_threshold_paise || 100000) / 100));
       setRechargeAmount(String((walletData.auto_recharge_amount_paise || 500000) / 100));
       setHasSavedCard(walletData.has_saved_card);
+
+      if (walletData.is_sub_org) {
+        fetch(`${TALKAR}/customers/by-org/${resolvedOrgId}/spending-limits`)
+          .then(r => r.ok ? r.json() : null)
+          .then(limits => { if (limits) setSubOrgLimits(limits); })
+          .catch(console.error);
+      } else {
+        fetch(`${TALKAR}/customers/by-org/${resolvedOrgId}/sub-orgs`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => { if (data?.sub_orgs) setSubOrgs(data.sub_orgs); })
+          .catch(console.error);
+      }
     }).catch(console.error);
   }, [resolvedOrgId]);
 
+  const refreshSubOrgs = async () => {
+    if (!resolvedOrgId) return;
+    try {
+      const res = await fetch(`${TALKAR}/customers/by-org/${resolvedOrgId}/sub-orgs`);
+      if (res.ok) {
+        const data = await res.json();
+        setSubOrgs(data.sub_orgs || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveSubOrgLimits = async () => {
+    if (!editingSubOrg) return;
+    setIsSavingLimits(true);
+    setSaveLimitsSuccess(false);
+    try {
+      const capPaise = editCapRupees.trim() === "" ? 0 : Math.round(parseFloat(editCapRupees) * 100);
+      const concurrency = editConcurrencyLimit.trim() === "" ? null : parseInt(editConcurrencyLimit, 10);
+
+      const payload: any = {
+        monthly_spending_cap_paise: capPaise,
+      };
+      if (concurrency !== null && !isNaN(concurrency)) {
+        payload.concurrent_call_limit = concurrency;
+      }
+
+      const res = await fetch(`${TALKAR}/customers/by-org/${editingSubOrg.dograh_org_id}/spending-limits`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Failed to update spending limits");
+      }
+
+      setSaveLimitsSuccess(true);
+      await refreshSubOrgs();
+      setTimeout(() => {
+        setEditingSubOrg(null);
+        setSaveLimitsSuccess(false);
+      }, 700);
+    } catch (err: any) {
+      alert(err.message || "Could not save spending limits.");
+    } finally {
+      setIsSavingLimits(false);
+    }
+  };
+
   const currentPlan = subscription?.tier || plan || "starter";
   const isCustomPlan = subscription?.is_custom;
+  const isSubOrg = Boolean(wallet?.is_sub_org || wallet?.can_manage_billing === false);
 
   useEffect(() => {
     if (subscription) {
@@ -269,6 +343,10 @@ export default function WalletPage() {
 
   const handleSaveAutoRecharge = async () => {
     if (!resolvedOrgId) return;
+    if (isSubOrg) {
+      alert("Payment cards and auto-recharge settings can only be managed by the Master Organization owner.");
+      return;
+    }
     if (autoRechargeEnabled && !hasSavedCard) {
       alert("Please add and verify a card before enabling auto-recharge.");
       return;
@@ -299,8 +377,39 @@ export default function WalletPage() {
     }
   };
 
+  const handleRemoveCard = async () => {
+    if (!resolvedOrgId) return;
+    if (isSubOrg) {
+      alert("Payment cards can only be managed by the Master Organization owner.");
+      return;
+    }
+    if (!confirm("Are you sure you want to remove the saved payment card? Auto-reload will be disabled.")) {
+      return;
+    }
+    try {
+      const res = await fetch(`${TALKAR}/billing/wallet/remove-card/by-org/${resolvedOrgId}`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        setHasSavedCard(false);
+        setAutoRechargeEnabled(false);
+        alert("Payment card removed.");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Failed to remove payment card");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to remove payment card");
+    }
+  };
+
   const handleAddCard = async (isMock = false) => {
     if (!resolvedOrgId) return;
+    if (isSubOrg) {
+      alert("Payment cards can only be managed by the Master Organization owner.");
+      return;
+    }
     const dograhOrgId = resolvedOrgId;
     try {
       const custRes = await fetch(`${TALKAR}/billing/razorpay-customer/create`, {
@@ -509,6 +618,87 @@ export default function WalletPage() {
         </div>
       )}
 
+      {/* Sub-Org Spending Limit & Concurrency Policy Card */}
+      {isSubOrg && (
+        <div className="rounded-xl border border-border/80 bg-gradient-to-r from-card via-card to-muted/20 p-5 shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground">Workspace Spending Limit & Live Concurrency</h3>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                    Master Agency Managed
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This workspace draws credits directly from your Master Agency shared wallet.
+                </p>
+              </div>
+            </div>
+            {subOrgLimits?.is_blocked_by_cap ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                <AlertCircle className="w-3.5 h-3.5" /> Monthly Cap Reached
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                <ShieldCheck className="w-3.5 h-3.5" /> Policy Active & Healthy
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+            <div className="p-3.5 rounded-lg bg-background border border-border/60">
+              <span className="text-[11px] font-medium text-muted-foreground">Monthly Spending Cap</span>
+              <div className="text-lg font-bold text-foreground mt-1">
+                {subOrgLimits?.monthly_spending_cap_paise && subOrgLimits.monthly_spending_cap_paise > 0
+                  ? `₹${(subOrgLimits.monthly_spending_cap_paise / 100).toLocaleString("en-IN")}`
+                  : "Unlimited"}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Reset at 00:00 UTC on 1st of month</p>
+            </div>
+
+            <div className="p-3.5 rounded-lg bg-background border border-border/60">
+              <span className="text-[11px] font-medium text-muted-foreground">Current Month Spend</span>
+              <div className="text-lg font-bold text-foreground mt-1">
+                ₹{((subOrgLimits?.current_month_spend_paise ?? 0) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </div>
+              <div className="mt-1.5">
+                {subOrgLimits?.monthly_spending_cap_paise && subOrgLimits.monthly_spending_cap_paise > 0 ? (
+                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-1.5 rounded-full ${
+                        subOrgLimits.is_blocked_by_cap ? "bg-rose-500" : "bg-primary"
+                      }`}
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          Math.round(((subOrgLimits.current_month_spend_paise || 0) / subOrgLimits.monthly_spending_cap_paise) * 100)
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground">No ceiling active</span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-lg bg-background border border-border/60">
+              <span className="text-[11px] font-medium text-muted-foreground">Max Concurrent Calls</span>
+              <div className="text-lg font-bold text-foreground mt-1">
+                {subOrgLimits?.concurrent_call_limit
+                  ? `${subOrgLimits.concurrent_call_limit} channels`
+                  : "Fleet Default (Shared)"}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Concurrent live calls cap</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Overview Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Balance */}
@@ -664,8 +854,15 @@ export default function WalletPage() {
             <Switch
               checked={autoRechargeEnabled}
               onCheckedChange={setAutoRechargeEnabled}
+              disabled={isSubOrg}
             />
           </div>
+
+          {isSubOrg && (
+            <div className="p-3 rounded-lg bg-muted/60 border border-border/50 text-xs text-muted-foreground leading-relaxed">
+              <span className="font-semibold text-foreground">Sub-Organization:</span> Payment methods and auto-reload configurations are centrally managed and billed to your Master Organization.
+            </div>
+          )}
 
           <div className="space-y-4 pt-1">
             <div className="space-y-1.5">
@@ -674,7 +871,7 @@ export default function WalletPage() {
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
                 <Input
                   type="number"
-                  disabled={!autoRechargeEnabled}
+                  disabled={!autoRechargeEnabled || isSubOrg}
                   value={threshold}
                   onChange={(e) => setThreshold(e.target.value)}
                   className="pl-7 h-9 text-xs rounded-lg bg-background"
@@ -688,7 +885,7 @@ export default function WalletPage() {
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
                 <Input
                   type="number"
-                  disabled={!autoRechargeEnabled}
+                  disabled={!autoRechargeEnabled || isSubOrg}
                   value={rechargeAmount}
                   onChange={(e) => setRechargeAmount(e.target.value)}
                   className="pl-7 h-9 text-xs rounded-lg bg-background"
@@ -700,10 +897,23 @@ export default function WalletPage() {
             <div className="pt-2 border-t border-border/50">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Payment Method</span>
-                {hasSavedCard ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                    <Check className="h-3 w-3" /> Card on file
+                {isSubOrg ? (
+                  <span className="text-xs text-muted-foreground italic">
+                    Managed by Master Organization
                   </span>
+                ) : hasSavedCard ? (
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                      <Check className="h-3 w-3" /> Card on file
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCard}
+                      className="text-[11px] text-muted-foreground hover:text-destructive underline ml-1"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 ) : (
                   <button
                     type="button"
@@ -718,11 +928,15 @@ export default function WalletPage() {
 
             <Button
               onClick={handleSaveAutoRecharge}
-              disabled={isSavingRecharge || (autoRechargeEnabled && !hasSavedCard)}
+              disabled={isSubOrg || isSavingRecharge || (autoRechargeEnabled && !hasSavedCard)}
               variant="outline"
               className="w-full h-9 rounded-lg text-xs font-medium border-border/80"
             >
-              {isSavingRecharge ? "Saving..." : "Save Auto-Reload Settings"}
+              {isSubOrg
+                ? "Managed by Master Organization"
+                : isSavingRecharge
+                ? "Saving..."
+                : "Save Auto-Reload Settings"}
             </Button>
           </div>
         </div>
@@ -894,6 +1108,102 @@ export default function WalletPage() {
                 </Button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-Organizations Management Section (Issue 5 / Caveat 4) */}
+      {!isSubOrg && subOrgs.length > 0 && (
+        <div className="rounded-xl border border-border/70 bg-card p-5 sm:p-6 shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/50">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold text-foreground">Sub-Organization Spending & Concurrency Controls</h3>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-primary/10 text-primary">
+                  {subOrgs.length} Connected Sub-Orgs
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Manage monthly spending caps and concurrency limits for client workspaces connected to your shared wallet.
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border/40 hover:bg-transparent">
+                  <TableHead className="text-xs font-medium text-muted-foreground py-3">Sub-Organization</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground py-3">Month-to-Date Spend</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground py-3">Monthly Cap</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground py-3">Concurrent Channels</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground py-3">Status</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground py-3 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {subOrgs.map((so) => {
+                  const spendRupees = (so.current_month_spend_paise || 0) / 100;
+                  const capRupees = so.monthly_spending_cap_paise ? so.monthly_spending_cap_paise / 100 : null;
+                  const pct = capRupees ? Math.min(100, Math.round((spendRupees / capRupees) * 100)) : 0;
+
+                  return (
+                    <TableRow key={so.id} className="border-border/30 hover:bg-muted/20">
+                      <TableCell className="py-3">
+                        <div>
+                          <div className="text-xs font-semibold text-foreground">{so.company_name}</div>
+                          <div className="text-[11px] text-muted-foreground">Org ID: #{so.dograh_org_id} {so.contact_email ? `· ${so.contact_email}` : ""}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <div className="text-xs font-medium text-foreground">
+                          ₹{spendRupees.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </div>
+                        {capRupees && (
+                          <div className="w-24 bg-muted rounded-full h-1 mt-1 overflow-hidden">
+                            <div
+                              className={`h-1 rounded-full ${so.is_blocked_by_cap ? "bg-rose-500" : "bg-primary"}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3 text-xs text-foreground">
+                        {capRupees ? `₹${capRupees.toLocaleString("en-IN")}` : <span className="text-muted-foreground italic">No cap</span>}
+                      </TableCell>
+                      <TableCell className="py-3 text-xs text-foreground">
+                        {so.concurrent_call_limit ? `${so.concurrent_call_limit} calls` : <span className="text-muted-foreground italic">Fleet Default</span>}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        {so.is_blocked_by_cap ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                            Cap Exceeded
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                            Active
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3 text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingSubOrg(so);
+                            setEditCapRupees(so.monthly_spending_cap_paise ? String(so.monthly_spending_cap_paise / 100) : "");
+                            setEditConcurrencyLimit(so.concurrent_call_limit ? String(so.concurrent_call_limit) : "");
+                          }}
+                          className="h-7 text-xs px-2.5 rounded-lg border-border/80 hover:bg-muted"
+                        >
+                          Configure Caps
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}
@@ -1124,6 +1434,81 @@ export default function WalletPage() {
           </div>
         </div>
       )}
+
+      {/* Edit Sub-Organization Limits Dialog */}
+      <Dialog open={Boolean(editingSubOrg)} onOpenChange={(open) => !open && setEditingSubOrg(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold">
+              Configure Sub-Organization Controls
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Set monthly spending caps and concurrency limits for <span className="font-semibold text-foreground">{editingSubOrg?.company_name}</span> (Org #{editingSubOrg?.dograh_org_id}).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">Monthly Spending Cap (₹)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">₹</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="100"
+                  placeholder="e.g. 10000 (Leave empty or 0 for unlimited)"
+                  value={editCapRupees}
+                  onChange={(e) => setEditCapRupees(e.target.value)}
+                  className="pl-7 h-9 text-xs rounded-lg bg-background"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                When reached, outbound campaigns and agent calls for this sub-org are paused until the 1st of next month.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">Max Concurrent Calls</label>
+              <Input
+                type="number"
+                min="1"
+                placeholder="e.g. 5 (Leave empty for fleet default)"
+                value={editConcurrencyLimit}
+                onChange={(e) => setEditConcurrencyLimit(e.target.value)}
+                className="h-9 text-xs rounded-lg bg-background"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Restricts simultaneous live calls to prevent this sub-org from exhausting the agency channel capacity.
+              </p>
+            </div>
+
+            {saveLimitsSuccess && (
+              <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-2">
+                <Check className="w-4 h-4" /> Limits updated successfully!
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex sm:justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditingSubOrg(null)}
+              className="text-xs h-8 rounded-lg"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={isSavingLimits}
+              onClick={handleSaveSubOrgLimits}
+              className="text-xs h-8 rounded-lg bg-foreground text-background hover:bg-foreground/90"
+            >
+              {isSavingLimits ? "Saving..." : "Save Limits"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -34,30 +34,14 @@ export function useRealtimeWallet(): RealtimeWalletState {
   const [isLoading, setIsLoading] = useState(true);
   const fetchingRef = useRef(false);
 
-  // 1. Resolve Organization ID
+  // 1. Resolve Organization ID strictly from current workspace context (prevents by-email route collisions)
   useEffect(() => {
     if (orgContext?.organization_id) {
       setResolvedOrgId(orgContext.organization_id);
-      return;
+    } else {
+      setResolvedOrgId(null);
     }
-
-    const email = (user as any)?.email || (user as any)?.primaryEmail;
-    if (!email) return;
-
-    let isMounted = true;
-    fetch(`/api/talkar/customers/by-email/${encodeURIComponent(email)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (isMounted && data?.dograh_org_id) {
-          setResolvedOrgId(data.dograh_org_id);
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user, orgContext?.organization_id]);
+  }, [orgContext?.organization_id]);
 
   // 2. Fetch Wallet & Subscription Plan Data
   const fetchWallet = useCallback(async () => {

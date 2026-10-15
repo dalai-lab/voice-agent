@@ -318,6 +318,53 @@ async def process_campaign_batch(
 
 
     except PhoneNumberPoolExhaustedError as e:
+        # Check if the campaign itself, the org, or the phone number pool has active calls running right now.
+        # If calls are in progress (e.g. customer calls lasting several minutes),
+        # phone numbers being in use is EXPECTED and HEALTHY, not an error or starvation condition.
+        # We must NOT increment the exhaustion counter or pause/fail the campaign while calls are active!
+        has_active_call = False
+        try:
+            scope_count = await rate_limiter.get_live_slot_count(f"campaign:{campaign_id}")
+            if scope_count and scope_count > 0:
+                has_active_call = True
+            else:
+                db_active = await db_client.get_active_runs_count_for_campaign(campaign_id)
+                if db_active > 0:
+                    has_active_call = True
+                else:
+                    in_use_numbers = await rate_limiter.get_in_use_from_number_count(
+                        e.organization_id, e.telephony_configuration_id
+                    )
+                    if in_use_numbers > 0:
+                        has_active_call = True
+                    else:
+                        org_active = await rate_limiter.get_live_slot_count(f"org:{e.organization_id}")
+                        if org_active and org_active > 0:
+                            has_active_call = True
+        except Exception as active_err:
+            logger.debug(f"Error checking active calls during pool exhaustion: {active_err}")
+
+        publisher = await get_campaign_event_publisher()
+
+        if has_active_call:
+            # Reset retry counter since calls are actively executing
+            await db_client.reset_campaign_metadata_counter(
+                campaign_id=campaign_id,
+                key=PHONE_NUMBER_POOL_EXHAUSTED_COUNTER_KEY,
+            )
+            logger.info(
+                f"Campaign {campaign_id} (org {e.organization_id}) currently has active call(s) in progress occupying phone numbers; "
+                f"waiting for active call to complete before dispatching next batch. Deferring 15s."
+            )
+            await publisher.publish_batch_completed(
+                campaign_id=campaign_id,
+                processed_count=0,
+                failed_count=0,
+                batch_size=batch_size,
+                metadata={"defer_seconds": 15, "reason": "campaign_call_in_progress"},
+            )
+            return
+
         attempt = await db_client.increment_campaign_metadata_counter(
             campaign_id=campaign_id,
             key=PHONE_NUMBER_POOL_EXHAUSTED_COUNTER_KEY,
@@ -326,8 +373,6 @@ async def process_campaign_batch(
             f"Phone number pool exhausted for campaign {campaign_id}: {e}; "
             f"attempt={attempt}/{MAX_PHONE_NUMBER_POOL_EXHAUSTED_ATTEMPTS}"
         )
-
-        publisher = await get_campaign_event_publisher()
 
         if attempt < MAX_PHONE_NUMBER_POOL_EXHAUSTED_ATTEMPTS:
             await db_client.append_campaign_log(
@@ -345,6 +390,7 @@ async def process_campaign_batch(
                     "organization_id": e.organization_id,
                     "attempt": attempt,
                     "max_attempts": MAX_PHONE_NUMBER_POOL_EXHAUSTED_ATTEMPTS,
+                    "reason": "phone_number_pool_exhausted",
                 },
             )
             await publisher.publish_batch_completed(
@@ -356,30 +402,50 @@ async def process_campaign_batch(
             )
             return
 
+        # Retries exhausted with NO active calls in progress.
+        # PAUSE (not fail) the campaign: this is an operational condition
+        # (pool empty, numbers missing/unassigned), not a code crash.
+        # The campaign can be resumed once the operator configures phone numbers
+        # or numbers become available.
+        logger.warning(
+            f"Phone number pool exhausted after {attempt} attempts for campaign {campaign_id}; "
+            f"pausing campaign for operator review."
+        )
+
+        campaign_obj = await db_client.get_campaign_by_id(campaign_id)
+        new_meta = dict(campaign_obj.orchestrator_metadata or {}) if campaign_obj else {}
+        new_meta["paused_reason"] = "phone_number_pool_exhausted"
+
         await publisher.publish_batch_failed(
             campaign_id=campaign_id,
             error=f"Phone number pool exhausted: {e}",
             processed_count=0,
         )
-
-        await db_client.update_campaign(campaign_id=campaign_id, state="failed")
+        await db_client.update_campaign(
+            campaign_id=campaign_id,
+            state="paused",
+            orchestrator_metadata=new_meta,
+        )
         await db_client.append_campaign_log(
             campaign_id=campaign_id,
-            level="error",
-            event="phone_number_pool_exhausted",
+            level="warning",
+            event="campaign_paused_phone_number_pool_exhausted",
             message=(
-                f"Phone number pool exhausted for org {e.organization_id} after "
-                f"{attempt} consecutive attempts: no free from_number available "
-                "to dispatch outbound calls"
+                f"Campaign {campaign_id} paused: phone number pool exhausted for org {e.organization_id} "
+                f"after {attempt} consecutive attempts with no active calls. "
+                "Add available numbers to your telephony configuration, then resume the campaign."
             ),
             details={
                 "error": str(e),
                 "organization_id": e.organization_id,
                 "attempt": attempt,
                 "max_attempts": MAX_PHONE_NUMBER_POOL_EXHAUSTED_ATTEMPTS,
+                "reason": "phone_number_pool_exhausted",
+                "action": "campaign_paused_resumable",
             },
         )
-        raise
+        # Do NOT raise — campaign is paused, not crashed.
+        # The orchestrator's BatchFailedEvent handler clears _batch_in_progress.
 
     except CampaignQuotaExceededError as e:
         is_transient = e.error_code in TRANSIENT_QUOTA_ERROR_CODES

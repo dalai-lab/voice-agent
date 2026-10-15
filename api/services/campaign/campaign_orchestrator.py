@@ -201,13 +201,9 @@ class CampaignOrchestrator:
                 pass
 
             logger.warning(
-                f"campaign_id: {campaign_id} - Batch failed: {event.error}, "
-                f"scheduling next batch to continue processing"
+                f"campaign_id: {campaign_id} - Batch failed: {event.error}; "
+                f"cleared batch in-progress flag."
             )
-
-            # Lets not schedule another batch, since we mark the campaign
-            # as failed just to be on the safe side from process_campaign_batch
-            # if a batch fails
 
             self._last_activity[campaign_id] = datetime.now(UTC)
 

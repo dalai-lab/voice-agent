@@ -780,6 +780,41 @@ class RateLimiter:
             logger.error(f"Error releasing from_number: {e}")
             return False
 
+    async def get_in_use_from_number_count(
+        self, organization_id: int, telephony_configuration_id: int | None
+    ) -> int:
+        """
+        Return the number of from_numbers currently in use (score > 0 and not stale)
+        for the given (organization_id, telephony_configuration_id).
+        """
+        try:
+            redis_client = await self._get_redis()
+            key = self._from_number_pool_key(organization_id, telephony_configuration_id)
+            now = time.time()
+            stale_cutoff = now - self.stale_call_timeout
+            min_score = f"({max(0.0, stale_cutoff)}"
+            count = await redis_client.zcount(key, min_score, "+inf")
+            return int(count or 0)
+        except Exception as e:
+            logger.error(f"Error getting in-use from_number count: {e}")
+            return 0
+
+    async def get_total_from_number_count(
+        self, organization_id: int, telephony_configuration_id: int | None
+    ) -> int:
+        """
+        Return the total count of registered from_numbers in the pool
+        for the given (organization_id, telephony_configuration_id).
+        """
+        try:
+            redis_client = await self._get_redis()
+            key = self._from_number_pool_key(organization_id, telephony_configuration_id)
+            count = await redis_client.zcard(key)
+            return int(count or 0)
+        except Exception as e:
+            logger.error(f"Error getting total from_number count: {e}")
+            return 0
+
     async def store_workflow_from_number_mapping(
         self,
         workflow_run_id: int,

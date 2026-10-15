@@ -715,9 +715,13 @@ class TestResumeCampaignResetsCircuitBreaker:
         with (
             patch("api.services.campaign.runner.db_client") as mock_db,
             patch("api.services.campaign.runner.circuit_breaker") as mock_cb,
+            patch("api.services.campaign.runner.get_campaign_event_publisher") as mock_get_pub,
         ):
+            mock_pub = AsyncMock()
+            mock_get_pub.return_value = mock_pub
             mock_db.get_campaign_by_id = AsyncMock(return_value=mock_campaign)
             mock_db.update_campaign = AsyncMock()
+            mock_db.reset_campaign_metadata_counter = AsyncMock()
             mock_cb.reset = AsyncMock(return_value=True)
 
             runner = CampaignRunnerService()
@@ -728,5 +732,5 @@ class TestResumeCampaignResetsCircuitBreaker:
 
             # Verify campaign state was updated
             mock_db.update_campaign.assert_called_once_with(
-                campaign_id=42, state="running"
+                campaign_id=42, state="running", orchestrator_metadata={}
             )

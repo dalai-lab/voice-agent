@@ -329,7 +329,9 @@ class CampaignCallDispatcher:
             )
             if from_number is None:
                 raise PhoneNumberPoolExhaustedError(
-                    organization_id=campaign.organization_id
+                    organization_id=campaign.organization_id,
+                    telephony_configuration_id=campaign.telephony_configuration_id,
+                    campaign_id=campaign.id,
                 )
 
             logger.info(f"Provider name: {provider.PROVIDER_NAME}")

@@ -23,12 +23,13 @@ class TestProcessCampaignBatchFailureLogs:
     ``batch_failed`` entry."""
 
     @pytest.mark.asyncio
-    async def test_phone_number_pool_exhausted_retries_before_final_failure(self):
+    async def test_phone_number_pool_exhausted_retries_before_final_pause(self):
         """The first two consecutive pool exhaustion attempts keep the
         campaign running and schedule another batch."""
         with (
             patch("api.tasks.campaign_tasks.campaign_call_dispatcher") as mock_disp,
             patch("api.tasks.campaign_tasks.db_client") as mock_db,
+            patch("api.tasks.campaign_tasks.rate_limiter") as mock_rl,
             patch(
                 "api.tasks.campaign_tasks.get_campaign_event_publisher"
             ) as mock_get_pub,
@@ -36,13 +37,16 @@ class TestProcessCampaignBatchFailureLogs:
             mock_disp.process_batch = AsyncMock(
                 side_effect=PhoneNumberPoolExhaustedError(organization_id=7)
             )
+            mock_rl.get_live_slot_count = AsyncMock(return_value=0)
+            mock_rl.get_in_use_from_number_count = AsyncMock(return_value=0)
+            mock_db.get_active_runs_count_for_campaign = AsyncMock(return_value=0)
             mock_db.increment_campaign_metadata_counter = AsyncMock(return_value=2)
             mock_db.update_campaign = AsyncMock()
             mock_db.append_campaign_log = AsyncMock()
             mock_pub = AsyncMock()
             mock_get_pub.return_value = mock_pub
 
-            await process_campaign_batch({}, campaign_id=42)
+            await process_campaign_batch({"redis": AsyncMock()}, campaign_id=42)
 
             mock_db.update_campaign.assert_not_awaited()
             mock_pub.publish_batch_failed.assert_not_awaited()
@@ -63,12 +67,13 @@ class TestProcessCampaignBatchFailureLogs:
             assert kwargs["details"]["attempt"] == 2
 
     @pytest.mark.asyncio
-    async def test_phone_number_pool_exhausted_fails_on_third_attempt(self):
-        """The third consecutive pool exhaustion attempt marks the campaign
-        failed with a specific operator-facing log entry."""
+    async def test_phone_number_pool_exhausted_pauses_on_max_attempts(self):
+        """When retries are exhausted and NO active calls are in progress,
+        the campaign is PAUSED (not failed) for operator review without raising."""
         with (
             patch("api.tasks.campaign_tasks.campaign_call_dispatcher") as mock_disp,
             patch("api.tasks.campaign_tasks.db_client") as mock_db,
+            patch("api.tasks.campaign_tasks.rate_limiter") as mock_rl,
             patch(
                 "api.tasks.campaign_tasks.get_campaign_event_publisher"
             ) as mock_get_pub,
@@ -76,28 +81,109 @@ class TestProcessCampaignBatchFailureLogs:
             mock_disp.process_batch = AsyncMock(
                 side_effect=PhoneNumberPoolExhaustedError(organization_id=7)
             )
+            mock_rl.get_live_slot_count = AsyncMock(return_value=0)
+            mock_rl.get_in_use_from_number_count = AsyncMock(return_value=0)
+            mock_db.get_active_runs_count_for_campaign = AsyncMock(return_value=0)
             mock_db.increment_campaign_metadata_counter = AsyncMock(return_value=3)
+            mock_db.get_campaign_by_id = AsyncMock(return_value=MagicMock(orchestrator_metadata={}))
             mock_db.update_campaign = AsyncMock()
             mock_db.append_campaign_log = AsyncMock()
             mock_pub = AsyncMock()
             mock_get_pub.return_value = mock_pub
 
-            with pytest.raises(PhoneNumberPoolExhaustedError):
-                await process_campaign_batch({}, campaign_id=42)
+            # Does NOT raise!
+            await process_campaign_batch({"redis": AsyncMock()}, campaign_id=42)
 
             mock_db.update_campaign.assert_called_once_with(
-                campaign_id=42, state="failed"
+                campaign_id=42,
+                state="paused",
+                orchestrator_metadata={"paused_reason": "phone_number_pool_exhausted"},
             )
             mock_pub.publish_batch_failed.assert_awaited_once()
 
             mock_db.append_campaign_log.assert_called_once()
             kwargs = mock_db.append_campaign_log.call_args.kwargs
             assert kwargs["campaign_id"] == 42
-            assert kwargs["event"] == "phone_number_pool_exhausted"
-            assert kwargs["level"] == "error"
-            assert "phone number" in kwargs["message"].lower()
+            assert kwargs["event"] == "campaign_paused_phone_number_pool_exhausted"
+            assert kwargs["level"] == "warning"
             assert kwargs["details"]["organization_id"] == 7
             assert kwargs["details"]["attempt"] == 3
+
+    @pytest.mark.asyncio
+    async def test_phone_number_pool_exhausted_does_not_pause_while_campaign_call_in_progress(self):
+        """When an ongoing call is in progress for this campaign, retry counters are NOT incremented and campaign does NOT pause."""
+        with (
+            patch("api.tasks.campaign_tasks.campaign_call_dispatcher") as mock_disp,
+            patch("api.tasks.campaign_tasks.db_client") as mock_db,
+            patch("api.tasks.campaign_tasks.rate_limiter") as mock_rl,
+            patch("api.tasks.campaign_tasks.get_campaign_event_publisher") as mock_get_pub,
+        ):
+            mock_disp.process_batch = AsyncMock(
+                side_effect=PhoneNumberPoolExhaustedError(organization_id=8, telephony_configuration_id=11, campaign_id=67)
+            )
+            # 1 ongoing call in progress for this campaign
+            mock_rl.get_live_slot_count = AsyncMock(return_value=1)
+            mock_db.reset_campaign_metadata_counter = AsyncMock()
+            mock_db.increment_campaign_metadata_counter = AsyncMock()
+            mock_db.update_campaign = AsyncMock()
+            mock_pub = AsyncMock()
+            mock_get_pub.return_value = mock_pub
+
+            await process_campaign_batch({"redis": AsyncMock()}, campaign_id=67)
+
+            # Counter was reset, NOT incremented
+            mock_db.reset_campaign_metadata_counter.assert_awaited_once_with(
+                campaign_id=67, key="phone_number_pool_exhausted_attempts"
+            )
+            mock_db.increment_campaign_metadata_counter.assert_not_called()
+            # Campaign was NOT paused or failed
+            mock_db.update_campaign.assert_not_called()
+            # Published batch completed with 15s backoff
+            mock_pub.publish_batch_completed.assert_awaited_once_with(
+                campaign_id=67,
+                processed_count=0,
+                failed_count=0,
+                batch_size=10,
+                metadata={"defer_seconds": 15, "reason": "campaign_call_in_progress"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_phone_number_pool_exhausted_does_not_pause_while_pool_numbers_in_use(self):
+        """When phone numbers in the pool are in use by active calls (e.g. other calls in org), counter is reset and campaign defers."""
+        with (
+            patch("api.tasks.campaign_tasks.campaign_call_dispatcher") as mock_disp,
+            patch("api.tasks.campaign_tasks.db_client") as mock_db,
+            patch("api.tasks.campaign_tasks.rate_limiter") as mock_rl,
+            patch("api.tasks.campaign_tasks.get_campaign_event_publisher") as mock_get_pub,
+        ):
+            mock_disp.process_batch = AsyncMock(
+                side_effect=PhoneNumberPoolExhaustedError(organization_id=8, telephony_configuration_id=11, campaign_id=67)
+            )
+            mock_rl.get_live_slot_count = AsyncMock(return_value=0)
+            mock_db.get_active_runs_count_for_campaign = AsyncMock(return_value=0)
+            # 2 numbers in use in pool
+            mock_rl.get_in_use_from_number_count = AsyncMock(return_value=2)
+
+            mock_db.reset_campaign_metadata_counter = AsyncMock()
+            mock_db.increment_campaign_metadata_counter = AsyncMock()
+            mock_db.update_campaign = AsyncMock()
+            mock_pub = AsyncMock()
+            mock_get_pub.return_value = mock_pub
+
+            await process_campaign_batch({"redis": AsyncMock()}, campaign_id=67)
+
+            mock_db.reset_campaign_metadata_counter.assert_awaited_once_with(
+                campaign_id=67, key="phone_number_pool_exhausted_attempts"
+            )
+            mock_db.increment_campaign_metadata_counter.assert_not_called()
+            mock_db.update_campaign.assert_not_called()
+            mock_pub.publish_batch_completed.assert_awaited_once_with(
+                campaign_id=67,
+                processed_count=0,
+                failed_count=0,
+                batch_size=10,
+                metadata={"defer_seconds": 15, "reason": "campaign_call_in_progress"},
+            )
 
     @pytest.mark.asyncio
     async def test_concurrent_slot_timeout_retries_with_backoff(self):
@@ -119,7 +205,7 @@ class TestProcessCampaignBatchFailureLogs:
             mock_pub = AsyncMock()
             mock_get_pub.return_value = mock_pub
 
-            await process_campaign_batch({}, campaign_id=42)
+            await process_campaign_batch({"redis": AsyncMock()}, campaign_id=42)
 
             mock_pub.publish_batch_completed.assert_awaited_once_with(
                 campaign_id=42,
@@ -155,7 +241,7 @@ class TestProcessCampaignBatchFailureLogs:
             mock_pub = AsyncMock()
             mock_get_pub.return_value = mock_pub
 
-            await process_campaign_batch({}, campaign_id=42)
+            await process_campaign_batch({"redis": AsyncMock()}, campaign_id=42)
 
             mock_db.update_campaign.assert_called_once_with(
                 campaign_id=42,
@@ -193,7 +279,7 @@ class TestProcessCampaignBatchFailureLogs:
             mock_pub = AsyncMock()
             mock_get_pub.return_value = mock_pub
 
-            await process_campaign_batch({}, campaign_id=62)
+            await process_campaign_batch({"redis": AsyncMock()}, campaign_id=62)
 
             # Counter was reset, NOT incremented
             mock_db.reset_campaign_metadata_counter.assert_awaited_once_with(

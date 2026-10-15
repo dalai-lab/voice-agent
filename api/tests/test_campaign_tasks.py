@@ -170,3 +170,43 @@ class TestProcessCampaignBatchFailureLogs:
             kwargs = mock_db.append_campaign_log.call_args.kwargs
             assert kwargs["event"] == "campaign_paused_concurrency_limit"
             assert kwargs["details"]["reason"] == "concurrency_limit_exhausted"
+
+    @pytest.mark.asyncio
+    async def test_concurrent_slot_timeout_does_not_pause_while_call_in_progress(self):
+        """When an ongoing call is in progress for this campaign, retry counters are NOT incremented and campaign does NOT pause."""
+        with (
+            patch("api.tasks.campaign_tasks.campaign_call_dispatcher") as mock_disp,
+            patch("api.tasks.campaign_tasks.db_client") as mock_db,
+            patch("api.tasks.campaign_tasks.rate_limiter") as mock_rl,
+            patch("api.tasks.campaign_tasks.get_campaign_event_publisher") as mock_get_pub,
+        ):
+            mock_disp.process_batch = AsyncMock(
+                side_effect=ConcurrentSlotAcquisitionError(
+                    organization_id=89, campaign_id=62, wait_time=0.0, max_concurrent=1
+                )
+            )
+            # 1 ongoing call in progress for this campaign
+            mock_rl.get_live_slot_count = AsyncMock(return_value=1)
+            mock_db.reset_campaign_metadata_counter = AsyncMock()
+            mock_db.increment_campaign_metadata_counter = AsyncMock()
+            mock_db.update_campaign = AsyncMock()
+            mock_pub = AsyncMock()
+            mock_get_pub.return_value = mock_pub
+
+            await process_campaign_batch({}, campaign_id=62)
+
+            # Counter was reset, NOT incremented
+            mock_db.reset_campaign_metadata_counter.assert_awaited_once_with(
+                campaign_id=62, key="concurrent_slot_timeout_attempts"
+            )
+            mock_db.increment_campaign_metadata_counter.assert_not_called()
+            # Campaign was NOT paused
+            mock_db.update_campaign.assert_not_called()
+            # Published batch completed with 15s backoff
+            mock_pub.publish_batch_completed.assert_awaited_once_with(
+                campaign_id=62,
+                processed_count=0,
+                failed_count=0,
+                batch_size=10,
+                metadata={"defer_seconds": 15, "reason": "campaign_call_in_progress"},
+            )

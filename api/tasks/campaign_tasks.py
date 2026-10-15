@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from loguru import logger
 
 from api.db import db_client
+from api.services.call_concurrency.rate_limiter import rate_limiter
 from api.services.campaign.campaign_call_dispatcher import campaign_call_dispatcher
 from api.services.campaign.campaign_event_publisher import (
     get_campaign_event_publisher,
@@ -164,6 +165,43 @@ async def process_campaign_batch(
         )
 
     except ConcurrentSlotAcquisitionError as e:
+        # Check if the campaign itself has active calls running right now.
+        # If the campaign is actively executing calls (e.g. a customer call lasting 5-10 minutes),
+        # its slot being occupied is EXPECTED and HEALTHY, not an error or starvation condition.
+        # We must NOT increment the exhaustion counter or pause the campaign while its calls are active!
+        has_active_call = False
+        try:
+            scope_count = await rate_limiter.get_live_slot_count(f"campaign:{campaign_id}")
+            if scope_count and scope_count > 0:
+                has_active_call = True
+            else:
+                db_active = await db_client.get_active_runs_count_for_campaign(campaign_id)
+                if db_active > 0:
+                    has_active_call = True
+        except Exception as active_err:
+            logger.debug(f"Error checking active campaign calls: {active_err}")
+
+        publisher = await get_campaign_event_publisher()
+
+        if has_active_call:
+            # Reset retry counter since the campaign is actively executing calls
+            await db_client.reset_campaign_metadata_counter(
+                campaign_id=campaign_id,
+                key=CONCURRENT_SLOT_RETRY_COUNTER_KEY,
+            )
+            logger.info(
+                f"Campaign {campaign_id} currently has active call(s) in progress; "
+                f"waiting for active call to complete before dispatching next batch. Deferring 15s."
+            )
+            await publisher.publish_batch_completed(
+                campaign_id=campaign_id,
+                processed_count=0,
+                failed_count=0,
+                batch_size=batch_size,
+                metadata={"defer_seconds": 15, "reason": "campaign_call_in_progress"},
+            )
+            return
+
         attempt = await db_client.increment_campaign_metadata_counter(
             campaign_id=campaign_id,
             key=CONCURRENT_SLOT_RETRY_COUNTER_KEY,
@@ -172,8 +210,6 @@ async def process_campaign_batch(
             f"Failed to acquire concurrent slot for campaign {campaign_id}: {e}; "
             f"attempt={attempt}/{MAX_CONCURRENT_SLOT_RETRY_ATTEMPTS}"
         )
-
-        publisher = await get_campaign_event_publisher()
 
         if attempt < MAX_CONCURRENT_SLOT_RETRY_ATTEMPTS:
             # Transient: all org slots are busy right now.  Let the orchestrator

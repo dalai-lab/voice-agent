@@ -169,6 +169,16 @@ class CampaignClient(BaseDBClient):
             result = await session.execute(query)
             return list(result.scalars().all())
 
+    async def get_active_runs_count_for_campaign(self, campaign_id: int) -> int:
+        """Count workflow runs for a campaign that are currently in progress (is_completed is False)."""
+        async with self.async_session() as session:
+            query = select(func.count(WorkflowRunModel.id)).where(
+                WorkflowRunModel.campaign_id == campaign_id,
+                WorkflowRunModel.is_completed.is_(False),
+            )
+            result = await session.execute(query)
+            return int(result.scalar() or 0)
+
     async def get_campaign_runs_paginated(
         self,
         campaign_id: int,

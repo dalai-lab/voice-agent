@@ -79,6 +79,40 @@ class CampaignCallDispatcher:
             )
             return 0
 
+        # Fast pre-check: if the org is definitely at its concurrency limit,
+        # skip claiming queued runs entirely.  This avoids the expensive
+        # claim → wait-30s → unclaim cycle when all slots are genuinely occupied.
+        # The check is stale-aware (evicts expired heartbeat entries atomically)
+        # so it won't block on phantom stuck slots.
+        #
+        # • False  → org is full; raise immediately so task-level retry handles it
+        # • None   → Redis is unreachable; fall through — acquire_org_slot will
+        #            grant a synthetic slot so the campaign keeps running
+        # • True   → slots available; proceed normally
+        if not callbacks_only:
+            slots_available = await call_concurrency.check_slots_available(
+                campaign.organization_id
+            )
+            if slots_available is False:
+                max_concurrent = await call_concurrency.get_effective_org_concurrent_limit(
+                    campaign.organization_id
+                )
+                logger.warning(
+                    f"Campaign {campaign_id} (org {campaign.organization_id}): "
+                    f"all {max_concurrent} concurrent slots occupied — skipping claim."
+                )
+                raise ConcurrentSlotAcquisitionError(
+                    organization_id=campaign.organization_id,
+                    campaign_id=campaign_id,
+                    wait_time=0.0,
+                    max_concurrent=max_concurrent,
+                )
+            elif slots_available is None:
+                logger.warning(
+                    f"Campaign {campaign_id}: Redis unavailable for slot pre-check; "
+                    "proceeding — acquire_org_slot will fail open if Redis stays down."
+                )
+
         # Atomically claim queued runs for processing (thread-safe)
         # This uses SELECT FOR UPDATE SKIP LOCKED to prevent race conditions
         queued_runs = await db_client.claim_queued_runs_for_processing(
@@ -544,7 +578,7 @@ class CampaignCallDispatcher:
             await asyncio.sleep(wait_time)
 
     async def acquire_concurrent_slot(
-        self, organization_id: int, campaign: any, timeout: float = 240
+        self, organization_id: int, campaign: any, timeout: float = 30
     ) -> CallConcurrencySlot:
         """
         Acquires a concurrent call slot - waits if necessary until a slot is available.
@@ -552,7 +586,10 @@ class CampaignCallDispatcher:
         Args:
             organization_id: The organization ID
             campaign: The campaign object
-            timeout: Maximum time to wait for a slot (default 10 minutes)
+            timeout: Maximum time to wait for a slot per attempt (default 30s).
+                     The task-level retry loop in process_campaign_batch provides
+                     additional retries, giving ~3 min of total grace time without
+                     blocking the arq worker thread for the full duration.
 
         Returns the slot which must be released when the call completes.
 
@@ -588,6 +625,7 @@ class CampaignCallDispatcher:
                 organization_id=organization_id,
                 campaign_id=campaign.id,
                 wait_time=e.wait_time,
+                max_concurrent=e.max_concurrent,
             ) from e
 
     async def acquire_from_number(

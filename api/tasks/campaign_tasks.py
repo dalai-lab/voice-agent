@@ -18,6 +18,12 @@ PHONE_NUMBER_POOL_EXHAUSTED_COUNTER_KEY = "phone_number_pool_exhausted_attempts"
 MAX_PHONE_NUMBER_POOL_EXHAUSTED_ATTEMPTS = 3
 CAMPAIGN_QUOTA_RETRY_COUNTER_KEY = "quota_exhausted_attempts"
 MAX_CAMPAIGN_QUOTA_RETRY_ATTEMPTS = 5
+# Max retries before a concurrent-slot timeout permanently fails the campaign.
+# Each retry re-schedules via publish_batch_completed so the orchestrator backs
+# off naturally between attempts.  6 retries * ~30s orchestrator cycle ≈ 3 min
+# of grace time after a slot jam before we give up.
+CONCURRENT_SLOT_RETRY_COUNTER_KEY = "concurrent_slot_timeout_attempts"
+MAX_CONCURRENT_SLOT_RETRY_ATTEMPTS = 6
 TRANSIENT_QUOTA_ERROR_CODES = {
     "concurrency_limit_exceeded",
     "sub_org_concurrency_limit_exceeded",
@@ -138,6 +144,10 @@ async def process_campaign_batch(
                 campaign_id=campaign_id,
                 key=CAMPAIGN_QUOTA_RETRY_COUNTER_KEY,
             )
+            await db_client.reset_campaign_metadata_counter(
+                campaign_id=campaign_id,
+                key=CONCURRENT_SLOT_RETRY_COUNTER_KEY,
+            )
 
         # Publish batch completed event - orchestrator will handle next batch scheduling
         publisher = await get_campaign_event_publisher()
@@ -154,28 +164,100 @@ async def process_campaign_batch(
         )
 
     except ConcurrentSlotAcquisitionError as e:
+        attempt = await db_client.increment_campaign_metadata_counter(
+            campaign_id=campaign_id,
+            key=CONCURRENT_SLOT_RETRY_COUNTER_KEY,
+        )
         logger.warning(
-            f"Failed to acquire concurrent slot for campaign {campaign_id}: {e}"
+            f"Failed to acquire concurrent slot for campaign {campaign_id}: {e}; "
+            f"attempt={attempt}/{MAX_CONCURRENT_SLOT_RETRY_ATTEMPTS}"
         )
 
-        # Publish batch failed event with specific error
         publisher = await get_campaign_event_publisher()
+
+        if attempt < MAX_CONCURRENT_SLOT_RETRY_ATTEMPTS:
+            # Transient: all org slots are busy right now.  Let the orchestrator
+            # reschedule — stale slots will expire and free up within seconds.
+            await db_client.append_campaign_log(
+                campaign_id=campaign_id,
+                level="warning",
+                event="concurrent_slot_timeout_retry",
+                message=(
+                    f"Concurrent slot acquisition timed out for campaign {campaign_id} "
+                    f"(org {e.organization_id}); all {e.max_concurrent} slots occupied. "
+                    f"Retry attempt {attempt}/{MAX_CONCURRENT_SLOT_RETRY_ATTEMPTS}. "
+                    "Stale slots will be evicted automatically within 120 s."
+                ),
+                details={
+                    "error": str(e),
+                    "organization_id": e.organization_id,
+                    "max_concurrent": e.max_concurrent,
+                    "wait_time": e.wait_time,
+                    "attempt": attempt,
+                    "max_attempts": MAX_CONCURRENT_SLOT_RETRY_ATTEMPTS,
+                    "reason": "concurrent_slot_timeout",
+                },
+            )
+            # Publish as batch_completed (0 processed) so the orchestrator
+            # schedules the next batch without marking the campaign as failed.
+            await publisher.publish_batch_completed(
+                campaign_id=campaign_id,
+                processed_count=0,
+                failed_count=0,
+                batch_size=batch_size,
+            )
+            return
+
+        # Retries exhausted — the concurrency pool is persistently saturated.
+        # PAUSE (not fail) the campaign: this is an operational condition
+        # (org limit too low, or many long calls in flight), not a code error.
+        # The campaign can be resumed once the operator adjusts the concurrency
+        # limit or active calls clear out naturally.
+        logger.warning(
+            f"Concurrent slot acquisition exhausted retries for campaign {campaign_id} "
+            f"after {attempt} attempts; pausing campaign for operator review."
+        )
+
+        campaign_obj = await db_client.get_campaign_by_id(campaign_id)
+        new_meta = dict(campaign_obj.orchestrator_metadata or {}) if campaign_obj else {}
+        new_meta["paused_reason"] = "concurrency_limit_exhausted"
+        new_meta["paused_max_concurrent"] = e.max_concurrent
+
         await publisher.publish_batch_failed(
             campaign_id=campaign_id,
             error=f"Concurrent slot acquisition timeout: {e}",
             processed_count=0,
         )
-
-        # Update campaign state to failed
-        await db_client.update_campaign(campaign_id=campaign_id, state="failed")
+        await db_client.update_campaign(
+            campaign_id=campaign_id,
+            state="paused",
+            orchestrator_metadata=new_meta,
+        )
         await db_client.append_campaign_log(
             campaign_id=campaign_id,
-            level="error",
-            event="batch_failed",
-            message=f"Concurrent slot acquisition timeout: {e}",
-            details={"error": str(e), "reason": "concurrent_slot_timeout"},
+            level="warning",
+            event="campaign_paused_concurrency_limit",
+            message=(
+                f"Campaign {campaign_id} paused: concurrent slot acquisition timed out "
+                f"after {attempt} consecutive attempts (org {e.organization_id}, "
+                f"limit={e.max_concurrent}). "
+                "Increase the org's concurrent call limit or wait for active calls to clear, "
+                "then resume the campaign."
+            ),
+            details={
+                "error": str(e),
+                "organization_id": e.organization_id,
+                "max_concurrent": e.max_concurrent,
+                "wait_time": e.wait_time,
+                "attempt": attempt,
+                "max_attempts": MAX_CONCURRENT_SLOT_RETRY_ATTEMPTS,
+                "reason": "concurrency_limit_exhausted",
+                "action": "campaign_paused_resumable",
+            },
         )
-        raise
+        # Do NOT raise — campaign is paused, not crashed.
+        # The orchestrator's BatchFailedEvent handler clears _batch_in_progress.
+
 
     except PhoneNumberPoolExhaustedError as e:
         attempt = await db_client.increment_campaign_metadata_counter(

@@ -406,6 +406,30 @@ class RateLimiter:
             logger.error(f"Error getting concurrent count: {e}")
             return 0
 
+    async def get_live_slot_count(self, organization_id: int) -> int | None:
+        """Stale-aware count of active slots for an org.
+
+        Unlike ``get_concurrent_count`` this returns ``None`` on Redis errors
+        rather than ``0`` so callers can distinguish "Redis is down" from
+        "no active calls".  Atomically evicts stale heartbeat entries before
+        counting so the pre-check in the campaign dispatcher is consistent with
+        what the acquire Lua script would see.
+        """
+        try:
+            redis_client = await self._get_redis()
+            concurrent_key = f"concurrent_calls:{organization_id}"
+            stale_cutoff = time.time() - self.heartbeat_stale_timeout
+
+            lua_script = """
+            redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, ARGV[1])
+            return redis.call('ZCARD', KEYS[1])
+            """
+            result = await redis_client.eval(lua_script, 1, concurrent_key, stale_cutoff)
+            return int(result)
+        except Exception as e:
+            logger.warning(f"Redis error in get_live_slot_count for org {organization_id}: {e}")
+            return None  # Explicitly None — not zero — so callers can fail open
+
     async def get_fleet_concurrent_count(self) -> int:
         """Total active calls across every org — the fleet-wide autoscaling signal.
 

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import {
     getCampaignApiV1CampaignCampaignIdGet,
     getCampaignDefaultsApiV1OrganizationsCampaignDefaultsGet,
+    listTelephonyConfigurationsApiV1OrganizationsTelephonyConfigsGet,
     updateCampaignApiV1CampaignCampaignIdPatch
 } from '@/client/sdk.gen';
 import type { CampaignResponse } from '@/client/types.gen';
@@ -119,6 +120,19 @@ export default function EditCampaignPage() {
                     setCircuitBreakerMinCalls(String(cb.min_calls_in_window));
                 }
 
+                if (c.telephony_configuration_id) {
+                    try {
+                        const configsRes = await listTelephonyConfigurationsApiV1OrganizationsTelephonyConfigsGet({
+                            headers: { 'Authorization': `Bearer ${accessToken}` },
+                        });
+                        const matching = configsRes.data?.configurations?.find((cfg) => cfg.id === c.telephony_configuration_id);
+                        if (matching?.phone_number_count !== undefined) {
+                            setFromNumbersCount(matching.phone_number_count);
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch campaign telephony config details:', e);
+                    }
+                }
             }
         } catch (error) {
             console.error('Failed to fetch campaign:', error);

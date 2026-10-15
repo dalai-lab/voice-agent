@@ -291,3 +291,51 @@ class TestTalkarQuotaServiceConcurrencyBypass:
             assert result.has_quota is False
             assert result.error_code == "concurrency_limit_exceeded"
             assert "Concurrent call limit reached" in result.error_message
+
+
+class TestValidateMaxConcurrencyTelephonyConfig:
+    @pytest.mark.asyncio
+    async def test_validate_max_concurrency_uses_selected_telephony_config(self):
+        from api.routes.campaign import _validate_max_concurrency
+
+        with (
+            patch("api.routes.campaign._get_org_concurrent_limit", new_callable=AsyncMock, return_value=100),
+            patch("api.routes.campaign.db_client") as mock_db,
+        ):
+            # Selected config 99 has 50 numbers; default config 11 has only 2 numbers
+            mock_db.list_active_normalized_addresses_for_config = AsyncMock(
+                return_value=[f"+1555777{i:04d}" for i in range(1, 51)]
+            )
+
+            # Validating max_concurrency=50 with telephony_configuration_id=99 must pass without exception
+            await _validate_max_concurrency(
+                max_concurrency=50,
+                organization_id=8,
+                telephony_configuration_id=99,
+            )
+
+            mock_db.list_active_normalized_addresses_for_config.assert_awaited_once_with(99)
+
+    @pytest.mark.asyncio
+    async def test_validate_max_concurrency_fails_if_exceeds_selected_config(self):
+        from api.routes.campaign import _validate_max_concurrency
+
+        with (
+            patch("api.routes.campaign._get_org_concurrent_limit", new_callable=AsyncMock, return_value=100),
+            patch("api.routes.campaign.db_client") as mock_db,
+        ):
+            # Selected config 99 has 10 numbers
+            mock_db.list_active_normalized_addresses_for_config = AsyncMock(
+                return_value=[f"+1555777{i:04d}" for i in range(1, 11)]
+            )
+
+            with pytest.raises(HTTPException) as exc_info:
+                await _validate_max_concurrency(
+                    max_concurrency=50,
+                    organization_id=8,
+                    telephony_configuration_id=99,
+                )
+
+            assert exc_info.value.status_code == 400
+            assert "max_concurrency (50) cannot exceed 10" in exc_info.value.detail
+

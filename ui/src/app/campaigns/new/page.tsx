@@ -571,7 +571,7 @@ export default function NewCampaignPage() {
                                             onMaxConcurrencyChange={setMaxConcurrency}
                                             effectiveLimit={effectiveLimit}
                                             orgConcurrentLimit={orgConcurrentLimit}
-                                            fromNumbersCount={fromNumbersCount}
+                                            fromNumbersCount={availableFromNumbersCount}
                                             retryEnabled={retryEnabled}
                                             onRetryEnabledChange={setRetryEnabled}
                                             maxRetries={maxRetries}

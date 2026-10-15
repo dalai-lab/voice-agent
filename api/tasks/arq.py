@@ -45,6 +45,7 @@ from api.tasks.campaign_tasks import (
     sync_campaign_source,
 )
 from api.tasks.knowledge_base_processing import process_knowledge_base_document
+from api.tasks.mock_telephony_tasks import simulate_mock_call_completion
 from api.tasks.run_integrations import run_integrations_post_workflow_run
 from api.tasks.text_chat_inactivity import (
     complete_inactive_text_chat_session,
@@ -64,6 +65,7 @@ class WorkerSettings:
         deliver_webhook,
         execute_callback,
         complete_inactive_text_chat_session,
+        simulate_mock_call_completion,
     ]
     cron_jobs = [
         # Safety net for webhook deliveries whose ARQ job was lost (worker

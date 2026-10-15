@@ -7,3 +7,4 @@ class FunctionNames:
     DELIVER_WEBHOOK = "deliver_webhook"
     EXECUTE_CALLBACK = "execute_callback"
     COMPLETE_INACTIVE_TEXT_CHAT_SESSION = "complete_inactive_text_chat_session"
+    SIMULATE_MOCK_CALL_COMPLETION = "simulate_mock_call_completion"

@@ -393,3 +393,143 @@ async def test_simulate_mock_call_completion_chain_depth_limit():
         # Call completes cleanly
         mock_status_update.assert_called_once()
         assert mock_status_update.call_args[0][1].status == TelephonyCallStatus.COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_simulate_mock_call_completion_standalone_callback():
+    """Verify that when run.campaign_id is None, outcome='callback' creates a ScheduledCallbackModel."""
+    mock_run = MagicMock()
+    mock_run.id = 701
+    mock_run.campaign_id = None  # Standalone call
+    mock_run.organization_id = 15
+    mock_run.workflow_id = 22
+    mock_run.initial_context = {}
+
+    mock_session = AsyncMock()
+    mock_session_ctx = MagicMock()
+    mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("api.tasks.mock_telephony_tasks.db_client.get_workflow_run_by_id", new_callable=AsyncMock) as mock_get_run, \
+         patch("api.tasks.mock_telephony_tasks.db_client.async_session", return_value=mock_session_ctx), \
+         patch("api.services.telephony.status_processor._process_status_update", new_callable=AsyncMock):
+
+        mock_get_run.return_value = mock_run
+
+        await simulate_mock_call_completion(
+            ctx=None,
+            workflow_run_id=701,
+            call_id="mock_standalone_cb",
+            duration=30,
+            outcome="callback",
+            to_number="+15551239999",
+            from_number="+19990000001",
+            callback_params={"delay_minutes": 20, "summary": "Standalone appointment callback"},
+        )
+
+        mock_session.add.assert_called_once()
+        cb = mock_session.add.call_args[0][0]
+        assert cb.organization_id == 15
+        assert cb.workflow_id == 22
+        assert cb.original_run_id == 701
+        assert cb.to_number == "+15551239999"
+        assert cb.from_number == "+19990000001"
+        assert cb.conversation_summary == "Standalone appointment callback"
+
+
+@pytest.mark.asyncio
+async def test_mock_telephony_routes_status_callback():
+    """Verify handle_mock_status_callback extracts run_id and delegates to _process_status_update."""
+    from api.services.telephony.providers.mock.routes import handle_mock_status_callback
+
+    mock_request = AsyncMock()
+    mock_request.json = AsyncMock(return_value={
+        "status": "completed",
+        "duration": 42,
+        "from_number": "+19990000001",
+        "to_number": "+15551234567",
+    })
+    mock_request.query_params = {}
+
+    with patch("api.services.telephony.providers.mock.routes._process_status_update", new_callable=AsyncMock) as mock_process:
+        resp = await handle_mock_status_callback(mock_request, workflow_run_id=888)
+
+        assert resp["status"] == "success"
+        assert resp["workflow_run_id"] == 888
+
+        mock_process.assert_called_once()
+        run_id, status_req = mock_process.call_args[0]
+        assert run_id == 888
+        assert status_req.status == TelephonyCallStatus.COMPLETED
+        assert status_req.duration == "42"
+
+
+@pytest.mark.asyncio
+async def test_mock_telephony_override_endpoints():
+    """Verify internal mock-telephony override POST, GET, and DELETE endpoints."""
+    from api.routes.internal import (
+        MockTelephonyOverrideRequest,
+        clear_mock_telephony_override,
+        get_mock_telephony_override,
+        set_mock_telephony_override,
+    )
+
+    mock_redis = AsyncMock()
+    stored_data: dict[str, str] = {}
+
+    async def mock_set(key, val):
+        stored_data[key] = val
+
+    async def mock_get(key):
+        return stored_data.get(key)
+
+    async def mock_del(key):
+        return 1 if stored_data.pop(key, None) is not None else 0
+
+    mock_redis.set = mock_set
+    mock_redis.get = mock_get
+    mock_redis.delete = mock_del
+
+    with patch("redis.asyncio.from_url", new_callable=AsyncMock, return_value=mock_redis):
+        # 1. POST
+        req = MockTelephonyOverrideRequest(
+            organization_id=89,
+            min_duration_seconds=5,
+            max_duration_seconds=15,
+            outcomes={"completed": 100},
+            fast_forward_callbacks=True,
+        )
+        post_resp = await set_mock_telephony_override(req, _=None)
+        assert post_resp["status"] == "success"
+        assert post_resp["config"]["min_duration_seconds"] == 5
+
+        # 2. GET
+        get_resp = await get_mock_telephony_override(organization_id=89, _=None)
+        assert get_resp["config"]["max_duration_seconds"] == 15
+        assert get_resp["config"]["fast_forward_callbacks"] is True
+
+        # 3. DELETE
+        del_resp = await clear_mock_telephony_override(organization_id=89, _=None)
+        assert del_resp["cleared"] is True
+
+        get_resp_after = await get_mock_telephony_override(organization_id=89, _=None)
+        assert get_resp_after["config"] is None
+
+
+@pytest.mark.asyncio
+async def test_mock_provider_methods():
+    """Verify validate_phone_number, generate_error_response, and supports_transfers."""
+    provider = MockTelephonyProvider(config={"from_numbers": ["+19990000001"]})
+
+    # validate_phone_number
+    sync_res = await provider.validate_phone_number("+19990000001")
+    assert sync_res.ok is True
+
+    # supports_transfers
+    assert provider.supports_transfers() is False
+
+    # generate_error_response
+    resp, media_type = provider.generate_error_response("simulated_error", "Mock error details")
+    assert media_type == "application/json"
+    assert resp.status_code == 400
+

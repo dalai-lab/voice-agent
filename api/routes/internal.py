@@ -552,8 +552,6 @@ class MockTelephonyOverrideRequest(BaseModel):
     min_duration_seconds: int | None = None
     max_duration_seconds: int | None = None
     outcomes: dict[str, int] | None = None
-    callback_delay_minutes: int | None = None
-    fast_forward_callbacks: bool | None = None
 
 
 @router.post("/mock-telephony/override")

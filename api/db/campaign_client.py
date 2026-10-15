@@ -28,7 +28,6 @@ class CampaignClient(BaseDBClient):
         schedule_config: dict | None = None,
         circuit_breaker: dict | None = None,
         telephony_configuration_id: int | None = None,
-        callback_config: dict | None = None,
     ) -> CampaignModel:
         """Create a new campaign"""
         async with self.async_session() as session:
@@ -40,8 +39,6 @@ class CampaignClient(BaseDBClient):
                 orchestrator_metadata["schedule_config"] = schedule_config
             if circuit_breaker is not None:
                 orchestrator_metadata["circuit_breaker"] = circuit_breaker
-            if callback_config is not None:
-                orchestrator_metadata["callback_config"] = callback_config
 
             campaign = CampaignModel(
                 name=name,
@@ -832,31 +829,6 @@ class CampaignClient(BaseDBClient):
             result = await session.execute(query)
             return result.scalar() or 0
 
-    async def get_campaigns_with_due_callbacks(self) -> list[CampaignModel]:
-        """Get campaigns that have due callbacks, regardless of campaign state."""
-        async with self.async_session() as session:
-            now = datetime.now(UTC)
-            query = (
-                select(CampaignModel)
-                .join(QueuedRunModel, QueuedRunModel.campaign_id == CampaignModel.id)
-                .where(
-                    QueuedRunModel.retry_reason == "user_requested_callback",
-                    QueuedRunModel.state == "queued",
-                    QueuedRunModel.scheduled_for <= now
-                )
-            )
-            result = await session.execute(query)
-            
-            campaigns = list(result.scalars().all())
-            seen = set()
-            unique_campaigns = []
-            for c in campaigns:
-                if c.id not in seen:
-                    seen.add(c.id)
-                    unique_campaigns.append(c)
-                    
-            return unique_campaigns
-
     async def get_scheduled_runs_count(
         self,
         campaign_id: int,
@@ -888,7 +860,6 @@ class CampaignClient(BaseDBClient):
         campaign_id: int,
         scheduled_before: datetime,
         limit: int = 10,
-        callbacks_only: bool = False,
     ) -> list[QueuedRunModel]:
         """
         Atomically claim queued runs for processing using SELECT FOR UPDATE SKIP LOCKED.
@@ -914,8 +885,6 @@ class CampaignClient(BaseDBClient):
                     QueuedRunModel.scheduled_for <= scheduled_before,
                 )
             )
-            if callbacks_only:
-                scheduled_query = scheduled_query.where(QueuedRunModel.retry_reason == "user_requested_callback")
 
             scheduled_query = (
                 scheduled_query
@@ -936,8 +905,8 @@ class CampaignClient(BaseDBClient):
 
             remaining_slots = limit - len(scheduled_runs)
 
-            # Then get regular queued runs if we have remaining slots (skip if callbacks_only)
-            if remaining_slots > 0 and not callbacks_only:
+            # Then get regular queued runs if we have remaining slots
+            if remaining_slots > 0:
                 regular_query = (
                     select(QueuedRunModel)
                     .where(

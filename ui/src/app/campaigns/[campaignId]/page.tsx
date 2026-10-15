@@ -16,7 +16,6 @@ import {
     startCampaignApiV1CampaignCampaignIdStartPost,
 } from '@/client/sdk.gen';
 import type { CampaignResponse } from '@/client/types.gen';
-import { CampaignCallbacks } from '@/components/campaign-callbacks';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -26,7 +25,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CampaignAnalytics } from '@/components/analytics/CampaignAnalytics';
 import { CampaignRuns } from '@/components/workflow-runs';
 import { useOrganizationTimezone } from '@/hooks/useOrganizationTimezone';
@@ -874,25 +872,14 @@ export default function CampaignDetailPage() {
                 </div>
             </div>
 
-            {/* Workflow Runs and Callbacks */}
-            <Tabs defaultValue="runs" className="w-full">
-                <TabsList className="mb-4 bg-muted/40 border border-border rounded-lg p-0.5">
-                    <TabsTrigger value="runs" className="text-xs font-semibold rounded-md px-3 py-1.5">Runs</TabsTrigger>
-                    <TabsTrigger value="callbacks" className="text-xs font-semibold rounded-md px-3 py-1.5">Callbacks</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="runs">
-                    <CampaignRuns
-                        campaignId={campaignId}
-                        workflowId={campaign.workflow_id}
-                        searchParams={searchParams}
-                    />
-                </TabsContent>
-
-                <TabsContent value="callbacks">
-                    <CampaignCallbacks campaignId={campaignId} />
-                </TabsContent>
-            </Tabs>
+            {/* Workflow Runs */}
+            <div className="w-full">
+                <CampaignRuns
+                    campaignId={campaignId}
+                    workflowId={campaign.workflow_id}
+                    searchParams={searchParams}
+                />
+            </div>
 
             <Dialog open={isRedialDialogOpen} onOpenChange={setIsRedialDialogOpen}>
                 <DialogContent className="max-w-md rounded-xl bg-background border border-border shadow-lg p-6">

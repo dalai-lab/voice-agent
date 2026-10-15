@@ -149,32 +149,6 @@ class CircuitBreakerConfigResponse(BaseModel):
     min_calls_in_window: int = 5
 
 
-class CallbackConfigRequest(BaseModel):
-    enabled: bool = True
-    sociable_hours_start: str = Field(default="08:00", pattern=r"^\d{2}:\d{2}$")
-    sociable_hours_end: str = Field(default="21:00", pattern=r"^\d{2}:\d{2}$")
-    sociable_hours_timezone: str = "UTC"
-    honor_campaign_window_for_long_callbacks: bool = True
-    long_callback_threshold_minutes: int = Field(default=120, ge=0)
-
-    @field_validator("sociable_hours_timezone")
-    @classmethod
-    def validate_timezone(cls, v: str) -> str:
-        try:
-            ZoneInfo(v)
-        except (KeyError, Exception):
-            raise ValueError(f"Invalid timezone: {v}")
-        return v
-
-
-class CallbackConfigResponse(BaseModel):
-    enabled: bool = True
-    sociable_hours_start: str = "08:00"
-    sociable_hours_end: str = "21:00"
-    sociable_hours_timezone: str = "UTC"
-    honor_campaign_window_for_long_callbacks: bool = True
-    long_callback_threshold_minutes: int = 120
-
 
 class CreateCampaignRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -189,7 +163,7 @@ class CreateCampaignRequest(BaseModel):
     max_concurrency: int | None = Field(default=None, ge=1, le=100)
     schedule_config: ScheduleConfigRequest | None = None
     circuit_breaker: CircuitBreakerConfigRequest | None = None
-    callback_config: CallbackConfigRequest | None = None
+    callback_config: Any | None = None  # Deprecated, retained for CRM compatibility
 
 
 class UpdateCampaignRequest(BaseModel):
@@ -198,7 +172,7 @@ class UpdateCampaignRequest(BaseModel):
     max_concurrency: int | None = Field(default=None, ge=1, le=100)
     schedule_config: ScheduleConfigRequest | None = None
     circuit_breaker: CircuitBreakerConfigRequest | None = None
-    callback_config: CallbackConfigRequest | None = None
+    callback_config: Any | None = None  # Deprecated, retained for CRM compatibility
 
 
 class CampaignLogEntryResponse(BaseModel):
@@ -233,7 +207,7 @@ class CampaignResponse(BaseModel):
     max_concurrency: int | None = None
     schedule_config: ScheduleConfigResponse | None = None
     circuit_breaker: CircuitBreakerConfigResponse | None = None
-    callback_config: CallbackConfigResponse | None = None
+    callback_config: Any | None = None
     executed_count: int = 0
     total_queued_count: int = 0
     parent_campaign_id: int | None = None
@@ -300,7 +274,6 @@ def _build_campaign_response(
     max_concurrency = None
     schedule_config = None
     circuit_breaker_config = CircuitBreakerConfigResponse()
-    callback_config = None
     parent_campaign_id = None
     redialed_campaign_id = None
     if campaign.orchestrator_metadata:
@@ -315,9 +288,6 @@ def _build_campaign_response(
         cb = campaign.orchestrator_metadata.get("circuit_breaker")
         if cb:
             circuit_breaker_config = CircuitBreakerConfigResponse(**cb)
-        cc = campaign.orchestrator_metadata.get("callback_config")
-        if cc:
-            callback_config = CallbackConfigResponse(**cc)
         parent_campaign_id = campaign.orchestrator_metadata.get("parent_campaign_id")
         redialed_campaign_id = campaign.orchestrator_metadata.get(
             "redialed_campaign_id"
@@ -341,7 +311,7 @@ def _build_campaign_response(
         max_concurrency=max_concurrency,
         schedule_config=schedule_config,
         circuit_breaker=circuit_breaker_config,
-        callback_config=callback_config,
+        callback_config=None,
         executed_count=executed_count,
         total_queued_count=total_queued_count,
         parent_campaign_id=parent_campaign_id,
@@ -474,11 +444,6 @@ async def create_campaign(
     if request.circuit_breaker:
         circuit_breaker_config = request.circuit_breaker.model_dump()
 
-    # Build callback_config dict if provided
-    callback_config = None
-    if request.callback_config:
-        callback_config = request.callback_config.model_dump()
-
     campaign = await db_client.create_campaign(
         name=request.name,
         workflow_id=request.workflow_id,
@@ -491,7 +456,6 @@ async def create_campaign(
         schedule_config=schedule_config,
         circuit_breaker=circuit_breaker_config,
         telephony_configuration_id=telephony_configuration_id,
-        callback_config=callback_config,
     )
 
     cfg_name = await _get_telephony_configuration_name(
@@ -707,10 +671,6 @@ async def update_campaign(
 
     if request.circuit_breaker is not None:
         metadata["circuit_breaker"] = request.circuit_breaker.model_dump()
-        metadata_changed = True
-
-    if request.callback_config is not None:
-        metadata["callback_config"] = request.callback_config.model_dump()
         metadata_changed = True
 
     if metadata_changed:
@@ -1062,121 +1022,3 @@ async def download_campaign_report(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
-
-class CampaignCallbackItem(BaseModel):
-    queued_run_id: int
-    status: str
-    scheduled_for: datetime | None
-    fires_in_seconds: int | None
-    to_number: str | None
-    from_number: str | None
-    conversation_summary: str | None
-    callback_chain_depth: int
-    original_run_id: int | None
-    outcome_run_id: int | None
-    outcome_status: str | None
-    outcome_disposition: str | None
-    created_at: datetime | None
-
-@router.get("/{campaign_id}/callbacks", response_model=list[CampaignCallbackItem])
-async def list_campaign_callbacks(
-    campaign_id: int,
-    status: str | None = Query(None),
-    limit: int = Query(50),
-    offset: int = Query(0),
-    user: UserModel = Depends(get_user),
-) -> Any:
-    # verify campaign
-    campaign = await db_client.get_campaign(campaign_id, user.selected_organization_id)
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
-        
-
-    from sqlalchemy import desc, select, text
-
-    from api.db.models import QueuedRunModel
-    
-    query = select(QueuedRunModel).where(
-        QueuedRunModel.campaign_id == campaign_id,
-        QueuedRunModel.retry_reason == "user_requested_callback"
-    )
-    
-    if status:
-        if status == "pending":
-            query = query.where(QueuedRunModel.state == "queued")
-        elif status == "completed":
-            query = query.where(QueuedRunModel.state == "processed")
-        else:
-            query = query.where(QueuedRunModel.state == status)
-            
-    query = query.order_by(desc(QueuedRunModel.scheduled_for)).limit(limit).offset(offset)
-    
-    async with db_client.async_session() as db:
-        result = await db.execute(query)
-        queued_runs = result.scalars().all()
-        
-        # Batch fetch outcome runs
-        orig_run_ids = []
-        for qr in queued_runs:
-            cv = qr.context_variables or {}
-            if cv.get("original_run_id"):
-                orig_run_ids.append(str(cv.get("original_run_id")))
-                
-        outcome_map = {}
-        if orig_run_ids:
-            stmt = text("""
-                SELECT initial_context->>'original_run_id' as orig_run_id, id, state, gathered_context->>'call_disposition' as disposition 
-                FROM workflow_runs 
-                WHERE campaign_id = :campaign_id 
-                AND initial_context->>'is_callback' = 'true'
-                AND initial_context->>'original_run_id' = ANY(:orig_run_ids)
-                ORDER BY created_at ASC
-            """)
-            res = await db.execute(stmt, {"campaign_id": campaign_id, "orig_run_ids": orig_run_ids})
-            for row in res:
-                outcome_map[row.orig_run_id] = (row.id, row.state, row.disposition)
-        
-    items = []
-    now = datetime.now(UTC)
-    for qr in queued_runs:
-        cv = qr.context_variables or {}
-        orig_run_id = cv.get("original_run_id")
-        
-        status_mapped = qr.state
-        if qr.state == "queued":
-            status_mapped = "pending"
-        elif qr.state == "processed":
-            status_mapped = "completed"
-            
-        fires_in = None
-        if qr.scheduled_for:
-            fires_in = int((qr.scheduled_for - now).total_seconds())
-            
-        fis = None
-        if fires_in is not None and status_mapped == "pending":
-            fis = fires_in
-            
-        outcome_run_id = None
-        outcome_status = None
-        outcome_disposition = None
-        
-        if orig_run_id and str(orig_run_id) in outcome_map:
-            outcome_run_id, outcome_status, outcome_disposition = outcome_map[str(orig_run_id)]
-            
-        items.append(CampaignCallbackItem(
-            queued_run_id=qr.id,
-            status=status_mapped,
-            scheduled_for=qr.scheduled_for,
-            fires_in_seconds=fis,
-            to_number=cv.get("called_number") or cv.get("to_number"),
-            from_number=cv.get("caller_number") or cv.get("from_number"),
-            conversation_summary=cv.get("conversation_summary"),
-            callback_chain_depth=cv.get("callback_chain_depth", 1),
-            original_run_id=orig_run_id,
-            outcome_run_id=outcome_run_id,
-            outcome_status=outcome_status,
-            outcome_disposition=outcome_disposition,
-            created_at=qr.created_at
-        ))
-        
-    return items

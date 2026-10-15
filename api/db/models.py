@@ -464,12 +464,6 @@ class WorkflowModel(Base):
     enable_dtmf = Column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )
-    enable_callbacks = Column(
-        Boolean, nullable=False, default=False, server_default=text("false")
-    )
-    callback_resume_mode = Column(
-        String, nullable=False, default="fresh", server_default=text("'fresh'")
-    )
     runs = relationship("WorkflowRunModel", back_populates="workflow")
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
@@ -845,13 +839,6 @@ class QueuedRunModel(Base):
             "campaign_id",
             "scheduled_for",
             postgresql_where=text("scheduled_for IS NOT NULL"),
-        ),
-        # Optimized index for callbacks
-        Index(
-            "idx_queued_runs_callback",
-            "campaign_id",
-            "scheduled_for",
-            postgresql_where=text("state = 'queued' AND retry_reason = 'user_requested_callback'"),
         ),
         UniqueConstraint(
             "campaign_id",
@@ -1472,49 +1459,3 @@ class KnowledgeBaseChunkModel(Base):
         ),
     )
 
-
-class ScheduledCallbackModel(Base):
-    """Model for storing pending single-call callbacks (non-campaign) for durability and UI."""
-
-    __tablename__ = "scheduled_callbacks"
-
-    id = Column(Integer, primary_key=True, index=True)
-
-    organization_id = Column(
-        Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
-    )
-    workflow_id = Column(
-        Integer, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
-    )
-    original_run_id = Column(Integer, nullable=False, index=True)
-
-    status = Column(
-        Enum("pending", "completed", "failed", "cancelled", name="scheduled_callback_status"),
-        nullable=False,
-        default="pending",
-    )
-    scheduled_for = Column(DateTime(timezone=True), nullable=False, index=True)
-
-    to_number = Column(String(32), nullable=False)
-    from_number = Column(String(32), nullable=False)
-
-    conversation_summary = Column(Text, nullable=False)
-    gathered_context = Column(JSON, nullable=False, default=dict)
-    callback_chain_depth = Column(Integer, nullable=False, default=1)
-
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
-    updated_at = Column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
-    )
-
-    # Relationships
-    organization = relationship("OrganizationModel")
-    workflow = relationship("WorkflowModel")
-
-    __table_args__ = (
-        Index("ix_scheduled_callbacks_org_id", "organization_id"),
-        Index("ix_scheduled_callbacks_workflow_id", "workflow_id"),
-        Index("ix_scheduled_callbacks_status", "status"),
-    )

@@ -121,11 +121,6 @@ const NAV_SECTIONS: SidebarNavSection[] = [
             url: "/runs",
             icon: PhosphorIcons.ClockCounterClockwise,
           },
-          {
-            title: "Scheduled Callbacks",
-            url: "/callbacks",
-            icon: PhosphorIcons.PhoneCall,
-          },
         ],
       },
       {

@@ -22,21 +22,12 @@ class MockConfigurationRequest(BaseModel):
     )
     outcomes: dict[str, int] = Field(
         default_factory=lambda: {
-            "completed": 70,
+            "completed": 75,
             "busy": 10,
             "no_answer": 10,
             "carrier_error": 5,
-            "callback": 5,
         },
         description="Weighted distribution of simulated call outcomes",
-    )
-    callback_delay_minutes: int = Field(
-        default=15,
-        description="Default delay in minutes for simulated callbacks",
-    )
-    fast_forward_callbacks: bool = Field(
-        default=False,
-        description="When true, bypasses sociable hours clamping to test callbacks overnight instantly",
     )
 
 
@@ -48,5 +39,3 @@ class MockConfigurationResponse(BaseModel):
     min_duration_seconds: int = 10
     max_duration_seconds: int = 600
     outcomes: dict[str, int] = Field(default_factory=dict)
-    callback_delay_minutes: int = 15
-    fast_forward_callbacks: bool = False

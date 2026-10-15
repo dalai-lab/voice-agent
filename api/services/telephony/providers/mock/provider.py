@@ -30,8 +30,8 @@ def resolve_simulation_parameters(
     campaign_meta: dict[str, Any],
     telephony_config: dict[str, Any],
     live_redis_config: dict[str, Any] | None = None,
-) -> tuple[int, str, dict[str, Any]]:
-    """Resolves (duration_seconds, outcome, callback_params) via 4-tier hierarchy:
+) -> tuple[int, str]:
+    """Resolves (duration_seconds, outcome) via 4-tier hierarchy:
 
     1. Per-contact context override (CSV context variables)
     2. Live runtime Redis override (mock_telephony:config:{org_id})
@@ -42,14 +42,7 @@ def resolve_simulation_parameters(
     if "simulated_duration" in contact_context or "simulated_outcome" in contact_context:
         duration = int(contact_context.get("simulated_duration", 30))
         outcome = str(contact_context.get("simulated_outcome", "completed")).lower()
-        cb_params = {
-            "delay_minutes": int(contact_context.get("callback_delay_minutes", 15)),
-            "summary": contact_context.get(
-                "callback_summary", "Simulated contact requested appointment callback"
-            ),
-            "fast_forward": bool(contact_context.get("callback_fast_forward", False)),
-        }
-        return duration, outcome, cb_params
+        return duration, outcome
 
     # 2. Hierarchy fallback (Live Redis > Campaign Metadata > Telephony Config)
     active_cfg = (
@@ -69,11 +62,10 @@ def resolve_simulation_parameters(
     weights = active_cfg.get(
         "outcomes",
         {
-            "completed": 70,
+            "completed": 75,
             "busy": 10,
             "no_answer": 10,
             "carrier_error": 5,
-            "callback": 5,
         },
     )
     outcome = random.choices(
@@ -82,13 +74,7 @@ def resolve_simulation_parameters(
         k=1,
     )[0]
 
-    cb_params = {
-        "delay_minutes": int(active_cfg.get("callback_delay_minutes", 15)),
-        "summary": "Simulated contact requested callback",
-        "fast_forward": bool(active_cfg.get("fast_forward_callbacks", False)),
-    }
-
-    return duration, outcome, cb_params
+    return duration, outcome
 
 
 class MockTelephonyProvider(TelephonyProvider):
@@ -168,7 +154,7 @@ class MockTelephonyProvider(TelephonyProvider):
             await self._get_live_redis_config(org_id) if org_id else None
         )
 
-        duration, outcome, cb_params = resolve_simulation_parameters(
+        duration, outcome = resolve_simulation_parameters(
             contact_context=contact_context,
             campaign_meta=campaign_meta,
             telephony_config=self.config,
@@ -191,7 +177,6 @@ class MockTelephonyProvider(TelephonyProvider):
             outcome=outcome,
             to_number=to_number,
             from_number=selected_from,
-            callback_params=cb_params,
             _defer_by=timedelta(seconds=duration),
         )
 
@@ -204,7 +189,6 @@ class MockTelephonyProvider(TelephonyProvider):
                 "call_id": call_id,
                 "simulated_duration": duration,
                 "simulated_outcome": outcome,
-                "callback_params": cb_params if outcome == "callback" else None,
             },
         )
 

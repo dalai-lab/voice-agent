@@ -39,7 +39,6 @@ REDIS_SETTINGS = RedisSettings(
     ssl_check_hostname=False if use_ssl else None,
 )
 
-from api.tasks.callback_tasks import execute_callback
 from api.tasks.campaign_tasks import (
     process_campaign_batch,
     sweep_stuck_campaign_runs,
@@ -64,7 +63,6 @@ class WorkerSettings:
         process_campaign_batch,
         process_knowledge_base_document,
         deliver_webhook,
-        execute_callback,
         complete_inactive_text_chat_session,
         simulate_mock_call_completion,
         sweep_stuck_campaign_runs,

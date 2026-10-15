@@ -6,7 +6,7 @@ write a specific, identifiable entry into the campaign log so operators
 can tell at a glance why a campaign stopped.
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -51,6 +51,7 @@ class TestProcessCampaignBatchFailureLogs:
                 processed_count=0,
                 failed_count=0,
                 batch_size=10,
+                metadata={"defer_seconds": 15, "reason": "phone_number_pool_exhausted"},
             )
 
             mock_db.append_campaign_log.assert_called_once()
@@ -99,9 +100,8 @@ class TestProcessCampaignBatchFailureLogs:
             assert kwargs["details"]["attempt"] == 3
 
     @pytest.mark.asyncio
-    async def test_concurrent_slot_timeout_still_logs_specific_event(self):
-        """Regression guard: the existing ConcurrentSlotAcquisitionError branch
-        should keep logging its specific reason."""
+    async def test_concurrent_slot_timeout_retries_with_backoff(self):
+        """When concurrency slot timeout occurs and attempts remain, it logs a retry and defers."""
         with (
             patch("api.tasks.campaign_tasks.campaign_call_dispatcher") as mock_disp,
             patch("api.tasks.campaign_tasks.db_client") as mock_db,
@@ -111,18 +111,62 @@ class TestProcessCampaignBatchFailureLogs:
         ):
             mock_disp.process_batch = AsyncMock(
                 side_effect=ConcurrentSlotAcquisitionError(
-                    organization_id=7, campaign_id=42, wait_time=30.0
+                    organization_id=7, campaign_id=42, wait_time=30.0, max_concurrent=5
                 )
             )
+            mock_db.increment_campaign_metadata_counter = AsyncMock(return_value=1)
+            mock_db.append_campaign_log = AsyncMock()
+            mock_pub = AsyncMock()
+            mock_get_pub.return_value = mock_pub
+
+            await process_campaign_batch({}, campaign_id=42)
+
+            mock_pub.publish_batch_completed.assert_awaited_once_with(
+                campaign_id=42,
+                processed_count=0,
+                failed_count=0,
+                batch_size=10,
+                metadata={"defer_seconds": 15, "reason": "concurrent_slot_timeout"},
+            )
+            mock_db.append_campaign_log.assert_called_once()
+            kwargs = mock_db.append_campaign_log.call_args.kwargs
+            assert kwargs["event"] == "concurrent_slot_timeout_retry"
+            assert kwargs["details"]["attempt"] == 1
+
+    @pytest.mark.asyncio
+    async def test_concurrent_slot_timeout_pauses_campaign_after_max_retries(self):
+        """When retries are exhausted, the campaign is paused for operator review."""
+        with (
+            patch("api.tasks.campaign_tasks.campaign_call_dispatcher") as mock_disp,
+            patch("api.tasks.campaign_tasks.db_client") as mock_db,
+            patch(
+                "api.tasks.campaign_tasks.get_campaign_event_publisher"
+            ) as mock_get_pub,
+        ):
+            mock_disp.process_batch = AsyncMock(
+                side_effect=ConcurrentSlotAcquisitionError(
+                    organization_id=7, campaign_id=42, wait_time=30.0, max_concurrent=5
+                )
+            )
+            mock_db.increment_campaign_metadata_counter = AsyncMock(return_value=6)
+            mock_db.get_campaign_by_id = AsyncMock(return_value=MagicMock(orchestrator_metadata={}))
             mock_db.update_campaign = AsyncMock()
             mock_db.append_campaign_log = AsyncMock()
             mock_pub = AsyncMock()
             mock_get_pub.return_value = mock_pub
 
-            with pytest.raises(ConcurrentSlotAcquisitionError):
-                await process_campaign_batch({}, campaign_id=42)
+            await process_campaign_batch({}, campaign_id=42)
 
+            mock_db.update_campaign.assert_called_once_with(
+                campaign_id=42,
+                state="paused",
+                orchestrator_metadata={
+                    "paused_reason": "concurrency_limit_exhausted",
+                    "paused_max_concurrent": 5,
+                },
+            )
+            mock_pub.publish_batch_failed.assert_awaited_once()
             mock_db.append_campaign_log.assert_called_once()
             kwargs = mock_db.append_campaign_log.call_args.kwargs
-            assert kwargs["event"] == "batch_failed"
-            assert kwargs["details"]["reason"] == "concurrent_slot_timeout"
+            assert kwargs["event"] == "campaign_paused_concurrency_limit"
+            assert kwargs["details"]["reason"] == "concurrency_limit_exhausted"

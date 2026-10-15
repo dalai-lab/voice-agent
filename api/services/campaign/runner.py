@@ -89,12 +89,38 @@ class CampaignRunnerService:
                 f"Campaign must be in 'paused' state to resume, current state: {campaign.state}"
             )
 
-        # Update state to running. Do not queue batch since campaign orchestrator's
-        # stale campaign checker would do that if there are pending work.
-        await db_client.update_campaign(campaign_id=campaign_id, state="running")
+        # Clear paused reason and details from orchestrator metadata
+        new_meta = dict(campaign.orchestrator_metadata or {})
+        new_meta.pop("paused_reason", None)
+        new_meta.pop("paused_max_concurrent", None)
+
+        # Update state to running
+        await db_client.update_campaign(
+            campaign_id=campaign_id,
+            state="running",
+            orchestrator_metadata=new_meta,
+        )
+
+        # Reset retry counters so resumed campaign starts with full retry attempts
+        await db_client.reset_campaign_metadata_counter(
+            campaign_id=campaign_id,
+            key="concurrent_slot_timeout_attempts",
+        )
+        await db_client.reset_campaign_metadata_counter(
+            campaign_id=campaign_id,
+            key="quota_exhausted_attempts",
+        )
+        await db_client.reset_campaign_metadata_counter(
+            campaign_id=campaign_id,
+            key="phone_number_pool_exhausted_attempts",
+        )
 
         # Reset circuit breaker so the resumed campaign starts with a clean slate
         await circuit_breaker.reset(campaign_id)
+
+        # Publish event so orchestrator kicks off processing immediately
+        publisher = await get_campaign_event_publisher()
+        await publisher.publish_campaign_resumed(campaign_id)
 
         logger.info(f"Campaign {campaign_id} resumed")
 

@@ -199,6 +199,7 @@ class TestProcessCampaignBatchQuotaHandling:
                 processed_count=0,
                 failed_count=0,
                 batch_size=10,
+                metadata={"defer_seconds": 15, "reason": "quota_transient_retry"},
             )
 
             mock_db.append_campaign_log.assert_called_once()

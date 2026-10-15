@@ -68,6 +68,7 @@ async def test_acquire_org_slot_logs_warning_when_limit_reached():
             return_value=None
         )
         mock_rate_limiter.get_concurrent_count = AsyncMock(return_value=12)
+        mock_rate_limiter.get_live_slot_count = AsyncMock(return_value=12)
 
         with pytest.raises(CallConcurrencyLimitError):
             await service.acquire_org_slot(199, source="test_source", timeout=0)
@@ -107,6 +108,7 @@ async def test_acquire_org_slot_fires_usage_event_per_org_member_when_limit_reac
             return_value=None
         )
         mock_rate_limiter.get_concurrent_count = AsyncMock(return_value=10)
+        mock_rate_limiter.get_live_slot_count = AsyncMock(return_value=10)
 
         with pytest.raises(CallConcurrencyLimitError):
             await service.acquire_org_slot(199, source="webrtc", timeout=0)

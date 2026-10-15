@@ -724,7 +724,7 @@ class RateLimiter:
 
         -- Check if preferred number is available (score == 0)
         local score = redis.call('ZSCORE', key, preferred_number)
-        if score == "0" then
+        if score and tonumber(score) == 0 then
             -- Mark as in-use with current timestamp
             redis.call('ZADD', key, now, preferred_number)
             return 1

@@ -23,6 +23,7 @@ from api.enums import RedisChannel
 from api.services.campaign.campaign_event_protocol import (
     BatchCompletedEvent,
     BatchFailedEvent,
+    CampaignResumedEvent,
     CircuitBreakerTrippedEvent,
     RetryNeededEvent,
     SyncCompletedEvent,
@@ -123,6 +124,10 @@ class CampaignOrchestrator:
                     f"campaign_id: {campaign_id} - Batch completed, cleared in-progress flag"
                 )
 
+            # Clear processing lock held by the completed batch so the next batch can be scheduled
+            if campaign_id in self._processing_locks:
+                del self._processing_locks[campaign_id]
+
             # Check campaign state before scheduling next batch
             campaign = await db_client.get_campaign_by_id(campaign_id)
             if not campaign:
@@ -142,7 +147,22 @@ class CampaignOrchestrator:
                     self._clear_campaign_state(campaign_id)
                     return
 
-            # Immediately schedule next batch
+            defer_seconds = 0
+            if event.metadata:
+                defer_seconds = int(event.metadata.get("defer_seconds", 0) or 0)
+
+            # Schedule next batch
+            await self._schedule_next_batch(campaign_id, defer_seconds=defer_seconds)
+            self._last_activity[campaign_id] = datetime.now(UTC)
+
+        elif isinstance(event, CampaignResumedEvent):
+            logger.info(
+                f"campaign_id: {campaign_id} - Campaign resumed event received, scheduling batch"
+            )
+            if campaign_id in self._processing_locks:
+                del self._processing_locks[campaign_id]
+            if campaign_id in self._batch_in_progress:
+                del self._batch_in_progress[campaign_id]
             await self._schedule_next_batch(campaign_id)
             self._last_activity[campaign_id] = datetime.now(UTC)
 
@@ -339,8 +359,8 @@ class CampaignOrchestrator:
 
         return False
 
-    async def _schedule_next_batch(self, campaign_id: int):
-        """Schedule next batch immediately if work available."""
+    async def _schedule_next_batch(self, campaign_id: int, defer_seconds: int = 0):
+        """Schedule next batch immediately (or deferred) if work available."""
 
         # Prevent duplicate scheduling with in-memory lock
         if campaign_id in self._processing_locks:
@@ -440,11 +460,11 @@ class CampaignOrchestrator:
                 self._clear_campaign_state(campaign_id)
                 return
 
-            # Check for available work (queued runs + due retries)
+            # Check for available work that is due right now
             if callbacks_only:
                 has_work = True
             else:
-                has_work = await self._has_pending_work(campaign_id)
+                has_work = await self._has_due_work(campaign_id)
 
             if has_work:
                 if callbacks_only and campaign.state in ["completed", "failed"]:
@@ -454,14 +474,22 @@ class CampaignOrchestrator:
                         event="post_completion_callbacks",
                         message=f"Dispatching post-completion callbacks for {campaign.state} campaign",
                     )
-                # Schedule batch immediately
+                # Schedule batch immediately or deferred
+                enqueue_kwargs = {}
+                if defer_seconds > 0:
+                    enqueue_kwargs["_defer_by"] = timedelta(seconds=defer_seconds)
+
                 await enqueue_job(
                     FunctionNames.PROCESS_CAMPAIGN_BATCH,
                     campaign_id,
                     10,  # batch_size
-                    callbacks_only  # callbacks_only
+                    callbacks_only,  # callbacks_only
+                    **enqueue_kwargs,
                 )
-                logger.info(f"campaign_id: {campaign_id} - Scheduled next batch (callbacks_only={callbacks_only})")
+                logger.info(
+                    f"campaign_id: {campaign_id} - Scheduled next batch "
+                    f"(callbacks_only={callbacks_only}, defer_seconds={defer_seconds})"
+                )
 
                 # Set batch in progress flag
                 self._batch_in_progress[campaign_id] = datetime.now(UTC)
@@ -543,7 +571,7 @@ class CampaignOrchestrator:
                         del self._batch_in_progress[campaign_id]
 
                         # Check if there's work to be done
-                        if await self._has_pending_work(campaign_id):
+                        if await self._has_due_work(campaign_id):
                             logger.info(
                                 f"campaign_id: {campaign_id} - Found pending work after stuck batch, "
                                 f"scheduling new batch"
@@ -553,7 +581,7 @@ class CampaignOrchestrator:
 
                 # Check for orphaned work (e.g., newly created retries with no batch in progress)
                 if campaign_id not in self._batch_in_progress:
-                    has_work = await self._has_pending_work(campaign_id)
+                    has_work = await self._has_due_work(campaign_id)
                     if has_work:
                         callbacks_only = False
                         if not self._is_within_schedule(campaign) or campaign.state != "running":
@@ -598,8 +626,8 @@ class CampaignOrchestrator:
             )
             return False
 
-        # Check for any pending work
-        has_work = await self._has_pending_work(campaign_id)
+        # Check for any remaining work (due now or scheduled for future)
+        has_work = await self._has_any_remaining_work(campaign_id)
         if has_work:
             # If outside schedule window, don't mark complete — work remains for next window
             if not self._is_within_schedule(campaign):
@@ -634,9 +662,9 @@ class CampaignOrchestrator:
         )
         return True
 
-    async def _has_pending_work(self, campaign_id: int) -> bool:
+    async def _has_due_work(self, campaign_id: int) -> bool:
         """Check if there is any work that can be processed right now."""
-        # Check for regular queued runs (exclude scheduled runs like callbacks)
+        # Check for regular queued runs (exclude scheduled runs like future callbacks)
         queued_count = await db_client.get_queued_runs_count(
             campaign_id=campaign_id, states=["queued"], non_scheduled_only=True
         )
@@ -645,25 +673,41 @@ class CampaignOrchestrator:
             logger.debug(f"campaign_id: {campaign_id} - Has {queued_count} queued runs")
             return True
 
-        # Check scheduled retries that are due
+        # Check scheduled retries or callbacks that are due right now
         scheduled_count = await db_client.get_scheduled_runs_count(
             campaign_id=campaign_id, scheduled_before=datetime.now(UTC)
         )
 
         if scheduled_count > 0:
             logger.debug(
-                f"campaign_id: {campaign_id} - Has {scheduled_count} scheduled retries due"
+                f"campaign_id: {campaign_id} - Has {scheduled_count} scheduled retries/callbacks due"
             )
             return True
 
-        # Check for ANY pending callbacks (even future ones) to keep campaign alive
+        return False
+
+    async def _has_any_remaining_work(self, campaign_id: int) -> bool:
+        """Check if campaign has any work remaining, including future scheduled callbacks or retries."""
+        if await self._has_due_work(campaign_id):
+            return True
+
+        # Check for ANY pending callbacks (even future ones)
         pending_callback_count = await db_client.get_scheduled_runs_count(
             campaign_id=campaign_id, retry_reason="user_requested_callback"
         )
-        
         if pending_callback_count > 0:
             logger.debug(
-                f"campaign_id: {campaign_id} - Has {pending_callback_count} pending callbacks (future or due)"
+                f"campaign_id: {campaign_id} - Has {pending_callback_count} future callbacks"
+            )
+            return True
+
+        # Check for ANY future scheduled retries
+        pending_retries_count = await db_client.get_scheduled_runs_count(
+            campaign_id=campaign_id
+        )
+        if pending_retries_count > 0:
+            logger.debug(
+                f"campaign_id: {campaign_id} - Has {pending_retries_count} future retries"
             )
             return True
 
@@ -674,8 +718,8 @@ class CampaignOrchestrator:
         campaign_id = campaign.id
 
         try:
-            # Double-check no pending work
-            if await self._has_pending_work(campaign_id):
+            # Double-check no remaining work
+            if await self._has_any_remaining_work(campaign_id):
                 logger.info(
                     f"campaign_id: {campaign_id} - Found pending work, not completing"
                 )

@@ -277,6 +277,9 @@ def mock_call_concurrency():
         mock_concurrency.bind_workflow_run = AsyncMock()
         mock_concurrency.release_slot = AsyncMock(return_value=True)
         mock_concurrency.release_workflow_run_slot = AsyncMock(return_value=True)
+        mock_concurrency.check_slots_available = AsyncMock(return_value=True)
+        mock_concurrency.get_effective_org_concurrent_limit = AsyncMock(return_value=20)
+        mock_concurrency.get_concurrency_group_id = AsyncMock(side_effect=lambda org_id: org_id)
         yield mock_concurrency
 
 

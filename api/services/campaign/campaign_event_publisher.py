@@ -11,6 +11,7 @@ from api.services.campaign.campaign_event_protocol import (
     BatchCompletedEvent,
     BatchFailedEvent,
     CampaignCompletedEvent,
+    CampaignResumedEvent,
     CircuitBreakerTrippedEvent,
     RetryNeededEvent,
     SyncCompletedEvent,
@@ -56,6 +57,19 @@ class CampaignEventPublisher:
             error=error,
             processed_count=processed_count,
             metadata=metadata,
+        )
+
+        await self.redis.publish(RedisChannel.CAMPAIGN_EVENTS.value, event.to_json())
+
+    async def publish_campaign_resumed(
+        self,
+        campaign_id: int,
+        metadata: dict | None = None,
+    ):
+        """Publish campaign resumed event."""
+        event = CampaignResumedEvent(
+            campaign_id=campaign_id,
+            metadata=metadata or {},
         )
 
         await self.redis.publish(RedisChannel.CAMPAIGN_EVENTS.value, event.to_json())

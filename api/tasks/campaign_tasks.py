@@ -198,13 +198,14 @@ async def process_campaign_batch(
                     "reason": "concurrent_slot_timeout",
                 },
             )
-            # Publish as batch_completed (0 processed) so the orchestrator
-            # schedules the next batch without marking the campaign as failed.
+            # Publish as batch_completed (0 processed) with defer_seconds so the orchestrator
+            # backs off before scheduling the next batch without burning retries instantly.
             await publisher.publish_batch_completed(
                 campaign_id=campaign_id,
                 processed_count=0,
                 failed_count=0,
                 batch_size=batch_size,
+                metadata={"defer_seconds": 15, "reason": "concurrent_slot_timeout"},
             )
             return
 
@@ -294,6 +295,7 @@ async def process_campaign_batch(
                 processed_count=0,
                 failed_count=0,
                 batch_size=batch_size,
+                metadata={"defer_seconds": 15, "reason": "phone_number_pool_exhausted"},
             )
             return
 
@@ -359,6 +361,7 @@ async def process_campaign_batch(
                 processed_count=0,
                 failed_count=0,
                 batch_size=batch_size,
+                metadata={"defer_seconds": 15, "reason": "quota_transient_retry"},
             )
             return
 

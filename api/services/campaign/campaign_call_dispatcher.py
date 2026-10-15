@@ -648,7 +648,7 @@ class CampaignCallDispatcher:
         organization_id: int,
         telephony_configuration_id: int | None = None,
         preferred_number: str | None = None,
-        timeout: float = 600,
+        timeout: float = 20,
     ) -> str | None:
         """
         Acquire a from_number from the (org, telephony config) pool with retry.

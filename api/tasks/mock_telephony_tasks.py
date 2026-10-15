@@ -47,101 +47,119 @@ async def simulate_mock_call_completion(
         )
         return
 
+    # Resolve organization_id safely (WorkflowRunModel does not have a direct organization_id column)
+    org_id = getattr(run, "organization_id", None)
+    if not org_id and run.workflow_id:
+        workflow = await db_client.get_workflow_by_id(run.workflow_id)
+        if workflow:
+            org_id = workflow.organization_id
+    if not org_id and run.campaign_id:
+        campaign = await db_client.get_campaign_by_id(run.campaign_id)
+        if campaign:
+            org_id = campaign.organization_id
+
     orig_context = run.initial_context or {}
     chain_depth = orig_context.get("callback_chain_depth", 0)
 
     # 1. Specialized Callback Simulation Flow
-    if outcome == "callback":
-        if chain_depth >= MAX_CALLBACK_CHAIN_DEPTH:
-            logger.info(
-                f"[MOCK TELEPHONY] Callback chain depth {chain_depth} reached max {MAX_CALLBACK_CHAIN_DEPTH}; "
-                f"forcing completion to avoid infinite recursion."
-            )
-            outcome = "completed"
-        else:
-            cb_params = callback_params or {}
-            delay_minutes = int(cb_params.get("delay_minutes", 15))
-            summary = cb_params.get(
-                "summary", "Simulated contact requested appointment callback"
-            )
-            fast_forward = cb_params.get("fast_forward", False)
-
-            if run.campaign_id:
-                settings = await resolve_callback_settings(
-                    organization_id=run.organization_id,
-                    workflow_id=run.workflow_id,
-                    campaign_id=run.campaign_id,
+    try:
+        if outcome == "callback":
+            if chain_depth >= MAX_CALLBACK_CHAIN_DEPTH:
+                logger.info(
+                    f"[MOCK TELEPHONY] Callback chain depth {chain_depth} reached max {MAX_CALLBACK_CHAIN_DEPTH}; "
+                    f"forcing completion to avoid infinite recursion."
                 )
+                outcome = "completed"
+            else:
+                cb_params = callback_params or {}
+                delay_minutes = int(cb_params.get("delay_minutes", 15))
+                summary = cb_params.get(
+                    "summary", "Simulated contact requested appointment callback"
+                )
+                fast_forward = cb_params.get("fast_forward", False)
 
-                requested_time = datetime.now(UTC) + timedelta(minutes=delay_minutes)
-                if fast_forward:
-                    adjusted_time = requested_time
-                else:
-                    start_str = settings.get("sociable_hours_start", "08:00")
-                    end_str = settings.get("sociable_hours_end", "21:00")
-                    default_tz = settings.get("sociable_timezone", "UTC")
-                    tz_str = get_timezone_for_number(to_number, default_tz)
-                    adjusted_time = adjust_for_sociable_hours(
-                        requested_time, start_str, end_str, tz_str
+                if run.campaign_id:
+                    settings = await resolve_callback_settings(
+                        organization_id=org_id,
+                        workflow_id=run.workflow_id,
+                        campaign_id=run.campaign_id,
                     )
 
-                orig_queued = (
-                    await db_client.get_queued_run_by_id(run.queued_run_id)
-                    if run.queued_run_id
-                    else None
-                )
-                orig_source_uuid = (
-                    orig_queued.source_uuid if orig_queued else str(uuid.uuid4())
-                )
+                    requested_time = datetime.now(UTC) + timedelta(minutes=delay_minutes)
+                    if fast_forward:
+                        adjusted_time = requested_time
+                    else:
+                        start_str = settings.get("sociable_hours_start", "08:00")
+                        end_str = settings.get("sociable_hours_end", "21:00")
+                        default_tz = settings.get("sociable_timezone", "UTC")
+                        tz_str = get_timezone_for_number(to_number, default_tz)
+                        adjusted_time = adjust_for_sociable_hours(
+                            requested_time, start_str, end_str, tz_str
+                        )
 
-                new_queued_run = QueuedRunModel(
-                    campaign_id=run.campaign_id,
-                    source_uuid=f"{orig_source_uuid}_mock_callback_{int(time.time())}",
-                    context_variables={
-                        **orig_context,
-                        "is_callback": True,
-                        "callback_reason": "user_requested",
-                        "original_run_id": workflow_run_id,
-                        "conversation_summary": summary,
-                        "callback_chain_depth": chain_depth + 1,
-                        "caller_number": from_number,  # STICKY CALLER ID
-                        "called_number": to_number,
-                        "phone_number": to_number,
-                        "callback_originally_requested_minutes": delay_minutes,
-                    },
-                    state="queued",
-                    retry_reason="user_requested_callback",
-                    retry_count=0,
-                    scheduled_for=adjusted_time,
-                )
+                    orig_queued = (
+                        await db_client.get_queued_run_by_id(run.queued_run_id)
+                        if run.queued_run_id
+                        else None
+                    )
+                    orig_source_uuid = (
+                        orig_queued.source_uuid if orig_queued else str(uuid.uuid4())
+                    )
 
-                async with db_client.async_session() as session:
-                    session.add(new_queued_run)
-                    await session.commit()
+                    new_queued_run = QueuedRunModel(
+                        campaign_id=run.campaign_id,
+                        source_uuid=f"{orig_source_uuid}_mock_callback_{int(time.time())}",
+                        context_variables={
+                            **orig_context,
+                            "is_callback": True,
+                            "callback_reason": "user_requested",
+                            "original_run_id": workflow_run_id,
+                            "conversation_summary": summary,
+                            "callback_chain_depth": chain_depth + 1,
+                            "caller_number": from_number,  # STICKY CALLER ID
+                            "called_number": to_number,
+                            "phone_number": to_number,
+                            "callback_originally_requested_minutes": delay_minutes,
+                        },
+                        state="queued",
+                        retry_reason="user_requested_callback",
+                        retry_count=0,
+                        scheduled_for=adjusted_time,
+                    )
 
-                logger.info(
-                    f"[MOCK TELEPHONY] Scheduled mock callback QueuedRun for campaign {run.campaign_id} "
-                    f"at {adjusted_time.isoformat()} to {to_number} (caller_id: {from_number}, depth={chain_depth + 1})"
-                )
-            else:
-                # Standalone callback support
-                scheduled_cb = ScheduledCallbackModel(
-                    organization_id=run.organization_id,
-                    workflow_id=run.workflow_id,
-                    original_run_id=workflow_run_id,
-                    status="pending",
-                    scheduled_for=datetime.now(UTC) + timedelta(minutes=delay_minutes),
-                    to_number=to_number,
-                    from_number=from_number,
-                    conversation_summary=summary,
-                    callback_chain_depth=chain_depth + 1,
-                )
-                async with db_client.async_session() as session:
-                    session.add(scheduled_cb)
-                    await session.commit()
+                    async with db_client.async_session() as session:
+                        session.add(new_queued_run)
+                        await session.commit()
 
-            # The initial call concludes successfully
-            outcome = "completed"
+                    logger.info(
+                        f"[MOCK TELEPHONY] Scheduled mock callback QueuedRun for campaign {run.campaign_id} "
+                        f"at {adjusted_time.isoformat()} to {to_number} (caller_id: {from_number}, depth={chain_depth + 1})"
+                    )
+                else:
+                    # Standalone callback support
+                    scheduled_cb = ScheduledCallbackModel(
+                        organization_id=org_id,
+                        workflow_id=run.workflow_id,
+                        original_run_id=workflow_run_id,
+                        status="pending",
+                        scheduled_for=datetime.now(UTC) + timedelta(minutes=delay_minutes),
+                        to_number=to_number,
+                        from_number=from_number,
+                        conversation_summary=summary,
+                        callback_chain_depth=chain_depth + 1,
+                    )
+                    async with db_client.async_session() as session:
+                        session.add(scheduled_cb)
+                        await session.commit()
+
+                # The initial call concludes successfully
+                outcome = "completed"
+    except Exception as e:
+        logger.error(
+            f"[MOCK TELEPHONY] Error during mock callback scheduling for run {workflow_run_id}: {e}",
+            exc_info=True,
+        )
+        outcome = "completed"
 
     # 2. Map outcome to real TelephonyCallStatus
     status_map = {

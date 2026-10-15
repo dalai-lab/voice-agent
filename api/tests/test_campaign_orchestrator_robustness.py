@@ -366,3 +366,23 @@ async def test_dispatcher_skips_claim_when_scope_full():
         assert exc_info.value.wait_time == 0.0
 
 
+@pytest.mark.asyncio
+async def test_publish_campaign_resumed_event():
+    from api.services.campaign.campaign_event_publisher import CampaignEventPublisher
+    from api.services.campaign.campaign_event_protocol import parse_campaign_event, CampaignResumedEvent
+
+    mock_redis = AsyncMock()
+    publisher = CampaignEventPublisher(mock_redis)
+
+    await publisher.publish_campaign_resumed(62, metadata={"reason": "manual_resume"})
+
+    mock_redis.publish.assert_awaited_once()
+    channel, payload = mock_redis.publish.call_args[0]
+    assert channel == "campaign_events"
+    parsed_event = parse_campaign_event(payload)
+    assert isinstance(parsed_event, CampaignResumedEvent)
+    assert parsed_event.campaign_id == 62
+    assert parsed_event.metadata == {"reason": "manual_resume"}
+
+
+

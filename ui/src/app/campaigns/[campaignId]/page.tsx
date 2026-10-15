@@ -836,66 +836,73 @@ export default function CampaignDetailPage() {
                 </div>
 
                 {/* Multi-Segment Audience Progress Bar */}
-                <div className="space-y-2.5 pt-3 border-t border-border/40">
-                    <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-foreground">Unique Contacts / Leads Reached</span>
-                            <span className="text-muted-foreground font-normal">
-                                ({campaign.processed_rows} of {campaign.total_rows ?? 0} unique contacts finished)
-                            </span>
-                        </div>
-                        <span className="font-bold tabular-nums text-foreground">
-                            {campaign.total_rows && campaign.total_rows > 0
-                                ? `${Math.min(100, Math.round((campaign.processed_rows / campaign.total_rows) * 100))}%`
-                                : '0%'}
-                        </span>
-                    </div>
+                {(() => {
+                    const totalAudience = campaign.total_rows && campaign.total_rows > 0 ? campaign.total_rows : 0;
+                    const completedRows = campaign.processed_rows ?? 0;
+                    const failedRows = campaign.failed_rows ?? 0;
+                    const resolvedRows = completedRows + failedRows;
+                    const totalPercent = totalAudience > 0 ? Math.min(100, Math.round((resolvedRows / totalAudience) * 100)) : 0;
+                    const completedPercent = totalAudience > 0 ? Math.min(100, (completedRows / totalAudience) * 100) : 0;
+                    const failedPercent = totalAudience > 0 ? Math.min(100 - completedPercent, (failedRows / totalAudience) * 100) : 0;
+                    const remainingRows = Math.max(0, totalAudience - resolvedRows);
 
-                    {/* Segmented Progress Bar */}
-                    <div className="w-full h-3 rounded-full overflow-hidden bg-muted/60 flex border border-border/20">
-                        {/* Completed segment */}
-                        {campaign.total_rows && campaign.total_rows > 0 && campaign.processed_rows > 0 && (
-                            <div
-                                className="bg-emerald-500 h-full transition-all duration-300"
-                                style={{ width: `${Math.min(100, (campaign.processed_rows / campaign.total_rows) * 100)}%` }}
-                                title={`Completed Leads: ${campaign.processed_rows}`}
-                            />
-                        )}
-                        {/* Permanently failed segment */}
-                        {campaign.total_rows && campaign.total_rows > 0 && campaign.failed_rows > 0 && (
-                            <div
-                                className="bg-rose-500 h-full transition-all duration-300"
-                                style={{ width: `${Math.min(100, (campaign.failed_rows / campaign.total_rows) * 100)}%` }}
-                                title={`Permanently Failed: ${campaign.failed_rows}`}
-                            />
-                        )}
-                    </div>
+                    return (
+                        <div className="space-y-2.5 pt-3 border-t border-border/40">
+                            <div className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-foreground">Unique Contacts / Leads Reached</span>
+                                    <span className="text-muted-foreground font-normal">
+                                        ({resolvedRows} of {totalAudience} unique contacts finished)
+                                    </span>
+                                </div>
+                                <span className="font-bold tabular-nums text-foreground">
+                                    {totalPercent}%
+                                </span>
+                            </div>
 
-                    {/* Progress Bar Legend */}
-                    <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground pt-0.5">
-                        <div className="flex items-center gap-1.5">
-                            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                            <span className="font-semibold text-foreground">{campaign.processed_rows}</span>
-                            <span>Completed Leads</span>
+                            {/* Segmented Progress Bar */}
+                            <div className="w-full h-3 rounded-full overflow-hidden bg-muted/60 flex border border-border/20">
+                                {completedPercent > 0 && (
+                                    <div
+                                        className="bg-emerald-500 h-full transition-all duration-300"
+                                        style={{ width: `${completedPercent}%` }}
+                                        title={`Completed Leads: ${completedRows}`}
+                                    />
+                                )}
+                                {failedPercent > 0 && (
+                                    <div
+                                        className="bg-rose-500 h-full transition-all duration-300"
+                                        style={{ width: `${failedPercent}%` }}
+                                        title={`Permanently Failed: ${failedRows}`}
+                                    />
+                                )}
+                            </div>
+
+                            {/* Progress Bar Legend */}
+                            <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground pt-0.5">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                    <span className="font-semibold text-foreground">{completedRows}</span>
+                                    <span>Completed Leads</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                                    <span className="font-semibold text-foreground">{failedRows}</span>
+                                    <span>Exhausted / Failed</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+                                    <span className="font-semibold text-foreground">{remainingRows}</span>
+                                    <span>Remaining Leads</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 ml-auto font-mono text-[10px]">
+                                    <span className="text-muted-foreground">Original Audience:</span>
+                                    <span className="font-bold text-foreground">{totalAudience} leads</span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                            <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-                            <span className="font-semibold text-foreground">{campaign.failed_rows}</span>
-                            <span>Exhausted / Failed</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
-                            <span className="font-semibold text-foreground">
-                                {Math.max(0, (campaign.total_rows ?? 0) - campaign.processed_rows - campaign.failed_rows)}
-                            </span>
-                            <span>Remaining Leads</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 ml-auto font-mono text-[10px]">
-                            <span className="text-muted-foreground">Original Audience:</span>
-                            <span className="font-bold text-foreground">{campaign.total_rows ?? 0} leads</span>
-                        </div>
-                    </div>
-                </div>
+                    );
+                })()}
             </div>
 
             {/* Content Split: Details & Settings */}

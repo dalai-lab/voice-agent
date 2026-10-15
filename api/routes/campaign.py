@@ -318,22 +318,30 @@ def _build_campaign_response(
     circuit_breaker_config = CircuitBreakerConfigResponse()
     parent_campaign_id = None
     redialed_campaign_id = None
-    if campaign.orchestrator_metadata:
-        max_concurrency = campaign.orchestrator_metadata.get("max_concurrency")
-        sc = campaign.orchestrator_metadata.get("schedule_config")
-        if sc:
+    meta = campaign.orchestrator_metadata
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except Exception:
+            meta = {}
+    if isinstance(meta, dict):
+        max_concurrency = meta.get("max_concurrency")
+        sc = meta.get("schedule_config")
+        if sc and isinstance(sc, dict):
             schedule_config = ScheduleConfigResponse(
                 enabled=sc.get("enabled", False),
                 timezone=sc.get("timezone", "UTC"),
-                slots=[TimeSlotResponse(**slot) for slot in sc.get("slots", [])],
+                slots=[
+                    TimeSlotResponse(**slot)
+                    for slot in sc.get("slots", [])
+                    if isinstance(slot, dict)
+                ],
             )
-        cb = campaign.orchestrator_metadata.get("circuit_breaker")
-        if cb:
+        cb = meta.get("circuit_breaker")
+        if cb and isinstance(cb, dict):
             circuit_breaker_config = CircuitBreakerConfigResponse(**cb)
-        parent_campaign_id = campaign.orchestrator_metadata.get("parent_campaign_id")
-        redialed_campaign_id = campaign.orchestrator_metadata.get(
-            "redialed_campaign_id"
-        )
+        parent_campaign_id = meta.get("parent_campaign_id")
+        redialed_campaign_id = meta.get("redialed_campaign_id")
 
     return CampaignResponse(
         id=campaign.id,
@@ -724,7 +732,16 @@ async def update_campaign(
         update_kwargs["retry_config"] = request.retry_config.model_dump()
 
     # Merge max_concurrency and schedule_config into orchestrator_metadata
-    metadata = campaign.orchestrator_metadata or {}
+    raw_meta = campaign.orchestrator_metadata or {}
+    if isinstance(raw_meta, str):
+        try:
+            metadata = json.loads(raw_meta)
+        except Exception:
+            metadata = {}
+    elif isinstance(raw_meta, dict):
+        metadata = dict(raw_meta)
+    else:
+        metadata = {}
     metadata_changed = False
 
     if request.max_concurrency is not None:

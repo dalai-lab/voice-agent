@@ -191,19 +191,23 @@ class CampaignRunnerService:
         if not campaign:
             raise ValueError(f"Campaign {campaign_id} not found")
 
-        # Count failed calls from workflow runs
-        failed_calls = await self._count_failed_campaign_calls(campaign_id)
+        stats_map = await db_client.get_queued_runs_stats_for_campaigns([campaign_id])
+        stats = stats_map.get(campaign_id, {})
+        failed_calls = max(campaign.failed_rows or 0, stats.get("failed_calls", 0))
+        processed_rows = max(campaign.processed_rows or 0, stats.get("completed_calls", 0))
+        total_rows = campaign.total_rows or 0
+        resolved_rows = processed_rows + failed_calls
 
         return {
             "campaign_id": campaign_id,
             "state": campaign.state,
-            "total_rows": campaign.total_rows or 0,
-            "processed_rows": campaign.processed_rows,
+            "total_rows": total_rows,
+            "processed_rows": processed_rows,
             "failed_calls": failed_calls,
             "progress_percentage": (
-                (campaign.processed_rows / campaign.total_rows * 100)
-                if campaign.total_rows and campaign.total_rows > 0
-                else 0
+                min(100.0, (resolved_rows / total_rows * 100))
+                if total_rows > 0
+                else 0.0
             ),
             "source_sync": {
                 "status": campaign.source_sync_status,
@@ -214,22 +218,6 @@ class CampaignRunnerService:
             "started_at": campaign.started_at,
             "completed_at": campaign.completed_at,
         }
-
-    async def _count_failed_campaign_calls(self, campaign_id: int) -> int:
-        """Count failed calls by examining workflow_run telephony callbacks"""
-        # Get all workflow runs for this campaign
-        workflow_runs = await db_client.get_workflow_runs_by_campaign(campaign_id)
-
-        failed_count = 0
-        for run in workflow_runs:
-            callbacks = run.logs.get("telephony_status_callbacks", [])
-            if callbacks:
-                # Check final status
-                final_status = callbacks[-1].get("status", "").lower()
-                if final_status in ["failed", "busy", "no-answer"]:
-                    failed_count += 1
-
-        return failed_count
 
 
 # Global instance

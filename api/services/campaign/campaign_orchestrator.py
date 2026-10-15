@@ -316,10 +316,22 @@ class CampaignOrchestrator:
             f"retry attempt {original_run.retry_count + 1}"
         )
 
+        # Check if a retry run has already been scheduled for this attempt
+        retry_source_uuid = f"{original_run.source_uuid}_retry_{original_run.retry_count + 1}"
+        existing_retry = await db_client.get_queued_run_by_source_uuid(
+            campaign_id, retry_source_uuid
+        )
+        if existing_retry:
+            logger.debug(
+                f"campaign_id: {campaign_id} - Retry run already exists (id={existing_retry.id}), "
+                f"skipping duplicate schedule"
+            )
+            return
+
         # Create retry entry with unique source_uuid
         retry_run = await db_client.create_queued_run(
             campaign_id=campaign_id,
-            source_uuid=f"{original_run.source_uuid}_retry_{original_run.retry_count + 1}",
+            source_uuid=retry_source_uuid,
             context_variables=retry_context,
             state="queued",
             retry_count=original_run.retry_count + 1,
@@ -355,6 +367,14 @@ class CampaignOrchestrator:
     async def _mark_final_failure(self, queued_run: QueuedRunModel, reason: str):
         """Mark a queued run as finally failed after max retries."""
         campaign_id = queued_run.campaign_id
+
+        # Idempotency: if already marked failed, do not double-increment counters
+        if queued_run.state == "failed":
+            logger.debug(
+                f"campaign_id: {campaign_id} - Queued run {queued_run.id} already marked as failed, "
+                f"skipping duplicate final failure."
+            )
+            return
 
         # Update the campaign's failed_rows counter atomically
         try:
@@ -440,8 +460,15 @@ class CampaignOrchestrator:
             if slot.get("day_of_week") == current_day:
                 start = slot.get("start_time", "")
                 end = slot.get("end_time", "")
-                if start <= current_time < end:
-                    return True
+                if not start or not end:
+                    continue
+                if start <= end:
+                    if start <= current_time < end:
+                        return True
+                else:
+                    # Overnight slot spanning midnight (e.g. 22:00 to 02:00)
+                    if current_time >= start or current_time < end:
+                        return True
 
         return False
 
@@ -932,6 +959,18 @@ class CampaignOrchestrator:
             processed = campaign.processed_rows
             failed = campaign.failed_rows
 
+            # Try to fetch fresh campaign counts from DB if available
+            try:
+                latest_campaign = await db_client.get_campaign_by_id(campaign_id)
+                if latest_campaign:
+                    total = latest_campaign.total_rows or total
+                    processed = latest_campaign.processed_rows
+                    failed = latest_campaign.failed_rows
+            except Exception as fetch_err:
+                logger.debug(
+                    f"campaign_id: {campaign_id} - Using in-memory campaign counters for completion log: {fetch_err}"
+                )
+
             await db_client.append_campaign_log(
                 campaign_id=campaign_id,
                 level="info",
@@ -951,9 +990,9 @@ class CampaignOrchestrator:
             # Publish completion event
             await self.publisher.publish_campaign_completed(
                 campaign_id=campaign_id,
-                total_rows=campaign.total_rows or 0,
-                processed_rows=campaign.processed_rows,
-                failed_rows=campaign.failed_rows,
+                total_rows=total,
+                processed_rows=processed,
+                failed_rows=failed,
                 duration_seconds=duration,
             )
 

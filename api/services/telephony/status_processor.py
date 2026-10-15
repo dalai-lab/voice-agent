@@ -136,6 +136,11 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
         logs={"telephony_status_callbacks": telephony_callback_logs},
     )
 
+    already_finalized = bool(
+        workflow_run.is_completed
+        or workflow_run.state == WorkflowRunState.COMPLETED.value
+    )
+
     if normalized_status == TelephonyCallStatus.COMPLETED:
         logger.info(
             f"[run {workflow_run_id}] Call completed with duration: {status.duration}s"
@@ -144,12 +149,12 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
         await campaign_call_dispatcher.release_call_slot(workflow_run_id)
         await call_concurrency.unregister_active_call(workflow_run_id)
 
-        if workflow_run.campaign_id:
+        if not already_finalized and workflow_run.campaign_id:
             await circuit_breaker.record_and_evaluate(
                 workflow_run.campaign_id, is_failure=False
             )
 
-        if workflow_run.state != WorkflowRunState.COMPLETED.value:
+        if not already_finalized:
             await db_client.update_workflow_run(
                 run_id=workflow_run_id,
                 is_completed=True,
@@ -164,62 +169,63 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
         await campaign_call_dispatcher.release_call_slot(workflow_run_id)
         await call_concurrency.unregister_active_call(workflow_run_id)
 
-        if workflow_run.campaign_id:
-            is_failure = normalized_status in FAILURE_NOT_CONNECTED_STATUSES
-            await circuit_breaker.record_and_evaluate(
-                workflow_run.campaign_id,
-                is_failure=is_failure,
-                workflow_run_id=workflow_run_id if is_failure else None,
-                reason=normalized_status.value if is_failure else None,
-            )
-            if is_failure:
-                target_phone = (
-                    (workflow_run.initial_context or {}).get("phone_number")
-                    or (workflow_run.initial_context or {}).get("called_number")
-                    or "Unknown"
+        if not already_finalized:
+            if workflow_run.campaign_id:
+                is_failure = normalized_status in FAILURE_NOT_CONNECTED_STATUSES
+                await circuit_breaker.record_and_evaluate(
+                    workflow_run.campaign_id,
+                    is_failure=is_failure,
+                    workflow_run_id=workflow_run_id if is_failure else None,
+                    reason=normalized_status.value if is_failure else None,
                 )
-                if workflow_run.queued_run_id:
+                if is_failure:
+                    target_phone = (
+                        (workflow_run.initial_context or {}).get("phone_number")
+                        or (workflow_run.initial_context or {}).get("called_number")
+                        or "Unknown"
+                    )
+                    if workflow_run.queued_run_id:
+                        try:
+                            await db_client.update_queued_run(
+                                queued_run_id=workflow_run.queued_run_id,
+                                state="failed",
+                            )
+                        except Exception as q_err:
+                            logger.warning(
+                                f"Failed to mark queued_run {workflow_run.queued_run_id} as failed: {q_err}"
+                            )
                     try:
-                        await db_client.update_queued_run(
-                            queued_run_id=workflow_run.queued_run_id,
-                            state="failed",
-                        )
-                    except Exception as q_err:
+                        await db_client.increment_campaign_failed_rows(workflow_run.campaign_id)
+                    except Exception as inc_err:
                         logger.warning(
-                            f"Failed to mark queued_run {workflow_run.queued_run_id} as failed: {q_err}"
+                            f"Failed to increment campaign failed rows: {inc_err}"
                         )
-                try:
-                    await db_client.increment_campaign_failed_rows(workflow_run.campaign_id)
-                except Exception as inc_err:
-                    logger.warning(
-                        f"Failed to increment campaign failed rows: {inc_err}"
-                    )
-                try:
-                    await db_client.append_campaign_log(
-                        campaign_id=workflow_run.campaign_id,
-                        level="error",
-                        event="carrier_call_failed",
-                        message=f"Carrier reported terminal failure [{normalized_status.value}] for call to {target_phone}",
-                        details={
-                            "workflow_run_id": workflow_run_id,
-                            "status": normalized_status.value,
-                            "phone_number": target_phone,
-                        },
-                    )
-                except Exception as log_err:
-                    logger.warning(
-                        f"Failed to append campaign log for carrier failure: {log_err}"
-                    )
+                    try:
+                        await db_client.append_campaign_log(
+                            campaign_id=workflow_run.campaign_id,
+                            level="error",
+                            event="carrier_call_failed",
+                            message=f"Carrier reported terminal failure [{normalized_status.value}] for call to {target_phone}",
+                            details={
+                                "workflow_run_id": workflow_run_id,
+                                "status": normalized_status.value,
+                                "phone_number": target_phone,
+                            },
+                        )
+                    except Exception as log_err:
+                        logger.warning(
+                            f"Failed to append campaign log for carrier failure: {log_err}"
+                        )
 
-        if normalized_status in RETRYABLE_NOT_CONNECTED_STATUSES:
-            if workflow_run.campaign_id is not None:
-                publisher = await get_campaign_event_publisher()
-                await publisher.publish_retry_needed(
-                    workflow_run_id=workflow_run_id,
-                    reason=normalized_status.value.replace("-", "_"),
-                    campaign_id=workflow_run.campaign_id,
-                    queued_run_id=workflow_run.queued_run_id,
-                )
+            if normalized_status in RETRYABLE_NOT_CONNECTED_STATUSES:
+                if workflow_run.campaign_id is not None:
+                    publisher = await get_campaign_event_publisher()
+                    await publisher.publish_retry_needed(
+                        workflow_run_id=workflow_run_id,
+                        reason=normalized_status.value.replace("-", "_"),
+                        campaign_id=workflow_run.campaign_id,
+                        queued_run_id=workflow_run.queued_run_id,
+                    )
 
         call_tags = (
             workflow_run.gathered_context.get("call_tags", [])

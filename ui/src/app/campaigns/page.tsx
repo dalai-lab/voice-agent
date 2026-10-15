@@ -168,8 +168,10 @@ export default function CampaignsPage() {
                             {campaignsData.campaigns.map((campaign) => {
                                 const totalContacts = campaign.total_rows ?? 0;
                                 const processedContacts = campaign.processed_rows ?? 0;
+                                const failedContacts = campaign.failed_rows ?? 0;
+                                const resolvedContacts = processedContacts + failedContacts;
                                 const contactPercent = totalContacts > 0
-                                    ? Math.min(100, Math.round((processedContacts / totalContacts) * 100))
+                                    ? Math.min(100, Math.round((resolvedContacts / totalContacts) * 100))
                                     : (campaign.total_queued_count && campaign.total_queued_count > 0
                                         ? Math.min(100, Math.round(((campaign.executed_count ?? 0) / campaign.total_queued_count) * 100))
                                         : 0);
@@ -203,7 +205,7 @@ export default function CampaignsPage() {
                                                 <div className="flex items-center justify-between text-[11px]">
                                                     <span className="font-bold text-foreground tabular-nums">
                                                         {totalContacts > 0
-                                                            ? `${processedContacts} / ${totalContacts} leads`
+                                                            ? `${resolvedContacts} / ${totalContacts} leads`
                                                             : `${campaign.executed_count ?? 0} / ${totalDials} dials`}
                                                     </span>
                                                     <span className="text-[10px] text-muted-foreground font-semibold tabular-nums">

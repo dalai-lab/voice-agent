@@ -928,6 +928,18 @@ class CampaignClient(BaseDBClient):
             result = await session.execute(query)
             return result.scalar_one_or_none()
 
+    async def get_queued_run_by_source_uuid(
+        self, campaign_id: int, source_uuid: str
+    ) -> QueuedRunModel | None:
+        """Get a queued run by campaign_id and unique source_uuid"""
+        async with self.async_session() as session:
+            query = select(QueuedRunModel).where(
+                QueuedRunModel.campaign_id == campaign_id,
+                QueuedRunModel.source_uuid == source_uuid,
+            )
+            result = await session.execute(query)
+            return result.scalar_one_or_none()
+
     async def get_campaigns_by_status(self, statuses: list[str]) -> list[CampaignModel]:
         """Get campaigns by status"""
         async with self.async_session() as session:

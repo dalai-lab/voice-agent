@@ -129,6 +129,27 @@ async def process_campaign_batch(
     """
     logger.info(f"Processing batch for campaign {campaign_id}, batch_size={batch_size}")
 
+    # Worker-level deduplication: ensure only one worker executes a batch for this campaign at a time
+    redis = ctx.get("redis") if isinstance(ctx, dict) else None
+    if redis is None:
+        try:
+            from api.tasks.arq import get_arq_redis
+            redis = await get_arq_redis()
+        except Exception:
+            redis = None
+
+    exec_lock_key = f"campaign:batch_executing:{campaign_id}"
+    if redis is not None:
+        try:
+            lock_acquired = await redis.set(exec_lock_key, "1", nx=True, ex=120)
+            if not lock_acquired:
+                logger.warning(
+                    f"Campaign {campaign_id} batch is already running in another worker, skipping duplicate task execution"
+                )
+                return
+        except Exception as lock_err:
+            logger.debug(f"Worker execution lock error: {lock_err}")
+
     failed_count = 0
     try:
         # Process the batch
@@ -464,3 +485,26 @@ async def process_campaign_batch(
             details={"error": str(e)},
         )
         raise
+    finally:
+        if redis is not None:
+            try:
+                await redis.delete(exec_lock_key)
+            except Exception:
+                pass
+
+
+async def sweep_stuck_campaign_runs(ctx: dict) -> int:
+    """Periodic ARQ cron task to recover queued runs stuck in 'processing' state.
+
+    Safety net for runs whose worker crashed, got evicted, or hit an unhandled exception.
+    """
+    logger.debug("Running periodic sweep of stuck processing campaign runs...")
+    try:
+        recovered = await db_client.cleanup_stuck_processing_queued_runs(threshold_seconds=300)
+        if recovered > 0:
+            logger.info(f"Sweep recovered {recovered} stuck processing queued runs")
+        return recovered
+    except Exception as e:
+        logger.error(f"Error during sweep of stuck processing queued runs: {e}")
+        return 0
+

@@ -1,8 +1,9 @@
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, text, update
+from loguru import logger
+from sqlalchemy import func, or_, text, update
 from sqlalchemy.future import select
 
 from api.db.base_client import BaseDBClient
@@ -584,7 +585,7 @@ class CampaignClient(BaseDBClient):
                     QueuedRunModel.state == "processing",
                     ~workflow_exists,
                 )
-                .values(state="queued")
+                .values(state="queued", processed_at=None)
             )
             try:
                 await session.commit()
@@ -592,6 +593,73 @@ class CampaignClient(BaseDBClient):
                 await session.rollback()
                 raise
             return result.rowcount or 0
+
+    async def cleanup_stuck_processing_queued_runs(
+        self,
+        threshold_seconds: int = 300,
+        campaign_id: int | None = None,
+    ) -> int:
+        """Reset stuck processing queued runs back to queued (or mark as processed if workflow exists).
+
+        Runs can get stuck in 'processing' state if an ARQ worker crashes, gets killed,
+        encounters network disruptions, or suffers an unhandled exception before
+        creating a workflow run or returning unprocessed claims.
+        """
+        cutoff = datetime.now(UTC) - timedelta(seconds=threshold_seconds)
+        stuck_filter = [
+            QueuedRunModel.state == "processing",
+            or_(
+                QueuedRunModel.processed_at < cutoff,
+                QueuedRunModel.processed_at.is_(None),
+            ),
+            QueuedRunModel.created_at < cutoff,
+        ]
+        if campaign_id is not None:
+            stuck_filter.append(QueuedRunModel.campaign_id == campaign_id)
+
+        workflow_exists = (
+            select(WorkflowRunModel.id)
+            .where(WorkflowRunModel.queued_run_id == QueuedRunModel.id)
+            .exists()
+        )
+
+        async with self.async_session() as session:
+            # 1. Runs that actually had a WorkflowRun created: mark as processed to prevent double-dialing
+            res_processed = await session.execute(
+                update(QueuedRunModel)
+                .where(
+                    *stuck_filter,
+                    workflow_exists,
+                )
+                .values(state="processed", processed_at=datetime.now(UTC))
+            )
+
+            # 2. Runs without a WorkflowRun: reset back to queued so they can be processed
+            res_queued = await session.execute(
+                update(QueuedRunModel)
+                .where(
+                    *stuck_filter,
+                    ~workflow_exists,
+                )
+                .values(state="queued", processed_at=None)
+            )
+
+            try:
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+            reverted = res_queued.rowcount or 0
+            marked_processed = res_processed.rowcount or 0
+            total_cleaned = reverted + marked_processed
+            if total_cleaned > 0:
+                logger.warning(
+                    f"Cleaned up {total_cleaned} stuck processing queued runs "
+                    f"(reverted_to_queued={reverted}, marked_processed={marked_processed}, "
+                    f"campaign_id={campaign_id})"
+                )
+            return total_cleaned
 
     async def count_queued_runs(
         self, campaign_id: int, state: str | None = None
@@ -859,9 +927,11 @@ class CampaignClient(BaseDBClient):
             scheduled_result = await session.execute(scheduled_query)
             scheduled_runs = list(scheduled_result.scalars().all())
 
+            now = datetime.now(UTC)
             # Mark scheduled runs as processing
             for run in scheduled_runs:
                 run.state = "processing"
+                run.processed_at = now
                 claimed_runs.append(run)
 
             remaining_slots = limit - len(scheduled_runs)
@@ -886,6 +956,7 @@ class CampaignClient(BaseDBClient):
                 # Mark regular runs as processing
                 for run in regular_runs:
                     run.state = "processing"
+                    run.processed_at = now
                     claimed_runs.append(run)
 
             # Commit the state changes

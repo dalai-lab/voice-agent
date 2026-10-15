@@ -109,6 +109,20 @@ class CampaignOrchestrator:
 
         campaign_id = event.campaign_id
 
+        # Deduplicate events on pub/sub replay using event timestamp
+        event_ts = getattr(event, "timestamp", None)
+        if event_ts:
+            event_key = f"campaign:event:seen:{event.type}:{campaign_id}:{event_ts}"
+            try:
+                is_new = await self.redis.set(event_key, "1", nx=True, ex=300)
+                if not is_new:
+                    logger.warning(
+                        f"campaign_id: {campaign_id} - Duplicate event {event.type} ignored (pub/sub replay detected, ts={event_ts})"
+                    )
+                    return
+            except Exception as e:
+                logger.debug(f"Redis event deduplication check failed: {e}")
+
         logger.debug(
             f"campaign_id: {campaign_id} - Received event: {type(event).__name__}"
         )
@@ -123,10 +137,18 @@ class CampaignOrchestrator:
                 logger.debug(
                     f"campaign_id: {campaign_id} - Batch completed, cleared in-progress flag"
                 )
+            try:
+                await self.redis.delete(f"campaign:batch_in_progress:{campaign_id}")
+            except Exception:
+                pass
 
             # Clear processing lock held by the completed batch so the next batch can be scheduled
             if campaign_id in self._processing_locks:
                 del self._processing_locks[campaign_id]
+            try:
+                await self.redis.delete(f"campaign:batch:scheduling_lock:{campaign_id}")
+            except Exception:
+                pass
 
             # Check campaign state before scheduling next batch
             campaign = await db_client.get_campaign_by_id(campaign_id)
@@ -163,6 +185,13 @@ class CampaignOrchestrator:
                 del self._processing_locks[campaign_id]
             if campaign_id in self._batch_in_progress:
                 del self._batch_in_progress[campaign_id]
+            try:
+                await self.redis.delete(
+                    f"campaign:batch_in_progress:{campaign_id}",
+                    f"campaign:batch:scheduling_lock:{campaign_id}",
+                )
+            except Exception:
+                pass
             await self._schedule_next_batch(campaign_id)
             self._last_activity[campaign_id] = datetime.now(UTC)
 
@@ -170,6 +199,10 @@ class CampaignOrchestrator:
             # Clear the batch in progress flag
             if campaign_id in self._batch_in_progress:
                 del self._batch_in_progress[campaign_id]
+            try:
+                await self.redis.delete(f"campaign:batch_in_progress:{campaign_id}")
+            except Exception:
+                pass
 
             logger.warning(
                 f"campaign_id: {campaign_id} - Batch failed: {event.error}, "
@@ -362,6 +395,16 @@ class CampaignOrchestrator:
     async def _schedule_next_batch(self, campaign_id: int, defer_seconds: int = 0):
         """Schedule next batch immediately (or deferred) if work available."""
 
+        # Check if a batch is already in progress (guard against duplicate batch dispatch)
+        if campaign_id in self._batch_in_progress:
+            batch_start_time = self._batch_in_progress[campaign_id]
+            if (datetime.now(UTC) - batch_start_time).total_seconds() < 300:
+                logger.debug(
+                    f"campaign_id: {campaign_id} - Batch already in progress since {batch_start_time}, "
+                    f"skipping duplicate schedule"
+                )
+                return
+
         # Prevent duplicate scheduling with in-memory lock
         if campaign_id in self._processing_locks:
             lock_time = self._processing_locks[campaign_id]
@@ -370,6 +413,19 @@ class CampaignOrchestrator:
                     f"campaign_id: {campaign_id} - Batch already scheduled recently"
                 )
                 return
+
+        # Distributed scheduling lock across processes with Redis
+        try:
+            lock_acquired = await self.redis.set(
+                f"campaign:batch:scheduling_lock:{campaign_id}", "1", nx=True, ex=5
+            )
+            if not lock_acquired:
+                logger.debug(
+                    f"campaign_id: {campaign_id} - Batch already scheduled recently (Redis lock active)"
+                )
+                return
+        except Exception as redis_err:
+            logger.debug(f"Redis scheduling lock check error: {redis_err}")
 
         # Set lock
         self._processing_locks[campaign_id] = datetime.now(UTC)
@@ -491,8 +547,13 @@ class CampaignOrchestrator:
                     f"(callbacks_only={callbacks_only}, defer_seconds={defer_seconds})"
                 )
 
-                # Set batch in progress flag
-                self._batch_in_progress[campaign_id] = datetime.now(UTC)
+                # Set batch in progress flag (both in-memory and in Redis with 5-minute safety TTL)
+                now = datetime.now(UTC)
+                self._batch_in_progress[campaign_id] = now
+                try:
+                    await self.redis.set(f"campaign:batch_in_progress:{campaign_id}", "1", ex=300)
+                except Exception as redis_err:
+                    logger.debug(f"Redis batch_in_progress set error: {redis_err}")
 
                 # Update database
                 await db_client.update_campaign(
@@ -518,6 +579,10 @@ class CampaignOrchestrator:
         if campaign_id in self._processing_locks:
             del self._processing_locks[campaign_id]
             logger.debug(f"campaign_id: {campaign_id} - Released processing lock")
+        try:
+            await self.redis.delete(f"campaign:batch:scheduling_lock:{campaign_id}")
+        except Exception:
+            pass
 
     def _clear_campaign_state(self, campaign_id: int):
         """Clear all in-memory state for a campaign."""
@@ -527,6 +592,15 @@ class CampaignOrchestrator:
             del self._processing_locks[campaign_id]
         if campaign_id in self._batch_in_progress:
             del self._batch_in_progress[campaign_id]
+        try:
+            asyncio.create_task(
+                self.redis.delete(
+                    f"campaign:batch_in_progress:{campaign_id}",
+                    f"campaign:batch:scheduling_lock:{campaign_id}",
+                )
+            )
+        except Exception:
+            pass
         logger.debug(f"campaign_id: {campaign_id} - Cleared all in-memory state")
 
     async def _monitor_completion(self):
@@ -542,6 +616,14 @@ class CampaignOrchestrator:
     async def _check_stale_campaigns(self):
         """Check all running campaigns for completion or orphaned work."""
         logger.debug("Checking for stale campaigns...")
+
+        # Periodic cleanup: recover any queued runs stuck in 'processing' state (>5 min without workflow)
+        try:
+            recovered = await db_client.cleanup_stuck_processing_queued_runs(threshold_seconds=300)
+            if recovered > 0:
+                logger.info(f"Stale campaign sweep recovered {recovered} stuck processing queued runs")
+        except Exception as cleanup_err:
+            logger.error(f"Error during cleanup of stuck processing queued runs: {cleanup_err}")
 
         campaigns = await db_client.get_campaigns_by_status(statuses=["running"])
         due_callbacks_campaigns = await db_client.get_campaigns_with_due_callbacks()
@@ -566,9 +648,18 @@ class CampaignOrchestrator:
                     if time_since_batch_start > 300:  # 5 minutes
                         logger.warning(
                             f"campaign_id: {campaign_id} - Batch stuck for {time_since_batch_start:.0f}s, "
-                            f"clearing flag and checking for more work"
+                            f"clearing flag, recovering stuck claims, and checking for more work"
                         )
                         del self._batch_in_progress[campaign_id]
+                        try:
+                            await self.redis.delete(f"campaign:batch_in_progress:{campaign_id}")
+                        except Exception:
+                            pass
+
+                        # Explicitly recover any claimed runs stuck in processing for this campaign
+                        await db_client.cleanup_stuck_processing_queued_runs(
+                            threshold_seconds=300, campaign_id=campaign_id
+                        )
 
                         # Check if there's work to be done
                         if await self._has_due_work(campaign_id):

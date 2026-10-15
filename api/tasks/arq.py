@@ -42,6 +42,7 @@ REDIS_SETTINGS = RedisSettings(
 from api.tasks.callback_tasks import execute_callback
 from api.tasks.campaign_tasks import (
     process_campaign_batch,
+    sweep_stuck_campaign_runs,
     sync_campaign_source,
 )
 from api.tasks.knowledge_base_processing import process_knowledge_base_document
@@ -66,6 +67,7 @@ class WorkerSettings:
         execute_callback,
         complete_inactive_text_chat_session,
         simulate_mock_call_completion,
+        sweep_stuck_campaign_runs,
     ]
     cron_jobs = [
         # Safety net for webhook deliveries whose ARQ job was lost (worker
@@ -82,6 +84,13 @@ class WorkerSettings:
             sweep_inactive_text_chat_sessions,
             minute=set(range(0, 60, TEXT_CHAT_INACTIVITY_SWEEP_INTERVAL_MINUTES)),
             second=30,
+            run_at_startup=True,
+        ),
+        # Safety net for queued runs stuck in 'processing' (e.g. ARQ worker crashed mid-batch).
+        cron(
+            sweep_stuck_campaign_runs,
+            minute=set(range(0, 60, 5)),
+            second=15,
             run_at_startup=True,
         ),
     ]

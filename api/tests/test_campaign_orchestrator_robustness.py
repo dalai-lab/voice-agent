@@ -385,4 +385,74 @@ async def test_publish_campaign_resumed_event():
     assert parsed_event.metadata == {"reason": "manual_resume"}
 
 
+@pytest.mark.asyncio
+async def test_duplicate_batch_on_pubsub_replay_is_dropped(orchestrator, mock_redis):
+    """If pub/sub delivers a duplicate event (same timestamp), it should be dropped immediately."""
+    campaign_id = 55
+    event = BatchCompletedEvent(campaign_id=campaign_id, processed_count=5)
+
+    # First delivery: redis.set returns True (new event)
+    mock_redis.set = AsyncMock(return_value=True)
+
+    with (
+        patch("api.services.campaign.campaign_orchestrator.db_client") as mock_db,
+        patch("api.services.campaign.campaign_orchestrator.enqueue_job", new_callable=AsyncMock) as mock_enqueue,
+    ):
+        mock_campaign = MagicMock(id=campaign_id, state="running", orchestrator_metadata={})
+        mock_db.get_campaign_by_id = AsyncMock(return_value=mock_campaign)
+        mock_db.get_queued_runs_count = AsyncMock(return_value=5)
+        mock_db.get_scheduled_runs_count = AsyncMock(return_value=0)
+        mock_db.update_campaign = AsyncMock()
+
+        await orchestrator._handle_event(event)
+        assert mock_enqueue.await_count == 1
+
+        # Second delivery (replay): redis.set returns None/False (already seen key)
+        mock_redis.set = AsyncMock(return_value=None)
+        await orchestrator._handle_event(event)
+
+        # Enqueue count should still be 1 (second was dropped)
+        assert mock_enqueue.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_batch_in_progress_prevents_duplicate_schedule(orchestrator, mock_redis):
+    """_schedule_next_batch should not enqueue if a batch is already in progress."""
+    campaign_id = 77
+    orchestrator._batch_in_progress[campaign_id] = datetime.now(UTC)
+
+    with patch("api.services.campaign.campaign_orchestrator.enqueue_job", new_callable=AsyncMock) as mock_enqueue:
+        await orchestrator._schedule_next_batch(campaign_id)
+        mock_enqueue.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_stale_campaign_sweep_cleans_up_stuck_processing_runs(orchestrator):
+    """_check_stale_campaigns triggers cleanup_stuck_processing_queued_runs."""
+    with patch("api.services.campaign.campaign_orchestrator.db_client") as mock_db:
+        mock_db.cleanup_stuck_processing_queued_runs = AsyncMock(return_value=3)
+        mock_db.get_campaigns_by_status = AsyncMock(return_value=[])
+        mock_db.get_campaigns_with_due_callbacks = AsyncMock(return_value=[])
+
+        await orchestrator._check_stale_campaigns()
+
+        mock_db.cleanup_stuck_processing_queued_runs.assert_awaited_once_with(threshold_seconds=300)
+
+
+@pytest.mark.asyncio
+async def test_worker_execution_lock_prevents_concurrent_batch():
+    """process_campaign_batch skips execution if another worker currently holds the execution lock."""
+    from api.tasks.campaign_tasks import process_campaign_batch
+
+    mock_redis = AsyncMock()
+    # Lock acquisition returns False (another worker holds the lock)
+    mock_redis.set = AsyncMock(return_value=False)
+
+    ctx = {"redis": mock_redis}
+    with patch("api.tasks.campaign_tasks.campaign_call_dispatcher") as mock_disp:
+        await process_campaign_batch(ctx, campaign_id=88)
+        mock_disp.process_batch.assert_not_called()
+
+
+
 

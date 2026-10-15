@@ -1,8 +1,9 @@
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, text, update
+from loguru import logger
+from sqlalchemy import and_, case, func, or_, text, update
 from sqlalchemy.future import select
 
 from api.db.base_client import BaseDBClient
@@ -27,7 +28,6 @@ class CampaignClient(BaseDBClient):
         schedule_config: dict | None = None,
         circuit_breaker: dict | None = None,
         telephony_configuration_id: int | None = None,
-        callback_config: dict | None = None,
     ) -> CampaignModel:
         """Create a new campaign"""
         async with self.async_session() as session:
@@ -39,8 +39,6 @@ class CampaignClient(BaseDBClient):
                 orchestrator_metadata["schedule_config"] = schedule_config
             if circuit_breaker is not None:
                 orchestrator_metadata["circuit_breaker"] = circuit_breaker
-            if callback_config is not None:
-                orchestrator_metadata["callback_config"] = callback_config
 
             campaign = CampaignModel(
                 name=name,
@@ -168,6 +166,16 @@ class CampaignClient(BaseDBClient):
 
             result = await session.execute(query)
             return list(result.scalars().all())
+
+    async def get_active_runs_count_for_campaign(self, campaign_id: int) -> int:
+        """Count workflow runs for a campaign that are currently in progress (is_completed is False)."""
+        async with self.async_session() as session:
+            query = select(func.count(WorkflowRunModel.id)).where(
+                WorkflowRunModel.campaign_id == campaign_id,
+                WorkflowRunModel.is_completed.is_(False),
+            )
+            result = await session.execute(query)
+            return int(result.scalar() or 0)
 
     async def get_campaign_runs_paginated(
         self,
@@ -420,6 +428,34 @@ class CampaignClient(BaseDBClient):
             await session.refresh(campaign)
             return campaign
 
+    async def increment_campaign_failed_rows(self, campaign_id: int) -> None:
+        """Atomically increment failed_rows for a campaign in PostgreSQL."""
+        async with self.async_session() as session:
+            stmt = (
+                update(CampaignModel)
+                .where(CampaignModel.id == campaign_id)
+                .values(
+                    failed_rows=CampaignModel.failed_rows + 1,
+                    updated_at=datetime.now(UTC),
+                )
+            )
+            await session.execute(stmt)
+            await session.commit()
+
+    async def increment_campaign_processed_rows(self, campaign_id: int) -> None:
+        """Atomically increment processed_rows for a campaign in PostgreSQL."""
+        async with self.async_session() as session:
+            stmt = (
+                update(CampaignModel)
+                .where(CampaignModel.id == campaign_id)
+                .values(
+                    processed_rows=CampaignModel.processed_rows + 1,
+                    updated_at=datetime.now(UTC),
+                )
+            )
+            await session.execute(stmt)
+            await session.commit()
+
     async def append_campaign_log(
         self,
         campaign_id: int,
@@ -442,25 +478,30 @@ class CampaignClient(BaseDBClient):
         if details:
             entry["details"] = details
 
-        async with self.async_session() as session:
-            await session.execute(
-                text(
-                    "UPDATE campaigns "
-                    "SET logs = (logs::jsonb || CAST(:entry AS jsonb))::json, "
-                    "    updated_at = :now "
-                    "WHERE id = :campaign_id"
-                ),
-                {
-                    "entry": json.dumps([entry]),
-                    "now": datetime.now(UTC),
-                    "campaign_id": campaign_id,
-                },
+        try:
+            async with self.async_session() as session:
+                await session.execute(
+                    text(
+                        "UPDATE campaigns "
+                        "SET logs = (logs::jsonb || CAST(:entry AS jsonb))::json, "
+                        "    updated_at = :now "
+                        "WHERE id = :campaign_id"
+                    ),
+                    {
+                        "entry": json.dumps([entry]),
+                        "now": datetime.now(UTC),
+                        "campaign_id": campaign_id,
+                    },
+                )
+                try:
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
+                    raise
+        except Exception as e:
+            logger.error(
+                f"Failed to append campaign log for campaign {campaign_id} (event={event}): {e}"
             )
-            try:
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
 
     async def increment_campaign_metadata_counter(
         self, campaign_id: int, key: str
@@ -574,7 +615,7 @@ class CampaignClient(BaseDBClient):
                     QueuedRunModel.state == "processing",
                     ~workflow_exists,
                 )
-                .values(state="queued")
+                .values(state="queued", processed_at=None)
             )
             try:
                 await session.commit()
@@ -582,6 +623,73 @@ class CampaignClient(BaseDBClient):
                 await session.rollback()
                 raise
             return result.rowcount or 0
+
+    async def cleanup_stuck_processing_queued_runs(
+        self,
+        threshold_seconds: int = 300,
+        campaign_id: int | None = None,
+    ) -> int:
+        """Reset stuck processing queued runs back to queued (or mark as processed if workflow exists).
+
+        Runs can get stuck in 'processing' state if an ARQ worker crashes, gets killed,
+        encounters network disruptions, or suffers an unhandled exception before
+        creating a workflow run or returning unprocessed claims.
+        """
+        cutoff = datetime.now(UTC) - timedelta(seconds=threshold_seconds)
+        stuck_filter = [
+            QueuedRunModel.state == "processing",
+            or_(
+                QueuedRunModel.processed_at < cutoff,
+                QueuedRunModel.processed_at.is_(None),
+            ),
+            QueuedRunModel.created_at < cutoff,
+        ]
+        if campaign_id is not None:
+            stuck_filter.append(QueuedRunModel.campaign_id == campaign_id)
+
+        workflow_exists = (
+            select(WorkflowRunModel.id)
+            .where(WorkflowRunModel.queued_run_id == QueuedRunModel.id)
+            .exists()
+        )
+
+        async with self.async_session() as session:
+            # 1. Runs that actually had a WorkflowRun created: mark as processed to prevent double-dialing
+            res_processed = await session.execute(
+                update(QueuedRunModel)
+                .where(
+                    *stuck_filter,
+                    workflow_exists,
+                )
+                .values(state="processed", processed_at=datetime.now(UTC))
+            )
+
+            # 2. Runs without a WorkflowRun: reset back to queued so they can be processed
+            res_queued = await session.execute(
+                update(QueuedRunModel)
+                .where(
+                    *stuck_filter,
+                    ~workflow_exists,
+                )
+                .values(state="queued", processed_at=None)
+            )
+
+            try:
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+            reverted = res_queued.rowcount or 0
+            marked_processed = res_processed.rowcount or 0
+            total_cleaned = reverted + marked_processed
+            if total_cleaned > 0:
+                logger.warning(
+                    f"Cleaned up {total_cleaned} stuck processing queued runs "
+                    f"(reverted_to_queued={reverted}, marked_processed={marked_processed}, "
+                    f"campaign_id={campaign_id})"
+                )
+            return total_cleaned
 
     async def count_queued_runs(
         self, campaign_id: int, state: str | None = None
@@ -600,30 +708,119 @@ class CampaignClient(BaseDBClient):
     async def get_queued_runs_stats_for_campaigns(
         self, campaign_ids: list[int]
     ) -> dict[int, dict[str, int]]:
-        """Return {campaign_id: {"total": N, "executed": M}} for given campaigns.
-
-        "executed" means queued runs in the "processed" state.
+        """Return comprehensive queue stats for given campaigns:
+        total (all queued runs created), executed (completed/failed/cancelled),
+        active (processing in flight), pending (queued to dial right now),
+        scheduled_retries (queued with future scheduled_for),
+        and retry_attempts (runs where retry_count > 0).
         """
         if not campaign_ids:
             return {}
+        now = datetime.now(UTC)
         async with self.async_session() as session:
+            is_scheduled = case((QueuedRunModel.scheduled_for > now, 1), else_=0)
+            is_retry = case((QueuedRunModel.retry_count > 0, 1), else_=0)
             query = (
                 select(
                     QueuedRunModel.campaign_id,
                     QueuedRunModel.state,
+                    is_scheduled.label("is_scheduled"),
+                    is_retry.label("is_retry"),
                     func.count(QueuedRunModel.id),
                 )
                 .where(QueuedRunModel.campaign_id.in_(campaign_ids))
-                .group_by(QueuedRunModel.campaign_id, QueuedRunModel.state)
+                .group_by(
+                    QueuedRunModel.campaign_id,
+                    QueuedRunModel.state,
+                    is_scheduled,
+                    is_retry,
+                )
             )
             result = await session.execute(query)
             stats: dict[int, dict[str, int]] = {
-                cid: {"total": 0, "executed": 0} for cid in campaign_ids
+                cid: {
+                    "total": 0,
+                    "executed": 0,
+                    "active": 0,
+                    "pending": 0,
+                    "scheduled_retries": 0,
+                    "retry_attempts": 0,
+                    "completed_calls": 0,
+                    "failed_calls": 0,
+                    "unanswered_calls": 0,
+                }
+                for cid in campaign_ids
             }
-            for campaign_id, state, count in result.all():
+            for campaign_id, state, is_sched, is_ret, count in result.all():
                 stats[campaign_id]["total"] += count
+                if is_ret:
+                    stats[campaign_id]["retry_attempts"] += count
                 if state in ("processed", "cancelled", "failed"):
                     stats[campaign_id]["executed"] += count
+                elif state == "processing":
+                    stats[campaign_id]["active"] += count
+                elif state == "queued":
+                    if is_sched:
+                        stats[campaign_id]["scheduled_retries"] += count
+                    else:
+                        stats[campaign_id]["pending"] += count
+
+            # Ground-truth call outcome aggregates from workflow runs
+            try:
+                wf_disp = WorkflowRunModel.gathered_context["mapped_call_disposition"].as_string()
+                wf_query = (
+                    select(
+                        WorkflowRunModel.campaign_id,
+                        func.count(
+                            case(
+                                (wf_disp == "failed", 1),
+                                (wf_disp == "error", 1),
+                                else_=None,
+                            )
+                        ).label("failed_calls"),
+                        func.count(
+                            case(
+                                (
+                                    wf_disp.in_(
+                                        [
+                                            "busy",
+                                            "no-answer",
+                                            "no_answer",
+                                            "unanswered",
+                                            "voicemail",
+                                        ]
+                                    ),
+                                    1,
+                                ),
+                                else_=None,
+                            )
+                        ).label("unanswered_calls"),
+                        func.count(
+                            case(
+                                (wf_disp == "completed", 1),
+                                (
+                                    and_(
+                                        WorkflowRunModel.is_completed.is_(True),
+                                        wf_disp.is_(None),
+                                    ),
+                                    1,
+                                ),
+                                else_=None,
+                            )
+                        ).label("completed_calls"),
+                    )
+                    .where(WorkflowRunModel.campaign_id.in_(campaign_ids))
+                    .group_by(WorkflowRunModel.campaign_id)
+                )
+                wf_result = await session.execute(wf_query)
+                for cid, f_calls, u_calls, c_calls in wf_result.all():
+                    if cid in stats:
+                        stats[cid]["failed_calls"] = f_calls or 0
+                        stats[cid]["unanswered_calls"] = u_calls or 0
+                        stats[cid]["completed_calls"] = c_calls or 0
+            except Exception as e:
+                logger.warning(f"Failed to query workflow run stats for campaigns: {e}")
+
             return stats
 
     async def get_workflow_runs_by_campaign(
@@ -731,6 +928,18 @@ class CampaignClient(BaseDBClient):
             result = await session.execute(query)
             return result.scalar_one_or_none()
 
+    async def get_queued_run_by_source_uuid(
+        self, campaign_id: int, source_uuid: str
+    ) -> QueuedRunModel | None:
+        """Get a queued run by campaign_id and unique source_uuid"""
+        async with self.async_session() as session:
+            query = select(QueuedRunModel).where(
+                QueuedRunModel.campaign_id == campaign_id,
+                QueuedRunModel.source_uuid == source_uuid,
+            )
+            result = await session.execute(query)
+            return result.scalar_one_or_none()
+
     async def get_campaigns_by_status(self, statuses: list[str]) -> list[CampaignModel]:
         """Get campaigns by status"""
         async with self.async_session() as session:
@@ -753,31 +962,6 @@ class CampaignClient(BaseDBClient):
                 query = query.where(QueuedRunModel.scheduled_for.is_(None))
             result = await session.execute(query)
             return result.scalar() or 0
-
-    async def get_campaigns_with_due_callbacks(self) -> list[CampaignModel]:
-        """Get campaigns that have due callbacks, regardless of campaign state."""
-        async with self.async_session() as session:
-            now = datetime.now(UTC)
-            query = (
-                select(CampaignModel)
-                .join(QueuedRunModel, QueuedRunModel.campaign_id == CampaignModel.id)
-                .where(
-                    QueuedRunModel.retry_reason == "user_requested_callback",
-                    QueuedRunModel.state == "queued",
-                    QueuedRunModel.scheduled_for <= now
-                )
-            )
-            result = await session.execute(query)
-            
-            campaigns = list(result.scalars().all())
-            seen = set()
-            unique_campaigns = []
-            for c in campaigns:
-                if c.id not in seen:
-                    seen.add(c.id)
-                    unique_campaigns.append(c)
-                    
-            return unique_campaigns
 
     async def get_scheduled_runs_count(
         self,
@@ -810,7 +994,6 @@ class CampaignClient(BaseDBClient):
         campaign_id: int,
         scheduled_before: datetime,
         limit: int = 10,
-        callbacks_only: bool = False,
     ) -> list[QueuedRunModel]:
         """
         Atomically claim queued runs for processing using SELECT FOR UPDATE SKIP LOCKED.
@@ -836,8 +1019,6 @@ class CampaignClient(BaseDBClient):
                     QueuedRunModel.scheduled_for <= scheduled_before,
                 )
             )
-            if callbacks_only:
-                scheduled_query = scheduled_query.where(QueuedRunModel.retry_reason == "user_requested_callback")
 
             scheduled_query = (
                 scheduled_query
@@ -849,15 +1030,17 @@ class CampaignClient(BaseDBClient):
             scheduled_result = await session.execute(scheduled_query)
             scheduled_runs = list(scheduled_result.scalars().all())
 
+            now = datetime.now(UTC)
             # Mark scheduled runs as processing
             for run in scheduled_runs:
                 run.state = "processing"
+                run.processed_at = now
                 claimed_runs.append(run)
 
             remaining_slots = limit - len(scheduled_runs)
 
-            # Then get regular queued runs if we have remaining slots (skip if callbacks_only)
-            if remaining_slots > 0 and not callbacks_only:
+            # Then get regular queued runs if we have remaining slots
+            if remaining_slots > 0:
                 regular_query = (
                     select(QueuedRunModel)
                     .where(
@@ -876,6 +1059,7 @@ class CampaignClient(BaseDBClient):
                 # Mark regular runs as processing
                 for run in regular_runs:
                     run.state = "processing"
+                    run.processed_at = now
                     claimed_runs.append(run)
 
             # Commit the state changes

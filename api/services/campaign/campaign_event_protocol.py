@@ -142,6 +142,12 @@ class CampaignStartedEvent(BaseCampaignEvent):
     type: str = CampaignEventType.CAMPAIGN_STARTED
     workflow_id: int = 0
     total_rows: int | None = None
+    metadata: dict[str, Any] | None = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.metadata is None:
+            self.metadata = {}
 
 
 @dataclass
@@ -151,6 +157,12 @@ class CampaignPausedEvent(BaseCampaignEvent):
     type: str = CampaignEventType.CAMPAIGN_PAUSED
     processed_rows: int = 0
     failed_rows: int = 0
+    metadata: dict[str, Any] | None = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.metadata is None:
+            self.metadata = {}
 
 
 @dataclass
@@ -160,6 +172,12 @@ class CampaignResumedEvent(BaseCampaignEvent):
     type: str = CampaignEventType.CAMPAIGN_RESUMED
     processed_rows: int = 0
     failed_rows: int = 0
+    metadata: dict[str, Any] | None = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.metadata is None:
+            self.metadata = {}
 
 
 @dataclass
@@ -171,6 +189,12 @@ class CampaignCompletedEvent(BaseCampaignEvent):
     processed_rows: int = 0
     failed_rows: int = 0
     duration_seconds: float | None = None
+    metadata: dict[str, Any] | None = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.metadata is None:
+            self.metadata = {}
 
 
 @dataclass
@@ -181,6 +205,12 @@ class CampaignFailedEvent(BaseCampaignEvent):
     error: str = ""
     processed_rows: int = 0
     failed_rows: int = 0
+    metadata: dict[str, Any] | None = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.metadata is None:
+            self.metadata = {}
 
 
 @dataclass

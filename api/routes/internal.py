@@ -1,3 +1,4 @@
+import json
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -567,3 +568,78 @@ async def delete_organization(
 
     logger.info(f"Internal request: deleted Dograh org {org_id}")
     return {"status": "success", "org_id": org_id, "action": "deleted"}
+
+
+class MockTelephonyOverrideRequest(BaseModel):
+    organization_id: int
+    min_duration_seconds: int | None = None
+    max_duration_seconds: int | None = None
+    outcomes: dict[str, int] | None = None
+
+
+@router.post("/mock-telephony/override")
+async def set_mock_telephony_override(
+    request: MockTelephonyOverrideRequest,
+    _: None = Depends(verify_internal_token),
+):
+    """Set live Redis simulation override parameters for an organization without restarting."""
+    import redis.asyncio as aioredis
+    from api.constants import REDIS_URL
+
+    redis_client = await aioredis.from_url(REDIS_URL, decode_responses=True)
+    override_dict = {
+        k: v
+        for k, v in request.model_dump().items()
+        if v is not None and k != "organization_id"
+    }
+
+    key = f"mock_telephony:config:{request.organization_id}"
+    await redis_client.set(key, json.dumps(override_dict))
+    logger.info(
+        f"Internal request: updated mock telephony override for org {request.organization_id}: {override_dict}"
+    )
+    return {
+        "status": "success",
+        "organization_id": request.organization_id,
+        "config": override_dict,
+    }
+
+
+@router.get("/mock-telephony/override")
+async def get_mock_telephony_override(
+    organization_id: int = Query(..., description="Organization ID"),
+    _: None = Depends(verify_internal_token),
+):
+    """Get active live Redis simulation override for an organization."""
+    import redis.asyncio as aioredis
+    from api.constants import REDIS_URL
+
+    redis_client = await aioredis.from_url(REDIS_URL, decode_responses=True)
+    raw = await redis_client.get(f"mock_telephony:config:{organization_id}")
+    config = json.loads(raw) if raw else None
+    return {
+        "organization_id": organization_id,
+        "config": config,
+    }
+
+
+@router.delete("/mock-telephony/override")
+async def clear_mock_telephony_override(
+    organization_id: int = Query(..., description="Organization ID"),
+    _: None = Depends(verify_internal_token),
+):
+    """Delete live Redis simulation override for an organization, reverting to campaign/telephony config defaults."""
+    import redis.asyncio as aioredis
+    from api.constants import REDIS_URL
+
+    redis_client = await aioredis.from_url(REDIS_URL, decode_responses=True)
+    deleted = await redis_client.delete(f"mock_telephony:config:{organization_id}")
+    logger.info(
+        f"Internal request: cleared mock telephony override for org {organization_id}"
+    )
+    return {
+        "status": "success",
+        "organization_id": organization_id,
+        "cleared": bool(deleted),
+    }
+

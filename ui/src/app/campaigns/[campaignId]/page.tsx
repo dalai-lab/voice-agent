@@ -1,7 +1,28 @@
 "use client";
 
 import { format } from 'date-fns';
-import { AlertCircle, AlertTriangle, ArrowLeft, CalendarIcon, Check, Clock, Download, Info, Pause, Pencil, Phone, Play, RefreshCw, X } from 'lucide-react';
+import {
+    Activity,
+    AlertCircle,
+    AlertTriangle,
+    ArrowLeft,
+    CalendarIcon,
+    Check,
+    CheckCircle2,
+    Clock,
+    Download,
+    Info,
+    Layers,
+    Pause,
+    Pencil,
+    Phone,
+    Play,
+    Radio,
+    RefreshCw,
+    Users,
+    X,
+    Zap,
+} from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -16,7 +37,6 @@ import {
     startCampaignApiV1CampaignCampaignIdStartPost,
 } from '@/client/sdk.gen';
 import type { CampaignResponse } from '@/client/types.gen';
-import { CampaignCallbacks } from '@/components/campaign-callbacks';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -26,7 +46,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CampaignAnalytics } from '@/components/analytics/CampaignAnalytics';
 import { CampaignRuns } from '@/components/workflow-runs';
 import { useOrganizationTimezone } from '@/hooks/useOrganizationTimezone';
@@ -72,9 +91,9 @@ export default function CampaignDetailPage() {
     const [isRedialing, setIsRedialing] = useState(false);
 
     // Fetch campaign details
-    const fetchCampaign = useCallback(async () => {
+    const fetchCampaign = useCallback(async (silent = false) => {
         if (!user) return;
-        setIsLoadingCampaign(true);
+        if (!silent) setIsLoadingCampaign(true);
         try {
             const accessToken = await getAccessToken();
             const response = await getCampaignApiV1CampaignCampaignIdGet({
@@ -91,9 +110,9 @@ export default function CampaignDetailPage() {
             }
         } catch (error) {
             console.error('Failed to fetch campaign:', error);
-            toast.error('Failed to load campaign details');
+            if (!silent) toast.error('Failed to load campaign details');
         } finally {
-            setIsLoadingCampaign(false);
+            if (!silent) setIsLoadingCampaign(false);
         }
     }, [user, getAccessToken, campaignId]);
 
@@ -101,6 +120,15 @@ export default function CampaignDetailPage() {
     useEffect(() => {
         fetchCampaign();
     }, [fetchCampaign]);
+
+    // Live auto-polling every 3s when running or syncing
+    useEffect(() => {
+        if (!campaign || !['running', 'syncing'].includes(campaign.state)) return;
+        const interval = setInterval(() => {
+            fetchCampaign(true);
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [campaign?.state, fetchCampaign]);
 
     // Handle back navigation
     const handleBack = () => {
@@ -381,7 +409,22 @@ export default function CampaignDetailPage() {
     // useful when the most recent failure / pause is at the top.
     const sortedLogs = (campaign?.logs ?? []).slice().reverse();
 
-    const getLogIcon = (level: string) => {
+    const getLogIcon = (level: string, event?: string) => {
+        if (event === 'lead_retry_scheduled') {
+            return <RefreshCw className="h-4 w-4 text-amber-500 animate-spin-reverse" />;
+        }
+        if (event === 'lead_retries_exhausted') {
+            return <AlertCircle className="h-4 w-4 text-destructive" />;
+        }
+        if (event?.includes('schedule')) {
+            return <Clock className="h-4 w-4 text-purple-500" />;
+        }
+        if (event === 'campaign_completed') {
+            return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+        }
+        if (event?.includes('started') || event?.includes('resumed')) {
+            return <Play className="h-4 w-4 text-emerald-500" />;
+        }
         switch (level) {
             case 'error':
                 return <AlertCircle className="h-4 w-4 text-destructive" />;
@@ -392,7 +435,9 @@ export default function CampaignDetailPage() {
         }
     };
 
-    const getLogBadgeVariant = (level: string): 'destructive' | 'secondary' | 'outline' => {
+    const getLogBadgeVariant = (level: string, event?: string): 'destructive' | 'secondary' | 'outline' => {
+        if (event === 'lead_retries_exhausted') return 'destructive';
+        if (event === 'lead_retry_scheduled') return 'outline';
         switch (level) {
             case 'error':
                 return 'destructive';
@@ -400,6 +445,62 @@ export default function CampaignDetailPage() {
                 return 'outline';
             default:
                 return 'secondary';
+        }
+    };
+
+    const getEventBadge = (event: string) => {
+        switch (event) {
+            case 'lead_retry_scheduled':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25 uppercase">
+                        RETRY SCHEDULED
+                    </span>
+                );
+            case 'lead_retries_exhausted':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25 uppercase">
+                        RETRIES EXHAUSTED
+                    </span>
+                );
+            case 'schedule_window_opened':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 uppercase">
+                        SCHEDULE OPENED
+                    </span>
+                );
+            case 'schedule_window_closed':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/25 uppercase">
+                        OUTSIDE SCHEDULE
+                    </span>
+                );
+            case 'campaign_completed':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 uppercase">
+                        COMPLETED
+                    </span>
+                );
+            case 'campaign_started':
+            case 'campaign_resumed_manual':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/25 uppercase">
+                        ACTIVE
+                    </span>
+                );
+            case 'campaign_paused_manual':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25 uppercase">
+                        PAUSED
+                    </span>
+                );
+            case 'circuit_breaker_tripped':
+                return (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25 uppercase">
+                        CIRCUIT BREAKER
+                    </span>
+                );
+            default:
+                return null;
         }
     };
 
@@ -507,6 +608,21 @@ export default function CampaignDetailPage() {
                         <Badge variant={getStateBadgeVariant(campaign.state)} className="text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider">
                             {campaign.state}
                         </Badge>
+                        {campaign.state === 'running' && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                LIVE DISPATCHING
+                            </span>
+                        )}
+                        {campaign.state === 'syncing' && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/25">
+                                <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                                SYNCING CONTACTS
+                            </span>
+                        )}
                         <span>•</span>
                         <span>Created {formatDate(campaign.created_at, organizationTimezone)}</span>
                     </div>
@@ -595,6 +711,200 @@ export default function CampaignDetailPage() {
                 </div>
             </div>
 
+            {/* Live Queue & Dispatch Monitor */}
+            <div className="border border-border bg-card rounded-xl p-5 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border/40">
+                    <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                            <Activity className="h-4 w-4 text-cta" />
+                            <h2 className="text-sm font-bold text-foreground">Live Dispatch & Queue Monitor</h2>
+                            {campaign.state === 'running' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                    LIVE AUTO-DISPATCH
+                                </span>
+                            ) : campaign.state === 'syncing' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/25">
+                                    <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                                    SYNCING AUDIENCE
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-muted text-muted-foreground border border-border/60">
+                                    {campaign.state.toUpperCase()}
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                            Real-time breakdown of unique leads, active telephony channels, and scheduled redial delays
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
+                        <Clock className="h-3 w-3" />
+                        <span>Live auto-sync every 3s</span>
+                    </div>
+                </div>
+
+                {/* 4 KPI Cards Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Active In-Flight */}
+                    <div className="p-4 rounded-xl border border-border/60 bg-muted/20 flex flex-col justify-between space-y-2 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="text-[10px] font-bold uppercase tracking-wider">Active In-Flight</span>
+                            <Phone className={`h-4 w-4 ${(campaign.active_count ?? 0) > 0 ? 'text-emerald-500 animate-pulse' : 'text-muted-foreground/50'}`} />
+                        </div>
+                        <div>
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-2xl font-bold text-foreground tabular-nums">
+                                    {campaign.active_count ?? 0}
+                                </span>
+                                <span className="text-xs text-muted-foreground font-semibold">
+                                    / {campaign.max_concurrency ? `${campaign.max_concurrency} lines` : 'auto'}
+                                </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                                {(campaign.active_count ?? 0) > 0 ? 'Dialing & connected now' : 'Idle channel capacity'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Ready to Dial */}
+                    <div className="p-4 rounded-xl border border-border/60 bg-muted/20 flex flex-col justify-between space-y-2 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="text-[10px] font-bold uppercase tracking-wider">Ready in Queue</span>
+                            <Play className="h-4 w-4 text-sky-500" />
+                        </div>
+                        <div>
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-2xl font-bold text-foreground tabular-nums">
+                                    {campaign.pending_count ?? 0}
+                                </span>
+                                <span className="text-xs text-muted-foreground font-semibold">queued</span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                                Awaiting available telephony line
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Scheduled Retries */}
+                    <div className="p-4 rounded-xl border border-border/60 bg-muted/20 flex flex-col justify-between space-y-2 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="text-[10px] font-bold uppercase tracking-wider">Scheduled Retries</span>
+                            <Clock className="h-4 w-4 text-amber-500" />
+                        </div>
+                        <div>
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                                    {campaign.scheduled_retries_count ?? 0}
+                                </span>
+                                <span className="text-xs text-muted-foreground font-semibold">in cool-down</span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                                In backoff before next retry attempt
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Total Call Dials Placed */}
+                    <div className="p-4 rounded-xl border border-border/60 bg-muted/20 flex flex-col justify-between space-y-2 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="text-[10px] font-bold uppercase tracking-wider">Total Call Dials</span>
+                            <RefreshCw className="h-4 w-4 text-muted-foreground/60" />
+                        </div>
+                        <div>
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-2xl font-bold text-foreground tabular-nums">
+                                    {campaign.total_queued_count ?? 0}
+                                </span>
+                                <span className="text-xs text-muted-foreground font-semibold">dials</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] mt-1 text-muted-foreground font-medium">
+                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{campaign.completed_calls_count ?? 0} connected</span>
+                                <span>•</span>
+                                <span className="text-rose-600 dark:text-rose-400 font-semibold">{campaign.failed_calls_count ?? 0} failed</span>
+                                <span>•</span>
+                                <span className="text-amber-600 dark:text-amber-400 font-semibold">{campaign.unanswered_calls_count ?? 0} unanswered</span>
+                            </div>
+                            <p className="text-[9px] text-muted-foreground/75 mt-1">
+                                {campaign.retry_attempts_count ?? 0} redials • {Math.max(0, (campaign.total_queued_count ?? 0) - (campaign.retry_attempts_count ?? 0))} initial
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Multi-Segment Audience Progress Bar */}
+                {(() => {
+                    const totalAudience = campaign.total_rows && campaign.total_rows > 0 ? campaign.total_rows : 0;
+                    const completedRows = campaign.processed_rows ?? 0;
+                    const failedRows = campaign.failed_rows ?? 0;
+                    const resolvedRows = completedRows + failedRows;
+                    const totalPercent = totalAudience > 0 ? Math.min(100, Math.round((resolvedRows / totalAudience) * 100)) : 0;
+                    const completedPercent = totalAudience > 0 ? Math.min(100, (completedRows / totalAudience) * 100) : 0;
+                    const failedPercent = totalAudience > 0 ? Math.min(100 - completedPercent, (failedRows / totalAudience) * 100) : 0;
+                    const remainingRows = Math.max(0, totalAudience - resolvedRows);
+
+                    return (
+                        <div className="space-y-2.5 pt-3 border-t border-border/40">
+                            <div className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-foreground">Unique Contacts / Leads Reached</span>
+                                    <span className="text-muted-foreground font-normal">
+                                        ({resolvedRows} of {totalAudience} unique contacts finished)
+                                    </span>
+                                </div>
+                                <span className="font-bold tabular-nums text-foreground">
+                                    {totalPercent}%
+                                </span>
+                            </div>
+
+                            {/* Segmented Progress Bar */}
+                            <div className="w-full h-3 rounded-full overflow-hidden bg-muted/60 flex border border-border/20">
+                                {completedPercent > 0 && (
+                                    <div
+                                        className="bg-emerald-500 h-full transition-all duration-300"
+                                        style={{ width: `${completedPercent}%` }}
+                                        title={`Completed Leads: ${completedRows}`}
+                                    />
+                                )}
+                                {failedPercent > 0 && (
+                                    <div
+                                        className="bg-rose-500 h-full transition-all duration-300"
+                                        style={{ width: `${failedPercent}%` }}
+                                        title={`Permanently Failed: ${failedRows}`}
+                                    />
+                                )}
+                            </div>
+
+                            {/* Progress Bar Legend */}
+                            <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground pt-0.5">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                    <span className="font-semibold text-foreground">{completedRows}</span>
+                                    <span>Completed Leads</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                                    <span className="font-semibold text-foreground">{failedRows}</span>
+                                    <span>Exhausted / Failed</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+                                    <span className="font-semibold text-foreground">{remainingRows}</span>
+                                    <span>Remaining Leads</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 ml-auto font-mono text-[10px]">
+                                    <span className="text-muted-foreground">Original Audience:</span>
+                                    <span className="font-bold text-foreground">{totalAudience} leads</span>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+            </div>
+
             {/* Content Split: Details & Settings */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Campaign Details */}
@@ -663,9 +973,15 @@ export default function CampaignDetailPage() {
                             <dd className="mt-1 text-xs font-semibold capitalize">{campaign.state}</dd>
                         </div>
                         <div>
-                            <dt className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">Progress</dt>
+                            <dt className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">Contacts Progress</dt>
                             <dd className="mt-1 text-xs font-bold text-foreground">
-                                {campaign.executed_count} / {campaign.total_queued_count}
+                                {campaign.processed_rows} / {campaign.total_rows ?? 0} leads ({campaign.total_rows && campaign.total_rows > 0 ? Math.round((campaign.processed_rows / campaign.total_rows) * 100) : 0}%)
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">Total Call Dials</dt>
+                            <dd className="mt-1 text-xs font-semibold text-foreground">
+                                {campaign.total_queued_count ?? 0} dials ({campaign.retry_attempts_count ?? 0} retries)
                             </dd>
                         </div>
                         {campaign.parent_campaign_id && (
@@ -842,12 +1158,13 @@ export default function CampaignDetailPage() {
                                     key={`${entry.ts}-${idx}`}
                                     className="flex gap-3 border-b border-border/40 last:border-b-0 pb-3 last:pb-0"
                                 >
-                                    <div className="mt-0.5 shrink-0">{getLogIcon(entry.level)}</div>
+                                    <div className="mt-0.5 shrink-0">{getLogIcon(entry.level, entry.event)}</div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <Badge variant={getLogBadgeVariant(entry.level)} className="text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider">
+                                            <Badge variant={getLogBadgeVariant(entry.level, entry.event)} className="text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider">
                                                 {entry.level}
                                             </Badge>
+                                            {getEventBadge(entry.event)}
                                             <code className="text-xs font-semibold text-muted-foreground font-mono">
                                                 {entry.event}
                                             </code>
@@ -874,25 +1191,14 @@ export default function CampaignDetailPage() {
                 </div>
             </div>
 
-            {/* Workflow Runs and Callbacks */}
-            <Tabs defaultValue="runs" className="w-full">
-                <TabsList className="mb-4 bg-muted/40 border border-border rounded-lg p-0.5">
-                    <TabsTrigger value="runs" className="text-xs font-semibold rounded-md px-3 py-1.5">Runs</TabsTrigger>
-                    <TabsTrigger value="callbacks" className="text-xs font-semibold rounded-md px-3 py-1.5">Callbacks</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="runs">
-                    <CampaignRuns
-                        campaignId={campaignId}
-                        workflowId={campaign.workflow_id}
-                        searchParams={searchParams}
-                    />
-                </TabsContent>
-
-                <TabsContent value="callbacks">
-                    <CampaignCallbacks campaignId={campaignId} />
-                </TabsContent>
-            </Tabs>
+            {/* Workflow Runs */}
+            <div className="w-full">
+                <CampaignRuns
+                    campaignId={campaignId}
+                    workflowId={campaign.workflow_id}
+                    searchParams={searchParams}
+                />
+            </div>
 
             <Dialog open={isRedialDialogOpen} onOpenChange={setIsRedialDialogOpen}>
                 <DialogContent className="max-w-md rounded-xl bg-background border border-border shadow-lg p-6">

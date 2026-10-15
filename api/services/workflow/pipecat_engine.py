@@ -86,7 +86,6 @@ class PipecatEngine:
         has_recordings: bool = False,
         context_compaction_enabled: bool = False,
         enable_dtmf: bool = False,
-        enable_callbacks: bool = False,
         cross_node_variable_injection_enabled: bool = False,
     ):
         self.task = task
@@ -113,7 +112,6 @@ class PipecatEngine:
         self._pending_extraction_tasks: set[asyncio.Task] = set()
         self._dtmf_subscription_task: asyncio.Task | None = None
         self._enable_dtmf: bool = enable_dtmf
-        self._enable_callbacks: bool = enable_callbacks
         self._cross_node_variable_injection_enabled: bool = cross_node_variable_injection_enabled
         self._dtmf_buffer: str = ""
         self._dtmf_timer_task: asyncio.Task | None = None
@@ -328,7 +326,7 @@ class PipecatEngine:
 
         Key ordering is intentional:
         - ``_call_context_vars`` is spread first (may contain a "gathered_context"
-          key carrying previous-run callback data, used for resume-node routing).
+          key carrying previous-run data, used for resume-node routing).
         - ``"gathered_context"`` is then overwritten with the live in-progress
           ``_gathered_context`` so that {{gathered_context.*}} references in
           node prompts always read from the current call's extraction output.
@@ -742,19 +740,6 @@ class PipecatEngine:
             has_recordings=self._has_recordings,
         )
 
-        # Callback context note — appended last so it's the final instruction the LLM reads
-        is_callback = self._call_context_vars.get("is_callback", False)
-        logger.info(f"[CALLBACK DEBUG] is_callback={is_callback!r}, node_id={node.id!r}")
-        if is_callback and "is_callback" not in node.prompt:
-            summary = self._call_context_vars.get("conversation_summary", "our previous conversation")
-            callback_injection = (
-                f"\n\n[SYSTEM NOTE: This is an outbound callback you are making to the user. "
-                f"Summary of the previous call: '{summary}'. "
-                f"Open the call by naturally referencing the callback and what the user needed — do not treat this as a new inbound call. "
-                f"Do not ask for information already covered in the summary.]\n"
-            )
-            system_prompt += callback_injection
-            logger.info(f"[CALLBACK DEBUG] Injected (appended). Prompt last 150 chars: {system_prompt[-150:]!r}")
         functions = await compose_functions_for_node(
             node=node,
             custom_tool_manager=self._custom_tool_manager,
@@ -846,13 +831,6 @@ class PipecatEngine:
 
         if node.greeting:
             greeting_text = node.greeting
-            
-            # Smart Fallback for Callbacks
-            is_callback = self._call_context_vars.get("is_callback", False)
-            if is_callback and "is_callback" not in greeting_text:
-                # Return None to skip the static TTS greeting and let the LLM generate the first turn
-                return None
-                
             return ("text", self._format_prompt(greeting_text))
 
         return None

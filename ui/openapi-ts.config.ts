@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { defineConfig } from '@hey-api/openapi-ts';
 import { loadEnvConfig } from '@next/env';
 
@@ -6,14 +8,21 @@ import { loadEnvConfig } from '@next/env';
 // scripts/worktree-sync-env.sh). Falls back to the default dev port if unset.
 loadEnvConfig(process.cwd());
 
+const docsPath = path.resolve(process.cwd(), '../docs/api-reference/openapi.json');
 const backendUrl = (
     process.env.BACKEND_URL ||
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     'http://127.0.0.1:8000'
 ).replace(/\/+$/, '');
 
+const input = process.env.OPENAPI_INPUT || (
+    fs.existsSync(docsPath)
+        ? docsPath
+        : `${backendUrl}/api/v1/openapi.json`
+);
+
 export default defineConfig({
-    input: `${backendUrl}/api/v1/openapi.json`,
+    input,
     output: 'src/client',
     plugins: [{
         name: '@hey-api/client-fetch',

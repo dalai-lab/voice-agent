@@ -1,5 +1,6 @@
 import asyncio
 import time
+import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
@@ -266,6 +267,47 @@ class CallConcurrencyService:
             return min(org_limit, group_limit)
         return org_limit
 
+    async def check_slots_available(
+        self,
+        organization_id: int,
+        scope_key: str | None = None,
+        scope_max_concurrent: int | None = None,
+    ) -> bool | None:
+        """Fast pre-check: are there available concurrent slots for this org and optional scope?
+
+        Returns:
+            True   – slots are available (safe to proceed with claiming runs)
+            False  – org or scope is definitely at its limit (skip claiming, retry later)
+            None   – Redis is unreachable; caller should fail open and let
+                     normal acquisition handle it
+        """
+        try:
+            group_id = await self.get_concurrency_group_id(organization_id)
+            max_concurrent = await self.get_effective_org_concurrent_limit(organization_id)
+            if max_concurrent <= 0:
+                return False
+            live_count = await rate_limiter.get_live_slot_count(group_id)
+            if live_count is None:
+                return None  # Redis down — fail open
+            if live_count >= max_concurrent:
+                return False
+
+            # Check scope-specific limit if provided (e.g. campaign-level max_concurrency cap)
+            if scope_key and scope_max_concurrent is not None:
+                if scope_max_concurrent <= 0:
+                    return False
+                scope_live_count = await rate_limiter.get_live_slot_count(scope_key)
+                if scope_live_count is not None and scope_live_count >= scope_max_concurrent:
+                    return False
+
+            return True
+        except Exception as e:
+            logger.warning(
+                f"check_slots_available error for org {organization_id}: {e}; "
+                "treating as available (fail open)"
+            )
+            return None  # Unknown state — fail open
+
     async def get_fleet_active_calls(self) -> int:
         """Total active calls across every org — the fleet-wide autoscaling
         signal scraped by /health/autoscale-metric. Thin passthrough so routes
@@ -329,6 +371,9 @@ class CallConcurrencyService:
             )
 
         wait_start = time.time()
+        consecutive_redis_errors = 0
+        MAX_CONSECUTIVE_REDIS_ERRORS = 3
+
         while True:
             acquisition = await rate_limiter.try_acquire_concurrent_slot_details(
                 group_id,
@@ -336,7 +381,44 @@ class CallConcurrencyService:
                 scope_key=scope_key,
                 scope_max_concurrent=scope_max_concurrent,
             )
-            if acquisition:
+
+            if acquisition is None:
+                # Distinguish genuine limit-reached from Redis being down.
+                # try_acquire_concurrent_slot_details logs the Redis error and
+                # returns None in both cases. We probe with get_live_slot_count
+                # (also returns None on Redis error) to detect the difference.
+                live_count = await rate_limiter.get_live_slot_count(group_id)
+                if live_count is None:
+                    # Redis is unreachable — can't acquire or verify count.
+                    # Fail open: grant a synthetic slot so the campaign keeps
+                    # running. The slot has no Redis backing; release() is a
+                    # no-op, which is fine since the tracking is broken anyway.
+                    consecutive_redis_errors += 1
+                    if consecutive_redis_errors >= MAX_CONSECUTIVE_REDIS_ERRORS:
+                        synthetic_slot_id = f"redis_unavailable_{uuid.uuid4().hex[:8]}"
+                        logger.warning(
+                            f"Redis unavailable after {consecutive_redis_errors} checks for org "
+                            f"{organization_id} (group {group_id}), source={source}. "
+                            "Granting synthetic slot to prevent campaign stall. "
+                            "Slots will self-correct when Redis recovers."
+                        )
+                        return CallConcurrencySlot(
+                            organization_id=group_id,
+                            slot_id=synthetic_slot_id,
+                            max_concurrent=max_concurrent,
+                            source=source,
+                            scope_key=scope_key,
+                        )
+                    # Brief pause before re-probing Redis
+                    await asyncio.sleep(min(retry_interval, max(0, timeout - (time.time() - wait_start))))
+                    continue
+
+                # Redis is healthy but limit is genuinely reached — normal path.
+                consecutive_redis_errors = 0
+
+            else:
+                # Successfully acquired.
+                consecutive_redis_errors = 0
                 logger.info(
                     f"Acquired concurrent call slot for org {organization_id} (group {group_id}): "
                     f"source={source}, active_calls="

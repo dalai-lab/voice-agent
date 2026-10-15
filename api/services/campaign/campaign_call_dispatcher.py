@@ -15,6 +15,7 @@ from api.services.call_concurrency.rate_limiter import rate_limiter
 from api.services.campaign.circuit_breaker import circuit_breaker
 from api.services.campaign.errors import (
     CampaignQuotaExceededError,
+    CampaignRateLimitTimeoutError,
     ConcurrentSlotAcquisitionError,
     PhoneNumberPoolExhaustedError,
 )
@@ -58,7 +59,7 @@ class CampaignCallDispatcher:
         """Get the concurrent call limit for an organization."""
         return await call_concurrency.get_effective_org_concurrent_limit(organization_id)
 
-    async def process_batch(self, campaign_id: int, batch_size: int = 10, callbacks_only: bool = False) -> int:
+    async def process_batch(self, campaign_id: int, batch_size: int = 10) -> int:
         """
         Processes a batch of queued runs with priority for scheduled retries.
         Thread-safe: uses SELECT FOR UPDATE SKIP LOCKED to prevent concurrent processing.
@@ -69,15 +70,60 @@ class CampaignCallDispatcher:
         if not campaign:
             raise ValueError(f"Campaign {campaign_id} not found")
 
-        # Check if campaign is in running state (or completed/failed for callbacks)
-        if campaign.state == "paused":
-            logger.info(f"Campaign {campaign_id} is paused")
-            return 0
-        elif campaign.state != "running" and not callbacks_only:
+        # Check if campaign is in running state
+        if campaign.state != "running":
             logger.info(
                 f"Campaign {campaign_id} is not in running state: {campaign.state}"
             )
             return 0
+
+        # Fast pre-check: if the org is definitely at its concurrency limit,
+        # skip claiming queued runs entirely.  This avoids the expensive
+        # claim → wait-30s → unclaim cycle when all slots are genuinely occupied.
+        # The check is stale-aware (evicts expired heartbeat entries atomically)
+        # so it won't block on phantom stuck slots.
+        #
+        # • False  → org is full; raise immediately so task-level retry handles it
+        # • None   → Redis is unreachable; fall through — acquire_org_slot will
+        #            grant a synthetic slot so the campaign keeps running
+        # • True   → slots available; proceed normally
+        campaign_max_concurrency = None
+        if campaign.orchestrator_metadata:
+            campaign_max_concurrency = campaign.orchestrator_metadata.get(
+                "max_concurrency"
+            )
+        scope_key = (
+            f"campaign:{campaign.id}"
+            if campaign_max_concurrency is not None
+            else None
+        )
+
+        slots_available = await call_concurrency.check_slots_available(
+            campaign.organization_id,
+            scope_key=scope_key,
+            scope_max_concurrent=campaign_max_concurrency,
+        )
+        if slots_available is False:
+            effective_limit = campaign_max_concurrency
+            if effective_limit is None:
+                effective_limit = await call_concurrency.get_effective_org_concurrent_limit(
+                    campaign.organization_id
+                )
+            logger.warning(
+                f"Campaign {campaign_id} (org {campaign.organization_id}): "
+                f"concurrent slots occupied (limit: {effective_limit}) — skipping claim."
+            )
+            raise ConcurrentSlotAcquisitionError(
+                organization_id=campaign.organization_id,
+                campaign_id=campaign_id,
+                wait_time=0.0,
+                max_concurrent=effective_limit,
+            )
+        elif slots_available is None:
+            logger.warning(
+                f"Campaign {campaign_id}: Redis unavailable for slot pre-check; "
+                "proceeding — acquire_org_slot will fail open if Redis stays down."
+            )
 
         # Atomically claim queued runs for processing (thread-safe)
         # This uses SELECT FOR UPDATE SKIP LOCKED to prevent race conditions
@@ -85,7 +131,6 @@ class CampaignCallDispatcher:
             campaign_id=campaign_id,
             scheduled_before=datetime.now(UTC),
             limit=batch_size,
-            callbacks_only=callbacks_only,
         )
 
         if not queued_runs:
@@ -107,50 +152,27 @@ class CampaignCallDispatcher:
         processed_count = 0
         processed_run_ids: set[int] = set()
         for i, queued_run in enumerate(queued_runs):
-            if getattr(queued_run, "retry_reason", None) == "user_requested_callback":
-                try:
-                    from api.services.workflow.tools.callback_settings import (
-                        adjust_for_sociable_hours,
-                        get_timezone_for_number,
-                        resolve_callback_settings,
+            # Mid-batch pause check: if campaign state was paused or stopped while processing previous
+            # calls in this batch, return remaining claims immediately instead of continuing.
+            if i > 0:
+                current_campaign = await db_client.get_campaign_by_id(campaign_id)
+                if current_campaign and current_campaign.state != "running":
+                    logger.info(
+                        f"Campaign {campaign_id} transitioned to state '{current_campaign.state}' mid-batch; "
+                        f"returning remaining {len(queued_runs) - i} claimed runs back to queued"
                     )
-                    
-                    settings = await resolve_callback_settings(
-                        organization_id=campaign.organization_id,
-                        workflow_id=campaign.workflow_id,
-                        campaign_id=campaign.id
+                    await self._return_unprocessed_claims(
+                        queued_runs, processed_run_ids, reason="campaign_stopped_mid_batch"
                     )
-                    
-                    to_number = queued_run.context_variables.get("called_number") or queued_run.context_variables.get("phone_number")
-                    start_str = settings.get("sociable_hours_start", "08:00")
-                    end_str = settings.get("sociable_hours_end", "21:00")
-                    default_tz_str = settings.get("sociable_timezone", "UTC")
-                    tz_str = get_timezone_for_number(to_number, default_tz_str)
-                    
-                    now_utc = datetime.now(UTC)
-                    adjusted_time = adjust_for_sociable_hours(now_utc, start_str, end_str, tz_str)
-                    
-                    if adjusted_time > now_utc:
-                        logger.info(
-                            f"Callback queued_run {queued_run.id} is outside sociable hours at dispatch time. "
-                            f"Re-queueing for {adjusted_time}"
-                        )
-                        await db_client.update_queued_run(
-                            queued_run_id=queued_run.id,
-                            state="queued",
-                            scheduled_for=adjusted_time
-                        )
-                        processed_run_ids.add(queued_run.id)
-                        continue
-                except Exception as e:
-                    logger.error(f"Error re-validating sociable hours for callback {queued_run.id}: {e}")
-                    # On error, we'll continue and dispatch it rather than dropping it forever
+                    break
 
             try:
                 # Apply rate limiting, i.e lets not initiate more than rate_limit_per_second
                 # calls per second. It is different than concurrency limit.
                 await self.apply_rate_limit(
-                    campaign.organization_id, campaign.rate_limit_per_second
+                    campaign.organization_id,
+                    campaign.rate_limit_per_second,
+                    campaign_id=campaign_id,
                 )
 
                 # Acquire concurrent slot - waits until a slot is available
@@ -174,11 +196,8 @@ class CampaignCallDispatcher:
                 processed_count += 1
                 processed_run_ids.add(queued_run.id)
 
-                # Update campaign processed count
-                if getattr(queued_run, "retry_reason", None) != "user_requested_callback":
-                    await db_client.update_campaign(
-                        campaign_id=campaign_id, processed_rows=campaign.processed_rows + 1
-                    )
+                # Update campaign processed count atomically
+                await db_client.increment_campaign_processed_rows(campaign_id)
 
             except asyncio.CancelledError:
                 logger.warning(
@@ -189,6 +208,25 @@ class CampaignCallDispatcher:
                     queued_runs, processed_run_ids, reason="task_cancelled"
                 )
                 raise
+
+            except (CampaignRateLimitTimeoutError, TimeoutError) as e:
+                logger.warning(
+                    f"Rate limit timeout for campaign {campaign_id}; "
+                    "returning claimed queued runs that were not dispatched: "
+                    f"{e}"
+                )
+                await self._return_unprocessed_claims(
+                    queued_runs,
+                    processed_run_ids,
+                    reason="rate_limit_timeout",
+                )
+                if isinstance(e, CampaignRateLimitTimeoutError):
+                    raise
+                raise CampaignRateLimitTimeoutError(
+                    organization_id=campaign.organization_id,
+                    campaign_id=campaign_id,
+                    wait_time=getattr(e, "wait_time", 10.0),
+                )
 
             except PhoneNumberPoolExhaustedError as e:
                 logger.warning(
@@ -242,8 +280,31 @@ class CampaignCallDispatcher:
                         state="failed",
                         processed_at=datetime.now(UTC),
                     )
+                    campaign_obj = await db_client.get_campaign_by_id(campaign_id)
+                    if campaign_obj:
+                        await db_client.update_campaign(
+                            campaign_id=campaign_id,
+                            failed_rows=campaign_obj.failed_rows + 1,
+                        )
                     logger.info(
                         f"Marked queued run {queued_run.id} as failed due to error: {e}"
+                    )
+                    phone_num = (
+                        queued_run.context_variables.get("phone_number", "Unknown")
+                        if queued_run.context_variables
+                        else "Unknown"
+                    )
+                    await db_client.append_campaign_log(
+                        campaign_id=campaign_id,
+                        level="error",
+                        event="call_dispatch_failed",
+                        message=f"Failed to dispatch call to {phone_num}: {e}",
+                        details={
+                            "queued_run_id": queued_run.id,
+                            "source_uuid": queued_run.source_uuid,
+                            "phone_number": phone_num,
+                            "error": str(e),
+                        },
                     )
                 except Exception as update_error:
                     logger.error(
@@ -313,7 +374,6 @@ class CampaignCallDispatcher:
             provider = await self.get_provider_for_campaign(campaign)
             workflow_run_mode = provider.PROVIDER_NAME
 
-            # For callbacks, prefer the original caller_number to maintain consistent caller ID
             preferred_number = queued_run.context_variables.get("caller_number")
 
             # Acquire a unique from_number from the pool scoped to this campaign's
@@ -326,7 +386,9 @@ class CampaignCallDispatcher:
             )
             if from_number is None:
                 raise PhoneNumberPoolExhaustedError(
-                    organization_id=campaign.organization_id
+                    organization_id=campaign.organization_id,
+                    telephony_configuration_id=campaign.telephony_configuration_id,
+                    campaign_id=campaign.id,
                 )
 
             logger.info(f"Provider name: {provider.PROVIDER_NAME}")
@@ -391,13 +453,6 @@ class CampaignCallDispatcher:
                 run_id=workflow_run.id,
                 gathered_context={
                     "call_tags": ["retry", f"retry_reason_{retry_reason}"]
-                },
-            )
-        elif getattr(queued_run, "retry_reason", None) == "user_requested_callback":
-            await db_client.update_workflow_run(
-                run_id=workflow_run.id,
-                gathered_context={
-                    "call_tags": ["callback"]
                 },
             )
 
@@ -512,39 +567,47 @@ class CampaignCallDispatcher:
 
         return workflow_run
 
-    async def apply_rate_limit(self, organization_id: int, rate_limit: int) -> None:
+    async def apply_rate_limit(
+        self, organization_id: int, rate_limit: int, campaign_id: int | None = None
+    ) -> None:
         """
         Enforces rate limiting - waits if necessary to comply with rate limit
 
         Example usage:
         ```
-        # This will wait up to 1 second if needed to respect rate limit
-        await self.apply_rate_limit(org_id, 1)  # 1 call per second
+        # This will wait up to 10 seconds if needed to respect rate limit
+        await self.apply_rate_limit(org_id, 1, campaign_id=campaign_id)  # 1 call per second
         await twilio.initiate_call(...)  # Now safe to call
         ```
         """
-        max_wait = 1.0  # Maximum time to wait for a slot
+        max_wait = 10.0  # Allow up to 10s to smoothly acquire tokens across concurrent campaigns
         start_time = time.time()
+        effective_rate_limit = max(1, rate_limit or 1)
 
         while True:
             # Try to acquire token
-            if await rate_limiter.acquire_token(organization_id, rate_limit):
+            if await rate_limiter.acquire_token(organization_id, effective_rate_limit):
                 return  # Got permission to proceed
 
             # Check how long to wait
             wait_time = await rate_limiter.get_next_available_slot(
-                organization_id, rate_limit
+                organization_id, effective_rate_limit
             )
 
             # Don't wait forever
             if time.time() - start_time + wait_time > max_wait:
-                raise TimeoutError("Rate limit timeout - try again later")
+                elapsed = time.time() - start_time
+                raise CampaignRateLimitTimeoutError(
+                    organization_id=organization_id,
+                    campaign_id=campaign_id or 0,
+                    wait_time=elapsed,
+                )
 
             # Wait for next available slot
             await asyncio.sleep(wait_time)
 
     async def acquire_concurrent_slot(
-        self, organization_id: int, campaign: any, timeout: float = 240
+        self, organization_id: int, campaign: any, timeout: float = 30
     ) -> CallConcurrencySlot:
         """
         Acquires a concurrent call slot - waits if necessary until a slot is available.
@@ -552,7 +615,10 @@ class CampaignCallDispatcher:
         Args:
             organization_id: The organization ID
             campaign: The campaign object
-            timeout: Maximum time to wait for a slot (default 10 minutes)
+            timeout: Maximum time to wait for a slot per attempt (default 30s).
+                     The task-level retry loop in process_campaign_batch provides
+                     additional retries, giving ~3 min of total grace time without
+                     blocking the arq worker thread for the full duration.
 
         Returns the slot which must be released when the call completes.
 
@@ -588,6 +654,7 @@ class CampaignCallDispatcher:
                 organization_id=organization_id,
                 campaign_id=campaign.id,
                 wait_time=e.wait_time,
+                max_concurrent=e.max_concurrent,
             ) from e
 
     async def acquire_from_number(
@@ -595,7 +662,7 @@ class CampaignCallDispatcher:
         organization_id: int,
         telephony_configuration_id: int | None = None,
         preferred_number: str | None = None,
-        timeout: float = 600,
+        timeout: float = 20,
     ) -> str | None:
         """
         Acquire a from_number from the (org, telephony config) pool with retry.

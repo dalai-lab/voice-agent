@@ -55,19 +55,6 @@ export interface CampaignAdvancedSettingsProps {
     onCircuitBreakerWindowSecondsChange: (value: string) => void;
     circuitBreakerMinCalls: string;
     onCircuitBreakerMinCallsChange: (value: string) => void;
-    // Callback config
-    callbackEnabled: boolean;
-    onCallbackEnabledChange: (value: boolean) => void;
-    callbackSociableHoursStart: string;
-    onCallbackSociableHoursStartChange: (value: string) => void;
-    callbackSociableHoursEnd: string;
-    onCallbackSociableHoursEndChange: (value: string) => void;
-    callbackSociableHoursTimezone: ITimezoneOption | string;
-    onCallbackSociableHoursTimezoneChange: (value: ITimezoneOption | string) => void;
-    callbackHonorCampaignWindowForLongCallbacks: boolean;
-    onCallbackHonorCampaignWindowForLongCallbacksChange: (value: boolean) => void;
-    callbackLongCallbackThresholdMinutes: string;
-    onCallbackLongCallbackThresholdMinutesChange: (value: string) => void;
 }
 
 /** Extract the string timezone value from ITimezoneOption | string */
@@ -142,18 +129,6 @@ export default function CampaignAdvancedSettings({
     onCircuitBreakerWindowSecondsChange,
     circuitBreakerMinCalls,
     onCircuitBreakerMinCallsChange,
-    callbackEnabled,
-    onCallbackEnabledChange,
-    callbackSociableHoursStart,
-    onCallbackSociableHoursStartChange,
-    callbackSociableHoursEnd,
-    onCallbackSociableHoursEndChange,
-    callbackSociableHoursTimezone,
-    onCallbackSociableHoursTimezoneChange,
-    callbackHonorCampaignWindowForLongCallbacks,
-    onCallbackHonorCampaignWindowForLongCallbacksChange,
-    callbackLongCallbackThresholdMinutes,
-    onCallbackLongCallbackThresholdMinutesChange,
 }: CampaignAdvancedSettingsProps) {
     const timezoneSelectId = useId();
 
@@ -415,87 +390,6 @@ export default function CampaignAdvancedSettings({
                                 />
                             </div>
                         </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Callback Settings */}
-            <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
-                <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                        <Label htmlFor="callback-enabled" className="text-xs font-bold text-foreground">Callback Settings</Label>
-                        <p className="text-[10px] text-muted-foreground/60 font-semibold">
-                            Configure callback handling for this campaign / event
-                        </p>
-                    </div>
-                    <Switch
-                        id="callback-enabled"
-                        checked={callbackEnabled}
-                        onCheckedChange={onCallbackEnabledChange}
-                    />
-                </div>
-
-                {callbackEnabled && (
-                    <div className="space-y-4 pt-3 border-t border-border/40">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="cb-sociable-start" className="text-xs font-bold text-foreground">Sociable Hours Start</Label>
-                                <Input
-                                    id="cb-sociable-start"
-                                    type="time"
-                                    value={callbackSociableHoursStart}
-                                    onChange={(e) => onCallbackSociableHoursStartChange(e.target.value)}
-                                    className="h-9 rounded-lg border-border bg-background text-xs"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="cb-sociable-end" className="text-xs font-bold text-foreground">Sociable Hours End</Label>
-                                <Input
-                                    id="cb-sociable-end"
-                                    type="time"
-                                    value={callbackSociableHoursEnd}
-                                    onChange={(e) => onCallbackSociableHoursEndChange(e.target.value)}
-                                    className="h-9 rounded-lg border-border bg-background text-xs"
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="cb-sociable-timezone" className="text-xs font-bold text-foreground">Sociable Hours Timezone</Label>
-                            <TimezoneSelect
-                                id="cb-sociable-timezone"
-                                value={callbackSociableHoursTimezone}
-                                onChange={onCallbackSociableHoursTimezoneChange}
-                                styles={timezoneSelectStyles}
-                            />
-                        </div>
-
-                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/40">
-                            <div className="space-y-0.5">
-                                <Label htmlFor="cb-honor-campaign" className="text-xs font-bold text-foreground">Honor Campaign Window for Long Callbacks</Label>
-                                <p className="text-[10px] text-muted-foreground/60 font-semibold">
-                                    Hold long callbacks until the next schedule window opens
-                                </p>
-                            </div>
-                            <Switch
-                                id="cb-honor-campaign"
-                                checked={callbackHonorCampaignWindowForLongCallbacks}
-                                onCheckedChange={onCallbackHonorCampaignWindowForLongCallbacksChange}
-                            />
-                        </div>
-
-                        {callbackHonorCampaignWindowForLongCallbacks && (
-                            <div className="space-y-2 mt-2 pt-2 border-t border-border/40">
-                                <Label htmlFor="cb-long-threshold" className="text-xs font-bold text-foreground">Long Callback Threshold (minutes)</Label>
-                                <Input
-                                    id="cb-long-threshold"
-                                    type="number"
-                                    value={callbackLongCallbackThresholdMinutes}
-                                    onChange={(e) => onCallbackLongCallbackThresholdMinutesChange(e.target.value)}
-                                    min={0}
-                                    className="h-9 rounded-lg border-border bg-background text-xs"
-                                />
-                            </div>
-                        )}
                     </div>
                 )}
             </div>

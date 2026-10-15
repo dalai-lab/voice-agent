@@ -287,23 +287,17 @@ function GeneralSection({
     workflowName,
     workflowId,
     enableDtmf,
-    enableCallbacks,
-    callbackResumeMode,
     onSave,
 }: {
     workflowConfigurations: WorkflowConfigurations;
     workflowName: string;
     workflowId: number;
     enableDtmf: boolean;
-    enableCallbacks: boolean;
-    callbackResumeMode: "fresh" | "last_node";
-    onSave: (configurations: WorkflowConfigurations, workflowName: string, enableDtmf?: boolean, enableCallbacks?: boolean, callbackResumeMode?: "fresh" | "last_node") => Promise<void>;
+    onSave: (configurations: WorkflowConfigurations, workflowName: string, enableDtmf?: boolean) => Promise<void>;
 }) {
     const { externalPbxIntegrationsEnabled } = useOrgConfig();
     const [name, setName] = useState(workflowName);
     const [dtmfEnabled, setDtmfEnabled] = useState(enableDtmf);
-    const [callbacksEnabled, setCallbacksEnabled] = useState(enableCallbacks);
-    const [resumeMode, setResumeMode] = useState(callbackResumeMode);
     const [ambientNoiseConfig, setAmbientNoiseConfig] = useState<AmbientNoiseConfiguration>(
         workflowConfigurations.ambient_noise_configuration,
     );
@@ -403,9 +397,7 @@ function GeneralSection({
             includeTranscriptEndTimestamps !==
             (workflowConfigurations.transcript_configuration?.include_end_timestamps ?? false) ||
             JSON.stringify(externalPbxFieldMappings) !==
-            JSON.stringify(workflowConfigurations.external_pbx_field_mappings) ||
-            callbacksEnabled !== enableCallbacks ||
-            resumeMode !== callbackResumeMode
+            JSON.stringify(workflowConfigurations.external_pbx_field_mappings)
         );
     }, [
         name,
@@ -431,11 +423,7 @@ function GeneralSection({
         workflowConfigurations,
         dtmfEnabled,
         enableDtmf,
-        callbacksEnabled,
-        enableCallbacks,
         externalPbxFieldMappings,
-        resumeMode,
-        callbackResumeMode,
     ]);
 
     useUnsavedChanges("general", isDirty);
@@ -528,9 +516,7 @@ function GeneralSection({
                     external_pbx_field_mappings: externalPbxFieldMappings,
                 },
                 name,
-                dtmfEnabled,
-                callbacksEnabled,
-                resumeMode
+                dtmfEnabled
             );
             toast.success(`General settings saved. ${PUBLISH_WORKFLOW_REMINDER}`);
         } catch (error) {
@@ -583,49 +569,6 @@ function GeneralSection({
                     </div>
                 </div>
 
-                <Separator />
-
-                {/* Callbacks */}
-                <div className="space-y-4">
-                    <div>
-                        <h3 className="text-sm font-medium">Schedule Callbacks</h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                            Allows the AI to schedule a callback later if the user requests it (e.g. "Call me back in 10 minutes").
-                        </p>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <Label htmlFor="callbacks-enabled" className="text-sm">Enable Callbacks</Label>
-                        <Switch
-                            id="callbacks-enabled"
-                            checked={callbacksEnabled}
-                            onCheckedChange={setCallbacksEnabled}
-                        />
-                    </div>
-                    {callbacksEnabled && (
-                        <div className="mt-4 pl-4 border-l-2 space-y-4 border-muted">
-                            <div className="space-y-1">
-                                <Label className="text-xs">Callback Resume Mode</Label>
-                                <p className="text-xs text-muted-foreground">
-                                    Determines where the workflow starts when calling the user back.
-                                </p>
-                            </div>
-                            <RadioGroup
-                                value={resumeMode}
-                                onValueChange={(value) => setResumeMode(value as "fresh" | "last_node")}
-                                className="flex flex-col space-y-1"
-                            >
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="fresh" id="resume-fresh" />
-                                    <Label htmlFor="resume-fresh" className="text-sm font-normal">Start Fresh (Default)</Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="last_node" id="resume-last-node" />
-                                    <Label htmlFor="resume-last-node" className="text-sm font-normal">Resume from Last Node</Label>
-                                </div>
-                            </RadioGroup>
-                        </div>
-                    )}
-                </div>
 
                 <Separator />
 
@@ -2346,8 +2289,6 @@ function WorkflowSettingsInner({
                                     workflowName={workflowName || workflow.name}
                                     workflowId={workflowId}
                                     enableDtmf={(workflow as any).enable_dtmf ?? false}
-                                    enableCallbacks={(workflow as any).enable_callbacks ?? false}
-                                    callbackResumeMode={(workflow as any).callback_resume_mode ?? "fresh"}
                                     onSave={saveWorkflowConfigurations}
                                 />
                             )}

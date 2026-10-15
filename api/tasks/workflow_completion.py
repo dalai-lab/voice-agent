@@ -57,8 +57,8 @@ async def process_workflow_completion(
             from api.db import db_client
             workflow_run = await db_client.get_workflow_run_by_id(workflow_run_id)
             if workflow_run:
-                if getattr(workflow_run, "mode", None) == "textchat":
-                    logger.info(f"Skipping Talkar deduction for text chat run {workflow_run_id}")
+                if getattr(workflow_run, "mode", None) in ("textchat", "mock"):
+                    logger.info(f"Skipping Talkar deduction for {getattr(workflow_run, 'mode', None)} run {workflow_run_id}")
                     deduct_success = True
                 else:
                     usage_info = getattr(workflow_run, "usage_info", None) or {}

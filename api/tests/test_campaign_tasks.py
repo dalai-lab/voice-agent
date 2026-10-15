@@ -296,3 +296,68 @@ class TestProcessCampaignBatchFailureLogs:
                 batch_size=10,
                 metadata={"defer_seconds": 15, "reason": "campaign_call_in_progress"},
             )
+
+    @patch("api.tasks.campaign_tasks.get_campaign_event_publisher")
+    @patch("api.tasks.campaign_tasks.db_client")
+    @patch("api.tasks.campaign_tasks.campaign_call_dispatcher")
+    async def test_rate_limit_timeout_defers_without_failing(
+        self, mock_dispatcher, mock_db, mock_get_pub
+    ):
+        """When rate limit acquisition times out, batch defers cleanly without failing leads or pausing."""
+        from api.services.campaign.errors import CampaignRateLimitTimeoutError
+
+        mock_dispatcher.process_batch.side_effect = CampaignRateLimitTimeoutError(
+            organization_id=8, campaign_id=69, wait_time=10.0
+        )
+        mock_db.update_campaign = AsyncMock()
+        mock_pub = AsyncMock()
+        mock_get_pub.return_value = mock_pub
+
+        await process_campaign_batch({"redis": AsyncMock()}, campaign_id=69)
+
+        # Campaign is NOT marked failed or paused
+        mock_db.update_campaign.assert_not_called()
+        # Batch completed is published with defer_seconds=5
+        mock_pub.publish_batch_completed.assert_awaited_once_with(
+            campaign_id=69,
+            processed_count=0,
+            failed_count=0,
+            batch_size=10,
+            metadata={"defer_seconds": 5, "reason": "rate_limit_timeout"},
+        )
+
+    @patch("api.tasks.campaign_tasks.get_campaign_event_publisher")
+    @patch("api.tasks.campaign_tasks.db_client")
+    @patch("api.tasks.campaign_tasks.campaign_call_dispatcher")
+    async def test_quota_exceeded_pauses_without_raising(
+        self, mock_dispatcher, mock_db, mock_get_pub
+    ):
+        """When quota is depleted, campaign pauses safely and does not raise into ARQ."""
+        from api.services.campaign.errors import CampaignQuotaExceededError
+        from unittest.mock import MagicMock
+
+        mock_dispatcher.process_batch.side_effect = CampaignQuotaExceededError(
+            organization_id=8,
+            campaign_id=69,
+            error_code="insufficient_credits",
+            error_message="Wallet depleted",
+        )
+        mock_campaign = MagicMock()
+        mock_campaign.orchestrator_metadata = {}
+        mock_db.get_campaign_by_id = AsyncMock(return_value=mock_campaign)
+        mock_db.update_campaign = AsyncMock()
+        mock_db.append_campaign_log = AsyncMock()
+        mock_pub = AsyncMock()
+        mock_get_pub.return_value = mock_pub
+
+        # Must NOT raise exception
+        await process_campaign_batch({"redis": AsyncMock()}, campaign_id=69)
+
+        # Paused safely
+        mock_db.update_campaign.assert_awaited_once_with(
+            campaign_id=69,
+            state="paused",
+            orchestrator_metadata={"paused_reason": "wallet_depleted"},
+        )
+        mock_pub.publish_batch_failed.assert_awaited_once()
+

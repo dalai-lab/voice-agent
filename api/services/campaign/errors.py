@@ -59,3 +59,22 @@ class CampaignQuotaExceededError(Exception):
             f"Quota check failed for campaign {campaign_id} (org {organization_id}): [{error_code}] {error_message}"
         )
 
+
+class CampaignRateLimitTimeoutError(Exception):
+    """Raised when dispatch rate limit cannot be acquired within the timeout period."""
+
+    def __init__(
+        self,
+        organization_id: int,
+        campaign_id: int,
+        wait_time: float = 10.0,
+    ):
+        self.organization_id = organization_id
+        self.campaign_id = campaign_id
+        self.wait_time = wait_time
+        super().__init__(
+            f"Dispatch rate limit acquisition timed out for org {organization_id}, "
+            f"campaign {campaign_id} after waiting {wait_time:.1f}s"
+        )
+
+

@@ -15,6 +15,7 @@ from api.services.call_concurrency.rate_limiter import rate_limiter
 from api.services.campaign.circuit_breaker import circuit_breaker
 from api.services.campaign.errors import (
     CampaignQuotaExceededError,
+    CampaignRateLimitTimeoutError,
     ConcurrentSlotAcquisitionError,
     PhoneNumberPoolExhaustedError,
 )
@@ -151,11 +152,27 @@ class CampaignCallDispatcher:
         processed_count = 0
         processed_run_ids: set[int] = set()
         for i, queued_run in enumerate(queued_runs):
+            # Mid-batch pause check: if campaign state was paused or stopped while processing previous
+            # calls in this batch, return remaining claims immediately instead of continuing.
+            if i > 0:
+                current_campaign = await db_client.get_campaign_by_id(campaign_id)
+                if current_campaign and current_campaign.state != "running":
+                    logger.info(
+                        f"Campaign {campaign_id} transitioned to state '{current_campaign.state}' mid-batch; "
+                        f"returning remaining {len(queued_runs) - i} claimed runs back to queued"
+                    )
+                    await self._return_unprocessed_claims(
+                        queued_runs, processed_run_ids, reason="campaign_stopped_mid_batch"
+                    )
+                    break
+
             try:
                 # Apply rate limiting, i.e lets not initiate more than rate_limit_per_second
                 # calls per second. It is different than concurrency limit.
                 await self.apply_rate_limit(
-                    campaign.organization_id, campaign.rate_limit_per_second
+                    campaign.organization_id,
+                    campaign.rate_limit_per_second,
+                    campaign_id=campaign_id,
                 )
 
                 # Acquire concurrent slot - waits until a slot is available
@@ -193,6 +210,25 @@ class CampaignCallDispatcher:
                     queued_runs, processed_run_ids, reason="task_cancelled"
                 )
                 raise
+
+            except (CampaignRateLimitTimeoutError, TimeoutError) as e:
+                logger.warning(
+                    f"Rate limit timeout for campaign {campaign_id}; "
+                    "returning claimed queued runs that were not dispatched: "
+                    f"{e}"
+                )
+                await self._return_unprocessed_claims(
+                    queued_runs,
+                    processed_run_ids,
+                    reason="rate_limit_timeout",
+                )
+                if isinstance(e, CampaignRateLimitTimeoutError):
+                    raise
+                raise CampaignRateLimitTimeoutError(
+                    organization_id=campaign.organization_id,
+                    campaign_id=campaign_id,
+                    wait_time=getattr(e, "wait_time", 10.0),
+                )
 
             except PhoneNumberPoolExhaustedError as e:
                 logger.warning(
@@ -246,6 +282,12 @@ class CampaignCallDispatcher:
                         state="failed",
                         processed_at=datetime.now(UTC),
                     )
+                    campaign_obj = await db_client.get_campaign_by_id(campaign_id)
+                    if campaign_obj:
+                        await db_client.update_campaign(
+                            campaign_id=campaign_id,
+                            failed_rows=campaign_obj.failed_rows + 1,
+                        )
                     logger.info(
                         f"Marked queued run {queued_run.id} as failed due to error: {e}"
                     )
@@ -510,33 +552,41 @@ class CampaignCallDispatcher:
 
         return workflow_run
 
-    async def apply_rate_limit(self, organization_id: int, rate_limit: int) -> None:
+    async def apply_rate_limit(
+        self, organization_id: int, rate_limit: int, campaign_id: int | None = None
+    ) -> None:
         """
         Enforces rate limiting - waits if necessary to comply with rate limit
 
         Example usage:
         ```
-        # This will wait up to 1 second if needed to respect rate limit
-        await self.apply_rate_limit(org_id, 1)  # 1 call per second
+        # This will wait up to 10 seconds if needed to respect rate limit
+        await self.apply_rate_limit(org_id, 1, campaign_id=campaign_id)  # 1 call per second
         await twilio.initiate_call(...)  # Now safe to call
         ```
         """
-        max_wait = 1.0  # Maximum time to wait for a slot
+        max_wait = 10.0  # Allow up to 10s to smoothly acquire tokens across concurrent campaigns
         start_time = time.time()
+        effective_rate_limit = max(1, rate_limit or 1)
 
         while True:
             # Try to acquire token
-            if await rate_limiter.acquire_token(organization_id, rate_limit):
+            if await rate_limiter.acquire_token(organization_id, effective_rate_limit):
                 return  # Got permission to proceed
 
             # Check how long to wait
             wait_time = await rate_limiter.get_next_available_slot(
-                organization_id, rate_limit
+                organization_id, effective_rate_limit
             )
 
             # Don't wait forever
             if time.time() - start_time + wait_time > max_wait:
-                raise TimeoutError("Rate limit timeout - try again later")
+                elapsed = time.time() - start_time
+                raise CampaignRateLimitTimeoutError(
+                    organization_id=organization_id,
+                    campaign_id=campaign_id or 0,
+                    wait_time=elapsed,
+                )
 
             # Wait for next available slot
             await asyncio.sleep(wait_time)

@@ -10,6 +10,7 @@ from api.services.campaign.campaign_event_publisher import (
 )
 from api.services.campaign.errors import (
     CampaignQuotaExceededError,
+    CampaignRateLimitTimeoutError,
     ConcurrentSlotAcquisitionError,
     PhoneNumberPoolExhaustedError,
 )
@@ -528,7 +529,24 @@ async def process_campaign_batch(
             error=f"Campaign paused due to quota check failure: [{e.error_code}] {e.error_message}",
             processed_count=0,
         )
-        raise
+        # Do NOT raise — campaign is paused, not crashed.
+        # The orchestrator's BatchFailedEvent handler clears _batch_in_progress.
+        return
+
+    except CampaignRateLimitTimeoutError as e:
+        logger.warning(
+            f"Campaign {campaign_id} (org {e.organization_id}) hit dispatch rate limit window ({e.wait_time:.1f}s); "
+            f"deferring next batch by 5s. No contact leads were marked as failed."
+        )
+        publisher = await get_campaign_event_publisher()
+        await publisher.publish_batch_completed(
+            campaign_id=campaign_id,
+            processed_count=0,
+            failed_count=0,
+            batch_size=batch_size,
+            metadata={"defer_seconds": 5, "reason": "rate_limit_timeout"},
+        )
+        return
 
     except Exception as e:
         logger.error(f"Error processing batch for campaign {campaign_id}: {e}")

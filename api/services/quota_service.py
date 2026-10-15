@@ -518,6 +518,7 @@ async def _authorize_talkar_workflow_run_start(
     mode: str | None = None,
     workflow_run_id: int | None = None,
     workflow_id: int | None = None,
+    check_concurrency: bool = True,
 ) -> QuotaCheckResult:
     try:
         import os
@@ -531,7 +532,12 @@ async def _authorize_talkar_workflow_run_start(
             if workflow_run_id is not None:
                 slot_position = await rate_limiter.get_workflow_slot_position(workflow_run_id)
 
-            if slot_position is not None:
+            if not check_concurrency:
+                # Pre-flight check for campaign queuing/starting: only evaluate wallet balance,
+                # active customer status, and account unblocked status. Concurrency slots are managed
+                # by the campaign dispatcher at dispatch time.
+                concurrent_calls = 1
+            elif slot_position is not None:
                 # Use the call's exact 1-based position (rank + 1) in the concurrency set.
                 # This prevents burst incoming calls from evaluating against aggregate peak
                 # active_calls simultaneously and starving valid calls funded by available balance.
@@ -589,6 +595,12 @@ async def _authorize_talkar_workflow_run_start(
                 if data.get("has_quota"):
                     return QuotaCheckResult(has_quota=True)
                 reason = data.get("reason", "insufficient_quota")
+                if not check_concurrency and reason in (
+                    "concurrency_limit_exceeded",
+                    "sub_org_concurrency_limit_exceeded",
+                    "insufficient_reserve",
+                ):
+                    return QuotaCheckResult(has_quota=True)
                 error_msg = "Talkar wallet balance is exhausted."
                 if reason == "concurrency_limit_exceeded":
                     error_msg = f"Concurrent call limit reached ({data.get('active_calls', 0)}/{data.get('concurrent_call_limit', 0)})."
@@ -730,6 +742,7 @@ async def authorize_workflow_run_start(
     organization_id: int,
     workflow_run_id: int | None = None,
     actor_user: UserModel | None = None,
+    check_concurrency: bool = True,
 ) -> QuotaCheckResult:
     """Authorize a workflow run before any billable call/text runtime starts.
 
@@ -877,7 +890,11 @@ async def authorize_workflow_run_start(
             if workflow_run_id is not None and "workflow_run" in locals() and workflow_run:
                 run_mode = workflow_run.mode
             return await _authorize_talkar_workflow_run_start(
-                organization_id, run_mode, workflow_run_id, getattr(workflow, "id", None)
+                organization_id,
+                run_mode,
+                workflow_run_id,
+                getattr(workflow, "id", None),
+                check_concurrency=check_concurrency,
             )
 
         if DEPLOYMENT_MODE != "oss":

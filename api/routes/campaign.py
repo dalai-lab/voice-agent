@@ -557,13 +557,21 @@ async def start_campaign(
 
     # Check Dograh quota before starting campaign (apply per-workflow
     # model_overrides so we evaluate the keys this campaign will use).
+    # check_concurrency=False ensures pre-flight checks only validate account
+    # status and wallet balance without failing on in-flight call concurrency.
     quota_result = await authorize_workflow_run_start(
         workflow_id=campaign.workflow_id,
         organization_id=user.selected_organization_id,
         actor_user=user,
+        check_concurrency=False,
     )
     if not quota_result.has_quota:
-        raise HTTPException(status_code=402, detail=quota_result.error_message)
+        if quota_result.error_code not in (
+            "concurrency_limit_exceeded",
+            "sub_org_concurrency_limit_exceeded",
+            "insufficient_reserve",
+        ):
+            raise HTTPException(status_code=402, detail=quota_result.error_message)
 
     # Start the campaign using the runner service
     try:
@@ -891,13 +899,21 @@ async def resume_campaign(
 
     # Check Dograh quota before resuming campaign (apply per-workflow
     # model_overrides so we evaluate the keys this campaign will use).
+    # check_concurrency=False ensures pre-flight checks only validate account
+    # status and wallet balance without failing on in-flight call concurrency.
     quota_result = await authorize_workflow_run_start(
         workflow_id=campaign.workflow_id,
         organization_id=user.selected_organization_id,
         actor_user=user,
+        check_concurrency=False,
     )
     if not quota_result.has_quota:
-        raise HTTPException(status_code=402, detail=quota_result.error_message)
+        if quota_result.error_code not in (
+            "concurrency_limit_exceeded",
+            "sub_org_concurrency_limit_exceeded",
+            "insufficient_reserve",
+        ):
+            raise HTTPException(status_code=402, detail=quota_result.error_message)
 
     # Resume the campaign using the runner service
     try:

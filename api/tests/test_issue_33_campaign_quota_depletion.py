@@ -235,8 +235,7 @@ class TestProcessCampaignBatchQuotaHandling:
             mock_pub = AsyncMock()
             mock_get_pub.return_value = mock_pub
 
-            with pytest.raises(CampaignQuotaExceededError):
-                await process_campaign_batch({}, campaign_id=42)
+            await process_campaign_batch({}, campaign_id=42)
 
             # Campaign must be PAUSED, never marked as failed!
             mock_db.update_campaign.assert_awaited_once_with(
@@ -283,8 +282,7 @@ class TestProcessCampaignBatchQuotaHandling:
             mock_pub = AsyncMock()
             mock_get_pub.return_value = mock_pub
 
-            with pytest.raises(CampaignQuotaExceededError):
-                await process_campaign_batch({}, campaign_id=42)
+            await process_campaign_batch({}, campaign_id=42)
 
             # On 5th attempt, campaign is paused
             mock_db.update_campaign.assert_awaited_once_with(

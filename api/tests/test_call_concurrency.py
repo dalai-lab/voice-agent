@@ -539,6 +539,55 @@ async def test_get_concurrency_group_id_serves_from_memory_cache_first():
 
 
 @pytest.mark.asyncio
+async def test_group_memory_cache_ttl_expiration_and_invalidation():
+    """Verify that _group_memory_cache respects TTL expiration and invalidation (Blocker 25)."""
+    service = CallConcurrencyService()
+    now = time.monotonic()
+    
+    # 1. Active cache within TTL returns cached value
+    service._group_memory_cache[100] = 500
+    service._group_memory_cache_expiry[100] = now + 300.0  # 5 minutes in future
+    
+    val = await service.get_concurrency_group_id(100)
+    assert val == 500
+    assert 100 in service._group_memory_cache
+
+    # 2. Expired cache (time advanced beyond 300s TTL) expires and purges entry
+    with patch("time.monotonic", return_value=now + 305.0):
+        # When cache expires, it will purge and try Redis/DB fallback
+        with patch.object(service, "default_concurrent_limit", 10):
+            val = await service.get_concurrency_group_id(100)
+            # Without DB/Redis, get_concurrency_group_id returns org_id (100) as fallback
+            assert val == 100
+            assert 100 not in service._group_memory_cache
+            assert 100 not in service._group_memory_cache_expiry
+
+    # 3. Invalidate concurrency group actively purges cache and expiry
+    service._group_memory_cache[200] = 777
+    service._group_memory_cache_expiry[200] = now + 300.0
+    await service.invalidate_concurrency_group(200)
+    assert 200 not in service._group_memory_cache
+    assert 200 not in service._group_memory_cache_expiry
+
+
+@pytest.mark.asyncio
+async def test_internal_api_endpoint_invalidates_concurrency_group():
+    """Verify Dograh internal API endpoint to invalidate concurrency group cache (Blocker 25)."""
+    from api.routes.internal import invalidate_concurrency_group_cache
+    from api.services.call_concurrency.service import call_concurrency
+
+    call_concurrency._group_memory_cache[300] = 888
+    call_concurrency._group_memory_cache_expiry[300] = time.monotonic() + 300.0
+
+    res = await invalidate_concurrency_group_cache(org_id=300, _=None)
+    assert res["status"] == "success"
+    assert res["org_id"] == 300
+    assert 300 not in call_concurrency._group_memory_cache
+    assert 300 not in call_concurrency._group_memory_cache_expiry
+
+
+
+@pytest.mark.asyncio
 async def test_bind_workflow_run_none_slot_safely_noops():
     """When concurrency slot is None (e.g. failing open or disabled), bind_workflow_run must not raise AttributeError."""
     service = CallConcurrencyService()

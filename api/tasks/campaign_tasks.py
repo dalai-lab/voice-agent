@@ -280,19 +280,55 @@ async def process_campaign_batch(
             )
             return
 
-        # Persistent depletion or transient retries exhausted -> PAUSE campaign safely
+        # Persistent depletion, suspension, or transient retries exhausted -> PAUSE campaign safely
+        # Blocker 29: Differentiate wallet depletion from policy suspension and spending caps
+        is_policy_suspension = e.error_code in (
+            "customer_status_suspended",
+            "master_suspended",
+        )
+        is_under_review = e.error_code == "customer_status_under_review"
+        is_spending_cap = e.error_code == "spending_cap_exceeded"
+
+        if is_policy_suspension:
+            paused_reason = "policy_suspended"
+            event_name = "campaign_paused_policy_suspended"
+            log_msg = (
+                f"Campaign {campaign_id} paused due to account/policy suspension: [{e.error_code}] {e.error_message}. "
+                "Contact support or resolve account status to resume."
+            )
+        elif is_under_review:
+            paused_reason = "under_review"
+            event_name = "campaign_paused_under_review"
+            log_msg = (
+                f"Campaign {campaign_id} paused because account is under review: [{e.error_code}] {e.error_message}."
+            )
+        elif is_spending_cap:
+            paused_reason = "spending_cap_exceeded"
+            event_name = "campaign_paused_spending_cap_exceeded"
+            log_msg = (
+                f"Campaign {campaign_id} paused due to spending cap: [{e.error_code}] {e.error_message}."
+            )
+        elif e.error_code in ("insufficient_balance", "insufficient_quota", "insufficient_credits", "quota_exceeded", "insufficient_reserve"):
+            paused_reason = "wallet_depleted"
+            event_name = "campaign_paused_quota_exhausted"
+            log_msg = (
+                f"Campaign {campaign_id} paused due to wallet depletion: [{e.error_code}] {e.error_message}. "
+                "Top up wallet or resolve billing to resume."
+            )
+        else:
+            paused_reason = "quota_exceeded"
+            event_name = "campaign_paused_quota_exhausted"
+            log_msg = (
+                f"Campaign {campaign_id} paused due to quota check failure: [{e.error_code}] {e.error_message}."
+            )
+
         logger.warning(
-            f"Pausing campaign {campaign_id} due to wallet depletion/quota exhaustion: "
-            f"[{e.error_code}] {e.error_message}"
+            f"Pausing campaign {campaign_id} due to {paused_reason}: [{e.error_code}] {e.error_message}"
         )
 
         campaign = await db_client.get_campaign_by_id(campaign_id)
         new_meta = dict(campaign.orchestrator_metadata or {}) if campaign else {}
-        new_meta["paused_reason"] = (
-            "wallet_depleted"
-            if e.error_code in ("insufficient_quota", "insufficient_credits", "quota_exceeded", "insufficient_reserve")
-            else "quota_exceeded"
-        )
+        new_meta["paused_reason"] = paused_reason
 
         await db_client.update_campaign(
             campaign_id=campaign_id,
@@ -302,15 +338,13 @@ async def process_campaign_batch(
         await db_client.append_campaign_log(
             campaign_id=campaign_id,
             level="warning",
-            event="campaign_paused_quota_exhausted",
-            message=(
-                f"Campaign {campaign_id} paused due to wallet depletion/quota exhaustion: [{e.error_code}] {e.error_message}. "
-                "No contact leads were marked as failed. Top up wallet or resolve billing to resume."
-            ),
+            event=event_name,
+            message=log_msg,
             details={
                 "error_code": e.error_code,
                 "error_message": e.error_message,
                 "organization_id": e.organization_id,
+                "paused_reason": paused_reason,
                 "attempt": attempt if is_transient else None,
             },
         )

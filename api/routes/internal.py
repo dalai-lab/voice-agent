@@ -87,6 +87,12 @@ async def upsert_org_configuration(
         key=request.key,
         value=request.value,
     )
+    if request.key == "CONCURRENCY_GROUP_ID":
+        try:
+            from api.services.call_concurrency.service import call_concurrency
+            await call_concurrency.invalidate_concurrency_group(org_id)
+        except Exception:
+            pass
     return {"status": "success", "org_id": org_id, "key": request.key}
 
 
@@ -99,6 +105,23 @@ async def get_org_configuration(
     """Retrieve an organization configuration value by key."""
     cfg = await db_client.get_configuration(organization_id=org_id, key=key)
     return {"org_id": org_id, "key": key, "value": cfg.value if cfg else None}
+
+
+@router.post("/concurrency-group/{org_id}/invalidate")
+@router.post("/org-concurrency-group/{org_id}/invalidate")
+async def invalidate_concurrency_group_cache(
+    org_id: int,
+    _: None = Depends(verify_internal_token),
+):
+    """Invalidate memory and Redis concurrency group cache for an organization (Blocker 25)."""
+    try:
+        from api.services.call_concurrency.service import call_concurrency
+        await call_concurrency.invalidate_concurrency_group(org_id)
+    except Exception as e:
+        logger.error(f"Error invalidating concurrency group cache for org {org_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "success", "org_id": org_id, "message": "Concurrency group cache invalidated"}
+
 
 
 @router.get("/runs/{run_id}")

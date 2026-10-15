@@ -54,6 +54,7 @@ export default function SelectPlanPage() {
   const dograhOrgId = orgContext?.organization_id;
   const router = useRouter();
   const [submitting, setSubmitting] = useState<string | null>(null);
+  const [customerData, setCustomerData] = useState<any>(null);
 
   useEffect(() => {
     if (!dograhOrgId) return;
@@ -62,6 +63,8 @@ export default function SelectPlanPage() {
       .then((data) => {
         if (data.status === "active") {
           router.replace("/overview");
+        } else {
+          setCustomerData(data);
         }
       })
       .catch(console.error);
@@ -69,6 +72,20 @@ export default function SelectPlanPage() {
 
   const handleSelectTier = async (tierId: string) => {
     if (!dograhOrgId) return;
+
+    // Blocker 18: Client-side master plan ceiling check for sub-organizations
+    const TIER_RANK: Record<string, number> = { starter: 1, growth: 1, pro: 2, elite: 3, custom: 10 };
+    const masterTier = (customerData?.master_plan || customerData?.plan || "starter").toLowerCase();
+    const masterRank = TIER_RANK[masterTier] || 1;
+    const reqRank = TIER_RANK[tierId.toLowerCase()] || 1;
+
+    if (customerData?.is_sub_org && reqRank > masterRank) {
+      alert(
+        `Sub-organization plan cannot exceed Master organization plan (${masterTier.toUpperCase()}). Please ask your master organization administrator to upgrade to ${tierId.toUpperCase()} first.`
+      );
+      return;
+    }
+
     setSubmitting(tierId);
     try {
       const res = await fetch(`/api/talkar/customers/by-org/${dograhOrgId}/select-tier`, {
@@ -140,56 +157,81 @@ export default function SelectPlanPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto gap-6 w-full pt-8">
-          {TIERS.map((tier) => (
-            <Card 
-              key={tier.id} 
-              className={`relative flex flex-col transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-black/45 border-white/10 ${
-                tier.recommended ? "border-orange-500/80 shadow-md scale-105 z-10" : "border-white/5"
-              }`}
-            >
-              {tier.recommended && (
-                <div className="absolute -top-4 left-0 right-0 flex justify-center">
-                  <span className="bg-gradient-to-r from-orange-500 to-rose-500 text-white text-xs font-bold uppercase tracking-wider py-1 px-3 rounded-full shadow-md badge-glow">
-                    Most Popular
-                  </span>
-                </div>
-              )}
-              <CardHeader className="text-center pb-2">
-                <div className="flex justify-center">{tier.icon}</div>
-                <CardTitle className="text-2xl text-white">{tier.name}</CardTitle>
-                <CardDescription className="pt-2 text-zinc-400">{tier.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow text-center space-y-6">
-                <div className="mt-4">
-                  <span className="text-4xl font-extrabold text-white">{tier.price}</span>
-                  <span className="text-zinc-500 ml-2">/ {tier.priceUnit}</span>
-                  <p className="text-orange-400 text-xs font-medium mt-2">{tier.depositRequired}</p>
-                </div>
-                <ul className="space-y-3 text-sm text-left pt-4 border-t border-white/5">
-                  {tier.features.map((feature, i) => (
-                    <li key={i} className="flex items-start text-zinc-300">
-                      <CheckCircle className="w-5 h-5 text-emerald-500 mr-3 shrink-0" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-              <CardFooter className="pt-6">
-                <Button 
-                  onClick={() => handleSelectTier(tier.id)} 
-                  disabled={submitting !== null}
-                  className={`w-full h-11 rounded-xl font-bold text-sm ${
-                    tier.recommended 
-                      ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 shadow-lg shadow-orange-500/10" 
-                      : "bg-white/10 hover:bg-white/15 border border-white/10 text-white"
-                  }`}
-                  size="lg"
-                >
-                  {submitting === tier.id ? "Activating..." : `Select ${tier.name}`}
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+          {TIERS.map((tier) => {
+            const TIER_RANK: Record<string, number> = { starter: 1, growth: 1, pro: 2, elite: 3, custom: 10 };
+            const masterTier = (customerData?.master_plan || customerData?.plan || "starter").toLowerCase();
+            const masterRank = TIER_RANK[masterTier] || 1;
+            const reqRank = TIER_RANK[tier.id.toLowerCase()] || 1;
+            const isExceeded = Boolean(customerData?.is_sub_org && reqRank > masterRank);
+
+            return (
+              <Card 
+                key={tier.id} 
+                className={`relative flex flex-col transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-black/45 border-white/10 ${
+                  isExceeded
+                    ? "opacity-60 border-zinc-800"
+                    : tier.recommended 
+                      ? "border-orange-500/80 shadow-md scale-105 z-10" 
+                      : "border-white/5"
+                }`}
+              >
+                {tier.recommended && !isExceeded && (
+                  <div className="absolute -top-4 left-0 right-0 flex justify-center">
+                    <span className="bg-gradient-to-r from-orange-500 to-rose-500 text-white text-xs font-bold uppercase tracking-wider py-1 px-3 rounded-full shadow-md badge-glow">
+                      Most Popular
+                    </span>
+                  </div>
+                )}
+                {isExceeded && (
+                  <div className="absolute -top-3 left-0 right-0 flex justify-center">
+                    <span className="bg-zinc-800 text-zinc-400 border border-zinc-700 text-[10px] font-bold uppercase tracking-wider py-0.5 px-2.5 rounded-full">
+                      Capped at Master Plan ({masterTier.toUpperCase()})
+                    </span>
+                  </div>
+                )}
+                <CardHeader className="text-center pb-2">
+                  <div className="flex justify-center">{tier.icon}</div>
+                  <CardTitle className="text-2xl text-white">{tier.name}</CardTitle>
+                  <CardDescription className="pt-2 text-zinc-400">{tier.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow text-center space-y-6">
+                  <div className="mt-4">
+                    <span className="text-4xl font-extrabold text-white">{tier.price}</span>
+                    <span className="text-zinc-500 ml-2">/ {tier.priceUnit}</span>
+                    <p className="text-orange-400 text-xs font-medium mt-2">{tier.depositRequired}</p>
+                  </div>
+                  <ul className="space-y-3 text-sm text-left pt-4 border-t border-white/5">
+                    {tier.features.map((feature, i) => (
+                      <li key={i} className="flex items-start text-zinc-300">
+                        <CheckCircle className="w-5 h-5 text-emerald-500 mr-3 shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+                <CardFooter className="pt-6">
+                  <Button 
+                    onClick={() => handleSelectTier(tier.id)} 
+                    disabled={submitting !== null || isExceeded}
+                    className={`w-full h-11 rounded-xl font-bold text-sm ${
+                      isExceeded
+                        ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5"
+                        : tier.recommended 
+                          ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 shadow-lg shadow-orange-500/10" 
+                          : "bg-white/10 hover:bg-white/15 border border-white/10 text-white"
+                    }`}
+                    size="lg"
+                  >
+                    {submitting === tier.id 
+                      ? "Activating..." 
+                      : isExceeded 
+                        ? `Exceeds Master Plan (${masterTier.toUpperCase()})` 
+                        : `Select ${tier.name}`}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
       </main>
     </div>

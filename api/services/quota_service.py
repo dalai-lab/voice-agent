@@ -596,6 +596,19 @@ async def _authorize_talkar_workflow_run_start(
                     error_msg = "Insufficient wallet reserve for active concurrent calls."
                 elif reason == "master_suspended":
                     error_msg = "Master account is suspended."
+                elif reason == "customer_status_suspended":
+                    error_msg = "Account is currently suspended. Please contact support or resolve billing issues."
+                elif reason == "customer_status_under_review":
+                    error_msg = "Account is currently under review by administration."
+                elif reason == "spending_cap_exceeded":
+                    month_spend = data.get("month_spend_paise", 0) // 100
+                    cap = data.get("monthly_spending_cap_paise", 0) // 100
+                    error_msg = f"Monthly spending cap exceeded ({month_spend}/{cap} INR)."
+                elif reason == "insufficient_balance":
+                    error_msg = "Talkar wallet balance is exhausted."
+                elif reason.startswith("customer_status_"):
+                    status_name = reason.replace("customer_status_", "").replace("_", " ")
+                    error_msg = f"Account status is '{status_name}'. Calls cannot be initiated."
                 return QuotaCheckResult(
                     has_quota=False,
                     error_code=reason,

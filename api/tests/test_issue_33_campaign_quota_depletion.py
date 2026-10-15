@@ -292,3 +292,103 @@ class TestProcessCampaignBatchQuotaHandling:
                 orchestrator_metadata={"paused_reason": "wallet_depleted"},
             )
             mock_pub.publish_batch_failed.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_process_campaign_batch_pauses_with_policy_suspended(self):
+        """Verify Blocker 29: customer_status_suspended sets paused_reason='policy_suspended'."""
+        campaign = MagicMock(id=42, orchestrator_metadata={})
+
+        with (
+            patch("api.tasks.campaign_tasks.campaign_call_dispatcher") as mock_disp,
+            patch("api.tasks.campaign_tasks.db_client") as mock_db,
+            patch("api.tasks.campaign_tasks.get_campaign_event_publisher") as mock_get_pub,
+        ):
+            mock_disp.process_batch = AsyncMock(
+                side_effect=CampaignQuotaExceededError(
+                    organization_id=7,
+                    campaign_id=42,
+                    error_code="customer_status_suspended",
+                    error_message="Account is currently suspended. Please contact support or resolve billing issues.",
+                )
+            )
+            mock_db.get_campaign_by_id = AsyncMock(return_value=campaign)
+            mock_db.update_campaign = AsyncMock()
+            mock_db.append_campaign_log = AsyncMock()
+            mock_pub = AsyncMock()
+            mock_get_pub.return_value = mock_pub
+
+            with pytest.raises(CampaignQuotaExceededError):
+                await process_campaign_batch({}, campaign_id=42)
+
+            mock_db.update_campaign.assert_awaited_once_with(
+                campaign_id=42,
+                state="paused",
+                orchestrator_metadata={"paused_reason": "policy_suspended"},
+            )
+            mock_db.append_campaign_log.assert_called_once()
+            assert mock_db.append_campaign_log.call_args.kwargs["event"] == "campaign_paused_policy_suspended"
+
+    @pytest.mark.asyncio
+    async def test_process_campaign_batch_pauses_with_spending_cap_exceeded(self):
+        """Verify Blocker 29: spending_cap_exceeded sets paused_reason='spending_cap_exceeded'."""
+        campaign = MagicMock(id=42, orchestrator_metadata={})
+
+        with (
+            patch("api.tasks.campaign_tasks.campaign_call_dispatcher") as mock_disp,
+            patch("api.tasks.campaign_tasks.db_client") as mock_db,
+            patch("api.tasks.campaign_tasks.get_campaign_event_publisher") as mock_get_pub,
+        ):
+            mock_disp.process_batch = AsyncMock(
+                side_effect=CampaignQuotaExceededError(
+                    organization_id=7,
+                    campaign_id=42,
+                    error_code="spending_cap_exceeded",
+                    error_message="Monthly spending cap exceeded (120/100 INR).",
+                )
+            )
+            mock_db.get_campaign_by_id = AsyncMock(return_value=campaign)
+            mock_db.update_campaign = AsyncMock()
+            mock_db.append_campaign_log = AsyncMock()
+            mock_pub = AsyncMock()
+            mock_get_pub.return_value = mock_pub
+
+            with pytest.raises(CampaignQuotaExceededError):
+                await process_campaign_batch({}, campaign_id=42)
+
+            mock_db.update_campaign.assert_awaited_once_with(
+                campaign_id=42,
+                state="paused",
+                orchestrator_metadata={"paused_reason": "spending_cap_exceeded"},
+            )
+            assert mock_db.append_campaign_log.call_args.kwargs["event"] == "campaign_paused_spending_cap_exceeded"
+
+    @pytest.mark.asyncio
+    async def test_quota_service_distinct_error_messages(self):
+        """Verify Blocker 29: quota_service maps suspended, under_review, and spending_cap_exceeded to distinct messages."""
+        from api.services.quota_service import _authorize_talkar_workflow_run_start
+
+        test_cases = [
+            ("customer_status_suspended", "Account is currently suspended. Please contact support or resolve billing issues."),
+            ("customer_status_under_review", "Account is currently under review by administration."),
+            ("spending_cap_exceeded", "Monthly spending cap exceeded (150/100 INR)."),
+        ]
+
+        for code, expected_substring in test_cases:
+            with patch("httpx.AsyncClient") as mock_client_cls:
+                mock_client = AsyncMock()
+                mock_resp = MagicMock()
+                mock_resp.status_code = 200
+                mock_payload = {"has_quota": False, "reason": code}
+                if code == "spending_cap_exceeded":
+                    mock_payload["month_spend_paise"] = 15000
+                    mock_payload["monthly_spending_cap_paise"] = 10000
+                mock_resp.json.return_value = mock_payload
+                mock_client.post.return_value = mock_resp
+                mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+                with patch("api.services.call_concurrency.service.call_concurrency.get_concurrency_group_id", AsyncMock(return_value=100)):
+                    res = await _authorize_talkar_workflow_run_start(organization_id=10, workflow_run_id=1)
+                    assert res.has_quota is False
+                    assert res.error_code == code
+                    assert expected_substring in res.error_message
+

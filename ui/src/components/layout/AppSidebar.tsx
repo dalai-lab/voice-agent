@@ -276,7 +276,6 @@ export function AppSidebar() {
       "/workflow",
       "/telephony-configurations",
       "/model-configurations",
-      "/models",
       "/api-keys",
       "/usage",
       "/billing",

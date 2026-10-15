@@ -96,6 +96,7 @@ function TalkarStatusGate() {
   // but ignores same-org double-fires from auth context settling.
   const lastCheckedOrgRef = useRef<number | null>(null);
   const [talkarStatus, setTalkarStatus] = React.useState<string | null>(null);
+  const [suspensionReason, setSuspensionReason] = React.useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -110,6 +111,7 @@ function TalkarStatusGate() {
     lastCheckedOrgRef.current = dograhOrgId;
     // Clear stale banner from previous org immediately
     setTalkarStatus(null);
+    setSuspensionReason(null);
 
     fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
       .then(async r => {
@@ -120,8 +122,9 @@ function TalkarStatusGate() {
         }
         if (!r.ok) return; // Real API error — fail open, don't block the user
         const data = await r.json();
-        const { status, is_sub_org, has_onboarding_form } = data;
+        const { status, is_sub_org, has_onboarding_form, suspension_reason } = data;
         setTalkarStatus(status);
+        setSuspensionReason(suspension_reason || null);
         // Note: isTalkarCustomer state is managed by TalkarCustomerContext (shared)
         
         // Edge case: Sub-orgs with no brief form need to fill it first
@@ -130,7 +133,7 @@ function TalkarStatusGate() {
             return;
         }
         
-        if (status === 'active' || status === 'agent_building' || status === 'under_review' || status === 'pending_deposit' || status === 'pending_plan_selection' || status === 'suspended' || status === 'approved') return;
+        if (status === 'active' || status === 'agent_building' || status === 'under_review' || status === 'pending_deposit' || status === 'suspended' || status === 'approved') return;
         router.replace('/onboarding');
       })
       .catch(() => { /* network failure — fail open */ });
@@ -170,25 +173,29 @@ function TalkarStatusGate() {
         <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
         <span>Workspace activation pending. Add credits to your wallet to activate your agent.</span>
         <Link href="/wallet" className="ml-1 font-semibold underline underline-offset-4 hover:opacity-80">Go to Wallet →</Link>
+        <span className="opacity-40">|</span>
+        <Link href="/onboarding/select-plan" className="font-semibold underline underline-offset-4 hover:opacity-80">Change Plan</Link>
       </div>
     );
   }
 
-  if (talkarStatus === 'pending_plan_selection') {
-    return (
-      <div className="border-b border-primary/20 bg-primary/10 text-foreground text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2">
-        <span>Your agent is ready. Please choose a calling plan to complete activation.</span>
-        <Link href="/onboarding/select-plan" className="ml-1 font-semibold underline underline-offset-4 hover:opacity-80">Choose Plan →</Link>
-      </div>
-    );
-  }
 
   if (talkarStatus === 'suspended') {
+    const isPolicyViolation = Boolean(suspensionReason && !['zero_balance', '', null].includes(suspensionReason));
     return (
       <div className="border-b border-rose-500/20 bg-rose-500/10 text-rose-900 dark:text-rose-200 text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2">
         <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-        <span>Calling services suspended due to zero wallet balance. Top up to reactivate immediately.</span>
-        <Link href="/wallet" className="ml-1 font-semibold underline underline-offset-4 hover:opacity-80">Add Credits →</Link>
+        {isPolicyViolation ? (
+          <>
+            <span>Calling services suspended by administration ({suspensionReason === 'fraud' ? 'Suspicious Activity' : 'Policy / Terms Violation'}). Please contact support.</span>
+            <Link href="/support" className="ml-1 font-semibold underline underline-offset-4 hover:opacity-80">Contact Support →</Link>
+          </>
+        ) : (
+          <>
+            <span>Calling services suspended due to zero wallet balance. Top up to reactivate immediately.</span>
+            <Link href="/wallet" className="ml-1 font-semibold underline underline-offset-4 hover:opacity-80">Add Credits →</Link>
+          </>
+        )}
       </div>
     );
   }
@@ -200,7 +207,6 @@ const TALKAR_FORBIDDEN_PREFIXES = [
   "/workflow",
   "/telephony-configurations",
   "/model-configurations",
-  "/models",
   "/api-keys",
   "/usage",
   "/billing",

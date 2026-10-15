@@ -13,7 +13,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { 
   Check, ArrowRight, ArrowLeft, Sparkles, Building2, User, Bot, Wrench, 
-  Clock, CheckCircle2, CreditCard, UploadCloud, ChevronRight, MessageSquare
+  Clock, CheckCircle2, CreditCard, UploadCloud, ChevronRight, MessageSquare,
+  XCircle, ShieldAlert, Mail
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useOrgConfig } from "@/context/OrgConfigContext";
@@ -157,12 +158,14 @@ export default function OnboardingPage() {
 
           if (data.status === "active") {
             router.push("/overview");
-          } else if (data.status === "pending_plan_selection") {
-            router.push("/onboarding/select-plan");
-          } else if (data.status === "pending_deposit") {
+          } else if (data.status === "pending_deposit" || data.status === "suspended") {
             router.push("/wallet");
-          } else if (data.status === "agent_building" && !data.has_onboarding_form) {
-            setStatus("new_agent_brief");
+          } else if (data.status === "agent_building") {
+            if (!data.has_onboarding_form) {
+              setStatus("new_agent_brief");
+            } else {
+              router.push("/overview");
+            }
           }
 
           // Fetch existing master info if available to provide linking / independent context
@@ -1303,6 +1306,143 @@ export default function OnboardingPage() {
               <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
                 Secure checkout via Razorpay · Instant activation upon completion
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── 6. REJECTED SCREEN ── */}
+        {status === "rejected" && (
+          <div className="max-w-xl mx-auto py-10 px-4 space-y-8">
+            {/* Minimal Status Header */}
+            <div className="text-center space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-400 text-xs font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                Application not approved
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+                Application Status Update
+              </h1>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+                We are unable to approve your voice agent onboarding application at this time based on our verification criteria.
+              </p>
+            </div>
+
+            {/* Rejection Details Card */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
+              <div className="flex items-start gap-3.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                  <XCircle className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    Reason for Rejection
+                  </p>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    {customerData?.rejection_reason || "Verification details did not satisfy our telecom compliance and verification policies."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
+                  <span className="text-zinc-400 dark:text-zinc-500">Reapplication Eligible In</span>
+                  <span className="font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    {customerData?.reapply_countdown || "30d 0h"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
+                  <span className="text-zinc-400 dark:text-zinc-500">Registered Business</span>
+                  <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                    {customerData?.company_name || formData.businessName || "Your Organization"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+              <a
+                href="mailto:support@talkar.in?subject=Application%20Rejection%20Inquiry"
+                className="inline-flex items-center justify-center gap-2 h-11 px-6 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-medium rounded-xl text-xs transition-colors shadow-xs"
+              >
+                <Mail className="w-4 h-4 text-orange-400 dark:text-orange-500" />
+                Contact Support Team
+              </a>
+              <Button
+                variant="outline"
+                className="h-11 px-6 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs"
+                onClick={() => void logout()}
+              >
+                Sign Out
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── 7. CHURNED SCREEN ── */}
+        {status === "churned" && (
+          <div className="max-w-xl mx-auto py-10 px-4 space-y-8">
+            {/* Minimal Status Header */}
+            <div className="text-center space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-500/10 border border-zinc-500/20 text-zinc-700 dark:text-zinc-400 text-xs font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                Account Closed
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+                Workspace Decommissioned
+              </h1>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+                This account was permanently closed following prolonged suspension exceeding 45 days.
+              </p>
+            </div>
+
+            {/* Churned Details Card */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
+              <div className="flex items-start gap-3.5">
+                <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 flex items-center justify-center shrink-0">
+                  <ShieldAlert className="w-5 h-5 text-zinc-500" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    Resource Release &amp; Closure Notice
+                  </p>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    All reserved telephony lines (DIDs), speech models, and agent configurations associated with this organization have been released back to the telecom pool.
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
+                  <span className="text-zinc-400 dark:text-zinc-500">Account ID</span>
+                  <span className="font-mono text-zinc-700 dark:text-zinc-300">
+                    {customerData?.id || dograhOrgId || "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
+                  <span className="text-zinc-400 dark:text-zinc-500">Status</span>
+                  <span className="font-medium text-rose-600 dark:text-rose-400">Churned (Permanent)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+              <a
+                href="mailto:support@talkar.in?subject=Reopen%20Churned%20Account%20Inquiry"
+                className="inline-flex items-center justify-center gap-2 h-11 px-6 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-medium rounded-xl text-xs transition-colors shadow-xs"
+              >
+                <Mail className="w-4 h-4 text-orange-400 dark:text-orange-500" />
+                Contact Talkar Support
+              </a>
+              <Button
+                variant="outline"
+                className="h-11 px-6 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs"
+                onClick={() => void logout()}
+              >
+                Sign Out
+              </Button>
             </div>
           </div>
         )}

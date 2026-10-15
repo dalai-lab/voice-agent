@@ -1,3 +1,4 @@
+import inspect
 from datetime import UTC, datetime
 from typing import Any
 
@@ -9,6 +10,30 @@ from api.services.campaign.circuit_breaker import circuit_breaker
 from api.tasks.arq import enqueue_job
 from api.tasks.function_names import FunctionNames
 from loguru import logger
+
+
+async def _safe_append_campaign_log(
+    campaign_id: int,
+    level: str,
+    event: str,
+    message: str,
+    details: dict[str, Any] | None = None,
+) -> None:
+    """Non-blocking activity log helper that safely awaits coroutines and ignores synchronous test mocks."""
+    try:
+        ret = db_client.append_campaign_log(
+            campaign_id=campaign_id,
+            level=level,
+            event=event,
+            message=message,
+            details=details,
+        )
+        if inspect.isawaitable(ret):
+            await ret
+    except Exception as e:
+        logger.error(
+            f"Failed to append campaign log for {campaign_id} (event={event}): {e}"
+        )
 
 
 class CampaignRunnerService:
@@ -39,6 +64,18 @@ class CampaignRunnerService:
                 started_at=now,
                 source_last_synced_at=now,
             )
+            parent_id = (campaign.orchestrator_metadata or {}).get("parent_campaign_id")
+            await _safe_append_campaign_log(
+                campaign_id=campaign_id,
+                level="info",
+                event="campaign_started",
+                message=f"Redial campaign started for parent campaign #{parent_id}. Queued {campaign.total_rows or 0} contact runs.",
+                details={
+                    "parent_campaign_id": parent_id,
+                    "total_rows": campaign.total_rows or 0,
+                    "is_redial": True,
+                },
+            )
             publisher = await get_campaign_event_publisher()
             await publisher.publish_sync_completed(
                 campaign_id=campaign_id,
@@ -55,6 +92,16 @@ class CampaignRunnerService:
             state="syncing",
             started_at=datetime.now(UTC),
             source_sync_status="in_progress",
+        )
+        await _safe_append_campaign_log(
+            campaign_id=campaign_id,
+            level="info",
+            event="campaign_started",
+            message=f"Campaign started by operator. Initiating contact sync from source ({campaign.source_type}).",
+            details={
+                "source_type": campaign.source_type,
+                "source_id": campaign.source_id,
+            },
         )
 
         # Enqueue the sync task
@@ -75,6 +122,13 @@ class CampaignRunnerService:
 
         # Update state to paused
         await db_client.update_campaign(campaign_id=campaign_id, state="paused")
+        await _safe_append_campaign_log(
+            campaign_id=campaign_id,
+            level="info",
+            event="campaign_paused_manual",
+            message="Campaign paused by operator. Active in-flight calls will complete; new calls are suspended.",
+            details={"previous_state": campaign.state},
+        )
 
         logger.info(f"Campaign {campaign_id} paused")
 
@@ -91,7 +145,7 @@ class CampaignRunnerService:
 
         # Clear paused reason and details from orchestrator metadata
         new_meta = dict(campaign.orchestrator_metadata or {})
-        new_meta.pop("paused_reason", None)
+        paused_reason = new_meta.pop("paused_reason", None)
         new_meta.pop("paused_max_concurrent", None)
 
         # Update state to running
@@ -99,6 +153,13 @@ class CampaignRunnerService:
             campaign_id=campaign_id,
             state="running",
             orchestrator_metadata=new_meta,
+        )
+        await _safe_append_campaign_log(
+            campaign_id=campaign_id,
+            level="info",
+            event="campaign_resumed_manual",
+            message="Campaign resumed by operator. Resetting retry counters and resuming call dispatch.",
+            details={"previous_paused_reason": paused_reason},
         )
 
         # Reset retry counters so resumed campaign starts with full retry attempts

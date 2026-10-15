@@ -722,6 +722,7 @@ class TestResumeCampaignResetsCircuitBreaker:
             mock_db.get_campaign_by_id = AsyncMock(return_value=mock_campaign)
             mock_db.update_campaign = AsyncMock()
             mock_db.reset_campaign_metadata_counter = AsyncMock()
+            mock_db.append_campaign_log = AsyncMock()
             mock_cb.reset = AsyncMock(return_value=True)
 
             runner = CampaignRunnerService()

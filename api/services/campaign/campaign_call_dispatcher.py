@@ -291,6 +291,23 @@ class CampaignCallDispatcher:
                     logger.info(
                         f"Marked queued run {queued_run.id} as failed due to error: {e}"
                     )
+                    phone_num = (
+                        queued_run.context_variables.get("phone_number", "Unknown")
+                        if queued_run.context_variables
+                        else "Unknown"
+                    )
+                    await db_client.append_campaign_log(
+                        campaign_id=campaign_id,
+                        level="error",
+                        event="call_dispatch_failed",
+                        message=f"Failed to dispatch call to {phone_num}: {e}",
+                        details={
+                            "queued_run_id": queued_run.id,
+                            "source_uuid": queued_run.source_uuid,
+                            "phone_number": phone_num,
+                            "error": str(e),
+                        },
+                    )
                 except Exception as update_error:
                     logger.error(
                         f"Failed to mark queued run {queued_run.id} as failed: {update_error}"

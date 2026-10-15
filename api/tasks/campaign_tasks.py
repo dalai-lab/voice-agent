@@ -68,6 +68,17 @@ async def sync_campaign_source(ctx: dict, campaign_id: int) -> None:
                 source_sync_status="completed",
                 source_last_synced_at=datetime.now(UTC),
             )
+            await db_client.append_campaign_log(
+                campaign_id=campaign_id,
+                level="info",
+                event="campaign_completed",
+                message="Campaign completed: 0 contacts found in configured source.",
+                details={
+                    "source_type": campaign.source_type,
+                    "source_id": campaign.source_id,
+                    "total_rows": 0,
+                },
+            )
             logger.info(f"Campaign {campaign_id} completed with no data to process")
             return
 
@@ -77,6 +88,17 @@ async def sync_campaign_source(ctx: dict, campaign_id: int) -> None:
             state="running",
             source_sync_status="completed",
             source_last_synced_at=datetime.now(UTC),
+        )
+        await db_client.append_campaign_log(
+            campaign_id=campaign_id,
+            level="info",
+            event="campaign_source_synced",
+            message=f"Contacts synced successfully: {rows_synced} contact leads queued for execution.",
+            details={
+                "total_rows": rows_synced,
+                "source_type": campaign.source_type,
+                "source_id": campaign.source_id,
+            },
         )
 
         # Publish sync completed event - orchestrator will schedule first batch
@@ -538,6 +560,28 @@ async def process_campaign_batch(
             f"Campaign {campaign_id} (org {e.organization_id}) hit dispatch rate limit window ({e.wait_time:.1f}s); "
             f"deferring next batch by 5s. No contact leads were marked as failed."
         )
+        if redis is not None:
+            try:
+                should_log = await redis.set(
+                    f"campaign:log_throttle:rate_limit:{campaign_id}", "1", nx=True, ex=60
+                )
+                if should_log:
+                    await db_client.append_campaign_log(
+                        campaign_id=campaign_id,
+                        level="warning",
+                        event="dispatch_rate_limited",
+                        message=(
+                            f"Dispatch throttled: org call rate limit reached. "
+                            f"Backing off batch dispatch by 5.0s. No contact leads were marked as failed."
+                        ),
+                        details={
+                            "organization_id": e.organization_id,
+                            "wait_time": e.wait_time,
+                            "defer_seconds": 5,
+                        },
+                    )
+            except Exception:
+                pass
         publisher = await get_campaign_event_publisher()
         await publisher.publish_batch_completed(
             campaign_id=campaign_id,

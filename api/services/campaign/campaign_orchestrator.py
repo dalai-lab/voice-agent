@@ -384,6 +384,81 @@ class CampaignOrchestrator:
 
         return False
 
+    async def _check_and_log_schedule_transition(
+        self, campaign: CampaignModel
+    ) -> bool:
+        """Evaluate if campaign is within schedule window and atomically log transitions."""
+        is_in_schedule = self._is_within_schedule(campaign)
+
+        schedule_config = (campaign.orchestrator_metadata or {}).get("schedule_config")
+        # If schedule is not configured or disabled, campaign runs unrestricted (24/7)
+        if (
+            not schedule_config
+            or not schedule_config.get("enabled", False)
+            or not schedule_config.get("slots")
+        ):
+            return True
+
+        target_state = "in" if is_in_schedule else "out"
+        redis_key = f"campaign:schedule_state:{campaign.id}"
+
+        try:
+            # Atomic swap: set new state and get previous state
+            old_state = await self.redis.set(redis_key, target_state, get=True)
+            if isinstance(old_state, bytes):
+                old_state = old_state.decode("utf-8")
+
+            timezone_str = schedule_config.get("timezone", "UTC")
+
+            if not is_in_schedule:
+                # Transition into outside window:
+                # Log if old_state was None (first check outside) or was previously "in"
+                if old_state != "out":
+                    logger.info(
+                        f"campaign_id: {campaign.id} - Transitioned outside schedule window ({timezone_str})"
+                    )
+                    await db_client.append_campaign_log(
+                        campaign_id=campaign.id,
+                        level="info",
+                        event="schedule_window_closed",
+                        message=(
+                            f"Allowed calling hours ended for today (outside scheduled window). "
+                            f"Outbound call dispatching paused until next scheduled window. "
+                            f"Campaign remains in running state."
+                        ),
+                        details={
+                            "timezone": timezone_str,
+                            "slots": schedule_config.get("slots", []),
+                            "state": campaign.state,
+                        },
+                    )
+            else:
+                # Transition back into schedule window:
+                # Only log if previously was outside ("out")
+                if old_state == "out":
+                    logger.info(
+                        f"campaign_id: {campaign.id} - Transitioned into schedule window ({timezone_str})"
+                    )
+                    await db_client.append_campaign_log(
+                        campaign_id=campaign.id,
+                        level="info",
+                        event="schedule_window_opened",
+                        message=(
+                            f"Allowed calling window opened ({timezone_str}). "
+                            f"Resuming outbound call batch dispatches."
+                        ),
+                        details={
+                            "timezone": timezone_str,
+                            "state": campaign.state,
+                        },
+                    )
+        except Exception as e:
+            logger.debug(
+                f"campaign_id: {campaign.id} - Redis schedule transition check error: {e}"
+            )
+
+        return is_in_schedule
+
     async def _schedule_next_batch(self, campaign_id: int, defer_seconds: int = 0):
         """Schedule next batch immediately (or deferred) if work available."""
 
@@ -437,7 +512,7 @@ class CampaignOrchestrator:
                 return
 
             # Check schedule window before scheduling
-            if not self._is_within_schedule(campaign):
+            if not await self._check_and_log_schedule_transition(campaign):
                 logger.info(
                     f"campaign_id: {campaign_id} - Outside scheduled time window"
                 )
@@ -609,8 +684,23 @@ class CampaignOrchestrator:
                             pass
 
                         # Explicitly recover any claimed runs stuck in processing for this campaign
-                        await db_client.cleanup_stuck_processing_queued_runs(
-                            threshold_seconds=300, campaign_id=campaign_id
+                        recovered_count = (
+                            await db_client.cleanup_stuck_processing_queued_runs(
+                                threshold_seconds=300, campaign_id=campaign_id
+                            )
+                        )
+                        await db_client.append_campaign_log(
+                            campaign_id=campaign_id,
+                            level="warning",
+                            event="stuck_batch_recovered",
+                            message=(
+                                f"Orchestrator recovered stalled batch ({time_since_batch_start:.0f}s inactivity). "
+                                f"Reclaimed {recovered_count or 0} stuck runs and resumed processing."
+                            ),
+                            details={
+                                "stall_duration_seconds": time_since_batch_start,
+                                "recovered_runs_count": recovered_count or 0,
+                            },
                         )
 
                         # Check if there's work to be done
@@ -626,7 +716,10 @@ class CampaignOrchestrator:
                 if campaign_id not in self._batch_in_progress:
                     has_work = await self._has_due_work(campaign_id)
                     if has_work:
-                        if not self._is_within_schedule(campaign) or campaign.state != "running":
+                        in_sched = await self._check_and_log_schedule_transition(
+                            campaign
+                        )
+                        if not in_sched or campaign.state != "running":
                             logger.info(
                                 f"campaign_id: {campaign_id} - Found orphaned work but outside "
                                 f"schedule window (or not running), skipping"
@@ -761,6 +854,38 @@ class CampaignOrchestrator:
             duration = None
             if campaign.started_at:
                 duration = (datetime.now(UTC) - campaign.started_at).total_seconds()
+
+            # Clean up schedule state Redis key
+            try:
+                await self.redis.delete(f"campaign:schedule_state:{campaign_id}")
+            except Exception:
+                pass
+
+            duration_str = ""
+            if duration is not None:
+                mins = int(duration // 60)
+                secs = int(duration % 60)
+                duration_str = f" in {mins}m {secs}s" if mins > 0 else f" in {secs}s"
+
+            total = campaign.total_rows or 0
+            processed = campaign.processed_rows
+            failed = campaign.failed_rows
+
+            await db_client.append_campaign_log(
+                campaign_id=campaign_id,
+                level="info",
+                event="campaign_completed",
+                message=(
+                    f"Campaign completed successfully. Processed {processed}/{total} contacts"
+                    f" ({failed} failed){duration_str}."
+                ),
+                details={
+                    "total_rows": total,
+                    "processed_rows": processed,
+                    "failed_rows": failed,
+                    "duration_seconds": duration,
+                },
+            )
 
             # Publish completion event
             await self.publisher.publish_campaign_completed(

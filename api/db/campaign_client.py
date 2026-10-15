@@ -450,25 +450,30 @@ class CampaignClient(BaseDBClient):
         if details:
             entry["details"] = details
 
-        async with self.async_session() as session:
-            await session.execute(
-                text(
-                    "UPDATE campaigns "
-                    "SET logs = (logs::jsonb || CAST(:entry AS jsonb))::json, "
-                    "    updated_at = :now "
-                    "WHERE id = :campaign_id"
-                ),
-                {
-                    "entry": json.dumps([entry]),
-                    "now": datetime.now(UTC),
-                    "campaign_id": campaign_id,
-                },
+        try:
+            async with self.async_session() as session:
+                await session.execute(
+                    text(
+                        "UPDATE campaigns "
+                        "SET logs = (logs::jsonb || CAST(:entry AS jsonb))::json, "
+                        "    updated_at = :now "
+                        "WHERE id = :campaign_id"
+                    ),
+                    {
+                        "entry": json.dumps([entry]),
+                        "now": datetime.now(UTC),
+                        "campaign_id": campaign_id,
+                    },
+                )
+                try:
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
+                    raise
+        except Exception as e:
+            logger.error(
+                f"Failed to append campaign log for campaign {campaign_id} (event={event}): {e}"
             )
-            try:
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
 
     async def increment_campaign_metadata_counter(
         self, campaign_id: int, key: str

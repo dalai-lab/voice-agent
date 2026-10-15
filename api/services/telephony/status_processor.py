@@ -172,6 +172,28 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
                 workflow_run_id=workflow_run_id if is_failure else None,
                 reason=normalized_status.value if is_failure else None,
             )
+            if is_failure:
+                target_phone = (
+                    (workflow_run.initial_context or {}).get("phone_number")
+                    or (workflow_run.initial_context or {}).get("called_number")
+                    or "Unknown"
+                )
+                try:
+                    await db_client.append_campaign_log(
+                        campaign_id=workflow_run.campaign_id,
+                        level="error",
+                        event="carrier_call_failed",
+                        message=f"Carrier reported terminal failure [{normalized_status.value}] for call to {target_phone}",
+                        details={
+                            "workflow_run_id": workflow_run_id,
+                            "status": normalized_status.value,
+                            "phone_number": target_phone,
+                        },
+                    )
+                except Exception as log_err:
+                    logger.warning(
+                        f"Failed to append campaign log for carrier failure: {log_err}"
+                    )
 
         if normalized_status in RETRYABLE_NOT_CONNECTED_STATUSES:
             if workflow_run.campaign_id is not None:

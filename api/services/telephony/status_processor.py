@@ -200,7 +200,12 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
                 if not is_busy_retry:
                     try:
                         # Check workflow settings for busy retry
-                        workflow = await db_client.get_workflow(workflow_run.workflow_id, organization_id=workflow_run.organization_id)
+                        workflow = await db_client.get_workflow_by_id(workflow_run.workflow_id)
+                        org_id = workflow.organization_id if workflow else None
+                        if not org_id and workflow_run.campaign_id:
+                            campaign = await db_client.get_campaign_by_id(workflow_run.campaign_id)
+                            org_id = campaign.organization_id if campaign else None
+
                         busy_retry_enabled = True
                         busy_retry_delay_minutes = 5
                         
@@ -236,7 +241,7 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
                                 else:
                                     # Re-queue standalone callback
                                     new_callback = ScheduledCallbackModel(
-                                        organization_id=workflow_run.organization_id,
+                                        organization_id=org_id,
                                         workflow_id=workflow_run.workflow_id,
                                         original_run_id=workflow_run.initial_context.get("original_run_id", workflow_run_id),
                                         status="pending",

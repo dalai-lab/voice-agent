@@ -287,3 +287,82 @@ def test_is_within_schedule_disabled_or_empty(orchestrator):
     )
     assert orchestrator._is_within_schedule(c3) is True
 
+
+@pytest.mark.asyncio
+async def test_check_slots_available_scope_and_org():
+    from api.services.call_concurrency.service import CallConcurrencyService
+
+    service = CallConcurrencyService()
+    service.get_effective_org_concurrent_limit = AsyncMock(return_value=5)
+    service.get_concurrency_group_id = AsyncMock(return_value=89)
+
+    with patch("api.services.call_concurrency.service.rate_limiter.get_live_slot_count") as mock_live_count:
+        # Case 1: Org is full (5/5)
+        mock_live_count.return_value = 5
+        res = await service.check_slots_available(89)
+        assert res is False
+
+        # Case 2: Org has capacity (1/5), but campaign scope is full (1/1)
+        async def mock_count_side_effect(key):
+            if key == 89:
+                return 1  # Org active
+            if key == "campaign:62":
+                return 1  # Campaign active
+            return 0
+
+        mock_live_count.side_effect = mock_count_side_effect
+        res = await service.check_slots_available(
+            organization_id=89,
+            scope_key="campaign:62",
+            scope_max_concurrent=1,
+        )
+        assert res is False
+
+        # Case 3: Org has capacity (1/5) and campaign has capacity (0/1)
+        async def mock_count_has_room(key):
+            if key == 89:
+                return 1
+            if key == "campaign:62":
+                return 0
+            return 0
+
+        mock_live_count.side_effect = mock_count_has_room
+        res = await service.check_slots_available(
+            organization_id=89,
+            scope_key="campaign:62",
+            scope_max_concurrent=1,
+        )
+        assert res is True
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_skips_claim_when_scope_full():
+    from api.services.campaign.campaign_call_dispatcher import CampaignCallDispatcher
+    from api.services.campaign.errors import ConcurrentSlotAcquisitionError
+
+    dispatcher = CampaignCallDispatcher()
+    mock_campaign = MagicMock(
+        id=62,
+        organization_id=89,
+        state="running",
+        orchestrator_metadata={"max_concurrency": 1},
+    )
+
+    with (
+        patch("api.services.campaign.campaign_call_dispatcher.db_client") as mock_db,
+        patch("api.services.campaign.campaign_call_dispatcher.call_concurrency") as mock_concurrency,
+    ):
+        mock_db.get_campaign_by_id = AsyncMock(return_value=mock_campaign)
+        # Concurrency precheck reports full for scope
+        mock_concurrency.check_slots_available = AsyncMock(return_value=False)
+        mock_concurrency.get_effective_org_concurrent_limit = AsyncMock(return_value=2)
+
+        with pytest.raises(ConcurrentSlotAcquisitionError) as exc_info:
+            await dispatcher.process_batch(campaign_id=62, batch_size=10)
+
+        # Confirm 0 runs were claimed because precheck aborted before DB query
+        mock_db.claim_queued_runs_for_processing.assert_not_called()
+        assert exc_info.value.max_concurrent == 1
+        assert exc_info.value.wait_time == 0.0
+
+

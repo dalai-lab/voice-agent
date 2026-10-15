@@ -238,12 +238,17 @@ class CallConcurrencyService:
             return min(org_limit, group_limit)
         return org_limit
 
-    async def check_slots_available(self, organization_id: int) -> bool | None:
-        """Fast pre-check: are there available concurrent slots for this org?
+    async def check_slots_available(
+        self,
+        organization_id: int,
+        scope_key: str | None = None,
+        scope_max_concurrent: int | None = None,
+    ) -> bool | None:
+        """Fast pre-check: are there available concurrent slots for this org and optional scope?
 
         Returns:
             True   – slots are available (safe to proceed with claiming runs)
-            False  – org is definitely at its limit (skip claiming, retry later)
+            False  – org or scope is definitely at its limit (skip claiming, retry later)
             None   – Redis is unreachable; caller should fail open and let
                      normal acquisition handle it
         """
@@ -255,7 +260,18 @@ class CallConcurrencyService:
             live_count = await rate_limiter.get_live_slot_count(group_id)
             if live_count is None:
                 return None  # Redis down — fail open
-            return live_count < max_concurrent
+            if live_count >= max_concurrent:
+                return False
+
+            # Check scope-specific limit if provided (e.g. campaign-level max_concurrency cap)
+            if scope_key and scope_max_concurrent is not None:
+                if scope_max_concurrent <= 0:
+                    return False
+                scope_live_count = await rate_limiter.get_live_slot_count(scope_key)
+                if scope_live_count is not None and scope_live_count >= scope_max_concurrent:
+                    return False
+
+            return True
         except Exception as e:
             logger.warning(
                 f"check_slots_available error for org {organization_id}: {e}; "

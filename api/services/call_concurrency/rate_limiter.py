@@ -406,8 +406,8 @@ class RateLimiter:
             logger.error(f"Error getting concurrent count: {e}")
             return 0
 
-    async def get_live_slot_count(self, organization_id: int) -> int | None:
-        """Stale-aware count of active slots for an org.
+    async def get_live_slot_count(self, key_or_id: int | str) -> int | None:
+        """Stale-aware count of active slots for an org or scope.
 
         Unlike ``get_concurrent_count`` this returns ``None`` on Redis errors
         rather than ``0`` so callers can distinguish "Redis is down" from
@@ -417,7 +417,7 @@ class RateLimiter:
         """
         try:
             redis_client = await self._get_redis()
-            concurrent_key = f"concurrent_calls:{organization_id}"
+            concurrent_key = f"concurrent_calls:{key_or_id}"
             stale_cutoff = time.time() - self.heartbeat_stale_timeout
 
             lua_script = """
@@ -427,7 +427,7 @@ class RateLimiter:
             result = await redis_client.eval(lua_script, 1, concurrent_key, stale_cutoff)
             return int(result)
         except Exception as e:
-            logger.warning(f"Redis error in get_live_slot_count for org {organization_id}: {e}")
+            logger.warning(f"Redis error in get_live_slot_count for {key_or_id}: {e}")
             return None  # Explicitly None — not zero — so callers can fail open
 
     async def get_fleet_concurrent_count(self) -> int:

@@ -90,22 +90,37 @@ class CampaignCallDispatcher:
         #            grant a synthetic slot so the campaign keeps running
         # • True   → slots available; proceed normally
         if not callbacks_only:
+            campaign_max_concurrency = None
+            if campaign.orchestrator_metadata:
+                campaign_max_concurrency = campaign.orchestrator_metadata.get(
+                    "max_concurrency"
+                )
+            scope_key = (
+                f"campaign:{campaign.id}"
+                if campaign_max_concurrency is not None
+                else None
+            )
+
             slots_available = await call_concurrency.check_slots_available(
-                campaign.organization_id
+                campaign.organization_id,
+                scope_key=scope_key,
+                scope_max_concurrent=campaign_max_concurrency,
             )
             if slots_available is False:
-                max_concurrent = await call_concurrency.get_effective_org_concurrent_limit(
-                    campaign.organization_id
-                )
+                effective_limit = campaign_max_concurrency
+                if effective_limit is None:
+                    effective_limit = await call_concurrency.get_effective_org_concurrent_limit(
+                        campaign.organization_id
+                    )
                 logger.warning(
                     f"Campaign {campaign_id} (org {campaign.organization_id}): "
-                    f"all {max_concurrent} concurrent slots occupied — skipping claim."
+                    f"concurrent slots occupied (limit: {effective_limit}) — skipping claim."
                 )
                 raise ConcurrentSlotAcquisitionError(
                     organization_id=campaign.organization_id,
                     campaign_id=campaign_id,
                     wait_time=0.0,
-                    max_concurrent=max_concurrent,
+                    max_concurrent=effective_limit,
                 )
             elif slots_available is None:
                 logger.warning(

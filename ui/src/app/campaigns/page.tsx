@@ -2,7 +2,7 @@
 
 import { Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getCampaignsApiV1CampaignGet } from '@/client/sdk.gen';
 import type { CampaignsResponse } from '@/client/types.gen';
@@ -36,35 +36,45 @@ export default function CampaignsPage() {
         }
     }, [loading, user, redirectToLogin]);
 
-    // Fetch campaigns once when user is ready
-    useEffect(() => {
-        if (loading || !user || hasFetched.current) {
-            return;
-        }
-        hasFetched.current = true;
-
-        const fetchCampaigns = async () => {
-            setIsLoading(true);
-            try {
-                const accessToken = await getAccessToken();
-                const response = await getCampaignsApiV1CampaignGet({
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                    }
-                });
-
-                if (response.data) {
-                    setCampaignsData(response.data);
+    const fetchCampaigns = useCallback(async (silent = false) => {
+        if (!user) return;
+        if (!silent) setIsLoading(true);
+        try {
+            const accessToken = await getAccessToken();
+            const response = await getCampaignsApiV1CampaignGet({
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
                 }
-            } catch (error) {
-                console.error('Failed to fetch campaigns:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+            });
 
+            if (response.data) {
+                setCampaignsData(response.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch campaigns:', error);
+        } finally {
+            if (!silent) setIsLoading(false);
+        }
+    }, [user, getAccessToken]);
+
+    // Initial load
+    useEffect(() => {
+        if (loading || !user) return;
         fetchCampaigns();
-    }, [loading, user, getAccessToken]);
+    }, [loading, user, fetchCampaigns]);
+
+    // Live auto-polling every 4 seconds if any campaign is active
+    useEffect(() => {
+        const hasActive = campaignsData?.campaigns.some(
+            c => c.state === 'running' || c.state === 'syncing'
+        );
+        if (!hasActive) return;
+
+        const interval = setInterval(() => {
+            fetchCampaigns(true);
+        }, 4000);
+        return () => clearInterval(interval);
+    }, [campaignsData, fetchCampaigns]);
 
     const handleRowClick = (campaignId: number) => {
         router.push(`/campaigns/${campaignId}`);
@@ -156,11 +166,17 @@ export default function CampaignsPage() {
                         </TableHeader>
                         <TableBody>
                             {campaignsData.campaigns.map((campaign) => {
-                                const totalQueued = campaign.total_queued_count ?? 0;
-                                const executed = campaign.executed_count ?? 0;
-                                const progressPercent = totalQueued > 0
-                                    ? Math.min(100, Math.round((executed / totalQueued) * 100))
-                                    : 0;
+                                const totalContacts = campaign.total_rows ?? 0;
+                                const processedContacts = campaign.processed_rows ?? 0;
+                                const contactPercent = totalContacts > 0
+                                    ? Math.min(100, Math.round((processedContacts / totalContacts) * 100))
+                                    : (campaign.total_queued_count && campaign.total_queued_count > 0
+                                        ? Math.min(100, Math.round(((campaign.executed_count ?? 0) / campaign.total_queued_count) * 100))
+                                        : 0);
+
+                                const totalDials = campaign.total_queued_count ?? 0;
+                                const retriesCount = campaign.retry_attempts_count ?? 0;
+                                const activeCount = campaign.active_count ?? 0;
 
                                 return (
                                     <TableRow
@@ -184,16 +200,33 @@ export default function CampaignsPage() {
                                         </TableCell>
                                         <TableCell>
                                             <div className="space-y-1.5 max-w-[240px]">
-                                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                                    <span className="font-semibold text-foreground">
-                                                        {executed} / {totalQueued} ({progressPercent}%)
+                                                <div className="flex items-center justify-between text-[11px]">
+                                                    <span className="font-bold text-foreground tabular-nums">
+                                                        {totalContacts > 0
+                                                            ? `${processedContacts} / ${totalContacts} leads`
+                                                            : `${campaign.executed_count ?? 0} / ${totalDials} dials`}
+                                                    </span>
+                                                    <span className="text-[10px] text-muted-foreground font-semibold tabular-nums">
+                                                        {contactPercent}%
                                                     </span>
                                                 </div>
                                                 <div className="w-full bg-muted/60 h-1.5 rounded-full overflow-hidden border border-border/10">
                                                     <div
                                                         className="bg-cta h-full rounded-full transition-all duration-300"
-                                                        style={{ width: `${progressPercent}%` }}
+                                                        style={{ width: `${contactPercent}%` }}
                                                     />
+                                                </div>
+                                                <div className="flex items-center justify-between text-[9px] text-muted-foreground/80">
+                                                    <span>
+                                                        {totalDials} dials{retriesCount > 0 ? ` (${retriesCount} retries)` : ''}
+                                                        {campaign.failed_rows > 0 ? ` • ${campaign.failed_rows} failed` : ''}
+                                                    </span>
+                                                    {activeCount > 0 && (
+                                                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                            {activeCount} active
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </TableCell>

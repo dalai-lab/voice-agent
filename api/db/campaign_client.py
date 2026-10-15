@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import func, or_, text, update
+from sqlalchemy import and_, case, func, or_, text, update
 from sqlalchemy.future import select
 
 from api.db.base_client import BaseDBClient
@@ -428,6 +428,34 @@ class CampaignClient(BaseDBClient):
             await session.refresh(campaign)
             return campaign
 
+    async def increment_campaign_failed_rows(self, campaign_id: int) -> None:
+        """Atomically increment failed_rows for a campaign in PostgreSQL."""
+        async with self.async_session() as session:
+            stmt = (
+                update(CampaignModel)
+                .where(CampaignModel.id == campaign_id)
+                .values(
+                    failed_rows=CampaignModel.failed_rows + 1,
+                    updated_at=datetime.now(UTC),
+                )
+            )
+            await session.execute(stmt)
+            await session.commit()
+
+    async def increment_campaign_processed_rows(self, campaign_id: int) -> None:
+        """Atomically increment processed_rows for a campaign in PostgreSQL."""
+        async with self.async_session() as session:
+            stmt = (
+                update(CampaignModel)
+                .where(CampaignModel.id == campaign_id)
+                .values(
+                    processed_rows=CampaignModel.processed_rows + 1,
+                    updated_at=datetime.now(UTC),
+                )
+            )
+            await session.execute(stmt)
+            await session.commit()
+
     async def append_campaign_log(
         self,
         campaign_id: int,
@@ -680,30 +708,119 @@ class CampaignClient(BaseDBClient):
     async def get_queued_runs_stats_for_campaigns(
         self, campaign_ids: list[int]
     ) -> dict[int, dict[str, int]]:
-        """Return {campaign_id: {"total": N, "executed": M}} for given campaigns.
-
-        "executed" means queued runs in the "processed" state.
+        """Return comprehensive queue stats for given campaigns:
+        total (all queued runs created), executed (completed/failed/cancelled),
+        active (processing in flight), pending (queued to dial right now),
+        scheduled_retries (queued with future scheduled_for),
+        and retry_attempts (runs where retry_count > 0).
         """
         if not campaign_ids:
             return {}
+        now = datetime.now(UTC)
         async with self.async_session() as session:
+            is_scheduled = case((QueuedRunModel.scheduled_for > now, 1), else_=0)
+            is_retry = case((QueuedRunModel.retry_count > 0, 1), else_=0)
             query = (
                 select(
                     QueuedRunModel.campaign_id,
                     QueuedRunModel.state,
+                    is_scheduled.label("is_scheduled"),
+                    is_retry.label("is_retry"),
                     func.count(QueuedRunModel.id),
                 )
                 .where(QueuedRunModel.campaign_id.in_(campaign_ids))
-                .group_by(QueuedRunModel.campaign_id, QueuedRunModel.state)
+                .group_by(
+                    QueuedRunModel.campaign_id,
+                    QueuedRunModel.state,
+                    is_scheduled,
+                    is_retry,
+                )
             )
             result = await session.execute(query)
             stats: dict[int, dict[str, int]] = {
-                cid: {"total": 0, "executed": 0} for cid in campaign_ids
+                cid: {
+                    "total": 0,
+                    "executed": 0,
+                    "active": 0,
+                    "pending": 0,
+                    "scheduled_retries": 0,
+                    "retry_attempts": 0,
+                    "completed_calls": 0,
+                    "failed_calls": 0,
+                    "unanswered_calls": 0,
+                }
+                for cid in campaign_ids
             }
-            for campaign_id, state, count in result.all():
+            for campaign_id, state, is_sched, is_ret, count in result.all():
                 stats[campaign_id]["total"] += count
+                if is_ret:
+                    stats[campaign_id]["retry_attempts"] += count
                 if state in ("processed", "cancelled", "failed"):
                     stats[campaign_id]["executed"] += count
+                elif state == "processing":
+                    stats[campaign_id]["active"] += count
+                elif state == "queued":
+                    if is_sched:
+                        stats[campaign_id]["scheduled_retries"] += count
+                    else:
+                        stats[campaign_id]["pending"] += count
+
+            # Ground-truth call outcome aggregates from workflow runs
+            try:
+                wf_disp = WorkflowRunModel.gathered_context["mapped_call_disposition"].as_string()
+                wf_query = (
+                    select(
+                        WorkflowRunModel.campaign_id,
+                        func.count(
+                            case(
+                                (wf_disp == "failed", 1),
+                                (wf_disp == "error", 1),
+                                else_=None,
+                            )
+                        ).label("failed_calls"),
+                        func.count(
+                            case(
+                                (
+                                    wf_disp.in_(
+                                        [
+                                            "busy",
+                                            "no-answer",
+                                            "no_answer",
+                                            "unanswered",
+                                            "voicemail",
+                                        ]
+                                    ),
+                                    1,
+                                ),
+                                else_=None,
+                            )
+                        ).label("unanswered_calls"),
+                        func.count(
+                            case(
+                                (wf_disp == "completed", 1),
+                                (
+                                    and_(
+                                        WorkflowRunModel.is_completed.is_(True),
+                                        wf_disp.is_(None),
+                                    ),
+                                    1,
+                                ),
+                                else_=None,
+                            )
+                        ).label("completed_calls"),
+                    )
+                    .where(WorkflowRunModel.campaign_id.in_(campaign_ids))
+                    .group_by(WorkflowRunModel.campaign_id)
+                )
+                wf_result = await session.execute(wf_query)
+                for cid, f_calls, u_calls, c_calls in wf_result.all():
+                    if cid in stats:
+                        stats[cid]["failed_calls"] = f_calls or 0
+                        stats[cid]["unanswered_calls"] = u_calls or 0
+                        stats[cid]["completed_calls"] = c_calls or 0
+            except Exception as e:
+                logger.warning(f"Failed to query workflow run stats for campaigns: {e}")
+
             return stats
 
     async def get_workflow_runs_by_campaign(

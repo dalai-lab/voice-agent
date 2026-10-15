@@ -243,29 +243,41 @@ class CampaignOrchestrator:
             logger.error(f"campaign_id: {campaign_id} - Campaign not found")
             return
 
-        retry_config = campaign.retry_config or {}
-        if not retry_config.get("enabled", True):
-            logger.info(f"campaign_id: {campaign_id} - Retry disabled")
-            return
-
-        # Check if this reason should be retried
-        reason = event.reason
-        if reason == "busy" and not retry_config.get("retry_on_busy", True):
-            logger.info(f"campaign_id: {campaign_id} - Skipping retry for busy signal")
-            return
-        if reason == "no_answer" and not retry_config.get("retry_on_no_answer", True):
-            logger.info(f"campaign_id: {campaign_id} - Skipping retry for no-answer")
-            return
-        if reason == "voicemail" and not retry_config.get("retry_on_voicemail", True):
-            logger.info(f"campaign_id: {campaign_id} - Skipping retry for voicemail")
-            return
-
         # Get the original queued run
         queued_run = await db_client.get_queued_run_by_id(event.queued_run_id)
         if not queued_run:
             logger.error(
                 f"campaign_id: {campaign_id} - Queued run {event.queued_run_id} not found"
             )
+            return
+
+        retry_config = campaign.retry_config or {}
+        if not retry_config.get("enabled", True):
+            logger.info(
+                f"campaign_id: {campaign_id} - Retry disabled, marking run {queued_run.id} as failed"
+            )
+            await self._mark_final_failure(queued_run, event.reason)
+            return
+
+        # Check if this reason should be retried
+        reason = event.reason
+        if reason == "busy" and not retry_config.get("retry_on_busy", True):
+            logger.info(
+                f"campaign_id: {campaign_id} - Skipping retry for busy signal, marking run {queued_run.id} as failed"
+            )
+            await self._mark_final_failure(queued_run, reason)
+            return
+        if reason == "no_answer" and not retry_config.get("retry_on_no_answer", True):
+            logger.info(
+                f"campaign_id: {campaign_id} - Skipping retry for no-answer, marking run {queued_run.id} as failed"
+            )
+            await self._mark_final_failure(queued_run, reason)
+            return
+        if reason == "voicemail" and not retry_config.get("retry_on_voicemail", True):
+            logger.info(
+                f"campaign_id: {campaign_id} - Skipping retry for voicemail, marking run {queued_run.id} as failed"
+            )
+            await self._mark_final_failure(queued_run, reason)
             return
 
         max_retries = retry_config.get("max_retries", 1)
@@ -321,20 +333,69 @@ class CampaignOrchestrator:
             f"retry attempt {retry_run.retry_count}"
         )
 
+        phone = (
+            (original_run.context_variables or {}).get("phone_number")
+            or (original_run.context_variables or {}).get("phone")
+            or "contact"
+        )
+        await db_client.append_campaign_log(
+            campaign_id=campaign_id,
+            level="info",
+            event="lead_retry_scheduled",
+            message=f"Scheduled retry #{original_run.retry_count + 1} for {phone} in {delay_seconds}s (reason: {reason}).",
+            details={
+                "lead_phone": phone,
+                "retry_attempt": original_run.retry_count + 1,
+                "delay_seconds": delay_seconds,
+                "reason": reason,
+                "queued_run_id": retry_run.id,
+            },
+        )
+
     async def _mark_final_failure(self, queued_run: QueuedRunModel, reason: str):
         """Mark a queued run as finally failed after max retries."""
         campaign_id = queued_run.campaign_id
 
-        # Update the campaign's failed_rows counter
-        campaign = await db_client.get_campaign_by_id(campaign_id)
-        if campaign:
-            await db_client.update_campaign(
-                campaign_id=campaign_id, failed_rows=campaign.failed_rows + 1
+        # Update the campaign's failed_rows counter atomically
+        try:
+            await db_client.increment_campaign_failed_rows(campaign_id)
+        except Exception as inc_err:
+            logger.warning(
+                f"campaign_id: {campaign_id} - Failed to atomically increment failed rows: {inc_err}"
+            )
+
+        # Mark the queued run as failed
+        try:
+            await db_client.update_queued_run(
+                queued_run_id=queued_run.id,
+                state="failed",
+            )
+        except Exception as q_err:
+            logger.warning(
+                f"campaign_id: {campaign_id} - Failed to update queued run {queued_run.id} to failed: {q_err}"
             )
 
         logger.info(
             f"campaign_id: {campaign_id} - Queued run {queued_run.id} finally failed after max retries, "
             f"last reason: {reason}"
+        )
+
+        phone = (
+            (queued_run.context_variables or {}).get("phone_number")
+            or (queued_run.context_variables or {}).get("phone")
+            or "contact"
+        )
+        await db_client.append_campaign_log(
+            campaign_id=campaign_id,
+            level="warning",
+            event="lead_retries_exhausted",
+            message=f"All retry attempts exhausted for {phone}. Marked as permanently failed (last reason: {reason}).",
+            details={
+                "lead_phone": phone,
+                "attempts": queued_run.retry_count + 1,
+                "last_reason": reason,
+                "queued_run_id": queued_run.id,
+            },
         )
 
     def _is_within_schedule(self, campaign: CampaignModel) -> bool:

@@ -1039,6 +1039,34 @@ export type CampaignResponse = {
      */
     total_queued_count?: number;
     /**
+     * Active Count
+     */
+    active_count?: number;
+    /**
+     * Pending Count
+     */
+    pending_count?: number;
+    /**
+     * Scheduled Retries Count
+     */
+    scheduled_retries_count?: number;
+    /**
+     * Retry Attempts Count
+     */
+    retry_attempts_count?: number;
+    /**
+     * Failed Calls Count
+     */
+    failed_calls_count?: number;
+    /**
+     * Completed Calls Count
+     */
+    completed_calls_count?: number;
+    /**
+     * Unanswered Calls Count
+     */
+    unanswered_calls_count?: number;
+    /**
      * Parent Campaign Id
      */
     parent_campaign_id?: number | null;

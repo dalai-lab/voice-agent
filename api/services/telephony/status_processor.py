@@ -178,6 +178,22 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
                     or (workflow_run.initial_context or {}).get("called_number")
                     or "Unknown"
                 )
+                if workflow_run.queued_run_id:
+                    try:
+                        await db_client.update_queued_run(
+                            queued_run_id=workflow_run.queued_run_id,
+                            state="failed",
+                        )
+                    except Exception as q_err:
+                        logger.warning(
+                            f"Failed to mark queued_run {workflow_run.queued_run_id} as failed: {q_err}"
+                        )
+                try:
+                    await db_client.increment_campaign_failed_rows(workflow_run.campaign_id)
+                except Exception as inc_err:
+                    logger.warning(
+                        f"Failed to increment campaign failed rows: {inc_err}"
+                    )
                 try:
                     await db_client.append_campaign_log(
                         campaign_id=workflow_run.campaign_id,

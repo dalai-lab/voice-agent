@@ -196,10 +196,8 @@ class CampaignCallDispatcher:
                 processed_count += 1
                 processed_run_ids.add(queued_run.id)
 
-                # Update campaign processed count
-                await db_client.update_campaign(
-                    campaign_id=campaign_id, processed_rows=campaign.processed_rows + 1
-                )
+                # Update campaign processed count atomically
+                await db_client.increment_campaign_processed_rows(campaign_id)
 
             except asyncio.CancelledError:
                 logger.warning(

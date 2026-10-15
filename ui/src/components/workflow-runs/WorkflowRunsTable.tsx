@@ -541,7 +541,27 @@ export function WorkflowRunsTable({
 
                                                             {/* Call Type */}
                                                             <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                <CallTypeCell mode={run.mode} callType={run.call_type} />
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <CallTypeCell mode={run.mode} callType={run.call_type} />
+                                                                    {(() => {
+                                                                        const initCtx = run.initial_context as Record<string, any> | undefined;
+                                                                        const isRetry = initCtx?.is_retry;
+                                                                        const attempt = initCtx?.retry_attempt;
+                                                                        const reason = initCtx?.retry_reason;
+                                                                        if (isRetry || attempt) {
+                                                                            return (
+                                                                                <span
+                                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                                                                    title={reason ? `Retry #${attempt} due to ${reason}` : `Retry #${attempt}`}
+                                                                                >
+                                                                                    Retry #{attempt || 1}
+                                                                                    {reason && <span className="font-normal opacity-80">({reason})</span>}
+                                                                                </span>
+                                                                            );
+                                                                        }
+                                                                        return null;
+                                                                    })()}
+                                                                </div>
                                                             </TableCell>
 
                                                             {/* Duration */}

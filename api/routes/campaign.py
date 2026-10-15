@@ -222,6 +222,13 @@ class CampaignResponse(BaseModel):
     callback_config: Any | None = None
     executed_count: int = 0
     total_queued_count: int = 0
+    active_count: int = 0
+    pending_count: int = 0
+    scheduled_retries_count: int = 0
+    retry_attempts_count: int = 0
+    failed_calls_count: int = 0
+    completed_calls_count: int = 0
+    unanswered_calls_count: int = 0
     parent_campaign_id: int | None = None
     redialed_campaign_id: int | None = None
     telephony_configuration_id: int | None = None
@@ -273,8 +280,31 @@ def _build_campaign_response(
     executed_count: int = 0,
     total_queued_count: int = 0,
     telephony_configuration_name: str | None = None,
+    stats: dict[str, int] | None = None,
+    active_count: int = 0,
+    pending_count: int = 0,
+    scheduled_retries_count: int = 0,
+    retry_attempts_count: int = 0,
 ) -> CampaignResponse:
     """Build a CampaignResponse from a campaign model."""
+    failed_calls_count = 0
+    completed_calls_count = 0
+    unanswered_calls_count = 0
+    if stats:
+        executed_count = stats.get("executed", 0)
+        total_queued_count = stats.get("total", 0)
+        active_count = stats.get("active", 0)
+        pending_count = stats.get("pending", 0)
+        scheduled_retries_count = stats.get("scheduled_retries", 0)
+        retry_attempts_count = stats.get("retry_attempts", 0)
+        failed_calls_count = stats.get("failed_calls", 0)
+        completed_calls_count = stats.get("completed_calls", 0)
+        unanswered_calls_count = stats.get("unanswered_calls", 0)
+
+    # Reconcile campaign failed_rows and processed_rows against ground-truth workflow stats
+    effective_failed_rows = max(campaign.failed_rows or 0, failed_calls_count)
+    effective_processed_rows = max(campaign.processed_rows or 0, completed_calls_count)
+
     # Get retry_config from campaign or use defaults
     retry_config = (
         campaign.retry_config
@@ -314,8 +344,8 @@ def _build_campaign_response(
         source_type=campaign.source_type,
         source_id=campaign.source_id,
         total_rows=campaign.total_rows,
-        processed_rows=campaign.processed_rows,
-        failed_rows=campaign.failed_rows,
+        processed_rows=effective_processed_rows,
+        failed_rows=effective_failed_rows,
         created_at=campaign.created_at,
         started_at=campaign.started_at,
         completed_at=campaign.completed_at,
@@ -326,6 +356,13 @@ def _build_campaign_response(
         callback_config=None,
         executed_count=executed_count,
         total_queued_count=total_queued_count,
+        active_count=active_count,
+        pending_count=pending_count,
+        scheduled_retries_count=scheduled_retries_count,
+        retry_attempts_count=retry_attempts_count,
+        failed_calls_count=failed_calls_count,
+        completed_calls_count=completed_calls_count,
+        unanswered_calls_count=unanswered_calls_count,
         parent_campaign_id=parent_campaign_id,
         redialed_campaign_id=redialed_campaign_id,
         telephony_configuration_id=campaign.telephony_configuration_id,
@@ -338,11 +375,20 @@ def _build_campaign_response(
     )
 
 
-async def _get_campaign_stats(campaign_id: int) -> tuple[int, int]:
-    """Return (executed_count, total_queued_count) for a campaign."""
+async def _get_campaign_stats(campaign_id: int) -> dict[str, int]:
+    """Return comprehensive queue stats breakdown for a campaign."""
     stats_map = await db_client.get_queued_runs_stats_for_campaigns([campaign_id])
-    s = stats_map.get(campaign_id, {})
-    return s.get("executed", 0), s.get("total", 0)
+    return stats_map.get(
+        campaign_id,
+        {
+            "total": 0,
+            "executed": 0,
+            "active": 0,
+            "pending": 0,
+            "scheduled_retries": 0,
+            "retry_attempts": 0,
+        },
+    )
 
 
 async def _get_telephony_configuration_name(
@@ -509,8 +555,7 @@ async def get_campaigns(
         _build_campaign_response(
             c,
             workflow_map.get(c.workflow_id, "Unknown"),
-            executed_count=stats_map.get(c.id, {}).get("executed", 0),
-            total_queued_count=stats_map.get(c.id, {}).get("total", 0),
+            stats=stats_map.get(c.id, {}),
             telephony_configuration_name=config_name_map.get(
                 c.telephony_configuration_id
             ),
@@ -535,15 +580,14 @@ async def get_campaign(
         campaign.workflow_id, organization_id=user.selected_organization_id
     )
 
-    executed, total = await _get_campaign_stats(campaign.id)
+    stats = await _get_campaign_stats(campaign.id)
     cfg_name = await _get_telephony_configuration_name(
         campaign.telephony_configuration_id, user.selected_organization_id
     )
     return _build_campaign_response(
         campaign,
         workflow_name or "Unknown",
-        executed,
-        total,
+        stats=stats,
         telephony_configuration_name=cfg_name,
     )
 
@@ -599,15 +643,14 @@ async def start_campaign(
         campaign.workflow_id, organization_id=user.selected_organization_id
     )
 
-    executed, total = await _get_campaign_stats(campaign.id)
+    stats = await _get_campaign_stats(campaign.id)
     cfg_name = await _get_telephony_configuration_name(
         campaign.telephony_configuration_id, user.selected_organization_id
     )
     return _build_campaign_response(
         campaign,
         workflow_name or "Unknown",
-        executed,
-        total,
+        stats=stats,
         telephony_configuration_name=cfg_name,
     )
 
@@ -635,15 +678,14 @@ async def pause_campaign(
         campaign.workflow_id, organization_id=user.selected_organization_id
     )
 
-    executed, total = await _get_campaign_stats(campaign.id)
+    stats = await _get_campaign_stats(campaign.id)
     cfg_name = await _get_telephony_configuration_name(
         campaign.telephony_configuration_id, user.selected_organization_id
     )
     return _build_campaign_response(
         campaign,
         workflow_name or "Unknown",
-        executed,
-        total,
+        stats=stats,
         telephony_configuration_name=cfg_name,
     )
 
@@ -709,15 +751,14 @@ async def update_campaign(
         campaign.workflow_id, organization_id=user.selected_organization_id
     )
 
-    executed, total = await _get_campaign_stats(campaign.id)
+    stats = await _get_campaign_stats(campaign.id)
     cfg_name = await _get_telephony_configuration_name(
         campaign.telephony_configuration_id, user.selected_organization_id
     )
     return _build_campaign_response(
         campaign,
         workflow_name or "Unknown",
-        executed,
-        total,
+        stats=stats,
         telephony_configuration_name=cfg_name,
     )
 
@@ -879,15 +920,14 @@ async def redial_campaign(
     workflow_name = await db_client.get_workflow_name(
         child.workflow_id, organization_id=user.selected_organization_id
     )
-    executed, total = await _get_campaign_stats(child.id)
+    stats = await _get_campaign_stats(child.id)
     cfg_name = await _get_telephony_configuration_name(
         child.telephony_configuration_id, user.selected_organization_id
     )
     return _build_campaign_response(
         child,
         workflow_name or "Unknown",
-        executed,
-        total,
+        stats=stats,
         telephony_configuration_name=cfg_name,
     )
 
@@ -943,15 +983,14 @@ async def resume_campaign(
         campaign.workflow_id, organization_id=user.selected_organization_id
     )
 
-    executed, total = await _get_campaign_stats(campaign.id)
+    stats = await _get_campaign_stats(campaign.id)
     cfg_name = await _get_telephony_configuration_name(
         campaign.telephony_configuration_id, user.selected_organization_id
     )
     return _build_campaign_response(
         campaign,
         workflow_name or "Unknown",
-        executed,
-        total,
+        stats=stats,
         telephony_configuration_name=cfg_name,
     )
 

@@ -9,6 +9,7 @@ Tests for Campaign Orchestrator robustness guarantees:
 
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 from api.services.campaign.campaign_event_protocol import (
@@ -208,3 +209,81 @@ async def test_runner_resume_resets_counters_and_publishes_event():
         mock_cb_reset.assert_awaited_once_with(campaign_id)
         # Verify resume event published
         mock_pub.publish_campaign_resumed.assert_awaited_once_with(campaign_id)
+
+
+def test_is_within_schedule_matching_slot(orchestrator):
+    """When current time falls inside a configured schedule slot, returns True."""
+    tz = "America/New_York"
+    now_ny = datetime.now(ZoneInfo(tz))
+    current_day = now_ny.weekday()
+    # Create a slot that spans 1 hour ago to 1 hour from now
+    start_time = (now_ny - timedelta(hours=1)).strftime("%H:%M")
+    end_time = (now_ny + timedelta(hours=1)).strftime("%H:%M")
+
+    campaign = MagicMock(
+        orchestrator_metadata={
+            "schedule_config": {
+                "enabled": True,
+                "timezone": tz,
+                "slots": [
+                    {
+                        "day_of_week": current_day,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                    }
+                ],
+            }
+        }
+    )
+    assert orchestrator._is_within_schedule(campaign) is True
+
+
+def test_is_within_schedule_outside_slot(orchestrator):
+    """When current time is outside all configured schedule slots, returns False."""
+    tz = "America/New_York"
+    now_ny = datetime.now(ZoneInfo(tz))
+    current_day = now_ny.weekday()
+    # Create a slot strictly in the past
+    start_time = (now_ny - timedelta(hours=4)).strftime("%H:%M")
+    end_time = (now_ny - timedelta(hours=2)).strftime("%H:%M")
+
+    campaign = MagicMock(
+        orchestrator_metadata={
+            "schedule_config": {
+                "enabled": True,
+                "timezone": tz,
+                "slots": [
+                    {
+                        "day_of_week": current_day,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                    }
+                ],
+            }
+        }
+    )
+    assert orchestrator._is_within_schedule(campaign) is False
+
+
+def test_is_within_schedule_disabled_or_empty(orchestrator):
+    """When schedule config is absent or disabled, fails open (returns True)."""
+    # No metadata
+    c1 = MagicMock(orchestrator_metadata=None)
+    assert orchestrator._is_within_schedule(c1) is True
+
+    # Disabled
+    c2 = MagicMock(orchestrator_metadata={"schedule_config": {"enabled": False}})
+    assert orchestrator._is_within_schedule(c2) is True
+
+    # Invalid timezone fails open
+    c3 = MagicMock(
+        orchestrator_metadata={
+            "schedule_config": {
+                "enabled": True,
+                "timezone": "Invalid/Timezone_Name",
+                "slots": [{"day_of_week": 0, "start_time": "09:00", "end_time": "17:00"}],
+            }
+        }
+    )
+    assert orchestrator._is_within_schedule(c3) is True
+

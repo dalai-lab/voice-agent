@@ -36,8 +36,8 @@ async def test_get_queued_runs_stats_counts_active_workflow_runs():
     stats = await client.get_queued_runs_stats_for_campaigns([1])
 
     assert 1 in stats
-    # Active must include the 15 active workflow runs PLUS 5 in processing = 20 active calls
-    assert stats[1]["active"] == 20
+    # Active must strictly reflect the 15 active workflow runs in progress (not internal processing batch claims)
+    assert stats[1]["active"] == 15
     assert stats[1]["total"] == 1000
     assert stats[1]["pending"] == 975
     assert stats[1]["executed"] == 20

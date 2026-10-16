@@ -32,6 +32,16 @@ ReportRunRow = namedtuple(
 )
 
 
+SUPPRESSED_CAMPAIGN_LOG_EVENTS = frozenset(
+    {
+        "lead_retry_scheduled",
+        "lead_retries_exhausted",
+        "carrier_call_failed",
+        "call_dispatch_failed",
+    }
+)
+
+
 class CampaignClient(BaseDBClient):
     async def create_campaign(
         self,
@@ -533,10 +543,13 @@ class CampaignClient(BaseDBClient):
         details: dict[str, Any] | None = None,
     ) -> None:
         """Append a timestamped entry to the campaign's logs JSON array.
-
-        Uses a SQL-side jsonb concat so concurrent writers do not clobber
-        each other's entries.
+        
+        Per-lead transient dial outcomes (e.g. retries, individual carrier rejections)
+        are suppressed so the campaign-level activity stream remains high-signal.
         """
+        if event in SUPPRESSED_CAMPAIGN_LOG_EVENTS:
+            return
+
         entry: dict[str, Any] = {
             "ts": datetime.now(UTC).isoformat(),
             "level": level,
@@ -862,8 +875,6 @@ class CampaignClient(BaseDBClient):
                     stats[campaign_id]["executed"] += count
                 if state == "failed":
                     failed_queued[campaign_id] += count
-                elif state == "processing":
-                    stats[campaign_id]["active"] += count
                 elif state == "queued":
                     if is_sched:
                         stats[campaign_id]["scheduled_retries"] += count
@@ -951,7 +962,7 @@ class CampaignClient(BaseDBClient):
                 wf_result = await session.execute(wf_query)
                 for cid, act_calls, f_calls, u_calls, c_calls in wf_result.all():
                     if cid in stats:
-                        stats[cid]["active"] = (act_calls or 0) + stats[cid]["active"]
+                        stats[cid]["active"] = act_calls or 0
                         stats[cid]["failed_calls"] = max(failed_queued.get(cid, 0), f_calls or 0)
                         stats[cid]["unanswered_calls"] = u_calls or 0
                         stats[cid]["completed_calls"] = c_calls or 0

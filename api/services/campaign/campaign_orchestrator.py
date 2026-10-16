@@ -350,25 +350,7 @@ class CampaignOrchestrator:
             f"retry attempt {retry_run.retry_count}"
         )
 
-        phone = (
-            (original_run.context_variables or {}).get("phone_number")
-            or (original_run.context_variables or {}).get("phone")
-            or "contact"
-        )
-        await db_client.append_campaign_log(
-            campaign_id=campaign_id,
-            level="info",
-            event="lead_retry_scheduled",
-            message=f"Scheduled retry #{original_run.retry_count + 1} for {phone} in {effective_delay}s (reason: {reason}).",
-            details={
-                "lead_phone": phone,
-                "retry_attempt": original_run.retry_count + 1,
-                "delay_seconds": effective_delay,
-                "base_delay_seconds": delay_seconds,
-                "reason": reason,
-                "queued_run_id": retry_run.id,
-            },
-        )
+
 
     async def _mark_final_failure(self, queued_run: QueuedRunModel, reason: str):
         """Mark a queued run as finally failed after max retries."""
@@ -406,23 +388,7 @@ class CampaignOrchestrator:
             f"last reason: {reason}"
         )
 
-        phone = (
-            (queued_run.context_variables or {}).get("phone_number")
-            or (queued_run.context_variables or {}).get("phone")
-            or "contact"
-        )
-        await db_client.append_campaign_log(
-            campaign_id=campaign_id,
-            level="warning",
-            event="lead_retries_exhausted",
-            message=f"All retry attempts exhausted for {phone}. Marked as permanently failed (last reason: {reason}).",
-            details={
-                "lead_phone": phone,
-                "attempts": queued_run.retry_count + 1,
-                "last_reason": reason,
-                "queued_run_id": queued_run.id,
-            },
-        )
+
 
     def _is_within_schedule(self, campaign: CampaignModel) -> bool:
         """Check if the current time falls within the campaign's schedule windows.

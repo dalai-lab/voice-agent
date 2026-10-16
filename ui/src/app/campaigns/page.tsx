@@ -171,6 +171,7 @@ export default function CampaignsPage() {
                                 const completedContacts = campaign.completed_calls_count ?? 0;
                                 const activeCount = campaign.active_count ?? 0;
                                 const retriesCount = campaign.retry_attempts_count ?? 0;
+                                const scheduledRetriesCount = campaign.scheduled_retries_count ?? 0;
                                 const resolvedContacts = Math.min(totalContacts, completedContacts + failedContacts);
                                 const totalDials = Math.max(
                                     campaign.executed_count ?? 0,
@@ -224,6 +225,7 @@ export default function CampaignsPage() {
                                                     <span>
                                                         {totalDials} dials{retriesCount > 0 ? ` (${retriesCount} retries)` : ''}
                                                         {campaign.failed_rows > 0 ? ` • ${campaign.failed_rows} failed` : ''}
+                                                        {scheduledRetriesCount > 0 ? ` • ${scheduledRetriesCount} in cool-down` : ''}
                                                     </span>
                                                     {activeCount > 0 && (
                                                         <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">

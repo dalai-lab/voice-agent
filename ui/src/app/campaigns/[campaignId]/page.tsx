@@ -861,17 +861,19 @@ export default function CampaignDetailPage() {
                     const failedRows = campaign.failed_rows ?? 0;
                     const completedRows = campaign.completed_calls_count ?? 0;
                     const activeRows = campaign.active_count ?? 0;
+                    const retriesInCooldown = campaign.scheduled_retries_count ?? 0;
                     const resolvedRows = Math.min(totalAudience, completedRows + failedRows);
                     const totalPercent = totalAudience > 0 ? Math.min(100, Math.round((resolvedRows / totalAudience) * 100)) : 0;
                     const completedPercent = totalAudience > 0 ? Math.min(100, (completedRows / totalAudience) * 100) : 0;
                     const activePercent = totalAudience > 0 ? Math.min(100 - completedPercent, (activeRows / totalAudience) * 100) : 0;
-                    const failedPercent = totalAudience > 0 ? Math.min(100 - completedPercent - activePercent, (failedRows / totalAudience) * 100) : 0;
-                    const remainingRows = Math.max(0, totalAudience - resolvedRows - activeRows);
+                    const retriesPercent = totalAudience > 0 ? Math.min(100 - completedPercent - activePercent, (retriesInCooldown / totalAudience) * 100) : 0;
+                    const failedPercent = totalAudience > 0 ? Math.min(100 - completedPercent - activePercent - retriesPercent, (failedRows / totalAudience) * 100) : 0;
+                    const remainingRows = Math.max(0, totalAudience - completedRows - failedRows - activeRows - retriesInCooldown);
 
                     return (
                         <div className="space-y-2.5 pt-3 border-t border-border/40">
                             <div className="flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     <span className="font-bold text-foreground">Unique Contacts / Leads Reached</span>
                                     <span className="text-muted-foreground font-normal">
                                         ({resolvedRows} of {totalAudience} unique contacts finished)
@@ -880,6 +882,12 @@ export default function CampaignDetailPage() {
                                         <span className="inline-flex items-center gap-1 text-[10px] text-sky-600 dark:text-sky-400 font-semibold">
                                             <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
                                             {activeRows} dialing now
+                                        </span>
+                                    )}
+                                    {retriesInCooldown > 0 && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                            {retriesInCooldown} in cool-down
                                         </span>
                                     )}
                                 </div>
@@ -902,6 +910,13 @@ export default function CampaignDetailPage() {
                                         className="bg-sky-500 h-full transition-all duration-300 animate-pulse"
                                         style={{ width: `${activePercent}%` }}
                                         title={`In-Flight Leads: ${activeRows}`}
+                                    />
+                                )}
+                                {retriesPercent > 0 && (
+                                    <div
+                                        className="bg-amber-400 dark:bg-amber-500 h-full transition-all duration-300"
+                                        style={{ width: `${retriesPercent}%` }}
+                                        title={`In Cool-Down (Scheduled Retries): ${retriesInCooldown}`}
                                     />
                                 )}
                                 {failedPercent > 0 && (
@@ -927,6 +942,13 @@ export default function CampaignDetailPage() {
                                         <span>In-Flight / Dialing</span>
                                     </div>
                                 )}
+                                {retriesInCooldown > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="h-2.5 w-2.5 rounded-full bg-amber-400 dark:bg-amber-500" />
+                                        <span className="font-semibold text-foreground">{retriesInCooldown}</span>
+                                        <span>In Cool-Down (Retries)</span>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-1.5">
                                     <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
                                     <span className="font-semibold text-foreground">{failedRows}</span>
@@ -935,7 +957,7 @@ export default function CampaignDetailPage() {
                                 <div className="flex items-center gap-1.5">
                                     <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
                                     <span className="font-semibold text-foreground">{remainingRows}</span>
-                                    <span>Remaining Leads</span>
+                                    <span>Remaining Ready</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 ml-auto font-mono text-[10px]">
                                     <span className="text-muted-foreground">Original Audience:</span>
@@ -1022,9 +1044,10 @@ export default function CampaignDetailPage() {
                                     const failed = campaign.failed_rows ?? 0;
                                     const completed = campaign.completed_calls_count ?? 0;
                                     const active = campaign.active_count ?? 0;
+                                    const retries = campaign.scheduled_retries_count ?? 0;
                                     const resolved = Math.min(totalAudience, completed + failed);
                                     const pct = totalAudience > 0 ? Math.min(100, Math.round((resolved / totalAudience) * 100)) : 0;
-                                    return `${resolved} / ${totalAudience} leads finished (${pct}%)${active > 0 ? ` • ${active} in flight` : ''}`;
+                                    return `${resolved} / ${totalAudience} leads finished (${pct}%)${active > 0 ? ` • ${active} in flight` : ''}${retries > 0 ? ` • ${retries} in cool-down` : ''}`;
                                 })()}
                             </dd>
                         </div>

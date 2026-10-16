@@ -53,6 +53,35 @@ async def test_append_campaign_log_caps_at_100_entries():
     assert "ts" in entry_payload[0]
 
 
+@pytest.mark.asyncio
+async def test_append_campaign_log_suppresses_per_call_transient_noise():
+    """Verify append_campaign_log drops per-call transient noise without writing to DB."""
+    client = CampaignClient()
+    mock_session = AsyncMock()
+    mock_session_ctx = AsyncMock()
+    mock_session_ctx.__aenter__.return_value = mock_session
+    mock_session_ctx.__aexit__.return_value = None
+    client.async_session = MagicMock(return_value=mock_session_ctx)
+
+    # Attempt to log suppressed events
+    for suppressed_event in [
+        "carrier_call_failed",
+        "lead_retry_scheduled",
+        "lead_retries_exhausted",
+        "call_dispatch_failed",
+    ]:
+        await client.append_campaign_log(
+            campaign_id=99,
+            level="error",
+            event=suppressed_event,
+            message="Transient per-call dial noise",
+        )
+
+    # None of these should execute any SQL
+    assert mock_session.execute.await_count == 0
+    assert mock_session.commit.await_count == 0
+
+
 def test_build_campaign_response_include_logs_toggle():
     """Verify _build_campaign_response omits logs when include_logs=False."""
     campaign = MagicMock(spec=CampaignModel)

@@ -359,20 +359,6 @@ class CampaignCallDispatcher:
                                 retry_reason="call_initiation_failed",
                             )
 
-                        await db_client.append_campaign_log(
-                            campaign_id=campaign_id,
-                            level="warning",
-                            event="call_dispatch_failed",
-                            message=f"Failed to dispatch call to {phone_num}: {e} (scheduled for retry attempt {queued_run.retry_count + 1}/{max_retries})",
-                            details={
-                                "queued_run_id": queued_run.id,
-                                "source_uuid": queued_run.source_uuid,
-                                "phone_number": phone_num,
-                                "error": str(e),
-                                "retry_attempt": queued_run.retry_count + 1,
-                                "max_retries": max_retries,
-                            },
-                        )
                     except Exception as retry_err:
                         logger.error(
                             f"Failed to schedule retry for queued run {queued_run.id}: {retry_err}"
@@ -393,20 +379,6 @@ class CampaignCallDispatcher:
                             )
                         logger.info(
                             f"Marked queued run {queued_run.id} as permanently failed (retries exhausted/disabled) due to error: {e}"
-                        )
-                        await db_client.append_campaign_log(
-                            campaign_id=campaign_id,
-                            level="error",
-                            event="call_dispatch_failed",
-                            message=f"Failed to dispatch call to {phone_num}: {e} (permanently failed)",
-                            details={
-                                "queued_run_id": queued_run.id,
-                                "source_uuid": queued_run.source_uuid,
-                                "phone_number": phone_num,
-                                "error": str(e),
-                                "retry_attempt": queued_run.retry_count,
-                                "max_retries": max_retries,
-                            },
                         )
                     except Exception as update_error:
                         logger.error(

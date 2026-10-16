@@ -57,6 +57,17 @@ async def get_user(
     if stack_user is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    # Invariant 1: Zero Unverified Entry — block unverified Stack Auth users
+    if stack_user.get("primary_email_verified") is False:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "EMAIL_NOT_VERIFIED",
+                "message": "Please verify your email address to continue.",
+                "email": stack_user.get("primary_email"),
+            },
+        )
+
     # ------------------------------------------------------------------
     # 2. Ensure the user has a team (Stack "selected_team_id")
     # ------------------------------------------------------------------

@@ -11,7 +11,7 @@ async def test_get_user_initializes_hosted_mps_billing_for_new_org(monkeypatch):
     stack_user = {
         "id": "stack-user-1",
         "selected_team_id": "team-1",
-        "primary_email_verified": False,
+        "primary_email_verified": True,
     }
     user = SimpleNamespace(
         id=7,
@@ -245,3 +245,27 @@ def test_sync_created_organization_to_posthog_with_provider_id(monkeypatch):
 
     _, capture_kwargs = capture_calls[0]
     assert capture_kwargs["distinct_id"] == "stack-user-1"
+
+
+@pytest.mark.asyncio
+async def test_stack_user_unverified_email_raises_403(monkeypatch):
+    from fastapi import HTTPException
+    stack_user = {
+        "id": "stack-user-unverified",
+        "selected_team_id": "team-unverified",
+        "primary_email_verified": False,
+        "primary_email": "unverified@example.com",
+    }
+    monkeypatch.setattr(auth_depends, "AUTH_PROVIDER", "stack")
+    monkeypatch.setattr(
+        auth_depends.stackauth,
+        "get_user",
+        AsyncMock(return_value=stack_user),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth_depends.get_user(authorization="Bearer token")
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail["code"] == "EMAIL_NOT_VERIFIED"
+

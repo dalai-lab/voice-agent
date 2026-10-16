@@ -57,6 +57,8 @@ class CallConcurrencyService:
         self.default_concurrent_limit = int(DEFAULT_ORG_CONCURRENCY_LIMIT)
         self._limit_memory_cache: dict[int, int] = {}
         self._group_memory_cache: dict[int, int] = {}
+        self._group_memory_cache_expiry: dict[int, float] = {}
+        self.group_cache_ttl: float = 300.0  # 5 minutes TTL
 
     async def get_org_concurrent_limit(self, organization_id: int) -> int:
         """Get the concurrent call limit for an organization.
@@ -141,8 +143,14 @@ class CallConcurrencyService:
 
     async def get_concurrency_group_id(self, organization_id: int) -> int:
         """Get the concurrency group ID for an organization (shares Redis counter across sub-orgs)."""
+        now = time.monotonic()
         if organization_id in self._group_memory_cache:
-            return self._group_memory_cache[organization_id]
+            expiry = self._group_memory_cache_expiry.get(organization_id)
+            if expiry is None or now < expiry:
+                return self._group_memory_cache[organization_id]
+            else:
+                self._group_memory_cache.pop(organization_id, None)
+                self._group_memory_cache_expiry.pop(organization_id, None)
 
         redis_client = None
         try:
@@ -163,6 +171,7 @@ class CallConcurrencyService:
                 if isinstance(cached_val, (str, int, bytes)):
                     group_int = int(cached_val)
                     self._group_memory_cache[organization_id] = group_int
+                    self._group_memory_cache_expiry[organization_id] = time.monotonic() + self.group_cache_ttl
                     return group_int
             except Exception:
                 pass
@@ -177,6 +186,7 @@ class CallConcurrencyService:
                 if val is not None:
                     group_int = int(val)
                     self._group_memory_cache[organization_id] = group_int
+                    self._group_memory_cache_expiry[organization_id] = time.monotonic() + self.group_cache_ttl
                     if redis_client and hasattr(redis_client, "set"):
                         try:
                             set_res = redis_client.set(
@@ -198,6 +208,25 @@ class CallConcurrencyService:
                 return self._group_memory_cache[organization_id]
 
             return organization_id
+
+    async def invalidate_concurrency_group(self, organization_id: int):
+        """Invalidate in-memory and Redis cached concurrency group ID (Issue 11 / Blocker 25)."""
+        self._group_memory_cache.pop(organization_id, None)
+        self._group_memory_cache_expiry.pop(organization_id, None)
+        try:
+            redis_client = None
+            if hasattr(rate_limiter, "_get_redis"):
+                redis_res = rate_limiter._get_redis()
+                if asyncio.iscoroutine(redis_res):
+                    redis_client = await redis_res
+                else:
+                    redis_client = redis_res
+            if redis_client and hasattr(redis_client, "delete"):
+                del_res = redis_client.delete(f"org_concurrency_group:{organization_id}")
+                if asyncio.iscoroutine(del_res):
+                    await del_res
+        except Exception as e:
+            logger.debug(f"Failed to invalidate redis org_concurrency_group for {organization_id}: {e}")
 
     async def is_org_custom_concurrency_cap(self, organization_id: int) -> bool | None:
         """Check whether an organization has an explicitly configured custom concurrency cap.

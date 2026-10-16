@@ -32,10 +32,22 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
     return document.cookie.includes("talkar_admin_bypass=true");
   });
 
-  const [isTalkarCustomer, setIsTalkarCustomer] = React.useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return document.cookie.includes("talkar_customer=true") && !document.cookie.includes("talkar_admin_bypass=true");
-  });
+  const [isTalkarCustomer, setIsTalkarCustomer] = React.useState<boolean>(false);
+
+  useEffect(() => {
+    if (dograhOrgId) {
+      const isOrgCustomer = document.cookie.includes(`talkar_customer_${dograhOrgId}=true`);
+      setIsTalkarCustomer(isOrgCustomer && !isAdminBypass);
+      if (isOrgCustomer) {
+        document.cookie = "talkar_customer=true; path=/; max-age=86400; SameSite=Lax";
+      } else {
+        document.cookie = "talkar_customer=; path=/; max-age=0";
+      }
+    } else {
+      setIsTalkarCustomer(false);
+      document.cookie = "talkar_customer=; path=/; max-age=0";
+    }
+  }, [dograhOrgId, isAdminBypass]);
 
   const [talkarStatus, setTalkarStatus] = React.useState<string | null>(null);
   const [isServiceDown, setIsServiceDown] = React.useState(false);
@@ -55,6 +67,8 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
               if (data?.status) {
                 setTalkarStatus(data.status);
                 setIsTalkarCustomer(true);
+                document.cookie = `talkar_customer_${dograhOrgId}=true; path=/; max-age=86400; SameSite=Lax`;
+                document.cookie = "talkar_customer=true; path=/; max-age=86400; SameSite=Lax";
               }
             })
             .catch(() => {});
@@ -67,6 +81,28 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
       setIsServiceDown(true);
       return false;
     }
+  }, [dograhOrgId]);
+
+  // Listen for explicit status invalidation event fired on successful payment
+  useEffect(() => {
+    const handleInvalidate = () => {
+      lastCheckedOrgRef.current = null;
+      if (dograhOrgId) {
+        fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data?.status) {
+              setTalkarStatus(data.status);
+              setIsTalkarCustomer(true);
+              document.cookie = `talkar_customer_${dograhOrgId}=true; path=/; max-age=86400; SameSite=Lax`;
+              document.cookie = "talkar_customer=true; path=/; max-age=86400; SameSite=Lax";
+            }
+          })
+          .catch(() => {});
+      }
+    };
+    window.addEventListener("talkar-status-invalidate", handleInvalidate);
+    return () => window.removeEventListener("talkar-status-invalidate", handleInvalidate);
   }, [dograhOrgId]);
 
   // Re-check admin bypass cookie on mount
@@ -133,6 +169,7 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
           // New workspace: service is up, customer just hasn't completed onboarding
           setIsServiceDown(false);
           setIsTalkarCustomer(false);
+          document.cookie = `talkar_customer_${dograhOrgId}=; path=/; max-age=0`;
           document.cookie = "talkar_customer=; path=/; max-age=0";
           return;
         }
@@ -152,9 +189,11 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
         if (data?.status) {
           setTalkarStatus(data.status);
           setIsTalkarCustomer(true);
+          document.cookie = `talkar_customer_${dograhOrgId}=true; path=/; max-age=86400; SameSite=Lax`;
           document.cookie = "talkar_customer=true; path=/; max-age=86400; SameSite=Lax";
         } else {
           setIsTalkarCustomer(false);
+          document.cookie = `talkar_customer_${dograhOrgId}=; path=/; max-age=0`;
           document.cookie = "talkar_customer=; path=/; max-age=0";
         }
       })

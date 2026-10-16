@@ -245,6 +245,7 @@ export default function WalletPage() {
         setWallet((prev: any) => ({ ...prev, balance_paise: newBalance }));
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("talkar:wallet-updated"));
+          window.dispatchEvent(new Event("talkar-status-invalidate"));
         }
         setTopupAmount("");
         setIsProcessing(false);
@@ -515,6 +516,55 @@ export default function WalletPage() {
       if (order.status === "upgraded_from_wallet") {
         alert(`Plan switched to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}.`);
         fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("talkar-status-invalidate"));
+        }
+      } else if (order.status === "payment_required" && order.razorpay_order_id) {
+        const statusRes = await fetch(`${TALKAR}/customers/status?dograh_org_id=${dograhOrgId}`);
+        const statusData = await statusRes.json().catch(() => ({}));
+        const rzpKey = statusData?.razorpay_key_id;
+        if (!rzpKey) {
+          alert(`Deposit shortfall of ₹${order.shortfall_inr} required to activate ${requestedTier}. Please top up your wallet.`);
+          return;
+        }
+        const rzp = new (window as any).Razorpay({
+          key: rzpKey,
+          amount: order.amount_paise,
+          currency: "INR",
+          name: "Talkar AI Voice",
+          description: `Tier upgrade deposit shortfall (₹${order.shortfall_inr})`,
+          order_id: order.razorpay_order_id,
+          handler: async (response: any) => {
+            const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                dograh_org_id: dograhOrgId,
+                amount_paise: order.amount_paise,
+                requested_tier: requestedTier,
+              })
+            });
+            if (confirmRes.ok) {
+              alert(`Payment successful. Plan switched to ${requestedTier.charAt(0).toUpperCase() + requestedTier.slice(1)}.`);
+              fetch(`${TALKAR}/billing/subscription/by-org/${dograhOrgId}`).then(r => r.json()).then(setSubscription);
+              fetch(`${TALKAR}/billing/wallet/by-org/${dograhOrgId}`).then(r => r.json()).then(w => setWallet(w));
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new Event("talkar-status-invalidate"));
+              }
+            } else {
+              const err = await confirmRes.json().catch(() => ({}));
+              alert(err.detail || "Failed to confirm upgrade payment");
+            }
+          },
+          prefill: {
+            name: (user as any)?.name || "",
+            email: (user as any)?.email || "",
+          }
+        });
+        rzp.open();
       }
     } catch (err: any) {
       console.error(err);

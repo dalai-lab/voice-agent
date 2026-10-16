@@ -13,7 +13,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { 
   Check, ArrowRight, ArrowLeft, Sparkles, Building2, User, Bot, Wrench, 
-  Clock, CheckCircle2, CreditCard, UploadCloud, ChevronRight, MessageSquare
+  Clock, CheckCircle2, CreditCard, UploadCloud, ChevronRight, MessageSquare,
+  XCircle, ShieldAlert, Mail
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useOrgConfig } from "@/context/OrgConfigContext";
@@ -63,6 +64,8 @@ export default function OnboardingPage() {
   const [uploadProgress, setUploadProgress] = useState({ gst: 0, reg: 0 });
   const [uploadedFiles, setUploadedFiles] = useState<{ gst: File | null; reg: File | null }>({ gst: null, reg: null });
   const [switchingBillingType, setSwitchingBillingType] = useState(false);
+  const [clarificationText, setClarificationText] = useState("");
+  const [submittingClarification, setSubmittingClarification] = useState(false);
 
   const handleSwitchToIndependent = async () => {
     if (!dograhOrgId) return;
@@ -157,12 +160,14 @@ export default function OnboardingPage() {
 
           if (data.status === "active") {
             router.push("/overview");
-          } else if (data.status === "pending_plan_selection") {
-            router.push("/onboarding/select-plan");
-          } else if (data.status === "pending_deposit") {
+          } else if (data.status === "pending_deposit" || data.status === "suspended") {
             router.push("/wallet");
-          } else if (data.status === "agent_building" && !data.has_onboarding_form) {
-            setStatus("new_agent_brief");
+          } else if (data.status === "agent_building") {
+            if (!data.has_onboarding_form) {
+              setStatus("new_agent_brief");
+            } else {
+              router.push("/overview");
+            }
           }
 
           // Fetch existing master info if available to provide linking / independent context
@@ -406,41 +411,114 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleFileSelect = (type: "gst" | "reg", e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (type: "gst" | "reg", e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     // Store file reference for display
     setUploadedFiles(prev => ({ ...prev, [type]: file }));
-    setUploadProgress(prev => ({ ...prev, [type]: 0 }));
+    setUploadProgress(prev => ({ ...prev, [type]: 15 }));
 
-    // Read as data URL for form submission (or just store the file name/object URL)
-    const reader = new FileReader();
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 25;
-      if (progress >= 90) clearInterval(interval);
-      setUploadProgress(prev => ({ ...prev, [type]: progress }));
-    }, 100);
+    try {
+      // 1. Request presigned upload URL from S3 presigned upload endpoint
+      const presignedRes = await fetch("/api/upload/presigned-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type || "application/pdf",
+          fileSize: file.size,
+          documentType: type,
+        }),
+      });
 
-    reader.onload = () => {
-      clearInterval(interval);
-      setUploadProgress(prev => ({ ...prev, [type]: 100 }));
-      const dataUrl = reader.result as string;
-      if (type === "gst") {
-        setFormData(prev => ({ ...prev, gstCertificateUrl: dataUrl }));
-      } else {
-        setFormData(prev => ({ ...prev, businessRegistrationUrl: dataUrl }));
+      if (!presignedRes.ok) {
+        const err = await presignedRes.json().catch(() => ({}));
+        throw new Error(err.error || err.detail || "Failed to get presigned upload URL");
       }
-    };
 
-    reader.onerror = () => {
-      clearInterval(interval);
+      const { uploadUrl, fileUrl } = await presignedRes.json();
+      setUploadProgress(prev => ({ ...prev, [type]: 45 }));
+
+      // 2. Direct upload to S3 / storage via HTTP PUT
+      const uploadRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`Upload failed with status ${uploadRes.status}`);
+      }
+
+      setUploadProgress(prev => ({ ...prev, [type]: 100 }));
+
+      // 3. Store clean HTTPS document URL in formData (NOT raw base64 data)
+      const cleanUrl = fileUrl || uploadUrl.split("?")[0];
+      if (type === "gst") {
+        setFormData(prev => ({ ...prev, gstCertificateUrl: cleanUrl }));
+      } else {
+        setFormData(prev => ({ ...prev, businessRegistrationUrl: cleanUrl }));
+      }
+    } catch (err: any) {
+      console.error(`Failed to upload ${type} document:`, err);
+      alert(`Document upload failed: ${err.message || "Please try again."}`);
       setUploadProgress(prev => ({ ...prev, [type]: 0 }));
       setUploadedFiles(prev => ({ ...prev, [type]: null }));
-    };
+    }
+  };
+ 
+  const handleSubmitClarification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clarificationText.trim() && !formData.gstCertificateUrl && !formData.businessRegistrationUrl) {
+      alert("Please provide a clarification message or upload requested documents.");
+      return;
+    }
 
-    reader.readAsDataURL(file);
+    setSubmittingClarification(true);
+    try {
+      const updatedForm = {
+        ...formData,
+        clarification_response: clarificationText.trim(),
+        info_requested_reply: clarificationText.trim(),
+      };
+      const endpoint = dograhOrgId
+        ? `${TALKAR_API}/customers/by-org/${dograhOrgId}/onboarding`
+        : `${TALKAR_API}/customers/${customerData?.customer_id}/onboarding`;
+
+      const docs = [
+        ...(formData.gstCertificateUrl ? [{ type: "gst_certificate", url: formData.gstCertificateUrl }] : []),
+        ...(formData.businessRegistrationUrl ? [{ type: "business_registration", url: formData.businessRegistrationUrl }] : []),
+      ];
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          form: updatedForm,
+          documents: docs,
+        }),
+      });
+
+      if (res.ok) {
+        setCustomerData((prev: any) => ({
+          ...prev,
+          status: "under_review",
+          onboarding_form: updatedForm,
+          documents: docs,
+        }));
+        setStatus("under_review");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed to submit clarification: ${err.detail || res.statusText}`);
+      }
+    } catch {
+      alert("Failed to submit clarification. Please try again.");
+    } finally {
+      setSubmittingClarification(false);
+    }
   };
 
   if (loading) {
@@ -498,7 +576,7 @@ export default function OnboardingPage() {
       <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12 lg:py-20 z-10">
         
         {/* ── 3. PENDING APPROVAL: Premium Split-Screen Wizard ── */}
-        {(status === "pending_approval" || status === "new") && (
+        {(status === "pending_approval" || status === "new" || status === "editing") && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-start">
             
             {/* Optional Banner to switch to Shared Wallet if returning customer has an established account */}
@@ -1053,31 +1131,33 @@ export default function OnboardingPage() {
           <div className="max-w-xl mx-auto py-10 px-4 space-y-8">
             {/* Minimal Status Header */}
             <div className="text-center space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                 Quick clarification needed
               </div>
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-                We need a few more details
+                Action Required: Additional Information
               </h1>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
-                Our team reviewed your setup request and has a quick question before we can activate your line.
+                Our onboarding team reviewed your setup request and has a question before we can activate your line.
               </p>
             </div>
 
-            {/* Clean Note Card */}
+            {/* Note Card with Admin Message */}
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
               <div className="flex items-start gap-3.5">
                 <div className="w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
                   <MessageSquare className="w-4 h-4" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1.5 w-full">
                   <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                    Message from onboarding team
+                    Message from Onboarding Team
                   </p>
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                    We sent a brief message to your email and phone to confirm your call flow and integration details.
-                  </p>
+                  <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
+                    <p className="text-xs text-amber-950 dark:text-amber-200 leading-relaxed whitespace-pre-line font-medium">
+                      {customerData?.info_requested_message || "We reviewed your onboarding application and need a brief clarification regarding your call flow or business verification before we can activate your account."}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1087,22 +1167,128 @@ export default function OnboardingPage() {
                   <span className="font-medium text-zinc-800 dark:text-zinc-200">{formData.pocName || "Account Owner"}</span>
                 </div>
                 <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
-                  <span className="text-zinc-400 dark:text-zinc-500">Expected response time</span>
-                  <span className="font-medium text-zinc-800 dark:text-zinc-200">&lt; 15 minutes</span>
+                  <span className="text-zinc-400 dark:text-zinc-500">Official support channel</span>
+                  <a href="mailto:support@talkar.in?subject=Application%20Clarification%20Inquiry" className="font-medium text-orange-600 dark:text-orange-400 hover:underline">
+                    support@talkar.in
+                  </a>
                 </div>
               </div>
             </div>
 
-            {/* Clean Modern Action Buttons */}
+            {/* Clarification & Document Re-Upload Form */}
+            <form onSubmit={handleSubmitClarification} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="clarification-response" className="text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                  Your Clarification / Response <span className="text-orange-500">*</span>
+                </Label>
+                <Textarea
+                  id="clarification-response"
+                  rows={4}
+                  value={clarificationText}
+                  onChange={(e) => setClarificationText(e.target.value)}
+                  placeholder="Provide answers to the team's questions, describe any updates to your call flow, or share additional business details..."
+                  className="bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:ring-orange-500"
+                />
+              </div>
+
+              {/* Document Re-upload Components */}
+              <div className="space-y-2.5 pt-1">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                  Re-upload Verification Documents (Optional)
+                </Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <label
+                    htmlFor="clarification-gst-upload"
+                    className={`border border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+                      uploadedFiles.gst
+                        ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20"
+                        : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 bg-zinc-50 dark:bg-zinc-800/40"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      id="clarification-gst-upload"
+                      className="hidden"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => handleFileSelect("gst", e)}
+                    />
+                    {uploadedFiles.gst ? (
+                      <>
+                        <Check className="w-5 h-5 text-emerald-600 mb-1" />
+                        <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300 truncate max-w-[180px]">{uploadedFiles.gst.name}</p>
+                        <p className="text-[10px] text-zinc-500">Click to replace</p>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="w-5 h-5 text-orange-500 mb-1" />
+                        <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200">GST / Tax Document</p>
+                        <p className="text-[10px] text-zinc-500">PDF, JPG, PNG</p>
+                      </>
+                    )}
+                    {uploadProgress.gst > 0 && uploadProgress.gst < 100 && (
+                      <div className="w-full mt-2 bg-zinc-200 rounded-full h-1 overflow-hidden">
+                        <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all" style={{ width: `${uploadProgress.gst}%` }} />
+                      </div>
+                    )}
+                  </label>
+
+                  <label
+                    htmlFor="clarification-reg-upload"
+                    className={`border border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+                      uploadedFiles.reg
+                        ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20"
+                        : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 bg-zinc-50 dark:bg-zinc-800/40"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      id="clarification-reg-upload"
+                      className="hidden"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => handleFileSelect("reg", e)}
+                    />
+                    {uploadedFiles.reg ? (
+                      <>
+                        <Check className="w-5 h-5 text-emerald-600 mb-1" />
+                        <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300 truncate max-w-[180px]">{uploadedFiles.reg.name}</p>
+                        <p className="text-[10px] text-zinc-500">Click to replace</p>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="w-5 h-5 text-orange-500 mb-1" />
+                        <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200">Business Registration</p>
+                        <p className="text-[10px] text-zinc-500">PDF, JPG, PNG</p>
+                      </>
+                    )}
+                    {uploadProgress.reg > 0 && uploadProgress.reg < 100 && (
+                      <div className="w-full mt-2 bg-zinc-200 rounded-full h-1 overflow-hidden">
+                        <div className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all" style={{ width: `${uploadProgress.reg}%` }} />
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <Button
+                  type="submit"
+                  disabled={submittingClarification}
+                  className="w-full h-11 bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-95 text-white font-semibold rounded-xl text-xs transition-opacity shadow-xs cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {submittingClarification ? "Submitting Clarification..." : "Submit Clarification & Update Application"}
+                </Button>
+              </div>
+            </form>
+
+            {/* Official Support & Sign Out */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
               <a
-                href="https://wa.me/919876543210"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="mailto:support@talkar.in?subject=Application%20Clarification%20Support"
                 className="inline-flex items-center justify-center gap-2 h-11 px-6 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-medium rounded-xl text-xs transition-colors shadow-xs"
               >
-                <MessageSquare className="w-4 h-4 text-orange-400 dark:text-orange-500" />
-                Chat with Onboarding Team
+                <Mail className="w-4 h-4 text-orange-400 dark:text-orange-500" />
+                Email Support (support@talkar.in)
               </a>
               <Button
                 variant="outline"
@@ -1303,6 +1489,179 @@ export default function OnboardingPage() {
               <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
                 Secure checkout via Razorpay · Instant activation upon completion
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── 6. REJECTED SCREEN ── */}
+        {status === "rejected" && (() => {
+          const remainingDays = typeof customerData?.remaining_days === "number"
+            ? customerData.remaining_days
+            : (typeof customerData?.reapply_countdown_days === "number"
+              ? customerData.reapply_countdown_days
+              : (customerData?.reapply_countdown === "0d 0h" ? 0 : 30));
+          const isEligible = remainingDays <= 0;
+
+          return (
+            <div className="max-w-xl mx-auto py-10 px-4 space-y-8">
+              {/* Minimal Status Header */}
+              <div className="text-center space-y-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-400 text-xs font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  Application not approved
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+                  Application Status Update
+                </h1>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+                  We are unable to approve your voice agent onboarding application at this time based on our verification criteria.
+                </p>
+              </div>
+
+              {/* Rejection Details Card */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                    <XCircle className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                      Reason for Rejection
+                    </p>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                      {customerData?.rejection_reason || "Verification details did not satisfy our telecom compliance and verification policies."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
+                    <span className="text-zinc-400 dark:text-zinc-500">Reapplication Eligible In</span>
+                    <span className={`font-semibold flex items-center gap-1.5 ${isEligible ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                      <Clock className="w-3.5 h-3.5" />
+                      {isEligible ? "Eligible now" : (customerData?.reapply_countdown || "30d 0h")}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
+                    <span className="text-zinc-400 dark:text-zinc-500">Registered Business</span>
+                    <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                      {customerData?.company_name || formData.businessName || "Your Organization"}
+                    </span>
+                  </div>
+                </div>
+
+                {isEligible && (
+                  <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                    <Button
+                      className="w-full h-11 bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-95 text-white font-semibold rounded-xl text-xs transition-opacity shadow-xs cursor-pointer flex items-center justify-center gap-2"
+                      onClick={() => {
+                        setActiveStep(1);
+                        setStatus("editing");
+                      }}
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Re-Apply Now
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                {isEligible && (
+                  <Button
+                    className="inline-flex items-center justify-center gap-2 h-11 px-6 bg-gradient-to-r from-orange-500 to-rose-500 hover:opacity-95 text-white font-medium rounded-xl text-xs transition-opacity shadow-xs cursor-pointer"
+                    onClick={() => {
+                      setActiveStep(1);
+                      setStatus("editing");
+                    }}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Re-Apply Now
+                  </Button>
+                )}
+                <a
+                  href="mailto:support@talkar.in?subject=Application%20Rejection%20Inquiry"
+                  className="inline-flex items-center justify-center gap-2 h-11 px-6 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-medium rounded-xl text-xs transition-colors shadow-xs"
+                >
+                  <Mail className="w-4 h-4 text-orange-400 dark:text-orange-500" />
+                  Contact Support Team
+                </a>
+                <Button
+                  variant="outline"
+                  className="h-11 px-6 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs"
+                  onClick={() => void logout()}
+                >
+                  Sign Out
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── 7. CHURNED SCREEN ── */}
+        {status === "churned" && (
+          <div className="max-w-xl mx-auto py-10 px-4 space-y-8">
+            {/* Minimal Status Header */}
+            <div className="text-center space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-500/10 border border-zinc-500/20 text-zinc-700 dark:text-zinc-400 text-xs font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                Account Closed
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+                Workspace Decommissioned
+              </h1>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+                This account was permanently closed following prolonged suspension exceeding 45 days.
+              </p>
+            </div>
+
+            {/* Churned Details Card */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
+              <div className="flex items-start gap-3.5">
+                <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 flex items-center justify-center shrink-0">
+                  <ShieldAlert className="w-5 h-5 text-zinc-500" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    Resource Release &amp; Closure Notice
+                  </p>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    All reserved telephony lines (DIDs), speech models, and agent configurations associated with this organization have been released back to the telecom pool.
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
+                  <span className="text-zinc-400 dark:text-zinc-500">Account ID</span>
+                  <span className="font-mono text-zinc-700 dark:text-zinc-300">
+                    {customerData?.id || dograhOrgId || "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
+                  <span className="text-zinc-400 dark:text-zinc-500">Status</span>
+                  <span className="font-medium text-rose-600 dark:text-rose-400">Churned (Permanent)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+              <a
+                href="mailto:support@talkar.in?subject=Reopen%20Churned%20Account%20Inquiry"
+                className="inline-flex items-center justify-center gap-2 h-11 px-6 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-medium rounded-xl text-xs transition-colors shadow-xs"
+              >
+                <Mail className="w-4 h-4 text-orange-400 dark:text-orange-500" />
+                Contact Talkar Support
+              </a>
+              <Button
+                variant="outline"
+                className="h-11 px-6 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs"
+                onClick={() => void logout()}
+              >
+                Sign Out
+              </Button>
             </div>
           </div>
         )}

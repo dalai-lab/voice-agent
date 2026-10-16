@@ -24,8 +24,10 @@ def test_legacy_recording_keys_do_not_fall_through_to_org_scoped_auth():
 def test_known_org_scoped_keys_extract_org_id():
     assert _extract_org_id_from_key("campaigns/42/source.csv") == 42
     assert _extract_org_id_from_key("knowledge_base/42/document/file.pdf") == 42
+    assert _extract_org_id_from_key("onboarding/42/gst_certificate.pdf") == 42
     assert _extract_org_id_from_key("recordings/42/greeting-123/greeting.wav") == 42
     assert _extract_legacy_workflow_run_id("campaigns/42/source.csv") is None
+    assert _extract_legacy_workflow_run_id("onboarding/42/gst_certificate.pdf") is None
 
 
 def test_unknown_numeric_prefix_is_not_treated_as_org_scoped():

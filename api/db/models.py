@@ -570,7 +570,9 @@ class WorkflowRunModel(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=True)
     campaign = relationship("CampaignModel")
-    queued_run_id = Column(Integer, ForeignKey("queued_runs.id"), nullable=True)
+    queued_run_id = Column(
+        Integer, ForeignKey("queued_runs.id", ondelete="SET NULL"), nullable=True
+    )
     queued_run = relationship("QueuedRunModel", foreign_keys=[queued_run_id])
     public_access_token = Column(String(36), nullable=True)
     text_session = relationship(
@@ -810,7 +812,9 @@ class QueuedRunModel(Base):
 
     # New retry-related fields
     retry_count = Column(Integer, default=0, nullable=False, server_default=text("0"))
-    parent_queued_run_id = Column(Integer, ForeignKey("queued_runs.id"), nullable=True)
+    parent_queued_run_id = Column(
+        Integer, ForeignKey("queued_runs.id", ondelete="CASCADE"), nullable=True
+    )
     scheduled_for = Column(DateTime(timezone=True), nullable=True)
     retry_reason = Column(String, nullable=True)  # 'busy', 'no_answer', 'voicemail'
 

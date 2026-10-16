@@ -98,6 +98,8 @@ class TestCampaignCallDispatcherQuotaHandling:
                 gathered_context={
                     "error": "Talkar wallet balance is exhausted.",
                     "error_code": "insufficient_quota",
+                    "mapped_call_disposition": "quota_exhausted",
+                    "call_tags": ["not_connected", "quota_exhausted"],
                 },
                 queued_run_id=None,
             )
@@ -184,6 +186,9 @@ class TestProcessCampaignBatchQuotaHandling:
                     error_message="Concurrent call limit reached.",
                 )
             )
+            mock_db.get_campaign_by_id = AsyncMock(
+                return_value=MagicMock(id=42, state="running", orchestrator_metadata={})
+            )
             mock_db.increment_campaign_metadata_counter = AsyncMock(return_value=2)
             mock_db.update_campaign = AsyncMock()
             mock_db.append_campaign_log = AsyncMock()
@@ -214,6 +219,7 @@ class TestProcessCampaignBatchQuotaHandling:
     async def test_process_campaign_batch_pauses_on_persistent_wallet_depletion(self):
         campaign = MagicMock()
         campaign.id = 42
+        campaign.state = "running"
         campaign.orchestrator_metadata = {}
 
         with (
@@ -260,6 +266,7 @@ class TestProcessCampaignBatchQuotaHandling:
     async def test_process_campaign_batch_pauses_when_transient_retries_exhausted(self):
         campaign = MagicMock()
         campaign.id = 42
+        campaign.state = "running"
         campaign.orchestrator_metadata = {}
 
         with (

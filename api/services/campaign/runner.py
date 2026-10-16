@@ -194,15 +194,18 @@ class CampaignRunnerService:
         stats_map = await db_client.get_queued_runs_stats_for_campaigns([campaign_id])
         stats = stats_map.get(campaign_id, {})
         failed_calls = max(campaign.failed_rows or 0, stats.get("failed_calls", 0))
-        processed_rows = max(campaign.processed_rows or 0, stats.get("completed_calls", 0))
+        completed_calls = stats.get("completed_calls", 0)
+        dispatched_rows = campaign.processed_rows or 0
         total_rows = campaign.total_rows or 0
-        resolved_rows = processed_rows + failed_calls
+        # processed_rows tracks unique contact leads dispatched.
+        # resolved_rows must not add dispatched_rows + failed_calls (which double-counts failed leads).
+        resolved_rows = min(total_rows, max(dispatched_rows, completed_calls + failed_calls))
 
         return {
             "campaign_id": campaign_id,
             "state": campaign.state,
             "total_rows": total_rows,
-            "processed_rows": processed_rows,
+            "processed_rows": dispatched_rows,
             "failed_calls": failed_calls,
             "progress_percentage": (
                 min(100.0, (resolved_rows / total_rows * 100))

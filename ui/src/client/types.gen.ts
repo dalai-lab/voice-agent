@@ -6753,6 +6753,10 @@ export type UpdateCampaignRequest = {
     schedule_config?: ScheduleConfigRequest | null;
     circuit_breaker?: CircuitBreakerConfigRequest | null;
     /**
+     * Telephony Configuration Id
+     */
+    telephony_configuration_id?: number | null;
+    /**
      * Callback Config
      */
     callback_config?: unknown | null;

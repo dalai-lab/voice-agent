@@ -161,6 +161,29 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
                 state=WorkflowRunState.COMPLETED.value,
             )
 
+        if workflow_run.campaign_id is not None:
+            call_tags = (workflow_run.gathered_context or {}).get("call_tags", [])
+            answered_by = (
+                (workflow_run.gathered_context or {}).get("answered_by")
+                or (status.extra or {}).get("AnsweredBy")
+                or (status.extra or {}).get("answered_by")
+                or ""
+            )
+            is_voicemail = (
+                "voicemail_detected" in call_tags
+                or str(answered_by).startswith("machine_")
+                or answered_by == "fax"
+            )
+
+            if is_voicemail:
+                publisher = await get_campaign_event_publisher()
+                await publisher.publish_retry_needed(
+                    workflow_run_id=workflow_run_id,
+                    reason="voicemail",
+                    campaign_id=workflow_run.campaign_id,
+                    queued_run_id=workflow_run.queued_run_id,
+                )
+
     elif normalized_status in TERMINAL_NOT_CONNECTED_STATUSES:
         logger.warning(
             f"[run {workflow_run_id}] Call failed with status: {normalized_status.value}"

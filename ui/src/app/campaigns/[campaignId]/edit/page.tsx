@@ -208,8 +208,8 @@ export default function EditCampaignPage() {
                 return;
             }
             for (const slot of timeSlots) {
-                if (slot.start_time >= slot.end_time) {
-                    toast.error('Start time must be before end time for each slot');
+                if (slot.start_time === slot.end_time) {
+                    toast.error('Start and end time cannot be identical');
                     return;
                 }
             }

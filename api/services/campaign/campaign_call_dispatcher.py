@@ -1,6 +1,7 @@
 import asyncio
+import random
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from api.db import db_client
@@ -152,19 +153,20 @@ class CampaignCallDispatcher:
         processed_count = 0
         processed_run_ids: set[int] = set()
         for i, queued_run in enumerate(queued_runs):
-            # Mid-batch pause check: if campaign state was paused or stopped while processing previous
-            # calls in this batch, return remaining claims immediately instead of continuing.
-            if i > 0:
-                current_campaign = await db_client.get_campaign_by_id(campaign_id)
-                if current_campaign and current_campaign.state != "running":
-                    logger.info(
-                        f"Campaign {campaign_id} transitioned to state '{current_campaign.state}' mid-batch; "
-                        f"returning remaining {len(queued_runs) - i} claimed runs back to queued"
-                    )
-                    await self._return_unprocessed_claims(
-                        queued_runs, processed_run_ids, reason="campaign_stopped_mid_batch"
-                    )
-                    break
+            # Campaign state check: if campaign state was paused or stopped,
+            # return remaining claims immediately instead of continuing to dial.
+            # Checked for all leads (i >= 0) to avoid dialing lead 0 on paused campaigns.
+            current_campaign = await db_client.get_campaign_by_id(campaign_id)
+            if not current_campaign or current_campaign.state != "running":
+                state_str = current_campaign.state if current_campaign else "deleted"
+                logger.info(
+                    f"Campaign {campaign_id} transitioned to state '{state_str}' (checked at lead {i}); "
+                    f"returning remaining {len(queued_runs) - i} claimed runs back to queued"
+                )
+                await self._return_unprocessed_claims(
+                    queued_runs, processed_run_ids, reason="campaign_stopped_mid_batch"
+                )
+                break
 
             try:
                 # Apply rate limiting, i.e lets not initiate more than rate_limit_per_second
@@ -196,8 +198,9 @@ class CampaignCallDispatcher:
                 processed_count += 1
                 processed_run_ids.add(queued_run.id)
 
-                # Update campaign processed count atomically
-                await db_client.increment_campaign_processed_rows(campaign_id)
+                # Update campaign processed count atomically (only for initial lead attempts, not retries)
+                if queued_run.retry_count == 0:
+                    await db_client.increment_campaign_processed_rows(campaign_id)
 
             except asyncio.CancelledError:
                 logger.warning(
@@ -273,43 +276,123 @@ class CampaignCallDispatcher:
             except Exception as e:
                 logger.warning(f"Error processing queued run {queued_run.id}: {e}")
 
-                # Mark the queued run as failed to prevent infinite retry loops
-                try:
-                    await db_client.update_queued_run(
-                        queued_run_id=queued_run.id,
-                        state="failed",
-                        processed_at=datetime.now(UTC),
-                    )
-                    campaign_obj = await db_client.get_campaign_by_id(campaign_id)
-                    if campaign_obj:
-                        await db_client.update_campaign(
-                            campaign_id=campaign_id,
-                            failed_rows=campaign_obj.failed_rows + 1,
+                retry_config = campaign.retry_config or {}
+                retry_enabled = (
+                    retry_config.get("enabled", True)
+                    if isinstance(retry_config, dict)
+                    else getattr(retry_config, "enabled", True)
+                )
+                max_retries = (
+                    retry_config.get("max_retries", 1)
+                    if isinstance(retry_config, dict)
+                    else getattr(retry_config, "max_retries", 1)
+                )
+
+                phone_num = (
+                    queued_run.context_variables.get("phone_number", "Unknown")
+                    if queued_run.context_variables
+                    else "Unknown"
+                )
+
+                if retry_enabled and queued_run.retry_count < max_retries:
+                    try:
+                        await db_client.update_queued_run(
+                            queued_run_id=queued_run.id,
+                            state="failed",
+                            processed_at=datetime.now(UTC),
                         )
-                    logger.info(
-                        f"Marked queued run {queued_run.id} as failed due to error: {e}"
-                    )
-                    phone_num = (
-                        queued_run.context_variables.get("phone_number", "Unknown")
-                        if queued_run.context_variables
-                        else "Unknown"
-                    )
-                    await db_client.append_campaign_log(
-                        campaign_id=campaign_id,
-                        level="error",
-                        event="call_dispatch_failed",
-                        message=f"Failed to dispatch call to {phone_num}: {e}",
-                        details={
-                            "queued_run_id": queued_run.id,
-                            "source_uuid": queued_run.source_uuid,
-                            "phone_number": phone_num,
-                            "error": str(e),
-                        },
-                    )
-                except Exception as update_error:
-                    logger.error(
-                        f"Failed to mark queued run {queued_run.id} as failed: {update_error}"
-                    )
+                        # Publish retry event or schedule directly
+                        try:
+                            from api.services.campaign.campaign_event_publisher import (
+                                get_campaign_event_publisher,
+                            )
+
+                            publisher = await get_campaign_event_publisher()
+                            await publisher.publish_retry_needed(
+                                workflow_run_id=0,
+                                reason="call_initiation_failed",
+                                campaign_id=campaign_id,
+                                queued_run_id=queued_run.id,
+                            )
+                            logger.info(
+                                f"campaign_id: {campaign_id} - Published retry event for failed initialization of queued run {queued_run.id} (attempt {queued_run.retry_count + 1}/{max_retries})"
+                            )
+                        except Exception as pub_err:
+                            logger.warning(
+                                f"campaign_id: {campaign_id} - Failed to publish retry event, creating scheduled retry directly: {pub_err}"
+                            )
+                            delay_seconds = (
+                                retry_config.get("retry_delay_seconds", 120)
+                                if isinstance(retry_config, dict)
+                                else getattr(retry_config, "retry_delay_seconds", 120)
+                            )
+                            jitter = random.uniform(0.8, 1.2)
+                            effective_delay = max(1, int(delay_seconds * jitter))
+                            retry_source_uuid = f"{queued_run.source_uuid}_retry_{queued_run.retry_count + 1}"
+                            await db_client.create_queued_run(
+                                campaign_id=campaign_id,
+                                source_uuid=retry_source_uuid,
+                                context_variables=queued_run.context_variables,
+                                state="queued",
+                                retry_count=queued_run.retry_count + 1,
+                                parent_queued_run_id=queued_run.id,
+                                scheduled_for=datetime.now(UTC) + timedelta(seconds=effective_delay),
+                                retry_reason="call_initiation_failed",
+                            )
+
+                        await db_client.append_campaign_log(
+                            campaign_id=campaign_id,
+                            level="warning",
+                            event="call_dispatch_failed",
+                            message=f"Failed to dispatch call to {phone_num}: {e} (scheduled for retry attempt {queued_run.retry_count + 1}/{max_retries})",
+                            details={
+                                "queued_run_id": queued_run.id,
+                                "source_uuid": queued_run.source_uuid,
+                                "phone_number": phone_num,
+                                "error": str(e),
+                                "retry_attempt": queued_run.retry_count + 1,
+                                "max_retries": max_retries,
+                            },
+                        )
+                    except Exception as retry_err:
+                        logger.error(
+                            f"Failed to schedule retry for queued run {queued_run.id}: {retry_err}"
+                        )
+                else:
+                    # Final terminal failure (retries exhausted or disabled)
+                    try:
+                        await db_client.update_queued_run(
+                            queued_run_id=queued_run.id,
+                            state="failed",
+                            processed_at=datetime.now(UTC),
+                        )
+                        try:
+                            await db_client.increment_campaign_failed_rows(campaign_id)
+                        except Exception as inc_err:
+                            logger.warning(
+                                f"campaign_id: {campaign_id} - Failed to atomically increment failed rows: {inc_err}"
+                            )
+                        logger.info(
+                            f"Marked queued run {queued_run.id} as permanently failed (retries exhausted/disabled) due to error: {e}"
+                        )
+                        await db_client.append_campaign_log(
+                            campaign_id=campaign_id,
+                            level="error",
+                            event="call_dispatch_failed",
+                            message=f"Failed to dispatch call to {phone_num}: {e} (permanently failed)",
+                            details={
+                                "queued_run_id": queued_run.id,
+                                "source_uuid": queued_run.source_uuid,
+                                "phone_number": phone_num,
+                                "error": str(e),
+                                "retry_attempt": queued_run.retry_count,
+                                "max_retries": max_retries,
+                            },
+                        )
+                    except Exception as update_error:
+                        logger.error(
+                            f"Failed to mark queued run {queued_run.id} as failed: {update_error}"
+                        )
 
         return processed_count
 
@@ -472,7 +555,12 @@ class CampaignCallDispatcher:
                 run_id=workflow_run.id,
                 is_completed=True,
                 state=WorkflowRunState.COMPLETED.value,
-                gathered_context={"error": error_message, "error_code": error_code},
+                gathered_context={
+                    "error": error_message,
+                    "error_code": error_code,
+                    "mapped_call_disposition": "quota_exhausted",
+                    "call_tags": ["not_connected", "quota_exhausted"],
+                },
                 queued_run_id=None,
             )
 
@@ -547,10 +635,16 @@ class CampaignCallDispatcher:
                 state=WorkflowRunState.COMPLETED.value,
                 gathered_context={
                     "error": str(e),
+                    "mapped_call_disposition": "failed",
+                    "call_tags": ["not_connected", "telephony_failed", "initiation_failed"],
                 },
                 logs={
                     "telephony_status_callbacks": telephony_callback_logs,
                 },
+            )
+            await db_client.update_queued_run(
+                queued_run_id=queued_run.id,
+                workflow_run_id=workflow_run.id,
             )
 
             # Record call initiation failure in circuit breaker

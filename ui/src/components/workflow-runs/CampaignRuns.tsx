@@ -14,9 +14,10 @@ interface CampaignRunsProps {
     campaignId: number;
     workflowId: number;
     searchParams?: URLSearchParams;
+    campaignState?: string;
 }
 
-export function CampaignRuns({ campaignId, workflowId, searchParams }: CampaignRunsProps) {
+export function CampaignRuns({ campaignId, workflowId, searchParams, campaignState }: CampaignRunsProps) {
     const router = useRouter();
     const { isAuthenticated } = useAuth();
     const [runs, setRuns] = useState<WorkflowRunResponseSchema[]>([]);
@@ -88,11 +89,12 @@ export function CampaignRuns({ campaignId, workflowId, searchParams }: CampaignR
         page: number,
         filters?: ActiveFilter[],
         sortByParam?: string | null,
-        sortOrderParam?: 'asc' | 'desc'
+        sortOrderParam?: 'asc' | 'desc',
+        silent = false
     ) => {
         if (!isAuthenticated) return;
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
             // Prepare filter data for API
             let filterParam = undefined;
             if (filters && filters.length > 0) {
@@ -129,9 +131,9 @@ export function CampaignRuns({ campaignId, workflowId, searchParams }: CampaignR
             setError(null);
         } catch (err) {
             console.error("Error fetching campaign runs:", err);
-            setError("Failed to load campaign runs");
+            if (!silent) setError("Failed to load campaign runs");
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [campaignId, isAuthenticated]);
 
@@ -162,6 +164,15 @@ export function CampaignRuns({ campaignId, workflowId, searchParams }: CampaignR
             fetchCampaignRuns(currentPage, appliedFilters, sortBy, sortOrder);
         }
     }, [currentPage, appliedFilters, fetchCampaignRuns, isAuthenticated, sortBy, sortOrder]);
+
+    // Live auto-polling every 4s when campaign is running or syncing
+    useEffect(() => {
+        if (!isAuthenticated || !campaignState || !['running', 'syncing'].includes(campaignState)) return;
+        const interval = setInterval(() => {
+            fetchCampaignRuns(currentPage, appliedFilters, sortBy, sortOrder, true);
+        }, 4000);
+        return () => clearInterval(interval);
+    }, [campaignState, currentPage, appliedFilters, sortBy, sortOrder, isAuthenticated, fetchCampaignRuns]);
 
     const handleApplyFilters = useCallback(async () => {
         setIsExecutingFilters(true);

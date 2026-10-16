@@ -167,13 +167,18 @@ class CampaignClient(BaseDBClient):
             result = await session.execute(query)
             return list(result.scalars().all())
 
-    async def get_active_runs_count_for_campaign(self, campaign_id: int) -> int:
+    async def get_active_runs_count_for_campaign(
+        self, campaign_id: int, since: datetime | None = None
+    ) -> int:
         """Count workflow runs for a campaign that are currently in progress (is_completed is False)."""
         async with self.async_session() as session:
-            query = select(func.count(WorkflowRunModel.id)).where(
+            conditions = [
                 WorkflowRunModel.campaign_id == campaign_id,
                 WorkflowRunModel.is_completed.is_(False),
-            )
+            ]
+            if since is not None:
+                conditions.append(WorkflowRunModel.created_at >= since)
+            query = select(func.count(WorkflowRunModel.id)).where(*conditions)
             result = await session.execute(query)
             return int(result.scalar() or 0)
 
@@ -290,6 +295,7 @@ class CampaignClient(BaseDBClient):
                 source_id=parent_campaign.source_id,
                 created_by=parent_campaign.created_by,
                 organization_id=parent_campaign.organization_id,
+                telephony_configuration_id=parent_campaign.telephony_configuration_id,
                 retry_config=(
                     retry_config
                     if retry_config
@@ -342,7 +348,7 @@ class CampaignClient(BaseDBClient):
         tag_clauses = []
         if include_voicemail:
             tag_clauses.append(
-                "(lr.gathered_context::jsonb -> 'call_tags') @> '[\"voicemail_detected\"]'::jsonb"
+                "((lr.gathered_context::jsonb -> 'call_tags') @> '[\"voicemail_detected\"]'::jsonb OR lr.gathered_context::jsonb ->> 'answered_by' LIKE 'machine_%')"
             )
         if include_no_answer:
             tag_clauses.append(
@@ -797,11 +803,26 @@ class CampaignClient(BaseDBClient):
                         ).label("unanswered_calls"),
                         func.count(
                             case(
-                                (wf_disp == "completed", 1),
                                 (
                                     and_(
                                         WorkflowRunModel.is_completed.is_(True),
-                                        wf_disp.is_(None),
+                                        or_(
+                                            wf_disp.is_(None),
+                                            wf_disp.notin_(
+                                                [
+                                                    "failed",
+                                                    "error",
+                                                    "busy",
+                                                    "no-answer",
+                                                    "no_answer",
+                                                    "unanswered",
+                                                    "voicemail",
+                                                    "canceled",
+                                                    "cancelled",
+                                                    "quota_exhausted",
+                                                ]
+                                            ),
+                                        ),
                                     ),
                                     1,
                                 ),
@@ -855,9 +876,6 @@ class CampaignClient(BaseDBClient):
         async with self.async_session() as session:
             conditions = [
                 WorkflowRunModel.is_completed.is_(True),
-                WorkflowRunModel.usage_info["call_duration_seconds"]
-                .as_string()
-                .isnot(None),
             ]
             if campaign_id is not None:
                 conditions.append(WorkflowRunModel.campaign_id == campaign_id)

@@ -838,9 +838,12 @@ export default function CampaignDetailPage() {
                 {/* Multi-Segment Audience Progress Bar */}
                 {(() => {
                     const totalAudience = campaign.total_rows && campaign.total_rows > 0 ? campaign.total_rows : 0;
-                    const completedRows = campaign.processed_rows ?? 0;
+                    const dispatchedRows = campaign.processed_rows ?? 0;
                     const failedRows = campaign.failed_rows ?? 0;
-                    const resolvedRows = completedRows + failedRows;
+                    const completedRows = campaign.completed_calls_count !== undefined && campaign.completed_calls_count > 0
+                        ? campaign.completed_calls_count
+                        : Math.max(0, dispatchedRows - failedRows);
+                    const resolvedRows = Math.min(totalAudience, Math.max(dispatchedRows, completedRows + failedRows));
                     const totalPercent = totalAudience > 0 ? Math.min(100, Math.round((resolvedRows / totalAudience) * 100)) : 0;
                     const completedPercent = totalAudience > 0 ? Math.min(100, (completedRows / totalAudience) * 100) : 0;
                     const failedPercent = totalAudience > 0 ? Math.min(100 - completedPercent, (failedRows / totalAudience) * 100) : 0;
@@ -975,7 +978,17 @@ export default function CampaignDetailPage() {
                         <div>
                             <dt className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">Contacts Progress</dt>
                             <dd className="mt-1 text-xs font-bold text-foreground">
-                                {campaign.processed_rows} / {campaign.total_rows ?? 0} leads ({campaign.total_rows && campaign.total_rows > 0 ? Math.round((campaign.processed_rows / campaign.total_rows) * 100) : 0}%)
+                                {(() => {
+                                    const totalAudience = campaign.total_rows && campaign.total_rows > 0 ? campaign.total_rows : 0;
+                                    const dispatched = campaign.processed_rows ?? 0;
+                                    const failed = campaign.failed_rows ?? 0;
+                                    const completed = campaign.completed_calls_count !== undefined && campaign.completed_calls_count > 0
+                                        ? campaign.completed_calls_count
+                                        : Math.max(0, dispatched - failed);
+                                    const resolved = Math.min(totalAudience, Math.max(dispatched, completed + failed));
+                                    const pct = totalAudience > 0 ? Math.min(100, Math.round((resolved / totalAudience) * 100)) : 0;
+                                    return `${resolved} / ${totalAudience} leads (${pct}%)`;
+                                })()}
                             </dd>
                         </div>
                         <div>
@@ -1140,7 +1153,7 @@ export default function CampaignDetailPage() {
             </div>
 
             {/* Campaign Analytics */}
-            <CampaignAnalytics campaignId={campaignId} />
+            <CampaignAnalytics campaignId={campaignId} campaign={campaign} />
 
             {/* Activity Log */}
             <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-4">
@@ -1197,6 +1210,7 @@ export default function CampaignDetailPage() {
                     campaignId={campaignId}
                     workflowId={campaign.workflow_id}
                     searchParams={searchParams}
+                    campaignState={campaign.state}
                 />
             </div>
 

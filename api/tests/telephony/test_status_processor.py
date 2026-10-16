@@ -105,3 +105,101 @@ async def test_running_terminal_status_does_not_enqueue_workflow_completion():
     ]
     mock_enqueue.assert_not_awaited()
     mock_dispatcher.release_call_slot.assert_awaited_once_with(456)
+
+
+@pytest.mark.asyncio
+async def test_completed_call_with_voicemail_publishes_retry_needed():
+    """When a completed call has voicemail_detected in call_tags, it publishes retry_needed."""
+    workflow_run = SimpleNamespace(
+        id=789,
+        campaign_id=42,
+        queued_run_id=101,
+        state=WorkflowRunState.RUNNING.value,
+        is_completed=False,
+        logs={"telephony_status_callbacks": []},
+        gathered_context={"call_tags": ["voicemail_detected"], "answered_by": "machine_start"},
+    )
+    status = StatusCallbackRequest(
+        call_id="call-789",
+        status=TelephonyCallStatus.COMPLETED,
+        duration="15",
+    )
+
+    with (
+        patch("api.services.telephony.status_processor.db_client") as mock_db,
+        patch(
+            "api.services.telephony.status_processor.campaign_call_dispatcher"
+        ) as mock_dispatcher,
+        patch(
+            "api.services.telephony.status_processor.get_campaign_event_publisher"
+        ) as mock_get_pub,
+        patch(
+            "api.services.telephony.status_processor.circuit_breaker"
+        ) as mock_cb,
+        patch(
+            "api.services.telephony.status_processor.call_concurrency"
+        ) as mock_cc,
+    ):
+        mock_db.get_workflow_run_by_id = AsyncMock(return_value=workflow_run)
+        mock_db.update_workflow_run = AsyncMock()
+        mock_dispatcher.release_call_slot = AsyncMock(return_value=True)
+        mock_cc.unregister_active_call = AsyncMock()
+        mock_cb.record_and_evaluate = AsyncMock()
+        mock_pub = AsyncMock()
+        mock_get_pub.return_value = mock_pub
+
+        await _process_status_update(789, status)
+
+        mock_pub.publish_retry_needed.assert_awaited_once_with(
+            workflow_run_id=789,
+            reason="voicemail",
+            campaign_id=42,
+            queued_run_id=101,
+        )
+
+
+@pytest.mark.asyncio
+async def test_completed_human_call_does_not_publish_retry_needed():
+    """When a completed call was answered by a human, retry_needed is NOT published."""
+    workflow_run = SimpleNamespace(
+        id=790,
+        campaign_id=42,
+        queued_run_id=102,
+        state=WorkflowRunState.RUNNING.value,
+        is_completed=False,
+        logs={"telephony_status_callbacks": []},
+        gathered_context={"call_tags": ["human_answered"], "answered_by": "human"},
+    )
+    status = StatusCallbackRequest(
+        call_id="call-790",
+        status=TelephonyCallStatus.COMPLETED,
+        duration="45",
+    )
+
+    with (
+        patch("api.services.telephony.status_processor.db_client") as mock_db,
+        patch(
+            "api.services.telephony.status_processor.campaign_call_dispatcher"
+        ) as mock_dispatcher,
+        patch(
+            "api.services.telephony.status_processor.get_campaign_event_publisher"
+        ) as mock_get_pub,
+        patch(
+            "api.services.telephony.status_processor.circuit_breaker"
+        ) as mock_cb,
+        patch(
+            "api.services.telephony.status_processor.call_concurrency"
+        ) as mock_cc,
+    ):
+        mock_db.get_workflow_run_by_id = AsyncMock(return_value=workflow_run)
+        mock_db.update_workflow_run = AsyncMock()
+        mock_dispatcher.release_call_slot = AsyncMock(return_value=True)
+        mock_cc.unregister_active_call = AsyncMock()
+        mock_cb.record_and_evaluate = AsyncMock()
+        mock_pub = AsyncMock()
+        mock_get_pub.return_value = mock_pub
+
+        await _process_status_update(790, status)
+
+        mock_pub.publish_retry_needed.assert_not_called()
+

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from loguru import logger
 
@@ -32,6 +32,9 @@ TRANSIENT_QUOTA_ERROR_CODES = {
     "insufficient_reserve",
     "billing_service_unavailable",
 }
+CONSECUTIVE_BATCH_FAILURES_KEY = "consecutive_batch_failures"
+MAX_CONSECUTIVE_BATCH_FAILURES = 3
+
 
 
 async def sync_campaign_source(ctx: dict, campaign_id: int) -> None:
@@ -60,6 +63,30 @@ async def sync_campaign_source(ctx: dict, campaign_id: int) -> None:
         rows_synced = await sync_service.sync_source_data(campaign_id)
 
         if rows_synced == 0:
+            current_campaign = await db_client.get_campaign_by_id(campaign_id)
+            if current_campaign and current_campaign.state == "paused":
+                await db_client.update_campaign(
+                    campaign_id=campaign_id,
+                    source_sync_status="completed",
+                    source_last_synced_at=datetime.now(UTC),
+                )
+                await db_client.append_campaign_log(
+                    campaign_id=campaign_id,
+                    level="info",
+                    event="campaign_source_synced",
+                    message="Contacts synced successfully while campaign is paused: 0 contacts found in configured source. Maintaining paused state.",
+                    details={
+                        "source_type": campaign.source_type,
+                        "source_id": campaign.source_id,
+                        "total_rows": 0,
+                        "state": "paused",
+                    },
+                )
+                logger.info(
+                    f"Campaign {campaign_id} source sync completed (0 rows) while paused; maintaining paused state"
+                )
+                return
+
             # No data to process
             await db_client.update_campaign(
                 campaign_id=campaign_id,
@@ -80,6 +107,42 @@ async def sync_campaign_source(ctx: dict, campaign_id: int) -> None:
                 },
             )
             logger.info(f"Campaign {campaign_id} completed with no data to process")
+            return
+
+        # Check if campaign was paused or transitioned to a terminal state while sync was in flight
+        current_campaign = await db_client.get_campaign_by_id(campaign_id)
+        if current_campaign and current_campaign.state == "paused":
+            await db_client.update_campaign(
+                campaign_id=campaign_id,
+                source_sync_status="completed",
+                source_last_synced_at=datetime.now(UTC),
+            )
+            await db_client.append_campaign_log(
+                campaign_id=campaign_id,
+                level="info",
+                event="campaign_source_synced",
+                message=f"Contacts synced successfully while campaign is paused: {rows_synced} contact leads queued for execution. Maintaining paused state.",
+                details={
+                    "total_rows": rows_synced,
+                    "source_type": campaign.source_type,
+                    "source_id": campaign.source_id,
+                    "state": "paused",
+                },
+            )
+            logger.info(
+                f"Campaign {campaign_id} source sync completed ({rows_synced} rows) while paused; maintaining paused state"
+            )
+            return
+
+        if current_campaign and current_campaign.state in ["completed", "failed"]:
+            await db_client.update_campaign(
+                campaign_id=campaign_id,
+                source_sync_status="completed",
+                source_last_synced_at=datetime.now(UTC),
+            )
+            logger.info(
+                f"Campaign {campaign_id} in state '{current_campaign.state}' during sync completion; maintaining state"
+            )
             return
 
         # Update campaign state to running
@@ -175,6 +238,14 @@ async def process_campaign_batch(
 
     failed_count = 0
     try:
+        # Check upfront if campaign is in running state before executing batch
+        campaign = await db_client.get_campaign_by_id(campaign_id)
+        if not campaign or campaign.state != "running":
+            logger.info(
+                f"Campaign {campaign_id} is not running ({campaign.state if campaign else 'None'}); skipping batch execution."
+            )
+            return
+
         # Process the batch
         processed_count = await campaign_call_dispatcher.process_batch(
             campaign_id=campaign_id, batch_size=batch_size
@@ -193,6 +264,15 @@ async def process_campaign_batch(
                 campaign_id=campaign_id,
                 key=CONCURRENT_SLOT_RETRY_COUNTER_KEY,
             )
+            await db_client.reset_campaign_metadata_counter(
+                campaign_id=campaign_id,
+                key=CONSECUTIVE_BATCH_FAILURES_KEY,
+            )
+            if redis is not None:
+                try:
+                    await redis.delete(f"campaign:consecutive_batch_failures:{campaign_id}")
+                except Exception:
+                    pass
 
         # Publish batch completed event - orchestrator will handle next batch scheduling
         publisher = await get_campaign_event_publisher()
@@ -351,7 +431,10 @@ async def process_campaign_batch(
             if scope_count and scope_count > 0:
                 has_active_call = True
             else:
-                db_active = await db_client.get_active_runs_count_for_campaign(campaign_id)
+                cutoff = datetime.now(UTC) - timedelta(hours=2)
+                db_active = await db_client.get_active_runs_count_for_campaign(
+                    campaign_id, since=cutoff
+                )
                 if db_active > 0:
                     has_active_call = True
                 else:
@@ -595,23 +678,79 @@ async def process_campaign_batch(
     except Exception as e:
         logger.error(f"Error processing batch for campaign {campaign_id}: {e}")
 
-        # Publish batch failed event
-        publisher = await get_campaign_event_publisher()
-        await publisher.publish_batch_failed(
-            campaign_id=campaign_id,
-            error=str(e),
-            processed_count=0,
-        )
+        # Track consecutive failure counter in Redis (with DB counter fallback)
+        failures = 0
+        fail_key = f"campaign:consecutive_batch_failures:{campaign_id}"
+        if redis is None:
+            try:
+                from api.tasks.arq import get_arq_redis
 
-        # Update campaign state to failed
-        await db_client.update_campaign(campaign_id=campaign_id, state="failed")
-        await db_client.append_campaign_log(
-            campaign_id=campaign_id,
-            level="error",
-            event="batch_failed",
-            message=f"Batch processing failed: {e}",
-            details={"error": str(e)},
-        )
+                redis = await get_arq_redis()
+            except Exception:
+                redis = None
+
+        if redis is not None:
+            try:
+                failures = await redis.incr(fail_key)
+                await redis.expire(fail_key, 300)
+            except Exception as r_err:
+                logger.debug(f"Failed to increment Redis failure counter: {r_err}")
+                failures = 0
+
+        if failures == 0:
+            try:
+                failures = await db_client.increment_campaign_metadata_counter(
+                    campaign_id=campaign_id,
+                    key=CONSECUTIVE_BATCH_FAILURES_KEY,
+                )
+            except Exception as db_err:
+                logger.debug(f"Failed to increment DB failure counter: {db_err}")
+                failures = MAX_CONSECUTIVE_BATCH_FAILURES
+
+        publisher = await get_campaign_event_publisher()
+
+        if failures >= MAX_CONSECUTIVE_BATCH_FAILURES:
+            logger.error(
+                f"Campaign {campaign_id} exceeded maximum consecutive batch failures "
+                f"({failures}/{MAX_CONSECUTIVE_BATCH_FAILURES}); failing campaign permanently."
+            )
+            # Publish batch failed event
+            await publisher.publish_batch_failed(
+                campaign_id=campaign_id,
+                error=str(e),
+                processed_count=0,
+            )
+            # Update campaign state to failed
+            await db_client.update_campaign(campaign_id=campaign_id, state="failed")
+            await db_client.append_campaign_log(
+                campaign_id=campaign_id,
+                level="error",
+                event="batch_failed",
+                message=f"Batch processing failed after {failures} consecutive attempts: {e}",
+                details={"error": str(e), "failures": failures, "max_failures": MAX_CONSECUTIVE_BATCH_FAILURES},
+            )
+        else:
+            logger.warning(
+                f"Batch failed ({failures}/{MAX_CONSECUTIVE_BATCH_FAILURES}) for campaign {campaign_id}. "
+                f"Scheduling retry backoff without failing campaign: {e}"
+            )
+            await db_client.append_campaign_log(
+                campaign_id=campaign_id,
+                level="warning",
+                event="batch_transient_failure_retry",
+                message=(
+                    f"Batch processing encountered transient error ({failures}/{MAX_CONSECUTIVE_BATCH_FAILURES}): {e}. "
+                    "Scheduling retry backoff without failing campaign."
+                ),
+                details={"error": str(e), "failures": failures, "max_failures": MAX_CONSECUTIVE_BATCH_FAILURES},
+            )
+            await publisher.publish_batch_completed(
+                campaign_id=campaign_id,
+                processed_count=0,
+                failed_count=0,
+                batch_size=batch_size,
+                metadata={"defer_seconds": 15, "reason": "batch_transient_failure_retry"},
+            )
         raise
     finally:
         if redis is not None:

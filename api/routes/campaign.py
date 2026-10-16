@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -115,8 +115,8 @@ class TimeSlotRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_times(self):
-        if self.start_time >= self.end_time:
-            raise ValueError("start_time must be before end_time")
+        if self.start_time == self.end_time:
+            raise ValueError("start_time and end_time cannot be identical")
         return self
 
 
@@ -184,6 +184,7 @@ class UpdateCampaignRequest(BaseModel):
     max_concurrency: int | None = Field(default=None, ge=1, le=100)
     schedule_config: ScheduleConfigRequest | None = None
     circuit_breaker: CircuitBreakerConfigRequest | None = None
+    telephony_configuration_id: int | None = None
     callback_config: Any | None = None  # Deprecated, retained for CRM compatibility
 
 
@@ -730,6 +731,17 @@ async def update_campaign(
 
     if request.retry_config is not None:
         update_kwargs["retry_config"] = request.retry_config.model_dump()
+
+    if request.telephony_configuration_id is not None:
+        cfg = await db_client.get_telephony_configuration_for_org(
+            request.telephony_configuration_id, user.selected_organization_id
+        )
+        if not cfg:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Telephony configuration {request.telephony_configuration_id} not found",
+            )
+        update_kwargs["telephony_configuration_id"] = request.telephony_configuration_id
 
     # Merge max_concurrency and schedule_config into orchestrator_metadata
     raw_meta = campaign.orchestrator_metadata or {}

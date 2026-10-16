@@ -38,10 +38,30 @@ class PresignedUploadUrlResponse(BaseModel):
     expires_in: int
 
 
+class PresignedDocumentUploadRequest(BaseModel):
+    file_name: str = Field(..., description="Document filename (e.g. PDF, PNG, JPG)")
+    file_size: int = Field(
+        ..., gt=0, le=20_971_520, description="File size in bytes (max 20MB)"
+    )
+    content_type: str = Field(
+        default="application/pdf", description="Document MIME type"
+    )
+    document_type: str | None = Field(
+        default="onboarding", description="Document category/type"
+    )
+
+
+class PresignedDocumentUploadResponse(BaseModel):
+    upload_url: str
+    file_url: str
+    file_key: str
+    expires_in: int
+
+
 router = APIRouter(prefix="/s3", tags=["s3"])
 
 
-ORG_SCOPED_STORAGE_PREFIXES = ("campaigns", "knowledge_base")
+ORG_SCOPED_STORAGE_PREFIXES = ("campaigns", "knowledge_base", "onboarding")
 
 
 def _extract_org_id_from_key(key: str) -> int | None:
@@ -353,3 +373,70 @@ async def get_presigned_upload_url(
         raise HTTPException(
             status_code=500, detail="Failed to generate presigned upload URL"
         )
+
+
+def _build_public_document_url(file_key: str) -> str:
+    """Construct a clean, persistent HTTPS document URL."""
+    if hasattr(storage_fs, "bucket_name") and hasattr(storage_fs, "region_name"):
+        endpoint = getattr(storage_fs, "endpoint_url", None)
+        if endpoint:
+            return f"{str(endpoint).rstrip('/')}/{storage_fs.bucket_name}/{file_key}"
+        return f"https://{storage_fs.bucket_name}.s3.{storage_fs.region_name}.amazonaws.com/{file_key}"
+    elif hasattr(storage_fs, "public_endpoint") and hasattr(storage_fs, "bucket_name"):
+        return f"{str(storage_fs.public_endpoint).rstrip('/')}/{storage_fs.bucket_name}/{file_key}"
+    return f"https://storage.talkar.ai/{file_key}"
+
+
+@router.post(
+    "/presigned-document-url",
+    response_model=PresignedDocumentUploadResponse,
+    summary="Get presigned URL for document upload (PDF, PNG, JPG)",
+)
+async def get_presigned_document_url(
+    request: PresignedDocumentUploadRequest,
+    user=Depends(get_user),
+):
+    """Generate a presigned PUT URL for direct document upload (PDF, PNG, JPG) to S3/MinIO.
+
+    Access Control:
+    * Authenticated users can upload documents scoped to their organization.
+    * Returns both presigned upload_url for direct client PUT and clean HTTPS file_url.
+    """
+    sanitized_name = re.sub(r"[^a-zA-Z0-9._-]", "_", request.file_name)
+    org_id = user.selected_organization_id or getattr(user, "id", 1)
+    doc_uuid = uuid.uuid4()
+    file_key = f"onboarding/{org_id}/{doc_uuid}_{sanitized_name}"
+
+    try:
+        upload_url = await storage_fs.aget_presigned_put_url(
+            file_path=file_key,
+            expiration=900,
+            content_type=request.content_type,
+            max_size=request.file_size,
+        )
+
+        if not upload_url:
+            raise HTTPException(
+                status_code=500, detail="Failed to generate presigned upload URL"
+            )
+
+        file_url = _build_public_document_url(file_key)
+
+        logger.info(
+            f"Generated presigned document upload URL for user {user.id}, org {org_id}, file_key: {file_key}"
+        )
+
+        return PresignedDocumentUploadResponse(
+            upload_url=upload_url,
+            file_url=file_url,
+            file_key=file_key,
+            expires_in=900,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Error generating presigned document upload URL: {exc}")
+        raise HTTPException(
+            status_code=500, detail="Failed to generate presigned upload URL"
+        ) from exc
+

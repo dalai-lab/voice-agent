@@ -83,6 +83,28 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
     }
   }, [dograhOrgId]);
 
+  // Listen for explicit status invalidation event fired on successful payment
+  useEffect(() => {
+    const handleInvalidate = () => {
+      lastCheckedOrgRef.current = null;
+      if (dograhOrgId) {
+        fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data?.status) {
+              setTalkarStatus(data.status);
+              setIsTalkarCustomer(true);
+              document.cookie = `talkar_customer_${dograhOrgId}=true; path=/; max-age=86400; SameSite=Lax`;
+              document.cookie = "talkar_customer=true; path=/; max-age=86400; SameSite=Lax";
+            }
+          })
+          .catch(() => {});
+      }
+    };
+    window.addEventListener("talkar-status-invalidate", handleInvalidate);
+    return () => window.removeEventListener("talkar-status-invalidate", handleInvalidate);
+  }, [dograhOrgId]);
+
   // Re-check admin bypass cookie on mount
   useEffect(() => {
     const hasBypass = document.cookie.includes("talkar_admin_bypass=true");

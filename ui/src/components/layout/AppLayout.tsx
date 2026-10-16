@@ -86,19 +86,36 @@ function BackendStatusBanner() {
 // The browser already has a valid session, so the /api/talkar proxy works fine.
 const TALKAR_ALLOWED_PATHS = ["/onboarding", "/wallet", "/handler", "/auth", "/api", "/support"];
 
+const TALKAR_BLOCKED_DIRECT_PATHS = [
+  "/workflow",
+  "/telephony-configurations",
+  "/model-configurations",
+  "/api-keys",
+  "/usage",
+  "/billing",
+  "/superadmin",
+  "/tools",
+];
+
 function TalkarStatusGate() {
   const { user } = useAuth();
   const { orgContext } = useOrgConfig();
   const dograhOrgId = orgContext?.organization_id;
   const pathname = usePathname();
   const router = useRouter();
+  const { isTalkarCustomer, isAdminBypass } = useTalkarCustomer();
   // Track the last org we checked. Re-fires when switching workspaces (different orgId)
   // but ignores same-org double-fires from auth context settling.
   const lastCheckedOrgRef = useRef<number | null>(null);
   const [talkarStatus, setTalkarStatus] = React.useState<string | null>(null);
   const [suspensionReason, setSuspensionReason] = React.useState<string | null>(null);
 
-  useEffect(() => {
+  const checkCustomerStatus = React.useCallback(() => {
+    if (isTalkarCustomer && !isAdminBypass && TALKAR_BLOCKED_DIRECT_PATHS.some(p => pathname.startsWith(p))) {
+      router.replace("/overview");
+      return;
+    }
+
     if (!user) return;
     if (TALKAR_ALLOWED_PATHS.some(p => pathname.startsWith(p))) return;
     if (document.cookie.includes('talkar_admin_bypass=true')) return;
@@ -127,6 +144,11 @@ function TalkarStatusGate() {
         setSuspensionReason(suspension_reason || null);
         // Note: isTalkarCustomer state is managed by TalkarCustomerContext (shared)
         
+        if (isTalkarCustomer && !isAdminBypass && TALKAR_BLOCKED_DIRECT_PATHS.some(p => pathname.startsWith(p))) {
+          router.replace("/overview");
+          return;
+        }
+
         // Edge case: Sub-orgs with no brief form need to fill it first
         if (is_sub_org && !has_onboarding_form && (status === 'agent_building' || status === 'pending_approval')) {
             router.replace('/onboarding');
@@ -137,7 +159,28 @@ function TalkarStatusGate() {
         router.replace('/onboarding');
       })
       .catch(() => { /* network failure — fail open */ });
-  }, [user, dograhOrgId, pathname, router]);
+  }, [user, dograhOrgId, pathname, router, isTalkarCustomer, isAdminBypass]);
+
+  useEffect(() => {
+    checkCustomerStatus();
+  }, [checkCustomerStatus]);
+
+  // Clear cached org status when navigating back from wallet or onboarding
+  useEffect(() => {
+    if (pathname === '/overview' || pathname === '/dashboard') {
+      lastCheckedOrgRef.current = null;
+    }
+  }, [pathname]);
+
+  // Listen for explicit status invalidation event fired on successful payment
+  useEffect(() => {
+    const handleInvalidate = () => {
+      lastCheckedOrgRef.current = null;
+      checkCustomerStatus();
+    };
+    window.addEventListener('talkar-status-invalidate', handleInvalidate);
+    return () => window.removeEventListener('talkar-status-invalidate', handleInvalidate);
+  }, [checkCustomerStatus]);
 
   if (talkarStatus === 'agent_building') {
     return (
@@ -239,14 +282,23 @@ function TalkarRouteGuard({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isAdminBypass) return;
-    if (isTalkarCustomer && isForbidden) {
-      router.replace("/runs");
+    if (isTalkarCustomer && TALKAR_BLOCKED_DIRECT_PATHS.some(p => pathname.startsWith(p))) {
+      router.replace("/overview");
+      return;
     }
-  }, [isTalkarCustomer, isAdminBypass, isForbidden, router]);
+    if (isTalkarCustomer && isForbidden) {
+      router.replace("/overview");
+    }
+  }, [isTalkarCustomer, isAdminBypass, isForbidden, pathname, router]);
 
   // Admin bypass sees everything
   if (isAdminBypass) {
     return <>{children}</>;
+  }
+
+  if (isTalkarCustomer && !isAdminBypass && TALKAR_BLOCKED_DIRECT_PATHS.some(p => pathname.startsWith(p))) {
+    router.replace("/overview");
+    return null;
   }
 
   // If visiting a forbidden path and verified as a Talkar customer:
@@ -272,12 +324,12 @@ function TalkarRouteGuard({ children }: { children: ReactNode }) {
             Contact Support
           </Button>
           <Button
-            onClick={() => router.replace("/runs")}
+            onClick={() => router.replace("/overview")}
             variant="outline"
             size="sm"
             className="text-xs h-9 px-4 border-border rounded-lg cursor-pointer"
           >
-            Go to Call History
+            Go to Overview
           </Button>
         </div>
       </div>

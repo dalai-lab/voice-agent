@@ -177,18 +177,26 @@ async def get_user(
                         if TALKAR_BILLING_API_TOKEN:
                             headers["Authorization"] = f"Bearer {TALKAR_BILLING_API_TOKEN}"
                         async with httpx.AsyncClient() as client:
-                            res = await client.post(
-                                f"{TALKAR_SERVICE_URL}/customers/",
-                                headers=headers,
-                                json={
-                                    "email": stack_email,
-                                    "contact_name": stack_name,
-                                    "dograh_org_id": organization.id,
-                                    "dograh_user_id": user_model.id,
-                                },
-                                timeout=5.0,
-                            )
-                            res.raise_for_status()
+                            try:
+                                res = await client.post(
+                                    f"{TALKAR_SERVICE_URL}/customers/",
+                                    headers=headers,
+                                    json={
+                                        "email": stack_email,
+                                        "contact_name": stack_name,
+                                        "dograh_org_id": organization.id,
+                                        "dograh_user_id": user_model.id,
+                                    },
+                                    timeout=5.0,
+                                )
+                                res.raise_for_status()
+                            except httpx.HTTPStatusError as e:
+                                if e.response.status_code == 429:
+                                    logger.warning(
+                                        f"Rate limited creating Talkar customer for org {organization.id}; falling back to existing customer state"
+                                    )
+                                else:
+                                    raise
 
                         # Stamp TALKAR_ORG_TYPE so UI middleware blocks advanced views
                         from api.enums import OrganizationConfigurationKey

@@ -26,8 +26,36 @@ class UserResponse(BaseModel):
     organization_id: int | None = None
     provider_id: str | None = None
     talkar_org_type: str | None = None
+    is_verified: bool = True
 
 
 class AuthResponse(BaseModel):
     token: str
     user: UserResponse
+    is_verified: bool = True
+    message: str | None = None
+
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class ChangeSignupEmailRequest(BaseModel):
+    current_email: EmailStr
+    new_email: EmailStr
+    password: str
+
+
+class SendCodeRequest(BaseModel):
+    email: EmailStr
+
+
+class LoginWithCodeRequest(BaseModel):
+    email: EmailStr
+    code: str
+

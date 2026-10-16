@@ -366,8 +366,25 @@ async def _handle_oss_auth(authorization: str | None) -> UserModel:
 
     try:
         payload = decode_jwt_token(token)
+        if payload.get("scope") == "unverified":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "EMAIL_NOT_VERIFIED",
+                    "message": "Email verification required. Please verify your email to access this workspace.",
+                }
+            )
         user = await db_client.get_user_by_id(int(payload["sub"]))
         if user:
+            if not getattr(user, "is_verified", True):
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "code": "EMAIL_NOT_VERIFIED",
+                        "message": "Email verification required. Please verify your email to access this workspace.",
+                        "email": user.email,
+                    }
+                )
             return user
         raise HTTPException(status_code=401, detail="User not found")
     except HTTPException:

@@ -53,6 +53,20 @@ export function SignupForm() {
         return;
       }
 
+      // If user requires email verification, save unverified session cookie and redirect
+      if (res.data.is_verified === false) {
+        if (res.data.token) {
+          await fetch("/api/auth/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: res.data.token, user: res.data.user }),
+          });
+        }
+        toast.success(res.data.message || "Verification code sent to your email.");
+        router.push(`/auth/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
+
       // Set httpOnly cookies via server route
       await fetch("/api/auth/session", {
         method: "POST",

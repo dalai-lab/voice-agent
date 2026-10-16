@@ -71,6 +71,24 @@ class UserModel(Base):
     email = Column(String, nullable=True)
     password_hash = Column(String, nullable=True)
 
+    # Email verification fields
+    is_verified = Column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default=text("true"),
+        index=True,
+    )
+    verification_code_hash = Column(String(64), nullable=True)
+    verification_code_expires_at = Column(DateTime(timezone=True), nullable=True)
+    verification_attempts = Column(
+        Integer,
+        default=0,
+        nullable=False,
+        server_default=text("0"),
+    )
+    last_verification_sent_at = Column(DateTime(timezone=True), nullable=True)
+
     __table_args__ = (
         Index(
             "ix_users_email_lower",

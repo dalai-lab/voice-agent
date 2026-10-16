@@ -35,9 +35,23 @@ async def _persist_amd_result_if_present(
         logger.info(
             f"[run {workflow_run_id}] AMD result: AnsweredBy={amd_result.answered_by}"
         )
+        updates: dict = {"answered_by": amd_result.answered_by}
+        if amd_result.answered_by and (
+            amd_result.answered_by.startswith("machine_")
+            or amd_result.answered_by == "fax"
+        ):
+            workflow_run = await db_client.get_workflow_run_by_id(workflow_run_id)
+            current_tags = (
+                (workflow_run.gathered_context or {}).get("call_tags", [])
+                if workflow_run
+                else []
+            )
+            if "voicemail_detected" not in current_tags:
+                updates["call_tags"] = current_tags + ["voicemail_detected"]
+
         await db_client.update_workflow_run(
             run_id=workflow_run_id,
-            gathered_context={"answered_by": amd_result.answered_by},
+            gathered_context=updates,
         )
     except Exception as exc:
         logger.warning(f"[run {workflow_run_id}] Failed to persist AMD result: {exc}")

@@ -15,6 +15,7 @@ import pytest
 from api.services.campaign.campaign_event_protocol import (
     BatchCompletedEvent,
     CampaignResumedEvent,
+    RetryNeededEvent,
 )
 from api.services.campaign.campaign_orchestrator import CampaignOrchestrator
 from api.services.campaign.runner import CampaignRunnerService
@@ -452,6 +453,238 @@ async def test_worker_execution_lock_prevents_concurrent_batch():
     with patch("api.tasks.campaign_tasks.campaign_call_dispatcher") as mock_disp:
         await process_campaign_batch(ctx, campaign_id=88)
         mock_disp.process_batch.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_should_mark_complete_resolves_last_activity_and_grace_period(orchestrator):
+    """_should_mark_complete correctly extracts last_activity from self._last_activity
+    or campaign.last_activity_at without raising NameError."""
+    campaign_id = 999
+    now = datetime.now(UTC)
+
+    with patch("api.services.campaign.campaign_orchestrator.db_client") as mock_db:
+        # No pending work, no active runs
+        mock_db.get_queued_runs_count = AsyncMock(return_value=0)
+        mock_db.get_scheduled_runs_count = AsyncMock(return_value=0)
+        mock_db.get_active_runs_count_for_campaign = AsyncMock(return_value=0)
+
+        # Case 1: In grace period (last activity was 10s ago in orchestrator cache)
+        orchestrator._last_activity[campaign_id] = now - timedelta(seconds=10)
+        mock_campaign = MagicMock(
+            id=campaign_id,
+            state="running",
+            last_activity_at=None,
+            orchestrator_metadata={},
+        )
+        assert await orchestrator._should_mark_complete(mock_campaign) is False
+
+        # Case 2: Grace period expired (>30s ago in orchestrator cache)
+        orchestrator._last_activity[campaign_id] = now - timedelta(seconds=45)
+        assert await orchestrator._should_mark_complete(mock_campaign) is True
+
+        # Case 3: Orchestrator cache is empty, falls back to campaign.last_activity_at (>30s ago)
+        del orchestrator._last_activity[campaign_id]
+        mock_campaign.last_activity_at = now - timedelta(seconds=45)
+        assert await orchestrator._should_mark_complete(mock_campaign) is True
+
+        # Case 4: Orchestrator cache is empty, falls back to campaign.last_activity_at (within grace period)
+        mock_campaign.last_activity_at = now - timedelta(seconds=15)
+        assert await orchestrator._should_mark_complete(mock_campaign) is False
+
+
+@pytest.mark.asyncio
+async def test_get_campaign_status_does_not_double_count_progress():
+    """Verify that runner.get_campaign_status does not add dispatched leads and failed calls together,
+    which previously caused 50% dispatched leads to report 100% completion."""
+    runner = CampaignRunnerService()
+    campaign_id = 701
+
+    mock_campaign = MagicMock(
+        id=campaign_id,
+        state="running",
+        total_rows=100,
+        processed_rows=50,  # 50 initial leads dispatched
+        failed_rows=50,     # all 50 failed
+        source_sync_status="completed",
+        source_last_synced_at=None,
+        source_sync_error=None,
+        rate_limit_per_second=5,
+        started_at=None,
+        completed_at=None,
+    )
+
+    with patch("api.services.campaign.runner.db_client") as mock_db:
+        mock_db.get_campaign_by_id = AsyncMock(return_value=mock_campaign)
+        mock_db.get_queued_runs_stats_for_campaigns = AsyncMock(
+            return_value={
+                campaign_id: {
+                    "failed_calls": 50,
+                    "completed_calls": 0,
+                }
+            }
+        )
+
+        status = await runner.get_campaign_status(campaign_id)
+
+        # 50 unique leads were dispatched, all 50 failed.
+        # Progress must be 50%, NOT 100%!
+        assert status["total_rows"] == 100
+        assert status["processed_rows"] == 50
+        assert status["failed_calls"] == 50
+        assert status["progress_percentage"] == 50.0
+
+
+@pytest.mark.asyncio
+async def test_get_campaign_status_100_percent_failed_never_reports_200_percent():
+    """Verify that when 100% of leads fail, progress is 100.0%, never 200.0%."""
+    runner = CampaignRunnerService()
+    campaign_id = 702
+
+    mock_campaign = MagicMock(
+        id=campaign_id,
+        state="running",
+        total_rows=100,
+        processed_rows=100,  # 100 initial leads dispatched
+        failed_rows=100,     # all 100 failed
+        source_sync_status="completed",
+        source_last_synced_at=None,
+        source_sync_error=None,
+        rate_limit_per_second=5,
+        started_at=None,
+        completed_at=None,
+    )
+
+    with patch("api.services.campaign.runner.db_client") as mock_db:
+        mock_db.get_campaign_by_id = AsyncMock(return_value=mock_campaign)
+        mock_db.get_queued_runs_stats_for_campaigns = AsyncMock(
+            return_value={
+                campaign_id: {
+                    "failed_calls": 100,
+                    "completed_calls": 0,
+                }
+            }
+        )
+
+        status = await runner.get_campaign_status(campaign_id)
+        assert status["progress_percentage"] == 100.0
+
+
+@pytest.mark.asyncio
+async def test_telephony_initiation_failure_sets_failed_disposition_and_links_queued_run():
+    """Verify that when provider.initiate_call raises an exception, the dispatcher marks
+    the workflow run with mapped_call_disposition='failed' and links the queued_run."""
+    from api.services.campaign.campaign_call_dispatcher import CampaignCallDispatcher
+    dispatcher = CampaignCallDispatcher()
+
+    queued_run = MagicMock()
+    queued_run.id = 501
+    queued_run.context_variables = {"phone_number": "+15551234567"}
+    queued_run.source_uuid = "uuid-501"
+
+    campaign = MagicMock()
+    campaign.id = 801
+    campaign.workflow_id = 901
+    campaign.organization_id = 1
+    campaign.telephony_configuration_id = None
+
+    workflow = MagicMock()
+    workflow.id = 901
+
+    workflow_run = MagicMock()
+    workflow_run.id = 1001
+    workflow_run.logs = {}
+
+    provider = MagicMock()
+    provider.PROVIDER_NAME = "mock"
+    provider.WEBHOOK_ENDPOINT = "webhook"
+    provider.initiate_call = AsyncMock(side_effect=RuntimeError("Carrier initiation network timeout"))
+
+    with (
+        patch("api.services.campaign.campaign_call_dispatcher.db_client") as mock_db,
+        patch.object(dispatcher, "get_provider_for_campaign", return_value=provider),
+        patch.object(dispatcher, "acquire_from_number", return_value="+15559876543"),
+        patch.object(dispatcher, "release_call_slot", return_value=None),
+        patch("api.services.campaign.campaign_call_dispatcher.prepare_workflow_run_inputs", return_value=MagicMock(definition_id=1)),
+        patch("api.services.campaign.campaign_call_dispatcher.authorize_workflow_run_start", return_value=MagicMock(has_quota=True)),
+        patch("api.services.campaign.campaign_call_dispatcher.get_backend_endpoints", return_value=("http://localhost:8000", "ws://localhost:8000")),
+        patch("api.services.campaign.campaign_call_dispatcher.circuit_breaker.record_and_evaluate", return_value=None),
+        patch("api.services.campaign.campaign_call_dispatcher.rate_limiter.store_workflow_from_number_mapping", return_value=None),
+    ):
+        mock_db.get_workflow = AsyncMock(return_value=workflow)
+        mock_db.create_workflow_run = AsyncMock(return_value=workflow_run)
+        mock_db.update_workflow_run = AsyncMock()
+        mock_db.update_queued_run = AsyncMock()
+
+        with pytest.raises(RuntimeError, match="Carrier initiation network timeout"):
+            await dispatcher.dispatch_call(queued_run, campaign, concurrency_slot=None)
+
+        # 1. Workflow run updated with failure disposition and tags
+        mock_db.update_workflow_run.assert_awaited()
+        update_call = mock_db.update_workflow_run.call_args_list[-1]
+        assert update_call.kwargs["run_id"] == 1001
+        assert update_call.kwargs["is_completed"] is True
+        assert update_call.kwargs["gathered_context"]["mapped_call_disposition"] == "failed"
+        assert "telephony_failed" in update_call.kwargs["gathered_context"]["call_tags"]
+        assert "initiation_failed" in update_call.kwargs["gathered_context"]["call_tags"]
+
+        # 2. Queued run linked to workflow run
+        mock_db.update_queued_run.assert_awaited_once_with(
+            queued_run_id=501,
+            workflow_run_id=1001,
+        )
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_handles_voicemail_retry_event(orchestrator):
+    """When a RetryNeededEvent for voicemail is received, orchestrator schedules a retry."""
+    campaign_id = 77
+    queued_run_id = 301
+    event = RetryNeededEvent(
+        campaign_id=campaign_id,
+        workflow_run_id=901,
+        queued_run_id=queued_run_id,
+        reason="voicemail",
+    )
+
+    campaign = MagicMock(
+        id=campaign_id,
+        retry_config={
+            "enabled": True,
+            "max_retries": 2,
+            "retry_delay_seconds": 60,
+            "retry_on_voicemail": True,
+        },
+    )
+    original_run = MagicMock(
+        id=queued_run_id,
+        campaign_id=campaign_id,
+        source_uuid="lead_77_301",
+        retry_count=0,
+        context_variables={"phone_number": "+1234567890"},
+    )
+
+    with patch("api.services.campaign.campaign_orchestrator.db_client") as mock_db:
+        mock_db.get_campaign_by_id = AsyncMock(return_value=campaign)
+        mock_db.get_queued_run_by_id = AsyncMock(return_value=original_run)
+        mock_db.get_queued_run_by_source_uuid = AsyncMock(return_value=None)
+        mock_db.create_queued_run = AsyncMock()
+        mock_db.append_campaign_log = AsyncMock()
+
+        await orchestrator._handle_event(event)
+
+        mock_db.create_queued_run.assert_awaited_once()
+        create_kwargs = mock_db.create_queued_run.call_args.kwargs
+        assert create_kwargs["campaign_id"] == campaign_id
+        assert create_kwargs["retry_count"] == 1
+        assert create_kwargs["parent_queued_run_id"] == queued_run_id
+        assert create_kwargs["retry_reason"] == "voicemail"
+        assert create_kwargs["state"] == "queued"
+        assert create_kwargs["context_variables"]["is_retry"] is True
+        assert create_kwargs["context_variables"]["retry_reason"] == "voicemail"
+
+
+
+
 
 
 

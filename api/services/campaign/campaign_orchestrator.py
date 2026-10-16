@@ -11,6 +11,7 @@ setup_logging()
 
 
 import asyncio
+import random
 import signal
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -328,6 +329,10 @@ class CampaignOrchestrator:
             )
             return
 
+        # Add random jitter (±20%) to prevent thundering herd bursts on the carrier pool
+        jitter = random.uniform(0.8, 1.2)
+        effective_delay = max(1, int(delay_seconds * jitter))
+
         # Create retry entry with unique source_uuid
         retry_run = await db_client.create_queued_run(
             campaign_id=campaign_id,
@@ -336,12 +341,12 @@ class CampaignOrchestrator:
             state="queued",
             retry_count=original_run.retry_count + 1,
             parent_queued_run_id=original_run.id,
-            scheduled_for=datetime.now(UTC) + timedelta(seconds=delay_seconds),
+            scheduled_for=datetime.now(UTC) + timedelta(seconds=effective_delay),
             retry_reason=reason,
         )
 
         logger.info(
-            f"campaign_id: {campaign_id} - Scheduled retry {retry_run.id} for {reason} in {delay_seconds}s, "
+            f"campaign_id: {campaign_id} - Scheduled retry {retry_run.id} for {reason} in {effective_delay}s (base {delay_seconds}s), "
             f"retry attempt {retry_run.retry_count}"
         )
 
@@ -354,11 +359,12 @@ class CampaignOrchestrator:
             campaign_id=campaign_id,
             level="info",
             event="lead_retry_scheduled",
-            message=f"Scheduled retry #{original_run.retry_count + 1} for {phone} in {delay_seconds}s (reason: {reason}).",
+            message=f"Scheduled retry #{original_run.retry_count + 1} for {phone} in {effective_delay}s (reason: {reason}).",
             details={
                 "lead_phone": phone,
                 "retry_attempt": original_run.retry_count + 1,
-                "delay_seconds": delay_seconds,
+                "delay_seconds": effective_delay,
+                "base_delay_seconds": delay_seconds,
                 "reason": reason,
                 "queued_run_id": retry_run.id,
             },
@@ -851,27 +857,29 @@ class CampaignOrchestrator:
                 )
             return False
 
-        # Check in-memory last activity
-        last_activity = self._last_activity.get(campaign_id)
-        if not last_activity:
-            # Fall back to database
-            last_activity = campaign.last_activity_at
+        # Check if there are active runs still in progress
+        active_runs = await db_client.get_active_runs_count_for_campaign(campaign_id)
+        if active_runs > 0:
+            logger.debug(
+                f"campaign_id: {campaign_id} - {active_runs} active runs still in progress, "
+                f"not marking complete"
+            )
+            return False
 
-        if not last_activity:
-            # No activity recorded, use last batch scheduled time
-            last_activity = campaign.last_batch_scheduled_at
-
-        if not last_activity:
-            # No activity at all, use started_at
-            last_activity = campaign.started_at
-
+        # If all work is finished and no calls are active, complete after short grace period (30s)
+        grace_period = 30
+        last_activity = self._last_activity.get(campaign_id) or campaign.last_activity_at
         if last_activity:
-            time_since = datetime.now(UTC) - last_activity
-            if time_since.total_seconds() < self.completion_timeout:
+            time_since = (datetime.now(UTC) - last_activity).total_seconds()
+            if time_since < grace_period:
+                logger.debug(
+                    f"campaign_id: {campaign_id} - Within grace period ({time_since:.1f}s < {grace_period}s), "
+                    f"waiting before completion"
+                )
                 return False
 
         logger.info(
-            f"campaign_id: {campaign_id} - No activity for {self.completion_timeout}s, "
+            f"campaign_id: {campaign_id} - All work finished and no active runs for >{grace_period}s, "
             f"marking complete"
         )
         return True

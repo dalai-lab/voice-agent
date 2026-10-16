@@ -752,6 +752,78 @@ class TestProcessBatchCancellation:
                 [101, 102, 103]
             )
 
+    @pytest.mark.asyncio
+    async def test_process_batch_does_not_dial_lead_zero_when_campaign_paused_mid_batch(self):
+        """When a campaign transitions to 'paused' after runs are claimed,
+        lead 0 must NOT be dialed and all claimed runs must be returned."""
+        dispatcher = CampaignCallDispatcher()
+        campaign_running = MagicMock()
+        campaign_running.id = 42
+        campaign_running.state = "running"
+        campaign_running.organization_id = 7
+        campaign_running.rate_limit_per_second = 1
+        campaign_running.telephony_configuration_id = 170
+        campaign_running.orchestrator_metadata = {}
+
+        campaign_paused = MagicMock()
+        campaign_paused.id = 42
+        campaign_paused.state = "paused"
+        campaign_paused.organization_id = 7
+        campaign_paused.rate_limit_per_second = 1
+        campaign_paused.telephony_configuration_id = 170
+        campaign_paused.orchestrator_metadata = {}
+
+        queued_runs = [MagicMock(id=101), MagicMock(id=102), MagicMock(id=103)]
+        provider = MagicMock()
+        provider.from_numbers = []
+
+        with (
+            patch(
+                "api.services.campaign.campaign_call_dispatcher.db_client"
+            ) as mock_db,
+            patch(
+                "api.services.campaign.campaign_call_dispatcher.call_concurrency"
+            ) as mock_cc,
+            patch.object(
+                dispatcher,
+                "get_provider_for_campaign",
+                AsyncMock(return_value=provider),
+            ),
+            patch.object(
+                dispatcher,
+                "acquire_concurrent_slot",
+                AsyncMock(),
+            ) as mock_acquire_slot,
+            patch.object(
+                dispatcher,
+                "dispatch_call",
+                AsyncMock(),
+            ) as mock_dispatch_call,
+        ):
+            mock_cc.check_slots_available = AsyncMock(return_value=True)
+            # First call (upfront in process_batch): campaign is "running"
+            # Second call (in loop at lead 0): campaign transitioned to "paused"
+            mock_db.get_campaign_by_id = AsyncMock(
+                side_effect=[campaign_running, campaign_paused]
+            )
+            mock_db.claim_queued_runs_for_processing = AsyncMock(
+                return_value=queued_runs
+            )
+            mock_db.return_processing_queued_runs_without_workflow = AsyncMock(
+                return_value=3
+            )
+
+            processed_count = await dispatcher.process_batch(campaign_id=42, batch_size=3)
+
+            assert processed_count == 0
+            # Ensure slot was never acquired and call was never dispatched for lead 0!
+            mock_acquire_slot.assert_not_called()
+            mock_dispatch_call.assert_not_called()
+            # Ensure all claimed runs were returned to queued state
+            mock_db.return_processing_queued_runs_without_workflow.assert_awaited_once_with(
+                [101, 102, 103]
+            )
+
 
 class TestProcessBatchEdgeCases:
     """Edge case tests for process_batch."""

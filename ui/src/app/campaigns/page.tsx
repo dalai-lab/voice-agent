@@ -167,9 +167,12 @@ export default function CampaignsPage() {
                         <TableBody>
                             {campaignsData.campaigns.map((campaign) => {
                                 const totalContacts = campaign.total_rows ?? 0;
-                                const processedContacts = campaign.processed_rows ?? 0;
+                                const dispatchedContacts = campaign.processed_rows ?? 0;
                                 const failedContacts = campaign.failed_rows ?? 0;
-                                const resolvedContacts = processedContacts + failedContacts;
+                                const completedContacts = campaign.completed_calls_count !== undefined && campaign.completed_calls_count > 0
+                                    ? campaign.completed_calls_count
+                                    : Math.max(0, dispatchedContacts - failedContacts);
+                                const resolvedContacts = Math.min(totalContacts, Math.max(dispatchedContacts, completedContacts + failedContacts));
                                 const contactPercent = totalContacts > 0
                                     ? Math.min(100, Math.round((resolvedContacts / totalContacts) * 100))
                                     : (campaign.total_queued_count && campaign.total_queued_count > 0

@@ -1,3 +1,4 @@
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
@@ -86,20 +87,23 @@ class CampaignSourceSyncService(ABC):
             )
 
         # Check for duplicate phone numbers
-        seen_phones: dict[str, int] = {}  # phone -> first row where it appeared
+        seen_phones: dict[str, int] = {}  # normalized phone -> first row where it appeared
         duplicate_rows = []
         for row_idx, row in enumerate(rows, start=2):
             if len(row) <= phone_number_idx:
                 continue
 
-            phone_number = row[phone_number_idx].strip()
-            if not phone_number:
+            raw_phone = row[phone_number_idx].strip()
+            if not raw_phone:
                 continue
 
-            if phone_number in seen_phones:
+            # Strip all formatting characters (whitespace, dashes, parentheses, dots) before duplicate validation
+            normalized_phone = re.sub(r"[\s\-\(\)\.]", "", raw_phone)
+
+            if normalized_phone in seen_phones:
                 duplicate_rows.append(row_idx)
             else:
-                seen_phones[phone_number] = row_idx
+                seen_phones[normalized_phone] = row_idx
 
         if duplicate_rows:
             if len(duplicate_rows) > 5:

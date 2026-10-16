@@ -1,6 +1,7 @@
 import csv
 import hashlib
 from io import StringIO
+import re
 
 import httpx
 from api.db import db_client
@@ -93,9 +94,13 @@ class CSVSyncService(CampaignSourceSyncService):
             context_vars = dict(zip(headers, padded_row))
 
             # Skip if no phone number
-            if not context_vars.get("phone_number"):
+            raw_phone = context_vars.get("phone_number", "")
+            if not raw_phone or not str(raw_phone).strip():
                 logger.debug(f"Skipping row {idx}: no phone_number")
                 continue
+
+            # Normalize phone number
+            context_vars["phone_number"] = re.sub(r"[\s\-\(\)\.]", "", str(raw_phone).strip())
 
             # Generate unique source UUID: csv_{hash(source_id)}_row_{idx}
             source_uuid = f"csv_{file_hash}_row_{idx}"

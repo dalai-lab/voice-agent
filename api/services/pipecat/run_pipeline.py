@@ -997,8 +997,7 @@ async def _run_pipeline_impl(
         embeddings_api_version=embeddings_api_version,
         has_recordings=has_recordings,
         context_compaction_enabled=context_compaction_enabled,
-        enable_dtmf=workflow.enable_dtmf,
-        enable_callbacks=workflow.enable_callbacks,
+        enable_dtmf=getattr(workflow, "enable_dtmf", False),
         cross_node_variable_injection_enabled=cross_node_variable_injection_enabled,
     )
 

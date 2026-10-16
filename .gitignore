@@ -46,6 +46,6 @@ APALEO_PMS_INTEGRATION_GUIDE.md
 dalai_call_initiator.html
 runthiscode
 workflow_editor.html
-pipecat/
+/pipecat/
 env stuff
 docker-compose.override.yaml

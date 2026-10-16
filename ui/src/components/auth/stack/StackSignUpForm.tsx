@@ -36,7 +36,7 @@ function InnerSignUpForm() {
       if (user.primaryEmailVerified === false) {
         router.push("/auth/verify-email");
       } else {
-        router.push("/overview");
+        router.push("/after-sign-in");
       }
     }
   }, [user, router]);

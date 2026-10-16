@@ -84,7 +84,17 @@ function BackendStatusBanner() {
 // We cannot use middleware for this because the Stack Auth opaque access token
 // in hexclave-access cannot be validated server-side from Edge runtime.
 // The browser already has a valid session, so the /api/talkar proxy works fine.
-const TALKAR_ALLOWED_PATHS = ["/onboarding", "/wallet", "/handler", "/auth", "/api", "/support"];
+const TALKAR_ALLOWED_PATHS = [
+  "/onboarding",
+  "/wallet",
+  "/handler",
+  "/auth",
+  "/api",
+  "/support",
+  "/privacy-policy",
+  "/terms-of-service",
+  "/after-sign-in",
+];
 
 const TALKAR_BLOCKED_DIRECT_PATHS = [
   "/workflow",
@@ -98,91 +108,9 @@ const TALKAR_BLOCKED_DIRECT_PATHS = [
 ];
 
 function TalkarStatusGate() {
-  const { user } = useAuth();
-  const { orgContext } = useOrgConfig();
-  const dograhOrgId = orgContext?.organization_id;
-  const pathname = usePathname();
-  const router = useRouter();
-  const { isTalkarCustomer, isAdminBypass } = useTalkarCustomer();
-  // Track the last org we checked. Re-fires when switching workspaces (different orgId)
-  // but ignores same-org double-fires from auth context settling.
-  const lastCheckedOrgRef = useRef<number | null>(null);
-  const [talkarStatus, setTalkarStatus] = React.useState<string | null>(null);
-  const [suspensionReason, setSuspensionReason] = React.useState<string | null>(null);
+  const { talkarStatus, suspensionReason } = useTalkarCustomer();
 
-  const checkCustomerStatus = React.useCallback(() => {
-    if (isTalkarCustomer && !isAdminBypass && TALKAR_BLOCKED_DIRECT_PATHS.some(p => pathname.startsWith(p))) {
-      router.replace("/overview");
-      return;
-    }
-
-    if (!user) return;
-    if (TALKAR_ALLOWED_PATHS.some(p => pathname.startsWith(p))) return;
-    if (document.cookie.includes('talkar_admin_bypass=true')) return;
-    if (!dograhOrgId) return;
-
-    // Skip if we already checked this exact org on this exact page
-    if (lastCheckedOrgRef.current === dograhOrgId) return;
-
-    // Mark in-flight before any async work
-    lastCheckedOrgRef.current = dograhOrgId;
-    // Clear stale banner from previous org immediately
-    setTalkarStatus(null);
-    setSuspensionReason(null);
-
-    fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
-      .then(async r => {
-        if (r.status === 404) {
-          // New workspace — no Talkar customer yet. Send to onboarding.
-          router.replace('/onboarding');
-          return;
-        }
-        if (!r.ok) return; // Real API error — fail open, don't block the user
-        const data = await r.json();
-        const { status, is_sub_org, has_onboarding_form, suspension_reason } = data;
-        setTalkarStatus(status);
-        setSuspensionReason(suspension_reason || null);
-        // Note: isTalkarCustomer state is managed by TalkarCustomerContext (shared)
-        
-        if (isTalkarCustomer && !isAdminBypass && TALKAR_BLOCKED_DIRECT_PATHS.some(p => pathname.startsWith(p))) {
-          router.replace("/overview");
-          return;
-        }
-
-        // Edge case: Sub-orgs with no brief form need to fill it first
-        if (is_sub_org && !has_onboarding_form && (status === 'agent_building' || status === 'pending_approval')) {
-            router.replace('/onboarding');
-            return;
-        }
-        
-        if (status === 'active' || status === 'agent_building' || status === 'under_review' || status === 'pending_deposit' || status === 'suspended' || status === 'approved') return;
-        router.replace('/onboarding');
-      })
-      .catch(() => { /* network failure — fail open */ });
-  }, [user, dograhOrgId, pathname, router, isTalkarCustomer, isAdminBypass]);
-
-  useEffect(() => {
-    checkCustomerStatus();
-  }, [checkCustomerStatus]);
-
-  // Clear cached org status when navigating back from wallet or onboarding
-  useEffect(() => {
-    if (pathname === '/overview' || pathname === '/dashboard') {
-      lastCheckedOrgRef.current = null;
-    }
-  }, [pathname]);
-
-  // Listen for explicit status invalidation event fired on successful payment
-  useEffect(() => {
-    const handleInvalidate = () => {
-      lastCheckedOrgRef.current = null;
-      checkCustomerStatus();
-    };
-    window.addEventListener('talkar-status-invalidate', handleInvalidate);
-    return () => window.removeEventListener('talkar-status-invalidate', handleInvalidate);
-  }, [checkCustomerStatus]);
-
-  if (talkarStatus === 'agent_building') {
+  if (talkarStatus === "agent_building") {
     return (
       <div className="border-b border-border/60 bg-muted/40 text-foreground text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2.5">
         <div className="w-3.5 h-3.5 rounded-full border-2 border-foreground/30 border-t-foreground animate-spin shrink-0" />
@@ -191,7 +119,7 @@ function TalkarStatusGate() {
     );
   }
 
-  if (talkarStatus === 'under_review') {
+  if (talkarStatus === "under_review") {
     return (
       <div className="border-b border-border/60 bg-muted/40 text-foreground text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2.5">
         <div className="w-3.5 h-3.5 rounded-full border-2 border-foreground/30 border-t-foreground animate-spin shrink-0" />
@@ -200,7 +128,7 @@ function TalkarStatusGate() {
     );
   }
 
-  if (talkarStatus === 'approved') {
+  if (talkarStatus === "approved") {
     return (
       <div className="border-b border-emerald-500/20 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200 text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2">
         <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -210,7 +138,7 @@ function TalkarStatusGate() {
     );
   }
 
-  if (talkarStatus === 'pending_deposit') {
+  if (talkarStatus === "pending_deposit") {
     return (
       <div className="border-b border-amber-500/20 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2">
         <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -222,15 +150,14 @@ function TalkarStatusGate() {
     );
   }
 
-
-  if (talkarStatus === 'suspended') {
-    const isPolicyViolation = Boolean(suspensionReason && !['zero_balance', '', null].includes(suspensionReason));
+  if (talkarStatus === "suspended") {
+    const isPolicyViolation = Boolean(suspensionReason && !["zero_balance", "", null].includes(suspensionReason));
     return (
       <div className="border-b border-rose-500/20 bg-rose-500/10 text-rose-900 dark:text-rose-200 text-center py-2.5 px-4 text-xs font-medium z-40 sticky top-0 flex items-center justify-center gap-2">
         <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
         {isPolicyViolation ? (
           <>
-            <span>Calling services suspended by administration ({suspensionReason === 'fraud' ? 'Suspicious Activity' : 'Policy / Terms Violation'}). Please contact support.</span>
+            <span>Calling services suspended by administration ({suspensionReason === "fraud" ? "Suspicious Activity" : "Policy / Terms Violation"}). Please contact support.</span>
             <Link href="/support" className="ml-1 font-semibold underline underline-offset-4 hover:opacity-80">Contact Support →</Link>
           </>
         ) : (
@@ -352,7 +279,14 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const auth = useAuth();
-  const { isLoading, isAdminBypass, isServiceDown, checkHealth } = useTalkarCustomer();
+  const {
+    isLoading,
+    isAdminBypass,
+    isServiceDown,
+    checkHealth,
+    talkarStatus,
+    hasOnboardingForm,
+  } = useTalkarCustomer();
 
   const isPublicRoute =
     pathname === "/" ||
@@ -362,6 +296,16 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
     pathname.startsWith("/auth") ||
     pathname.startsWith("/privacy-policy") ||
     pathname.startsWith("/terms-of-service");
+
+  const isAllowedPath = TALKAR_ALLOWED_PATHS.some((p) => pathname.startsWith(p));
+
+  // Determine if the customer has incomplete onboarding
+  const isPendingOnboarding =
+    talkarStatus === "not_onboarded" ||
+    talkarStatus === "pending_approval" ||
+    talkarStatus === "info_requested" ||
+    talkarStatus === "rejected" ||
+    (talkarStatus === "agent_building" && !hasOnboardingForm);
 
   // Prevent unverified Stack users from hanging in protected routes
   useEffect(() => {
@@ -375,6 +319,34 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
       router.replace("/auth/verify-email");
     }
   }, [auth.provider, auth.user, isPublicRoute, router]);
+
+  // Route protection for non-admin users
+  useEffect(() => {
+    if (isPublicRoute || isAdminBypass || isLoading) return;
+
+    if (isPendingOnboarding && !isAllowedPath) {
+      router.replace("/onboarding");
+      return;
+    }
+
+    if (
+      (talkarStatus === "pending_deposit" || talkarStatus === "suspended") &&
+      !isAllowedPath &&
+      pathname !== "/overview"
+    ) {
+      router.replace("/wallet");
+      return;
+    }
+  }, [
+    isPublicRoute,
+    isAdminBypass,
+    isLoading,
+    isPendingOnboarding,
+    isAllowedPath,
+    talkarStatus,
+    pathname,
+    router,
+  ]);
 
   if (
     auth.provider === "stack" &&
@@ -391,9 +363,19 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
     return <TalkarMaintenanceBlockage onRetry={checkHealth} />;
   }
 
+  // Admin bypass sees everything
+  if (isAdminBypass) {
+    return <>{children}</>;
+  }
+
   // Keep showing the initial Talkar SpinLoader until we know whether the user is an admin or customer
-  if (isLoading && !isPublicRoute && !isAdminBypass) {
+  if (isLoading && !isPublicRoute) {
     return <SpinLoader />;
+  }
+
+  // FAIL CLOSED: Never render protected dashboard pages for un-onboarded users
+  if (!isPublicRoute && isPendingOnboarding && !isAllowedPath) {
+    return <SpinLoader label="Redirecting to onboarding..." />;
   }
 
   return <>{children}</>;

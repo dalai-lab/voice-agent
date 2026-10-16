@@ -22,7 +22,7 @@ export function LoginForm({ signupEnabled }: { signupEnabled: boolean }) {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/overview");
+      router.push("/after-sign-in");
     }
   }, [isAuthenticated, router]);
 

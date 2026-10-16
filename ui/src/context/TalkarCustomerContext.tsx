@@ -1,109 +1,55 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useRef, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useRef, ReactNode, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 import { useOrgConfig } from "@/context/OrgConfigContext";
 
-interface TalkarCustomerContextValue {
+export interface TalkarCustomerContextValue {
   isTalkarCustomer: boolean;
   isAdminBypass: boolean;
   talkarStatus: string | null;
+  suspensionReason: string | null;
+  hasOnboardingForm: boolean;
+  isSubOrg: boolean;
   isLoading: boolean;
   isServiceDown: boolean;
   checkHealth: () => Promise<boolean>;
+  refreshStatus: () => Promise<void>;
 }
 
 const TalkarCustomerContext = createContext<TalkarCustomerContextValue>({
   isTalkarCustomer: false,
   isAdminBypass: false,
   talkarStatus: null,
+  suspensionReason: null,
+  hasOnboardingForm: false,
+  isSubOrg: false,
   isLoading: true,
   isServiceDown: false,
   checkHealth: async () => true,
+  refreshStatus: async () => {},
 });
 
 export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const { orgContext, loading: orgLoading } = useOrgConfig();
   const dograhOrgId = orgContext?.organization_id;
+  const email = (user as any)?.primaryEmail ?? (user as any)?.email;
 
-  const [isAdminBypass, setIsAdminBypass] = React.useState(() => {
+  const [isAdminBypass, setIsAdminBypass] = useState(() => {
     if (typeof window === "undefined") return false;
     return document.cookie.includes("talkar_admin_bypass=true");
   });
 
-  const [isTalkarCustomer, setIsTalkarCustomer] = React.useState<boolean>(false);
+  const [isTalkarCustomer, setIsTalkarCustomer] = useState<boolean>(false);
+  const [talkarStatus, setTalkarStatus] = useState<string | null>(null);
+  const [suspensionReason, setSuspensionReason] = useState<string | null>(null);
+  const [hasOnboardingForm, setHasOnboardingForm] = useState<boolean>(false);
+  const [isSubOrg, setIsSubOrg] = useState<boolean>(false);
+  const [isServiceDown, setIsServiceDown] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (dograhOrgId) {
-      const isOrgCustomer = document.cookie.includes(`talkar_customer_${dograhOrgId}=true`);
-      setIsTalkarCustomer(isOrgCustomer && !isAdminBypass);
-      if (isOrgCustomer) {
-        document.cookie = "talkar_customer=true; path=/; max-age=86400; SameSite=Lax";
-      } else {
-        document.cookie = "talkar_customer=; path=/; max-age=0";
-      }
-    } else {
-      setIsTalkarCustomer(false);
-      document.cookie = "talkar_customer=; path=/; max-age=0";
-    }
-  }, [dograhOrgId, isAdminBypass]);
-
-  const [talkarStatus, setTalkarStatus] = React.useState<string | null>(null);
-  const [isServiceDown, setIsServiceDown] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const lastCheckedOrgRef = useRef<number | null>(null);
-
-  // Health check: probes lightweight /api/talkar/health without polling spam
-  const checkHealth = React.useCallback(async (): Promise<boolean> => {
-    try {
-      const res = await fetch("/api/talkar/health", { cache: "no-store" });
-      if (res.ok) {
-        setIsServiceDown(false);
-        if (dograhOrgId) {
-          fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
-            .then(r => r.ok ? r.json() : null)
-            .then(data => {
-              if (data?.status) {
-                setTalkarStatus(data.status);
-                setIsTalkarCustomer(true);
-                document.cookie = `talkar_customer_${dograhOrgId}=true; path=/; max-age=86400; SameSite=Lax`;
-                document.cookie = "talkar_customer=true; path=/; max-age=86400; SameSite=Lax";
-              }
-            })
-            .catch(() => {});
-        }
-        return true;
-      }
-      setIsServiceDown(true);
-      return false;
-    } catch {
-      setIsServiceDown(true);
-      return false;
-    }
-  }, [dograhOrgId]);
-
-  // Listen for explicit status invalidation event fired on successful payment
-  useEffect(() => {
-    const handleInvalidate = () => {
-      lastCheckedOrgRef.current = null;
-      if (dograhOrgId) {
-        fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(data => {
-            if (data?.status) {
-              setTalkarStatus(data.status);
-              setIsTalkarCustomer(true);
-              document.cookie = `talkar_customer_${dograhOrgId}=true; path=/; max-age=86400; SameSite=Lax`;
-              document.cookie = "talkar_customer=true; path=/; max-age=86400; SameSite=Lax";
-            }
-          })
-          .catch(() => {});
-      }
-    };
-    window.addEventListener("talkar-status-invalidate", handleInvalidate);
-    return () => window.removeEventListener("talkar-status-invalidate", handleInvalidate);
-  }, [dograhOrgId]);
+  const lastCheckedKeyRef = useRef<string | null>(null);
 
   // Re-check admin bypass cookie on mount
   useEffect(() => {
@@ -114,12 +60,143 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const fetchCustomerStatus = useCallback(async (forcedOrgId?: number) => {
+    const targetOrgId = forcedOrgId ?? dograhOrgId;
+    const query = targetOrgId
+      ? `dograh_org_id=${targetOrgId}`
+      : email
+      ? `contact_email=${encodeURIComponent(email)}`
+      : "";
+
+    if (!query) {
+      setIsLoading(false);
+      return;
+    }
+
+    const checkKey = `${targetOrgId || email}`;
+    lastCheckedKeyRef.current = checkKey;
+    setIsLoading(true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    try {
+      const r = await fetch(`/api/talkar/customers/status?${query}`, {
+        signal: controller.signal,
+      });
+
+      if (r.status === 502 || r.status === 503 || r.status === 504) {
+        setIsServiceDown(true);
+        return;
+      }
+
+      if (r.status === 404) {
+        setIsServiceDown(false);
+        setIsTalkarCustomer(true);
+        setTalkarStatus("not_onboarded");
+        setHasOnboardingForm(false);
+        setIsSubOrg(false);
+        if (targetOrgId) {
+          document.cookie = `talkar_customer_${targetOrgId}=; path=/; max-age=0`;
+        }
+        document.cookie = "talkar_customer=; path=/; max-age=0";
+        return;
+      }
+
+      if (!r.ok) {
+        setIsServiceDown(true);
+        return;
+      }
+
+      const data = await r.json();
+      if (data?.error === "Talkar service unreachable") {
+        setIsServiceDown(true);
+        return;
+      }
+
+      setIsServiceDown(false);
+      if (data?.status) {
+        setTalkarStatus(data.status);
+        setSuspensionReason(data.suspension_reason || null);
+        setHasOnboardingForm(Boolean(data.has_onboarding_form));
+        setIsSubOrg(Boolean(data.is_sub_org));
+        setIsTalkarCustomer(true);
+        if (targetOrgId) {
+          document.cookie = `talkar_customer_${targetOrgId}=true; path=/; max-age=86400; SameSite=Lax`;
+        }
+        document.cookie = "talkar_customer=true; path=/; max-age=86400; SameSite=Lax";
+      } else {
+        setTalkarStatus("not_onboarded");
+        setIsTalkarCustomer(true);
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setIsServiceDown(true);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      setIsLoading(false);
+    }
+  }, [dograhOrgId, email]);
+
+  const checkHealth = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/talkar/health", { cache: "no-store" });
+      if (res.ok) {
+        setIsServiceDown(false);
+        await fetchCustomerStatus();
+        return true;
+      }
+      setIsServiceDown(true);
+      return false;
+    } catch {
+      setIsServiceDown(true);
+      return false;
+    }
+  }, [fetchCustomerStatus]);
+
+  const refreshStatus = useCallback(async () => {
+    lastCheckedKeyRef.current = null;
+    await fetchCustomerStatus();
+  }, [fetchCustomerStatus]);
+
+  // Listen for explicit status invalidation event fired on successful payment or onboarding action
+  useEffect(() => {
+    const handleInvalidate = () => {
+      refreshStatus();
+    };
+    window.addEventListener("talkar-status-invalidate", handleInvalidate);
+    return () => window.removeEventListener("talkar-status-invalidate", handleInvalidate);
+  }, [refreshStatus]);
+
+  // Trigger status check whenever user or org settles
+  useEffect(() => {
+    if (authLoading || orgLoading) return;
+    if (!user) {
+      setIsLoading(false);
+      setTalkarStatus(null);
+      setIsTalkarCustomer(false);
+      return;
+    }
+
+    const checkKey = `${dograhOrgId || email}`;
+    if (!dograhOrgId && !email) {
+      return; // wait for identity to resolve
+    }
+
+    if (lastCheckedKeyRef.current === checkKey) {
+      setIsLoading(false);
+      return;
+    }
+
+    fetchCustomerStatus();
+  }, [user, authLoading, dograhOrgId, orgLoading, email, fetchCustomerStatus]);
+
   // Event-driven check on tab focus (debounced to avoid heartbeat spam)
   useEffect(() => {
     let lastChecked = Date.now();
     const onFocus = () => {
       const now = Date.now();
-      // Only verify if currently down, or if at least 60s passed since last interaction
       if (isServiceDown || now - lastChecked > 60000) {
         lastChecked = now;
         checkHealth();
@@ -134,94 +211,19 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
     };
   }, [isServiceDown, checkHealth]);
 
-  useEffect(() => {
-    // If auth or org context is still resolving, keep waiting
-    if (authLoading || orgLoading) {
-      return;
-    }
-
-    // If user is not logged in or has no org, we are done
-    if (!user || !dograhOrgId) {
-      setIsLoading(false);
-      return;
-    }
-
-    // Only re-fetch when the org changes
-    if (lastCheckedOrgRef.current === dograhOrgId) {
-      setIsLoading(false);
-      return;
-    }
-    lastCheckedOrgRef.current = dograhOrgId;
-    setIsLoading(true);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-    fetch(`/api/talkar/customers/status?dograh_org_id=${dograhOrgId}`, { signal: controller.signal })
-      .then(async (r) => {
-        // Upstream gateway failures indicate Talkar billing service is offline
-        if (r.status === 502 || r.status === 503 || r.status === 504) {
-          setIsServiceDown(true);
-          return;
-        }
-
-        if (r.status === 404) {
-          // New workspace: service is up, customer just hasn't completed onboarding
-          setIsServiceDown(false);
-          setIsTalkarCustomer(false);
-          document.cookie = `talkar_customer_${dograhOrgId}=; path=/; max-age=0`;
-          document.cookie = "talkar_customer=; path=/; max-age=0";
-          return;
-        }
-
-        if (!r.ok) {
-          setIsServiceDown(true);
-          return;
-        }
-
-        const data = await r.json();
-        if (data?.error === "Talkar service unreachable") {
-          setIsServiceDown(true);
-          return;
-        }
-
-        setIsServiceDown(false);
-        if (data?.status) {
-          setTalkarStatus(data.status);
-          setIsTalkarCustomer(true);
-          document.cookie = `talkar_customer_${dograhOrgId}=true; path=/; max-age=86400; SameSite=Lax`;
-          document.cookie = "talkar_customer=true; path=/; max-age=86400; SameSite=Lax";
-        } else {
-          setIsTalkarCustomer(false);
-          document.cookie = `talkar_customer_${dograhOrgId}=; path=/; max-age=0`;
-          document.cookie = "talkar_customer=; path=/; max-age=0";
-        }
-      })
-      .catch((err) => {
-        if (err.name !== "AbortError") {
-          setIsServiceDown(true);
-        }
-      })
-      .finally(() => {
-        clearTimeout(timeoutId);
-        setIsLoading(false);
-      });
-
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
-  }, [user, authLoading, dograhOrgId, orgLoading]);
-
   return (
     <TalkarCustomerContext.Provider
       value={{
         isTalkarCustomer,
         isAdminBypass,
         talkarStatus,
+        suspensionReason,
+        hasOnboardingForm,
+        isSubOrg,
         isLoading,
         isServiceDown,
-        checkHealth
+        checkHealth,
+        refreshStatus,
       }}
     >
       {children}

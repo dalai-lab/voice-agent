@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function VerifyEmailPage() {
   const authProvider = await getAuthProvider();
   if (authProvider === "local") {
-    redirect("/overview");
+    redirect("/after-sign-in");
   }
 
   const stackConfig = await getStackConfig();

@@ -10,12 +10,25 @@ import api.routes.auth as auth_routes
 from api.routes.auth import router
 from api.services.auth import depends as auth_depends
 from api.utils.auth import create_jwt_token, hash_otp_code, hash_password
+from api.utils.email_validation import (
+    _HOURLY_WINDOW_CACHE,
+    get_canonical_email,
+    is_disposable_email,
+    normalize_email,
+)
 
 
 def _make_test_app() -> FastAPI:
     app = FastAPI()
     app.include_router(router)
     return app
+
+
+@pytest.fixture(autouse=True)
+def reset_hourly_rate_limit_cache():
+    _HOURLY_WINDOW_CACHE.clear()
+    yield
+    _HOURLY_WINDOW_CACHE.clear()
 
 
 @pytest.fixture
@@ -117,21 +130,20 @@ async def test_signup_conflict_on_already_verified(test_client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_verify_email_success(test_client, monkeypatch):
-    code = "123456"
-    code_hash = hash_otp_code(code)
     unverified_user = SimpleNamespace(
         id=104,
         email="verify@example.com",
-        is_verified=False,
-        verification_code_hash=code_hash,
-        verification_code_expires_at=datetime.now(UTC) + timedelta(minutes=10),
-        verification_attempts=0,
+        is_verified=True,
         selected_organization_id=None,
         provider_id="oss_user_104",
     )
 
     mock_org = SimpleNamespace(id=501, provider_id="org_oss_user_104")
-    monkeypatch.setattr(auth_routes.db_client, "get_user_by_email", AsyncMock(return_value=unverified_user))
+    monkeypatch.setattr(
+        auth_routes.db_client,
+        "verify_user_otp_atomic",
+        AsyncMock(return_value=(True, "SUCCESS", unverified_user, 0)),
+    )
     monkeypatch.setattr(auth_routes.db_client, "mark_user_email_verified", AsyncMock())
     monkeypatch.setattr(auth_routes.db_client, "get_or_create_organization_by_provider_id", AsyncMock(return_value=(mock_org, True)))
     monkeypatch.setattr(auth_routes.db_client, "add_user_to_organization", AsyncMock())
@@ -152,19 +164,12 @@ async def test_verify_email_success(test_client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_verify_email_invalid_code_attempts_decrement(test_client, monkeypatch):
-    code_hash = hash_otp_code("654321")
-    unverified_user = SimpleNamespace(
-        id=105,
-        email="wrongcode@example.com",
-        is_verified=False,
-        verification_code_hash=code_hash,
-        verification_code_expires_at=datetime.now(UTC) + timedelta(minutes=10),
-        verification_attempts=1,
-        selected_organization_id=None,
+    unverified_user = SimpleNamespace(id=105, email="wrongcode@example.com")
+    monkeypatch.setattr(
+        auth_routes.db_client,
+        "verify_user_otp_atomic",
+        AsyncMock(return_value=(False, "INVALID_CODE", unverified_user, 3)),
     )
-
-    monkeypatch.setattr(auth_routes.db_client, "get_user_by_email", AsyncMock(return_value=unverified_user))
-    monkeypatch.setattr(auth_routes.db_client, "increment_user_verification_attempts", AsyncMock(return_value=2))
 
     response = test_client.post(
         "/auth/verify-email",
@@ -177,19 +182,12 @@ async def test_verify_email_invalid_code_attempts_decrement(test_client, monkeyp
 
 @pytest.mark.asyncio
 async def test_verify_email_lockout_on_fifth_attempt(test_client, monkeypatch):
-    code_hash = hash_otp_code("654321")
-    unverified_user = SimpleNamespace(
-        id=106,
-        email="lockout@example.com",
-        is_verified=False,
-        verification_code_hash=code_hash,
-        verification_code_expires_at=datetime.now(UTC) + timedelta(minutes=10),
-        verification_attempts=4,
-        selected_organization_id=None,
+    unverified_user = SimpleNamespace(id=106, email="lockout@example.com")
+    monkeypatch.setattr(
+        auth_routes.db_client,
+        "verify_user_otp_atomic",
+        AsyncMock(return_value=(False, "INVALID_CODE", unverified_user, 0)),
     )
-
-    monkeypatch.setattr(auth_routes.db_client, "get_user_by_email", AsyncMock(return_value=unverified_user))
-    monkeypatch.setattr(auth_routes.db_client, "increment_user_verification_attempts", AsyncMock(return_value=5))
 
     response = test_client.post(
         "/auth/verify-email",
@@ -202,19 +200,12 @@ async def test_verify_email_lockout_on_fifth_attempt(test_client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_verify_email_expired_otp_rejected(test_client, monkeypatch):
-    code_hash = hash_otp_code("123456")
-    expired_user = SimpleNamespace(
-        id=107,
-        email="expired@example.com",
-        is_verified=False,
-        verification_code_hash=code_hash,
-        # Expired 2 minutes ago (beyond 30s grace)
-        verification_code_expires_at=datetime.now(UTC) - timedelta(minutes=2),
-        verification_attempts=0,
-        selected_organization_id=None,
+    unverified_user = SimpleNamespace(id=107, email="expired@example.com")
+    monkeypatch.setattr(
+        auth_routes.db_client,
+        "verify_user_otp_atomic",
+        AsyncMock(return_value=(False, "CODE_EXPIRED", unverified_user, 0)),
     )
-
-    monkeypatch.setattr(auth_routes.db_client, "get_user_by_email", AsyncMock(return_value=expired_user))
 
     response = test_client.post(
         "/auth/verify-email",
@@ -236,7 +227,7 @@ async def test_resend_cooldown_60_seconds(test_client, monkeypatch):
 
     monkeypatch.setattr(auth_routes.db_client, "get_user_by_email", AsyncMock(return_value=recent_user))
 
-    # Should be rejected with 429
+    # 1. Should be rejected with 429 cooldown
     response = test_client.post(
         "/auth/resend-verification",
         json={"email": "cooldown@example.com"},
@@ -244,7 +235,7 @@ async def test_resend_cooldown_60_seconds(test_client, monkeypatch):
     assert response.status_code == 429
     assert "wait" in response.json()["detail"].lower()
 
-    # Now simulate 65 seconds elapsed
+    # 2. Now simulate 65 seconds elapsed
     recent_user.last_verification_sent_at = datetime.now(UTC) - timedelta(seconds=65)
     monkeypatch.setattr(auth_routes.db_client, "update_user_verification_otp", AsyncMock())
     monkeypatch.setattr(auth_routes, "_dispatch_verification_email", AsyncMock(return_value=True))
@@ -255,6 +246,32 @@ async def test_resend_cooldown_60_seconds(test_client, monkeypatch):
     )
     assert ok_response.status_code == 200
     assert ok_response.json()["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_resend_hourly_cap_enforced(test_client, monkeypatch):
+    """Test Case 9: Request 5 resends -> 6th attempt within rolling hour rejected with 429."""
+    user = SimpleNamespace(
+        id=115,
+        email="hourlycap@example.com",
+        is_verified=False,
+        last_verification_sent_at=None,
+    )
+    monkeypatch.setattr(auth_routes.db_client, "get_user_by_email", AsyncMock(return_value=user))
+    monkeypatch.setattr(auth_routes.db_client, "update_user_verification_otp", AsyncMock())
+    monkeypatch.setattr(auth_routes, "_dispatch_verification_email", AsyncMock(return_value=True))
+
+    # Send 5 requests (bypassing 60s cooldown by setting last_verification_sent_at to None)
+    for _ in range(5):
+        user.last_verification_sent_at = None
+        res = test_client.post("/auth/resend-verification", json={"email": "hourlycap@example.com"})
+        assert res.status_code == 200
+
+    # 6th attempt should be blocked by hourly rate limit
+    user.last_verification_sent_at = None
+    rate_limited_res = test_client.post("/auth/resend-verification", json={"email": "hourlycap@example.com"})
+    assert rate_limited_res.status_code == 429
+    assert "Too many verification requests" in rate_limited_res.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -358,20 +375,20 @@ async def test_send_code_jit_creation_and_login_with_code(test_client, monkeypat
     otp = dispatched[0][1]
 
     # 2. Verify with code -> promotes to verified and provisions org
-    otp_hash = hash_otp_code(otp)
     jit_user = SimpleNamespace(
         id=112,
         email="jituser@example.com",
-        is_verified=False,
-        verification_code_hash=otp_hash,
-        verification_code_expires_at=datetime.now(UTC) + timedelta(minutes=15),
-        verification_attempts=0,
+        is_verified=True,
         selected_organization_id=None,
         provider_id="oss_user_112",
     )
     mock_org = SimpleNamespace(id=502, provider_id="org_oss_user_112")
 
-    monkeypatch.setattr(auth_routes.db_client, "get_user_by_email", AsyncMock(return_value=jit_user))
+    monkeypatch.setattr(
+        auth_routes.db_client,
+        "verify_user_otp_atomic",
+        AsyncMock(return_value=(True, "SUCCESS", jit_user, 0)),
+    )
     monkeypatch.setattr(auth_routes.db_client, "mark_user_email_verified", AsyncMock())
     monkeypatch.setattr(auth_routes.db_client, "get_or_create_organization_by_provider_id", AsyncMock(return_value=(mock_org, True)))
     monkeypatch.setattr(auth_routes.db_client, "add_user_to_organization", AsyncMock())
@@ -407,3 +424,10 @@ async def test_handle_oss_auth_rejects_unverified_scope(monkeypatch):
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail["code"] == "EMAIL_NOT_VERIFIED"
+
+
+def test_canonical_email_strips_plus_addressing():
+    """Edge Case 22: Plus-addressing sub-aliases are stripped for master quota tracking."""
+    assert get_canonical_email("user+test1@gmail.com") == "user@gmail.com"
+    assert get_canonical_email("User+Spam@Googlemail.com") == "user@gmail.com"
+    assert get_canonical_email("regular@company.com") == "regular@company.com"

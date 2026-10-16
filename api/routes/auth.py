@@ -19,8 +19,10 @@ from api.schemas.auth import (
 )
 from api.utils.email_validation import (
     normalize_email,
+    get_canonical_email,
     is_disposable_email,
     validate_domain_mx,
+    check_and_increment_hourly_verification_rate_limit,
 )
 from api.services.auth.depends import (
     create_user_configuration_with_mps_key,
@@ -172,11 +174,17 @@ async def _activate_user_and_provision_workspace(
 
 async def _execute_code_verification(email: str, code: str) -> AuthResponse:
     normalized_email = normalize_email(email)
-    user = await db_client.get_user_by_email(normalized_email)
-    if not user:
+    (
+        is_valid,
+        status_reason,
+        user,
+        remaining_attempts,
+    ) = await db_client.verify_user_otp_atomic(normalized_email, code)
+
+    if status_reason == "USER_NOT_FOUND":
         raise HTTPException(status_code=404, detail="User not found")
 
-    if getattr(user, "is_verified", False):
+    if status_reason == "ALREADY_VERIFIED":
         token = create_jwt_token(user.id, normalized_email, scope="authenticated")
         return AuthResponse(
             token=token,
@@ -191,39 +199,30 @@ async def _execute_code_verification(email: str, code: str) -> AuthResponse:
             message="Email already verified.",
         )
 
-    # 1. Check max attempts (Max 5)
-    if (user.verification_attempts or 0) >= 5:
+    if status_reason == "MAX_ATTEMPTS_EXCEEDED":
         raise HTTPException(
             status_code=400,
             detail="Maximum verification attempts exceeded. Please request a new code.",
         )
 
-    # 2. Check expiry with 30-second clock skew grace period
-    if user.verification_code_expires_at:
-        now = datetime.now(UTC)
-        grace_expiry = user.verification_code_expires_at + timedelta(seconds=30)
-        if now > grace_expiry:
-            raise HTTPException(
-                status_code=400,
-                detail="Verification code has expired. Please request a new code.",
-            )
+    if status_reason == "CODE_EXPIRED":
+        raise HTTPException(
+            status_code=400,
+            detail="Verification code has expired. Please request a new code.",
+        )
 
-    # 3. Constant-time OTP verification
-    is_valid = verify_otp_code(code, user.verification_code_hash)
-    if not is_valid:
-        attempts = await db_client.increment_user_verification_attempts(user.id)
-        remaining = max(0, 5 - attempts)
-        if remaining == 0:
+    if status_reason == "INVALID_CODE":
+        if remaining_attempts == 0:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid code. Maximum attempts reached. Please request a new code.",
             )
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid verification code. {remaining} attempts remaining.",
+            detail=f"Invalid verification code. {remaining_attempts} attempts remaining.",
         )
 
-    # 4. Success! Activate & provision
+    # Success! Complete workspace provisioning and session regeneration
     return await _activate_user_and_provision_workspace(user, normalized_email)
 
 
@@ -248,6 +247,14 @@ async def signup(request: SignupRequest):
         raise HTTPException(
             status_code=400,
             detail="Invalid email domain: no active mail server found.",
+        )
+
+    # Enforce rolling hourly limit (Max 5 requests per rolling hour per canonical email)
+    allowed, retry_after = await check_and_increment_hourly_verification_rate_limit(normalized_email)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many verification requests. Please try again in {retry_after} seconds.",
         )
 
     # Check if email is already taken
@@ -344,6 +351,14 @@ async def send_code(request: SendCodeRequest):
             detail="Invalid email domain: no active mail server found.",
         )
 
+    # Enforce rolling hourly limit
+    allowed, retry_after = await check_and_increment_hourly_verification_rate_limit(normalized_email)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many verification requests. Please try again in {retry_after} seconds.",
+        )
+
     user = await db_client.get_user_by_email(normalized_email)
     now = datetime.now(UTC)
 
@@ -413,6 +428,14 @@ async def resend_verification(request: ResendVerificationRequest):
     if getattr(user, "is_verified", False):
         return {"success": True, "message": "Email is already verified. Please sign in."}
 
+    # Enforce rolling hourly limit
+    allowed, retry_after = await check_and_increment_hourly_verification_rate_limit(normalized_email)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many verification requests. Please try again in {retry_after} seconds.",
+        )
+
     # Check 60-second cooldown
     if user.last_verification_sent_at:
         elapsed = (datetime.now(UTC) - user.last_verification_sent_at).total_seconds()
@@ -459,6 +482,14 @@ async def change_signup_email(request: ChangeSignupEmailRequest):
         raise HTTPException(
             status_code=400,
             detail="Invalid email domain: no active mail server found.",
+        )
+
+    # Enforce rolling hourly limit on new email
+    allowed, retry_after = await check_and_increment_hourly_verification_rate_limit(new_email)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many verification requests. Please try again in {retry_after} seconds.",
         )
 
     user = await db_client.get_user_by_email(curr_email)

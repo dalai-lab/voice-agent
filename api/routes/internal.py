@@ -643,3 +643,14 @@ async def clear_mock_telephony_override(
         "cleared": bool(deleted),
     }
 
+
+@router.post("/cleanup-abandoned-signups")
+async def cleanup_abandoned_signups_endpoint(
+    max_age_hours: int = Query(48, description="Purge unverified accounts older than this many hours"),
+    _: None = Depends(verify_internal_token),
+):
+    """Purge abandoned unverified user signups older than max_age_hours (Edge Case 28)."""
+    deleted_count = await db_client.cleanup_abandoned_signups(max_age_hours=max_age_hours)
+    logger.info(f"Purged {deleted_count} abandoned unverified user signups older than {max_age_hours}h")
+    return {"status": "success", "deleted_count": deleted_count}
+

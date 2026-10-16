@@ -279,3 +279,74 @@ class UserClient(BaseDBClient):
                 user.verification_attempts = 0
                 await session.commit()
 
+    async def verify_user_otp_atomic(
+        self, email: str, code: str
+    ) -> tuple[bool, str, UserModel | None, int]:
+        """
+        Atomically verify an OTP code using PostgreSQL row-level locking (SELECT ... FOR UPDATE).
+        Returns:
+            (is_valid: bool, status_reason: str, user: UserModel | None, remaining_attempts: int)
+        """
+        normalized_email = email.strip().lower()
+        async with self.async_session() as session:
+            stmt = (
+                select(UserModel)
+                .where(func.lower(UserModel.email) == normalized_email)
+                .with_for_update()
+            )
+            res = await session.execute(stmt)
+            user = res.scalars().first()
+
+            if not user:
+                return False, "USER_NOT_FOUND", None, 0
+
+            if getattr(user, "is_verified", False):
+                return True, "ALREADY_VERIFIED", user, 0
+
+            # 1. Check max attempts (Max 5)
+            if (user.verification_attempts or 0) >= 5:
+                return False, "MAX_ATTEMPTS_EXCEEDED", user, 0
+
+            # 2. Check expiry with 30-second clock skew grace period
+            if user.verification_code_expires_at:
+                now = datetime.now(UTC)
+                grace_expiry = user.verification_code_expires_at + timedelta(seconds=30)
+                if now > grace_expiry:
+                    return False, "CODE_EXPIRED", user, 0
+
+            # 3. Constant-time verification
+            from api.utils.auth import verify_otp_code
+            if not verify_otp_code(code, user.verification_code_hash):
+                user.verification_attempts = (user.verification_attempts or 0) + 1
+                if user.verification_attempts >= 5:
+                    user.verification_code_hash = None  # Invalidate OTP on 5th attempt
+                await session.commit()
+                remaining = max(0, 5 - user.verification_attempts)
+                return False, "INVALID_CODE", user, remaining
+
+            # 4. Success! Mark verified and clear OTP
+            user.is_verified = True
+            user.verification_code_hash = None
+            user.verification_code_expires_at = None
+            user.verification_attempts = 0
+            await session.commit()
+            await session.refresh(user)
+            return True, "SUCCESS", user, 0
+
+    async def cleanup_abandoned_signups(self, max_age_hours: int = 48) -> int:
+        """Purge unverified user accounts older than max_age_hours that never verified or completed setup."""
+        from sqlalchemy import delete
+        cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
+        async with self.async_session() as session:
+            stmt = (
+                delete(UserModel)
+                .where(
+                    UserModel.is_verified == False,
+                    UserModel.created_at < cutoff,
+                    UserModel.selected_organization_id == None,
+                )
+            )
+            result = await session.execute(stmt)
+            await session.commit()
+            return result.rowcount or 0
+

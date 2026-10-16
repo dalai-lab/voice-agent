@@ -117,6 +117,10 @@ function TalkarStatusGate() {
     }
 
     if (!user) return;
+    if ((user as any).is_verified === false && !pathname.startsWith('/auth/verify-email')) {
+      router.replace(`/auth/verify-email?email=${encodeURIComponent((user as any)?.email || '')}`);
+      return;
+    }
     if (TALKAR_ALLOWED_PATHS.some(p => pathname.startsWith(p))) return;
     if (document.cookie.includes('talkar_admin_bypass=true')) return;
     if (!dograhOrgId) return;

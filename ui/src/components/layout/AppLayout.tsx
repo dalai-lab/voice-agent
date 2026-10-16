@@ -294,6 +294,7 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
     pathname.startsWith("/integrations") ||
     pathname.startsWith("/handler") ||
     pathname.startsWith("/auth") ||
+    pathname.startsWith("/after-sign-in") ||
     pathname.startsWith("/privacy-policy") ||
     pathname.startsWith("/terms-of-service");
 
@@ -313,7 +314,7 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
       auth.provider === "stack" &&
       auth.user &&
       "primaryEmailVerified" in auth.user &&
-      auth.user.primaryEmailVerified === false &&
+      !auth.user.primaryEmailVerified &&
       !isPublicRoute
     ) {
       router.replace("/auth/verify-email");
@@ -352,7 +353,7 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
     auth.provider === "stack" &&
     auth.user &&
     "primaryEmailVerified" in auth.user &&
-    auth.user.primaryEmailVerified === false &&
+    !auth.user.primaryEmailVerified &&
     !isPublicRoute
   ) {
     return <SpinLoader label="Redirecting to email verification..." />;

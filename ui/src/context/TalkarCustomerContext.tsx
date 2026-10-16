@@ -181,7 +181,8 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
 
     const checkKey = `${dograhOrgId || email}`;
     if (!dograhOrgId && !email) {
-      return; // wait for identity to resolve
+      setIsLoading(false);
+      return;
     }
 
     if (lastCheckedKeyRef.current === checkKey) {

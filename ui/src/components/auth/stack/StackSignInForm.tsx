@@ -41,10 +41,14 @@ function InnerSignInForm({ signupEnabled = true }: { signupEnabled?: boolean }) 
   const [oauthProviders, setOauthProviders] = useState<Array<{ id: string }>>([]);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
-  // If already logged in, redirect to overview
+  // If already logged in, redirect based on verification status
   useEffect(() => {
     if (user) {
-      router.push("/overview");
+      if (user.primaryEmailVerified === false) {
+        router.push("/auth/verify-email");
+      } else {
+        router.push("/overview");
+      }
     }
   }, [user, router]);
 

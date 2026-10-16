@@ -30,10 +30,14 @@ function InnerSignUpForm() {
   const [oauthProviders, setOauthProviders] = useState<Array<{ id: string }>>([]);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
-  // If already logged in, redirect to overview
+  // If already logged in, redirect based on verification status
   useEffect(() => {
     if (user) {
-      router.push("/overview");
+      if (user.primaryEmailVerified === false) {
+        router.push("/auth/verify-email");
+      } else {
+        router.push("/overview");
+      }
     }
   }, [user, router]);
 
@@ -83,11 +87,10 @@ function InnerSignUpForm() {
       }
 
       toast.success("Account created successfully!");
-      // Stack automatically redirects to afterSignUp / verification callback,
-      // but we add a safety timeout
+      // Stack automatically dispatches a verification email. Forward to holding screen.
       setTimeout(() => {
-        window.location.href = "/after-sign-in";
-      }, 1000);
+        window.location.href = "/auth/verify-email";
+      }, 800);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create account. Please try again.";
       toast.error(message);

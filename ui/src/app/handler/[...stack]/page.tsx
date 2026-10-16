@@ -104,6 +104,18 @@ export default async function Handler(props: unknown) {
     );
   }
 
+  if (normalizedSegment === "verifyemail" || normalizedSegment === "verify") {
+    const { StackVerifyEmailView } = await import("@/components/auth/stack/StackVerifyEmailView");
+    return (
+      <AuthShell enterpriseSlot={<AuthEnterpriseCTA />}>
+        <StackVerifyEmailView
+          projectId={stackConfig?.projectId || ""}
+          publishableClientKey={stackConfig?.publishableClientKey || ""}
+        />
+      </AuthShell>
+    );
+  }
+
   // Lazily import the real StackServerApp only for machine/callback routes
   const { getStackServerApp } = await import("@/lib/auth/server");
   const app = await getStackServerApp();

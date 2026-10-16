@@ -350,6 +350,8 @@ function TalkarRouteGuard({ children }: { children: ReactNode }) {
 
 function TalkarLayoutGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const auth = useAuth();
   const { isLoading, isAdminBypass, isServiceDown, checkHealth } = useTalkarCustomer();
 
   const isPublicRoute =
@@ -360,6 +362,29 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
     pathname.startsWith("/auth") ||
     pathname.startsWith("/privacy-policy") ||
     pathname.startsWith("/terms-of-service");
+
+  // Prevent unverified Stack users from hanging in protected routes
+  useEffect(() => {
+    if (
+      auth.provider === "stack" &&
+      auth.user &&
+      "primaryEmailVerified" in auth.user &&
+      auth.user.primaryEmailVerified === false &&
+      !isPublicRoute
+    ) {
+      router.replace("/auth/verify-email");
+    }
+  }, [auth.provider, auth.user, isPublicRoute, router]);
+
+  if (
+    auth.provider === "stack" &&
+    auth.user &&
+    "primaryEmailVerified" in auth.user &&
+    auth.user.primaryEmailVerified === false &&
+    !isPublicRoute
+  ) {
+    return <SpinLoader label="Redirecting to email verification..." />;
+  }
 
   // Full-level blockage when Talkar billing/backend is down
   if (isServiceDown && !isPublicRoute) {

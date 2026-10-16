@@ -17,6 +17,12 @@ export default async function AfterSignInPage() {
     logger.debug('[AfterSignInPage] Got user:', { hasUser: !!user, userId: user?.id });
 
     if (authProvider === 'stack' && user && 'getAuthJson' in user) {
+        // Zero unverified entry: redirect unverified users to verification holding page
+        if ('primaryEmailVerified' in user && user.primaryEmailVerified === false) {
+            logger.debug('[AfterSignInPage] Stack user email unverified, redirecting to /auth/verify-email');
+            redirect('/auth/verify-email');
+        }
+
         logger.debug('[AfterSignInPage] Stack user detected, getting auth token...');
         const token = await user.getAuthJson();
         logger.debug('[AfterSignInPage] Got token:', { hasToken: !!token?.accessToken });

@@ -1,3 +1,4 @@
+from collections import namedtuple
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -13,6 +14,22 @@ from api.db.models import CampaignModel, QueuedRunModel, WorkflowRunModel
 from api.schemas.workflow import WorkflowRunResponseSchema
 from api.services.workflow.run_usage_response import format_public_cost_info
 from api.utils.recording_artifacts import get_recording_storage_key
+
+ReportRunRow = namedtuple(
+    "ReportRunRow",
+    [
+        "id",
+        "workflow_id",
+        "definition_id",
+        "campaign_id",
+        "created_at",
+        "initial_context",
+        "gathered_context",
+        "cost_info",
+        "usage_info",
+        "public_access_token",
+    ],
+)
 
 
 class CampaignClient(BaseDBClient):
@@ -836,12 +853,15 @@ class CampaignClient(BaseDBClient):
                 }
                 for cid in campaign_ids
             }
+            failed_queued: dict[int, int] = {cid: 0 for cid in campaign_ids}
             for campaign_id, state, is_sched, is_ret, count in result.all():
                 stats[campaign_id]["total"] += count
                 if is_ret:
                     stats[campaign_id]["retry_attempts"] += count
                 if state in ("processed", "cancelled", "failed"):
                     stats[campaign_id]["executed"] += count
+                if state == "failed":
+                    failed_queued[campaign_id] += count
                 elif state == "processing":
                     stats[campaign_id]["active"] += count
                 elif state == "queued":
@@ -852,14 +872,30 @@ class CampaignClient(BaseDBClient):
 
             # Ground-truth call outcome aggregates from workflow runs
             try:
-                wf_disp = WorkflowRunModel.gathered_context["mapped_call_disposition"].as_string()
+                wf_disp = WorkflowRunModel.gathered_context.op("->>")("mapped_call_disposition")
                 wf_query = (
                     select(
                         WorkflowRunModel.campaign_id,
                         func.count(
                             case(
-                                (wf_disp == "failed", 1),
-                                (wf_disp == "error", 1),
+                                (WorkflowRunModel.is_completed.is_(False), 1),
+                                else_=None,
+                            )
+                        ).label("active_calls"),
+                        func.count(
+                            case(
+                                (
+                                    wf_disp.in_(
+                                        [
+                                            "failed",
+                                            "error",
+                                            "canceled",
+                                            "cancelled",
+                                            "quota_exhausted",
+                                        ]
+                                    ),
+                                    1,
+                                ),
                                 else_=None,
                             )
                         ).label("failed_calls"),
@@ -913,9 +949,10 @@ class CampaignClient(BaseDBClient):
                     .group_by(WorkflowRunModel.campaign_id)
                 )
                 wf_result = await session.execute(wf_query)
-                for cid, f_calls, u_calls, c_calls in wf_result.all():
+                for cid, act_calls, f_calls, u_calls, c_calls in wf_result.all():
                     if cid in stats:
-                        stats[cid]["failed_calls"] = f_calls or 0
+                        stats[cid]["active"] = (act_calls or 0) + stats[cid]["active"]
+                        stats[cid]["failed_calls"] = max(failed_queued.get(cid, 0), f_calls or 0)
                         stats[cid]["unanswered_calls"] = u_calls or 0
                         stats[cid]["completed_calls"] = c_calls or 0
             except Exception as e:
@@ -982,7 +1019,73 @@ class CampaignClient(BaseDBClient):
                 .order_by(WorkflowRunModel.created_at.desc())
             )
             result = await session.execute(query)
-            return list(result.all())
+            runs = list(result.all())
+
+            # When querying for a campaign report, also include pre-flight failed queued runs
+            # that have no associated workflow run (e.g. pool exhausted, format invalid)
+            if campaign_id is not None:
+                campaign = await session.get(CampaignModel, campaign_id)
+                wf_id = campaign.workflow_id if campaign else None
+
+                subq_wf = select(WorkflowRunModel.queued_run_id).where(
+                    WorkflowRunModel.campaign_id == campaign_id,
+                    WorkflowRunModel.queued_run_id.is_not(None),
+                )
+                subq_child = select(QueuedRunModel.parent_queued_run_id).where(
+                    QueuedRunModel.campaign_id == campaign_id,
+                    QueuedRunModel.parent_queued_run_id.is_not(None),
+                )
+
+                queued_conditions = [
+                    QueuedRunModel.campaign_id == campaign_id,
+                    QueuedRunModel.state == "failed",
+                    QueuedRunModel.id.not_in(subq_wf),
+                    QueuedRunModel.id.not_in(subq_child),
+                ]
+                if start_date is not None:
+                    queued_conditions.append(QueuedRunModel.created_at >= start_date)
+                if end_date is not None:
+                    queued_conditions.append(QueuedRunModel.created_at <= end_date)
+
+                queued_query = (
+                    select(QueuedRunModel)
+                    .where(*queued_conditions)
+                    .order_by(QueuedRunModel.created_at.desc())
+                )
+                queued_result = await session.execute(queued_query)
+                orphaned_queued = queued_result.scalars().all()
+
+                for q in orphaned_queued:
+                    reason = q.retry_reason or "preflight_failed"
+                    initial_ctx = q.context_variables or {}
+                    extracted = {k: v for k, v in initial_ctx.items() if k != "phone_number"}
+                    call_tags = ["preflight_failed"]
+                    if reason != "preflight_failed":
+                        call_tags.append(reason)
+                    failed_row = ReportRunRow(
+                        id=None,
+                        workflow_id=wf_id,
+                        definition_id=None,
+                        campaign_id=q.campaign_id,
+                        created_at=q.processed_at or q.created_at,
+                        initial_context=initial_ctx,
+                        gathered_context={
+                            "mapped_call_disposition": "failed",
+                            "call_tags": call_tags,
+                            "extracted_variables": extracted,
+                        },
+                        cost_info={},
+                        usage_info={"call_duration_seconds": 0},
+                        public_access_token=None,
+                    )
+                    runs.append(failed_row)
+
+                runs.sort(
+                    key=lambda r: r.created_at or datetime.min.replace(tzinfo=UTC),
+                    reverse=True,
+                )
+
+            return runs
 
     async def create_queued_run(
         self,

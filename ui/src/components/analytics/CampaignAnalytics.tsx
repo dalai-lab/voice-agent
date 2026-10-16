@@ -99,7 +99,11 @@ export function CampaignAnalytics({ campaignId, campaign }: CampaignAnalyticsPro
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value);
 
-        const totalCalls = campaign?.total_queued_count ?? (campaign?.total_rows ?? runs.length);
+        const totalCalls = Math.max(
+            campaign?.executed_count ?? 0,
+            (campaign?.completed_calls_count ?? 0) + (campaign?.failed_calls_count ?? 0) + (campaign?.unanswered_calls_count ?? 0) + (campaign?.active_count ?? 0),
+            runs.length
+        );
         const completedCalls = campaign?.completed_calls_count ?? sampleCompletedCalls;
         const durationDivisor = sampleCallsWithDuration > 0 ? sampleCallsWithDuration : (runs.length > 0 ? runs.length : 1);
         const avgDuration = runs.length > 0 ? Math.round(totalDuration / durationDivisor) : 0;

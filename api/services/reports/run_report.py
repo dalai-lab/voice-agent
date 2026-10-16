@@ -60,9 +60,9 @@ def build_run_report_csv(runs: list[Any]) -> io.StringIO:
             call_tags = ", ".join(str(t) for t in call_tags)
 
         pre_values = [
-            run.id,
+            run.id if run.id is not None else "",
             run.campaign_id if run.campaign_id is not None else "",
-            run.workflow_id,
+            run.workflow_id if run.workflow_id is not None else "",
             run.definition_id if run.definition_id is not None else "",
             run.created_at.isoformat() if run.created_at else "",
             initial.get("phone_number", ""),

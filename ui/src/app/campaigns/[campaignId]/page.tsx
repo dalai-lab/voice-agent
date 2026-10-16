@@ -818,22 +818,39 @@ export default function CampaignDetailPage() {
                             <RefreshCw className="h-4 w-4 text-muted-foreground/60" />
                         </div>
                         <div>
-                            <div className="flex items-baseline gap-1.5">
-                                <span className="text-2xl font-bold text-foreground tabular-nums">
-                                    {campaign.total_queued_count ?? 0}
-                                </span>
-                                <span className="text-xs text-muted-foreground font-semibold">dials</span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] mt-1 text-muted-foreground font-medium">
-                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{campaign.completed_calls_count ?? 0} connected</span>
-                                <span>•</span>
-                                <span className="text-rose-600 dark:text-rose-400 font-semibold">{campaign.failed_calls_count ?? 0} failed</span>
-                                <span>•</span>
-                                <span className="text-amber-600 dark:text-amber-400 font-semibold">{campaign.unanswered_calls_count ?? 0} unanswered</span>
-                            </div>
-                            <p className="text-[9px] text-muted-foreground/75 mt-1">
-                                {campaign.retry_attempts_count ?? 0} redials • {Math.max(0, (campaign.total_queued_count ?? 0) - (campaign.retry_attempts_count ?? 0))} initial
-                            </p>
+                            {(() => {
+                                const retries = campaign.retry_attempts_count ?? 0;
+                                const connected = campaign.completed_calls_count ?? 0;
+                                const failed = campaign.failed_calls_count ?? 0;
+                                const unanswered = campaign.unanswered_calls_count ?? 0;
+                                const active = campaign.active_count ?? 0;
+                                const dialsPlaced = Math.max(
+                                    campaign.executed_count ?? 0,
+                                    connected + failed + unanswered + active
+                                );
+                                const initialDials = Math.max(0, dialsPlaced - retries);
+
+                                return (
+                                    <>
+                                        <div className="flex items-baseline gap-1.5">
+                                            <span className="text-2xl font-bold text-foreground tabular-nums">
+                                                {dialsPlaced}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground font-semibold">dials</span>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] mt-1 text-muted-foreground font-medium">
+                                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{connected} connected</span>
+                                            <span>•</span>
+                                            <span className="text-rose-600 dark:text-rose-400 font-semibold">{failed} failed</span>
+                                            <span>•</span>
+                                            <span className="text-amber-600 dark:text-amber-400 font-semibold">{unanswered} unanswered</span>
+                                        </div>
+                                        <p className="text-[9px] text-muted-foreground/75 mt-1">
+                                            {retries} redials • {initialDials} initial
+                                        </p>
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>
@@ -841,16 +858,15 @@ export default function CampaignDetailPage() {
                 {/* Multi-Segment Audience Progress Bar */}
                 {(() => {
                     const totalAudience = campaign.total_rows && campaign.total_rows > 0 ? campaign.total_rows : 0;
-                    const dispatchedRows = campaign.processed_rows ?? 0;
                     const failedRows = campaign.failed_rows ?? 0;
-                    const completedRows = campaign.completed_calls_count !== undefined && campaign.completed_calls_count > 0
-                        ? campaign.completed_calls_count
-                        : Math.max(0, dispatchedRows - failedRows);
-                    const resolvedRows = Math.min(totalAudience, Math.max(dispatchedRows, completedRows + failedRows));
+                    const completedRows = campaign.completed_calls_count ?? 0;
+                    const activeRows = campaign.active_count ?? 0;
+                    const resolvedRows = Math.min(totalAudience, completedRows + failedRows);
                     const totalPercent = totalAudience > 0 ? Math.min(100, Math.round((resolvedRows / totalAudience) * 100)) : 0;
                     const completedPercent = totalAudience > 0 ? Math.min(100, (completedRows / totalAudience) * 100) : 0;
-                    const failedPercent = totalAudience > 0 ? Math.min(100 - completedPercent, (failedRows / totalAudience) * 100) : 0;
-                    const remainingRows = Math.max(0, totalAudience - resolvedRows);
+                    const activePercent = totalAudience > 0 ? Math.min(100 - completedPercent, (activeRows / totalAudience) * 100) : 0;
+                    const failedPercent = totalAudience > 0 ? Math.min(100 - completedPercent - activePercent, (failedRows / totalAudience) * 100) : 0;
+                    const remainingRows = Math.max(0, totalAudience - resolvedRows - activeRows);
 
                     return (
                         <div className="space-y-2.5 pt-3 border-t border-border/40">
@@ -860,6 +876,12 @@ export default function CampaignDetailPage() {
                                     <span className="text-muted-foreground font-normal">
                                         ({resolvedRows} of {totalAudience} unique contacts finished)
                                     </span>
+                                    {activeRows > 0 && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] text-sky-600 dark:text-sky-400 font-semibold">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
+                                            {activeRows} dialing now
+                                        </span>
+                                    )}
                                 </div>
                                 <span className="font-bold tabular-nums text-foreground">
                                     {totalPercent}%
@@ -873,6 +895,13 @@ export default function CampaignDetailPage() {
                                         className="bg-emerald-500 h-full transition-all duration-300"
                                         style={{ width: `${completedPercent}%` }}
                                         title={`Completed Leads: ${completedRows}`}
+                                    />
+                                )}
+                                {activePercent > 0 && (
+                                    <div
+                                        className="bg-sky-500 h-full transition-all duration-300 animate-pulse"
+                                        style={{ width: `${activePercent}%` }}
+                                        title={`In-Flight Leads: ${activeRows}`}
                                     />
                                 )}
                                 {failedPercent > 0 && (
@@ -891,6 +920,13 @@ export default function CampaignDetailPage() {
                                     <span className="font-semibold text-foreground">{completedRows}</span>
                                     <span>Completed Leads</span>
                                 </div>
+                                {activeRows > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="h-2.5 w-2.5 rounded-full bg-sky-500 animate-pulse" />
+                                        <span className="font-semibold text-foreground">{activeRows}</span>
+                                        <span>In-Flight / Dialing</span>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-1.5">
                                     <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
                                     <span className="font-semibold text-foreground">{failedRows}</span>
@@ -983,21 +1019,25 @@ export default function CampaignDetailPage() {
                             <dd className="mt-1 text-xs font-bold text-foreground">
                                 {(() => {
                                     const totalAudience = campaign.total_rows && campaign.total_rows > 0 ? campaign.total_rows : 0;
-                                    const dispatched = campaign.processed_rows ?? 0;
                                     const failed = campaign.failed_rows ?? 0;
-                                    const completed = campaign.completed_calls_count !== undefined && campaign.completed_calls_count > 0
-                                        ? campaign.completed_calls_count
-                                        : Math.max(0, dispatched - failed);
-                                    const resolved = Math.min(totalAudience, Math.max(dispatched, completed + failed));
+                                    const completed = campaign.completed_calls_count ?? 0;
+                                    const active = campaign.active_count ?? 0;
+                                    const resolved = Math.min(totalAudience, completed + failed);
                                     const pct = totalAudience > 0 ? Math.min(100, Math.round((resolved / totalAudience) * 100)) : 0;
-                                    return `${resolved} / ${totalAudience} leads (${pct}%)`;
+                                    return `${resolved} / ${totalAudience} leads finished (${pct}%)${active > 0 ? ` • ${active} in flight` : ''}`;
                                 })()}
                             </dd>
                         </div>
                         <div>
                             <dt className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">Total Call Dials</dt>
                             <dd className="mt-1 text-xs font-semibold text-foreground">
-                                {campaign.total_queued_count ?? 0} dials ({campaign.retry_attempts_count ?? 0} retries)
+                                {(() => {
+                                    const dials = Math.max(
+                                        campaign.executed_count ?? 0,
+                                        (campaign.completed_calls_count ?? 0) + (campaign.failed_calls_count ?? 0) + (campaign.unanswered_calls_count ?? 0) + (campaign.active_count ?? 0)
+                                    );
+                                    return `${dials} dials (${campaign.retry_attempts_count ?? 0} retries)`;
+                                })()}
                             </dd>
                         </div>
                         {campaign.parent_campaign_id && (

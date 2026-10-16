@@ -933,3 +933,85 @@ class TestAcquireConcurrentSlotScoping:
             scope_max_concurrent=None,
             retry_interval=1,
         )
+
+
+class TestCampaignScopeRateLimiting:
+    """Verifies that apply_rate_limit passes campaign_scope to prevent cross-campaign rate-limit starvation."""
+
+    @pytest.mark.asyncio
+    async def test_apply_rate_limit_passes_campaign_scope_to_acquire_token(self):
+        dispatcher = CampaignCallDispatcher()
+        with patch("api.services.campaign.campaign_call_dispatcher.rate_limiter") as mock_rl:
+            mock_rl.acquire_token = AsyncMock(return_value=True)
+
+            await dispatcher.apply_rate_limit(organization_id=12, rate_limit=3, campaign_id=99)
+
+            mock_rl.acquire_token.assert_awaited_once_with(
+                12, 3, scope_key="campaign:99"
+            )
+
+    @pytest.mark.asyncio
+    async def test_apply_rate_limit_passes_campaign_scope_to_get_next_available_slot(self):
+        dispatcher = CampaignCallDispatcher()
+        with (
+            patch("api.services.campaign.campaign_call_dispatcher.rate_limiter") as mock_rl,
+            patch("api.services.campaign.campaign_call_dispatcher.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+            mock_rl.acquire_token = AsyncMock(side_effect=[False, True])
+            mock_rl.get_next_available_slot = AsyncMock(return_value=0.2)
+
+            await dispatcher.apply_rate_limit(organization_id=12, rate_limit=3, campaign_id=99)
+
+            mock_rl.get_next_available_slot.assert_awaited_once_with(
+                12, 3, scope_key="campaign:99"
+            )
+            mock_sleep.assert_awaited_once_with(0.2)
+
+
+class TestDispatchCallNoneHandling:
+    """Verifies that when dispatch_call returns None, slot is released and queued_run is reverted to queued."""
+
+    @pytest.mark.asyncio
+    async def test_dispatch_call_returns_none_reverts_queued_run_and_releases_slot(self):
+        dispatcher = CampaignCallDispatcher()
+        mock_queued_run = MagicMock(id=505, retry_count=0)
+        mock_campaign = MagicMock(
+            id=10, organization_id=1, state="running", rate_limit_per_second=10, telephony_configuration_id=None
+        )
+        mock_slot = MagicMock()
+
+        with (
+            patch("api.services.campaign.campaign_call_dispatcher.db_client") as mock_db,
+            patch.object(dispatcher, "apply_rate_limit", new_callable=AsyncMock),
+            patch.object(dispatcher, "acquire_concurrent_slot", new_callable=AsyncMock) as mock_acquire_slot,
+            patch.object(dispatcher, "dispatch_call", new_callable=AsyncMock) as mock_dispatch,
+            patch.object(dispatcher, "get_provider_for_campaign", new_callable=AsyncMock) as mock_get_provider,
+            patch("api.services.campaign.campaign_call_dispatcher.call_concurrency") as mock_concurrency,
+            patch("api.services.campaign.campaign_call_dispatcher.rate_limiter") as mock_rl,
+        ):
+            mock_db.get_campaign_by_id = AsyncMock(return_value=mock_campaign)
+            mock_db.claim_queued_runs_for_processing = AsyncMock(return_value=[mock_queued_run])
+            mock_db.update_queued_run = AsyncMock()
+            mock_db.increment_campaign_processed_rows = AsyncMock()
+            mock_get_provider.return_value = MagicMock(from_numbers=[])
+            mock_acquire_slot.return_value = mock_slot
+            mock_dispatch.return_value = None  # dispatch_call returns None
+            mock_concurrency.check_slots_available = AsyncMock(return_value=True)
+            mock_concurrency.release_slot = AsyncMock()
+
+            processed_count = await dispatcher.process_batch(campaign_id=10, batch_size=1)
+
+            assert processed_count == 0
+            # Released concurrency slot
+            mock_concurrency.release_slot.assert_awaited_once_with(mock_slot)
+            # Reverted queued run to 'queued' state
+            mock_db.update_queued_run.assert_awaited_once_with(
+                queued_run_id=505,
+                state="queued",
+                processed_at=None,
+            )
+            # Campaign processed rows not incremented
+            mock_db.increment_campaign_processed_rows.assert_not_called()
+
+
+

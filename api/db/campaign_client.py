@@ -4,6 +4,7 @@ from typing import Any
 
 from loguru import logger
 from sqlalchemy import and_, case, func, or_, text, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.future import select
 
 from api.db.base_client import BaseDBClient
@@ -129,7 +130,7 @@ class CampaignClient(BaseDBClient):
             campaign.state = state
             if state == "running" and not campaign.started_at:
                 campaign.started_at = datetime.now(UTC)
-            elif state in ["completed", "failed"]:
+            elif state in ["completed", "failed", "cancelled"]:
                 campaign.completed_at = datetime.now(UTC)
 
             try:
@@ -139,6 +140,30 @@ class CampaignClient(BaseDBClient):
                 raise e
             await session.refresh(campaign)
             return campaign
+
+    async def delete_campaign(
+        self,
+        campaign_id: int,
+        organization_id: int,
+    ) -> bool:
+        """Delete a campaign and cascade its queued runs."""
+        async with self.async_session() as session:
+            query = select(CampaignModel).where(
+                CampaignModel.id == campaign_id,
+                CampaignModel.organization_id == organization_id,
+            )
+            result = await session.execute(query)
+            campaign = result.scalar_one_or_none()
+            if not campaign:
+                return False
+
+            await session.delete(campaign)
+            try:
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                raise e
+            return True
 
     async def get_campaign_runs(
         self,
@@ -336,27 +361,38 @@ class CampaignClient(BaseDBClient):
         include_voicemail: bool,
         include_no_answer: bool,
         include_busy: bool,
+        include_failed: bool = True,
     ) -> list[dict]:
         """Return root context_variables for subscribers whose LATEST
-        workflow_run indicates the call should be redialed.
+        workflow_run or queued_run indicates the call should be redialed.
 
         A subscriber (identified by `source_uuid`) is a redial candidate iff
-        the latest workflow_run (by created_at) for that source_uuid has a
-        `call_tags` entry matching any of the selected failure reasons. Uses
-        the root queued_run (retry_count=0) for the original context.
+        the latest workflow_run (by created_at) or latest queued_run for that
+        source_uuid matches any of the selected failure reasons or failed status.
+        Uses the root queued_run (retry_count=0) for the original context.
         """
         tag_clauses = []
         if include_voicemail:
             tag_clauses.append(
-                "((lr.gathered_context::jsonb -> 'call_tags') @> '[\"voicemail_detected\"]'::jsonb OR lr.gathered_context::jsonb ->> 'answered_by' LIKE 'machine_%')"
+                "(lr.gathered_context IS NOT NULL AND ((lr.gathered_context::jsonb -> 'call_tags') @> '[\"voicemail_detected\"]'::jsonb OR lr.gathered_context::jsonb ->> 'answered_by' LIKE 'machine_%'))"
             )
         if include_no_answer:
             tag_clauses.append(
-                "(lr.gathered_context::jsonb -> 'call_tags') @> '[\"telephony_no-answer\"]'::jsonb"
+                "(lr.gathered_context IS NOT NULL AND (lr.gathered_context::jsonb -> 'call_tags') @> '[\"telephony_no-answer\"]'::jsonb)"
             )
         if include_busy:
             tag_clauses.append(
-                "(lr.gathered_context::jsonb -> 'call_tags') @> '[\"telephony_busy\"]'::jsonb"
+                "(lr.gathered_context IS NOT NULL AND (lr.gathered_context::jsonb -> 'call_tags') @> '[\"telephony_busy\"]'::jsonb)"
+            )
+        if include_failed:
+            tag_clauses.append(
+                "("
+                "(lr.gathered_context IS NOT NULL AND ("
+                "(lr.gathered_context::jsonb -> 'call_tags') @> '[\"telephony_failed\"]'::jsonb "
+                "OR (lr.gathered_context::jsonb -> 'call_tags') @> '[\"call_dispatch_failed\"]'::jsonb"
+                ")) "
+                "OR lq.latest_queued_state = 'failed'"
+                ")"
             )
 
         if not tag_clauses:
@@ -378,6 +414,14 @@ class CampaignClient(BaseDBClient):
                 JOIN queued_runs q ON q.parent_queued_run_id = rt.run_id
                 WHERE q.campaign_id = :cid
             ),
+            latest_queued_per_root AS (
+                SELECT DISTINCT ON (rt.root_id)
+                    rt.root_id,
+                    q.state AS latest_queued_state
+                FROM run_tree rt
+                JOIN queued_runs q ON q.id = rt.run_id
+                ORDER BY rt.root_id, q.created_at DESC, q.id DESC
+            ),
             latest_run_per_root AS (
                 SELECT DISTINCT ON (rt.root_id)
                     rt.root_id,
@@ -390,7 +434,8 @@ class CampaignClient(BaseDBClient):
             )
             SELECT q0.source_uuid, q0.context_variables
             FROM queued_runs q0
-            JOIN latest_run_per_root lr ON lr.root_id = q0.id
+            JOIN latest_queued_per_root lq ON lq.root_id = q0.id
+            LEFT JOIN latest_run_per_root lr ON lr.root_id = q0.id
             WHERE q0.campaign_id = :cid
               AND ({tag_filter})
             """)
@@ -489,7 +534,14 @@ class CampaignClient(BaseDBClient):
                 await session.execute(
                     text(
                         "UPDATE campaigns "
-                        "SET logs = (logs::jsonb || CAST(:entry AS jsonb))::json, "
+                        "SET logs = ("
+                        "    SELECT COALESCE(jsonb_agg(elem ORDER BY elem->>'ts' ASC), '[]'::jsonb) "
+                        "    FROM ("
+                        "        SELECT elem FROM jsonb_array_elements(COALESCE(logs::jsonb, '[]'::jsonb) || CAST(:entry AS jsonb)) AS elem "
+                        "        ORDER BY elem->>'ts' DESC "
+                        "        LIMIT 100 "
+                        "    ) sub "
+                        ")::json, "
                         "    updated_at = :now "
                         "WHERE id = :campaign_id"
                     ),
@@ -567,13 +619,22 @@ class CampaignClient(BaseDBClient):
                 raise
 
     # QueuedRun methods
-    async def bulk_create_queued_runs(self, queued_runs_data: list[dict]) -> None:
-        """Bulk create queued runs"""
+    async def bulk_create_queued_runs(
+        self, queued_runs_data: list[dict], batch_size: int = 2000
+    ) -> None:
+        """Bulk create queued runs in chunks using PostgreSQL ON CONFLICT DO NOTHING."""
+        if not queued_runs_data:
+            return
+
         async with self.async_session() as session:
-            queued_runs = [QueuedRunModel(**data) for data in queued_runs_data]
-            session.add_all(queued_runs)
             try:
-                await session.commit()
+                for i in range(0, len(queued_runs_data), batch_size):
+                    chunk = queued_runs_data[i : i + batch_size]
+                    stmt = insert(QueuedRunModel).values(chunk).on_conflict_do_nothing(
+                        index_elements=["campaign_id", "source_uuid", "retry_count"]
+                    )
+                    await session.execute(stmt)
+                    await session.commit()
             except Exception as e:
                 await session.rollback()
                 raise e
@@ -600,6 +661,25 @@ class CampaignClient(BaseDBClient):
                 raise e
             await session.refresh(queued_run)
             return queued_run
+
+    async def cancel_pending_queued_runs(self, campaign_id: int) -> int:
+        """Cancel all pending or queued runs for a campaign."""
+        async with self.async_session() as session:
+            stmt = (
+                update(QueuedRunModel)
+                .where(
+                    QueuedRunModel.campaign_id == campaign_id,
+                    QueuedRunModel.state.in_(["queued", "processing"]),
+                )
+                .values(state="cancelled")
+            )
+            result = await session.execute(stmt)
+            try:
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                raise e
+            return result.rowcount
 
     async def return_processing_queued_runs_without_workflow(
         self, queued_run_ids: list[int]
@@ -648,7 +728,6 @@ class CampaignClient(BaseDBClient):
                 QueuedRunModel.processed_at < cutoff,
                 QueuedRunModel.processed_at.is_(None),
             ),
-            QueuedRunModel.created_at < cutoff,
         ]
         if campaign_id is not None:
             stuck_filter.append(QueuedRunModel.campaign_id == campaign_id)
@@ -1066,7 +1145,7 @@ class CampaignClient(BaseDBClient):
                         QueuedRunModel.state == "queued",
                         QueuedRunModel.scheduled_for.is_(None),
                     )
-                    .order_by(func.random())
+                    .order_by(QueuedRunModel.id.asc())
                     .limit(remaining_slots)
                     .with_for_update(skip_locked=True)
                 )

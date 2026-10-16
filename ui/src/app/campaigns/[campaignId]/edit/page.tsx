@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import type { ITimezoneOption } from 'react-timezone-select';
@@ -16,10 +17,21 @@ import type { CampaignResponse } from '@/client/types.gen';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/auth';
 
 import CampaignAdvancedSettings, { getTimezoneValue, type TimeSlot } from '../../CampaignAdvancedSettings';
+
+type TelephonyConfigurationListItem = NonNullable<
+    Awaited<ReturnType<typeof listTelephonyConfigurationsApiV1OrganizationsTelephonyConfigsGet>>['data']
+>['configurations'][number];
 
 export default function EditCampaignPage() {
     const { user, getAccessToken, redirectToLogin, loading } = useAuth();
@@ -40,6 +52,11 @@ export default function EditCampaignPage() {
     // Limits state
     const [orgConcurrentLimit, setOrgConcurrentLimit] = useState<number>(2);
     const [fromNumbersCount, setFromNumbersCount] = useState<number>(0);
+
+    // Telephony config state
+    const [telephonyConfigs, setTelephonyConfigs] = useState<TelephonyConfigurationListItem[]>([]);
+    const [selectedTelephonyConfigId, setSelectedTelephonyConfigId] = useState<string>('');
+    const [isLoadingTelephonyConfigs, setIsLoadingTelephonyConfigs] = useState(true);
 
     // Retry config state
     const [retryEnabled, setRetryEnabled] = useState(true);
@@ -121,17 +138,7 @@ export default function EditCampaignPage() {
                 }
 
                 if (c.telephony_configuration_id) {
-                    try {
-                        const configsRes = await listTelephonyConfigurationsApiV1OrganizationsTelephonyConfigsGet({
-                            headers: { 'Authorization': `Bearer ${accessToken}` },
-                        });
-                        const matching = configsRes.data?.configurations?.find((cfg) => cfg.id === c.telephony_configuration_id);
-                        if (matching?.phone_number_count !== undefined) {
-                            setFromNumbersCount(matching.phone_number_count);
-                        }
-                    } catch (e) {
-                        console.error('Failed to fetch campaign telephony config details:', e);
-                    }
+                    setSelectedTelephonyConfigId(String(c.telephony_configuration_id));
                 }
             }
         } catch (error) {
@@ -142,6 +149,26 @@ export default function EditCampaignPage() {
             setIsLoading(false);
         }
     }, [user, getAccessToken, campaignId, router]);
+
+    // Fetch telephony configurations
+    const fetchTelephonyConfigs = useCallback(async () => {
+        if (!user) return;
+        setIsLoadingTelephonyConfigs(true);
+        try {
+            const accessToken = await getAccessToken();
+            const response = await listTelephonyConfigurationsApiV1OrganizationsTelephonyConfigsGet({
+                headers: { 'Authorization': `Bearer ${accessToken}` },
+            });
+            if (response.data?.configurations) {
+                setTelephonyConfigs(response.data.configurations);
+            }
+        } catch (error) {
+            console.error('Failed to fetch telephony configurations:', error);
+            toast.error('Failed to load telephony configurations');
+        } finally {
+            setIsLoadingTelephonyConfigs(false);
+        }
+    }, [user, getAccessToken]);
 
     // Fetch campaign limits
     const fetchCampaignDefaults = useCallback(async () => {
@@ -165,9 +192,28 @@ export default function EditCampaignPage() {
     useEffect(() => {
         if (user) {
             fetchCampaign();
+            fetchTelephonyConfigs();
             fetchCampaignDefaults();
         }
-    }, [fetchCampaign, fetchCampaignDefaults, user]);
+    }, [fetchCampaign, fetchTelephonyConfigs, fetchCampaignDefaults, user]);
+
+    // Sync fromNumbersCount when selected config changes
+    useEffect(() => {
+        if (selectedTelephonyConfigId && telephonyConfigs.length > 0) {
+            const matching = telephonyConfigs.find((cfg) => String(cfg.id) === selectedTelephonyConfigId);
+            if (matching?.phone_number_count !== undefined) {
+                setFromNumbersCount(matching.phone_number_count);
+            }
+        }
+    }, [selectedTelephonyConfigId, telephonyConfigs]);
+
+    const handleTelephonyConfigChange = (val: string) => {
+        setSelectedTelephonyConfigId(val);
+        const matching = telephonyConfigs.find((cfg) => String(cfg.id) === val);
+        if (matching?.phone_number_count !== undefined) {
+            setFromNumbersCount(matching.phone_number_count);
+        }
+    };
 
     // Effective concurrency limit
     const effectiveLimit = fromNumbersCount > 0
@@ -257,6 +303,7 @@ export default function EditCampaignPage() {
                     max_concurrency: maxConcurrencyValue,
                     schedule_config: scheduleConfig,
                     circuit_breaker: circuitBreakerConfig,
+                    telephony_configuration_id: selectedTelephonyConfigId ? parseInt(selectedTelephonyConfigId) : null,
                 },
                 headers: { 'Authorization': `Bearer ${accessToken}` },
             });
@@ -347,6 +394,51 @@ export default function EditCampaignPage() {
                         required
                         className="h-9 rounded-lg border-border bg-background text-xs"
                     />
+                </div>
+
+                {/* Telephony Configuration Card */}
+                <div className="border border-border bg-card rounded-xl p-5 hover:bg-card/90 transition-all shadow-xs space-y-3">
+                    <Label htmlFor="telephony-config" className="text-xs font-bold text-foreground">Telephony Configuration</Label>
+                    {!isLoadingTelephonyConfigs && telephonyConfigs.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground bg-muted/20">
+                            No telephony configurations found.{' '}
+                            <Link
+                                href="/telephony-configurations"
+                                className="underline text-foreground font-semibold"
+                            >
+                                Add one
+                            </Link>{' '}
+                            to configure trunk.
+                        </div>
+                    ) : (
+                        <Select
+                            value={selectedTelephonyConfigId}
+                            onValueChange={handleTelephonyConfigChange}
+                        >
+                            <SelectTrigger id="telephony-config" className="h-9 rounded-lg border-border bg-background text-xs">
+                                <SelectValue placeholder="Select a telephony configuration" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-lg text-xs">
+                                {isLoadingTelephonyConfigs ? (
+                                    <SelectItem value="loading" disabled>
+                                        Loading configurations...
+                                    </SelectItem>
+                                ) : (
+                                    telephonyConfigs.map((config) => (
+                                        <SelectItem
+                                            key={config.id}
+                                            value={config.id.toString()}
+                                            className="text-xs"
+                                        >
+                                            {config.name} ({config.provider})
+                                            {config.phone_number_count !== undefined ? ` • ${config.phone_number_count} numbers` : ''}
+                                            {config.is_default_outbound ? ' - default' : ''}
+                                        </SelectItem>
+                                    ))
+                                )}
+                            </SelectContent>
+                        </Select>
+                    )}
                 </div>
 
                 <CampaignAdvancedSettings

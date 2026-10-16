@@ -1018,3 +1018,24 @@ async def test_hold_slot_heartbeat_runs_and_cancels_cleanly():
     assert len(refreshes) >= 2
     assert all(r == 501 for r in refreshes)
 
+
+@pytest.mark.asyncio
+async def test_get_next_available_slot_with_and_without_scope_key():
+    rl = RateLimiter()
+    mock_redis = AsyncMock()
+    now = time.time()
+    mock_redis.zrange = AsyncMock(return_value=[(b"ts", now)])
+    rl._get_redis = AsyncMock(return_value=mock_redis)
+
+    # With scope_key
+    wait_time = await rl.get_next_available_slot(123, rate_limit=5, scope_key="campaign:789")
+    mock_redis.zrange.assert_awaited_with("rate_limit:campaign:789", 0, 0, withscores=True)
+    assert wait_time > 0
+
+    # Without scope_key
+    mock_redis.zrange.reset_mock()
+    wait_time = await rl.get_next_available_slot(123, rate_limit=5)
+    mock_redis.zrange.assert_awaited_with("rate_limit:123", 0, 0, withscores=True)
+    assert wait_time > 0
+
+

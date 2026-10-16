@@ -75,6 +75,11 @@ async def _validate_max_concurrency(
     from_numbers_count = await _get_from_numbers_count(
         organization_id, telephony_configuration_id=telephony_configuration_id
     )
+    if from_numbers_count == 0 and telephony_configuration_id is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Selected telephony configuration has 0 configured phone numbers. Add numbers before setting concurrency.",
+        )
     effective_limit = (
         min(org_limit, from_numbers_count) if from_numbers_count > 0 else org_limit
     )
@@ -286,6 +291,7 @@ def _build_campaign_response(
     pending_count: int = 0,
     scheduled_retries_count: int = 0,
     retry_attempts_count: int = 0,
+    include_logs: bool = True,
 ) -> CampaignResponse:
     """Build a CampaignResponse from a campaign model."""
     failed_calls_count = 0
@@ -380,7 +386,9 @@ def _build_campaign_response(
             CampaignLogEntryResponse(**entry)
             for entry in (campaign.logs or [])
             if isinstance(entry, dict)
-        ],
+        ]
+        if include_logs
+        else [],
     )
 
 
@@ -490,6 +498,11 @@ async def create_campaign(
         )
         if default_cfg:
             telephony_configuration_id = default_cfg.id
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="No telephony configuration provided and no default configuration found for organization",
+            )
 
     if request.max_concurrency is not None:
         await _validate_max_concurrency(
@@ -568,6 +581,7 @@ async def get_campaigns(
             telephony_configuration_name=config_name_map.get(
                 c.telephony_configuration_id
             ),
+            include_logs=False,
         )
         for c in campaigns
     ]
@@ -716,13 +730,6 @@ async def update_campaign(
             detail=f"Cannot update a {campaign.state} campaign",
         )
 
-    if request.max_concurrency is not None:
-        await _validate_max_concurrency(
-            request.max_concurrency,
-            user.selected_organization_id,
-            telephony_configuration_id=campaign.telephony_configuration_id,
-        )
-
     # Build update kwargs
     update_kwargs = {}
 
@@ -732,6 +739,7 @@ async def update_campaign(
     if request.retry_config is not None:
         update_kwargs["retry_config"] = request.retry_config.model_dump()
 
+    target_telephony_id = campaign.telephony_configuration_id
     if request.telephony_configuration_id is not None:
         cfg = await db_client.get_telephony_configuration_for_org(
             request.telephony_configuration_id, user.selected_organization_id
@@ -742,6 +750,7 @@ async def update_campaign(
                 detail=f"Telephony configuration {request.telephony_configuration_id} not found",
             )
         update_kwargs["telephony_configuration_id"] = request.telephony_configuration_id
+        target_telephony_id = request.telephony_configuration_id
 
     # Merge max_concurrency and schedule_config into orchestrator_metadata
     raw_meta = campaign.orchestrator_metadata or {}
@@ -755,6 +764,18 @@ async def update_campaign(
     else:
         metadata = {}
     metadata_changed = False
+
+    # Concurrency validation: check new concurrency if provided, or existing concurrency if trunk is being changed
+    concurrency_to_validate = request.max_concurrency
+    if concurrency_to_validate is None and request.telephony_configuration_id is not None:
+        concurrency_to_validate = metadata.get("max_concurrency")
+
+    if concurrency_to_validate is not None:
+        await _validate_max_concurrency(
+            concurrency_to_validate,
+            user.selected_organization_id,
+            telephony_configuration_id=target_telephony_id,
+        )
 
     if request.max_concurrency is not None:
         metadata["max_concurrency"] = request.max_concurrency
@@ -863,16 +884,20 @@ class RedialCampaignRequest(BaseModel):
     retry_on_voicemail: bool = True
     retry_on_no_answer: bool = True
     retry_on_busy: bool = True
+    retry_on_failed: bool = True
     retry_config: RetryConfigRequest | None = None
 
     @model_validator(mode="after")
     def validate_at_least_one_reason(self):
         if not (
-            self.retry_on_voicemail or self.retry_on_no_answer or self.retry_on_busy
+            self.retry_on_voicemail
+            or self.retry_on_no_answer
+            or self.retry_on_busy
+            or self.retry_on_failed
         ):
             raise ValueError(
                 "At least one of retry_on_voicemail, retry_on_no_answer, "
-                "retry_on_busy must be true"
+                "retry_on_busy, retry_on_failed must be true"
             )
         return self
 
@@ -884,7 +909,7 @@ async def redial_campaign(
     user: UserModel = Depends(get_user),
 ) -> CampaignResponse:
     """Create a new campaign that re-dials unique subscribers from a completed
-    campaign whose latest call resulted in voicemail, no-answer, or busy.
+    campaign whose latest call resulted in voicemail, no-answer, busy, or failure.
 
     The new campaign is created in 'created' state with queued_runs pre-seeded
     from the parent's original initial contexts. A campaign can be redialed at
@@ -912,6 +937,7 @@ async def redial_campaign(
         include_voicemail=request.retry_on_voicemail,
         include_no_answer=request.retry_on_no_answer,
         include_busy=request.retry_on_busy,
+        include_failed=request.retry_on_failed,
     )
     if not candidates:
         raise HTTPException(
@@ -1022,6 +1048,47 @@ async def resume_campaign(
         stats=stats,
         telephony_configuration_name=cfg_name,
     )
+
+
+@router.post("/{campaign_id}/cancel")
+async def cancel_campaign(
+    campaign_id: int,
+    user: UserModel = Depends(get_user),
+) -> dict[str, Any]:
+    """Cancel campaign execution and mark all pending queued runs as cancelled"""
+    campaign = await db_client.get_campaign(campaign_id, user.selected_organization_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    try:
+        await campaign_runner_service.cancel_campaign(campaign_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"message": "Campaign cancelled successfully"}
+
+
+@router.delete("/{campaign_id}")
+async def delete_campaign(
+    campaign_id: int,
+    user: UserModel = Depends(get_user),
+) -> dict[str, Any]:
+    """Delete a campaign and cascade its queued runs"""
+    campaign = await db_client.get_campaign(campaign_id, user.selected_organization_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    if campaign.state in ["running", "syncing"]:
+        try:
+            await campaign_runner_service.cancel_campaign(campaign_id)
+        except Exception as e:
+            logger.warning(f"Failed to cancel campaign {campaign_id} before deletion: {e}")
+
+    deleted = await db_client.delete_campaign(campaign_id, user.selected_organization_id)
+    if not deleted:
+        raise HTTPException(status_code=500, detail="Failed to delete campaign")
+
+    return {"message": "Campaign deleted successfully", "id": campaign_id}
 
 
 @router.get("/{campaign_id}/progress")

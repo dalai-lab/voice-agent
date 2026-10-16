@@ -339,3 +339,27 @@ class TestValidateMaxConcurrencyTelephonyConfig:
             assert exc_info.value.status_code == 400
             assert "max_concurrency (50) cannot exceed 10" in exc_info.value.detail
 
+    @pytest.mark.asyncio
+    async def test_validate_max_concurrency_fails_if_zero_numbers_in_selected_config(self):
+        from api.routes.campaign import _validate_max_concurrency
+
+        with (
+            patch("api.routes.campaign._get_org_concurrent_limit", new_callable=AsyncMock, return_value=100),
+            patch("api.routes.campaign.db_client") as mock_db,
+        ):
+            # Selected config 99 has 0 numbers
+            mock_db.list_active_normalized_addresses_for_config = AsyncMock(
+                return_value=[]
+            )
+
+            with pytest.raises(HTTPException) as exc_info:
+                await _validate_max_concurrency(
+                    max_concurrency=10,
+                    organization_id=8,
+                    telephony_configuration_id=99,
+                )
+
+            assert exc_info.value.status_code == 400
+            assert "Selected telephony configuration has 0 configured phone numbers" in exc_info.value.detail
+
+

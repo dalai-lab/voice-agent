@@ -579,6 +579,7 @@ class TestProcessStatusUpdateCircuitBreaker:
         mock_workflow_run.campaign_id = 42
         mock_workflow_run.queued_run_id = 10
         mock_workflow_run.state = "running"
+        mock_workflow_run.is_completed = False
         mock_workflow_run.logs = {"telephony_status_callbacks": []}
         mock_workflow_run.gathered_context = {}
         mock_workflow_run.initial_context = {}
@@ -595,6 +596,9 @@ class TestProcessStatusUpdateCircuitBreaker:
             ) as mock_dispatcher,
             patch("api.services.telephony.status_processor.circuit_breaker") as mock_cb,
             patch(
+                "api.services.telephony.status_processor.call_concurrency"
+            ) as mock_cc,
+            patch(
                 "api.services.telephony.status_processor.get_campaign_event_publisher"
             ) as mock_get_publisher,
         ):
@@ -602,6 +606,7 @@ class TestProcessStatusUpdateCircuitBreaker:
             mock_db.update_workflow_run = AsyncMock()
 
             mock_dispatcher.release_call_slot = AsyncMock(return_value=True)
+            mock_cc.unregister_active_call = AsyncMock(return_value=True)
             mock_cb.record_and_evaluate = AsyncMock()
 
             mock_publisher = AsyncMock()
@@ -630,6 +635,7 @@ class TestProcessStatusUpdateCircuitBreaker:
         mock_workflow_run.id = 100
         mock_workflow_run.campaign_id = 42
         mock_workflow_run.state = "running"
+        mock_workflow_run.is_completed = False
         mock_workflow_run.logs = {"telephony_status_callbacks": []}
         mock_workflow_run.gathered_context = {}
         mock_workflow_run.initial_context = {}
@@ -644,12 +650,16 @@ class TestProcessStatusUpdateCircuitBreaker:
             patch(
                 "api.services.telephony.status_processor.campaign_call_dispatcher"
             ) as mock_dispatcher,
+            patch(
+                "api.services.telephony.status_processor.call_concurrency"
+            ) as mock_cc,
             patch("api.services.telephony.status_processor.circuit_breaker") as mock_cb,
         ):
             mock_db.get_workflow_run_by_id = AsyncMock(return_value=mock_workflow_run)
             mock_db.update_workflow_run = AsyncMock()
 
             mock_dispatcher.release_call_slot = AsyncMock(return_value=True)
+            mock_cc.unregister_active_call = AsyncMock(return_value=True)
             mock_cb.record_and_evaluate = AsyncMock()
 
             await _process_status_update(100, status)
@@ -735,3 +745,26 @@ class TestResumeCampaignResetsCircuitBreaker:
             mock_db.update_campaign.assert_called_once_with(
                 campaign_id=42, state="running", orchestrator_metadata={}
             )
+
+
+class TestCircuitBreakerZSetCollisionAvoidance:
+    """Verifies that the Lua script avoids timestamp collisions by generating unique members with nonces."""
+
+    @pytest.mark.asyncio
+    async def test_lua_script_uses_random_nonce_in_member(self):
+        from api.services.campaign.circuit_breaker import CircuitBreaker
+
+        cb = CircuitBreaker()
+        mock_redis = AsyncMock()
+        mock_redis.eval = AsyncMock(return_value=[0, 1, 0, 1])
+        cb.redis_client = mock_redis
+
+        await cb.record_call_outcome(campaign_id=1, is_failure=True)
+
+        assert mock_redis.eval.await_count == 1
+        lua_script = mock_redis.eval.await_args.args[0]
+        # Verify lua script generates unique members with nonces
+        assert "math.random" in lua_script
+        assert "redis.call('ZADD', fail_key, now, member)" in lua_script
+        assert "redis.call('ZADD', succ_key, now, member)" in lua_script
+

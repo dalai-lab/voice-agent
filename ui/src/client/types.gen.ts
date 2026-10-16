@@ -5226,6 +5226,10 @@ export type RedialCampaignRequest = {
      * Retry On Busy
      */
     retry_on_busy?: boolean;
+    /**
+     * Retry On Failed
+     */
+    retry_on_failed?: boolean;
     retry_config?: RetryConfigRequest | null;
 };
 

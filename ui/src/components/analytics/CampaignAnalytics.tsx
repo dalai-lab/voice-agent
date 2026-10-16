@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
     BarChart,
     Bar,
@@ -27,28 +27,42 @@ export function CampaignAnalytics({ campaignId, campaign }: CampaignAnalyticsPro
     const [loading, setLoading] = useState(true);
     const [runs, setRuns] = useState<any[]>([]);
 
-    useEffect(() => {
-        if (!isAuthenticated) return;
+    const campaignState = campaign?.state;
 
-        async function fetchRuns() {
-            try {
+    const fetchRuns = useCallback(async (silent = false) => {
+        try {
+            if (!silent) {
                 setLoading(true);
-                const res = await getCampaignRunsApiV1CampaignCampaignIdRunsGet({
-                    path: { campaign_id: campaignId },
-                    query: { limit: 100 }
-                });
-                
-                if (res.data?.runs) {
-                    setRuns(res.data.runs);
-                }
-            } catch (error) {
-                console.error("Failed to fetch campaign runs for analytics", error);
-            } finally {
+            }
+            const res = await getCampaignRunsApiV1CampaignCampaignIdRunsGet({
+                path: { campaign_id: campaignId },
+                query: { limit: 100 }
+            });
+            
+            if (res.data?.runs) {
+                setRuns(res.data.runs);
+            }
+        } catch (error) {
+            console.error("Failed to fetch campaign runs for analytics", error);
+        } finally {
+            if (!silent) {
                 setLoading(false);
             }
         }
-        fetchRuns();
-    }, [isAuthenticated, campaignId]);
+    }, [campaignId]);
+
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        fetchRuns(false);
+    }, [isAuthenticated, campaignId, fetchRuns]);
+
+    useEffect(() => {
+        if (!isAuthenticated || campaignState !== 'running') return;
+        const interval = setInterval(() => {
+            fetchRuns(true);
+        }, 4000);
+        return () => clearInterval(interval);
+    }, [isAuthenticated, campaignId, campaignState, fetchRuns]);
 
     const { kpis, dispositionData } = useMemo(() => {
         let totalDuration = 0;
@@ -95,6 +109,7 @@ export function CampaignAnalytics({ campaignId, campaign }: CampaignAnalyticsPro
                 totalCalls,
                 completedCalls,
                 avgDuration,
+                sampleSize: runs.length,
             },
             dispositionData: sortedDispositions
         };
@@ -117,7 +132,7 @@ export function CampaignAnalytics({ campaignId, campaign }: CampaignAnalyticsPro
                 </p>
             </div>
             
-                    <div className="grid grid-cols-3 gap-4 pt-2 border-t border-border/40">
+            <div className="grid grid-cols-3 gap-4 pt-2 border-t border-border/40">
                 <div className="p-4 rounded-xl border border-border bg-card/30 shadow-xs space-y-1">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Calls</p>
                     <p className="text-2xl font-bold text-foreground">{kpis.totalCalls}</p>
@@ -127,7 +142,9 @@ export function CampaignAnalytics({ campaignId, campaign }: CampaignAnalyticsPro
                     <p className="text-2xl font-bold text-foreground">{kpis.completedCalls}</p>
                 </div>
                 <div className="p-4 rounded-xl border border-border bg-card/30 shadow-xs space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Avg Duration</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Avg Duration (Sample: {kpis.sampleSize})
+                    </p>
                     <p className="text-2xl font-bold text-foreground">
                         {Math.floor(kpis.avgDuration / 60)}m {kpis.avgDuration % 60}s
                     </p>

@@ -1,5 +1,6 @@
 import type { Client } from '@/client/client';
 import type { CreateClientConfig } from '@/client/client.gen';
+import logger from '@/lib/logger';
 
 export function getServerBackendUrl() {
     return process.env.BACKEND_URL || 'http://api:8000';
@@ -52,6 +53,10 @@ export const createClientConfig: CreateClientConfig = (config) => {
 
 let interceptorRegistered = false;
 
+export function _resetInterceptorRegisteredForTesting() {
+    interceptorRegistered = false;
+}
+
 /**
  * Register a request interceptor that attaches a fresh access token
  * to every outgoing SDK request. Idempotent — safe for React strict mode.
@@ -64,11 +69,23 @@ export function setupAuthInterceptor(apiClient: Client, getAccessToken: () => Pr
         if (request.headers.get('Authorization')) {
             return request;
         }
-        try {
-            const token = await getAccessToken();
-            request.headers.set('Authorization', `Bearer ${token}`);
-        } catch {
-            // If token retrieval fails, let the request proceed without auth
+
+        const maxRetries = 3;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                const token = await getAccessToken();
+                if (token) {
+                    request.headers.set('Authorization', `Bearer ${token}`);
+                    return request;
+                }
+            } catch (err) {
+                if (attempt < maxRetries - 1) {
+                    logger.warn('Auth token not yet available, delaying request...', err);
+                    await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+                } else {
+                    logger.warn('Auth token not yet available, proceeding without auth', err);
+                }
+            }
         }
         return request;
     });

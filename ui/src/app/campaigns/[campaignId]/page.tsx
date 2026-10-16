@@ -88,6 +88,7 @@ export default function CampaignDetailPage() {
     const [redialOnVoicemail, setRedialOnVoicemail] = useState(true);
     const [redialOnNoAnswer, setRedialOnNoAnswer] = useState(true);
     const [redialOnBusy, setRedialOnBusy] = useState(true);
+    const [redialOnFailed, setRedialOnFailed] = useState(true);
     const [isRedialing, setIsRedialing] = useState(false);
 
     // Fetch campaign details
@@ -309,13 +310,14 @@ export default function CampaignDetailPage() {
         setRedialOnVoicemail(true);
         setRedialOnNoAnswer(true);
         setRedialOnBusy(true);
+        setRedialOnFailed(true);
         setIsRedialDialogOpen(true);
     };
 
     // Handle redial campaign
     const handleRedial = async () => {
         if (!user || !campaign) return;
-        if (!redialOnVoicemail && !redialOnNoAnswer && !redialOnBusy) {
+        if (!redialOnVoicemail && !redialOnNoAnswer && !redialOnBusy && !redialOnFailed) {
             toast.error('Select at least one reason to redial');
             return;
         }
@@ -331,6 +333,7 @@ export default function CampaignDetailPage() {
                     retry_on_voicemail: redialOnVoicemail,
                     retry_on_no_answer: redialOnNoAnswer,
                     retry_on_busy: redialOnBusy,
+                    retry_on_failed: redialOnFailed,
                 },
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -1266,6 +1269,16 @@ export default function CampaignDetailPage() {
                                     />
                                     <Label htmlFor="redial-busy" className="text-xs font-semibold text-foreground cursor-pointer">
                                         Busy
+                                    </Label>
+                                </div>
+                                <div className="flex items-center gap-2.5 pt-2 border-t border-border/40">
+                                    <Checkbox
+                                        id="redial-failed"
+                                        checked={redialOnFailed}
+                                        onCheckedChange={(v) => setRedialOnFailed(v === true)}
+                                    />
+                                    <Label htmlFor="redial-failed" className="text-xs font-semibold text-foreground cursor-pointer">
+                                        Failed (Carrier / Telephony Error)
                                     </Label>
                                 </div>
                             </div>

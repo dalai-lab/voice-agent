@@ -51,6 +51,19 @@ class CampaignRunnerService:
                 f"Campaign must be in 'created' state to start, current state: {campaign.state}"
             )
 
+        if not campaign.telephony_configuration_id:
+            default_cfg = await db_client.get_default_telephony_configuration(
+                campaign.organization_id
+            )
+            if not default_cfg:
+                raise ValueError(
+                    "Campaign cannot start: No telephony configuration assigned and no default configuration found."
+                )
+            await db_client.update_campaign(
+                campaign_id, telephony_configuration_id=default_cfg.id
+            )
+            campaign.telephony_configuration_id = default_cfg.id
+
         # Redial campaigns have queued_runs pre-seeded from the parent campaign,
         # so skip source sync and transition straight to 'running'.
         is_redial = bool(
@@ -131,6 +144,31 @@ class CampaignRunnerService:
         )
 
         logger.info(f"Campaign {campaign_id} paused")
+
+    async def cancel_campaign(self, campaign_id: int) -> None:
+        """Cancels a campaign, marks pending queued runs cancelled, and logs event"""
+        campaign = await db_client.get_campaign_by_id(campaign_id)
+        if not campaign:
+            raise ValueError(f"Campaign {campaign_id} not found")
+
+        if campaign.state in ["completed", "cancelled"]:
+            raise ValueError(f"Cannot cancel a {campaign.state} campaign")
+
+        now = datetime.now(UTC)
+        await db_client.update_campaign(
+            campaign_id=campaign_id,
+            state="cancelled",
+            completed_at=now,
+        )
+        cancelled_count = await db_client.cancel_pending_queued_runs(campaign_id)
+        await _safe_append_campaign_log(
+            campaign_id=campaign_id,
+            level="warning",
+            event="campaign_cancelled",
+            message=f"Campaign cancelled by operator. Cancelled {cancelled_count} pending leads.",
+            details={"previous_state": campaign.state, "cancelled_queued_runs": cancelled_count},
+        )
+        logger.info(f"Campaign {campaign_id} cancelled (cancelled {cancelled_count} pending queued runs)")
 
     async def resume_campaign(self, campaign_id: int) -> None:
         """Resumes paused campaign"""

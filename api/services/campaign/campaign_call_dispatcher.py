@@ -187,6 +187,25 @@ class CampaignCallDispatcher:
                     queued_run, campaign, concurrency_slot
                 )
 
+                if not workflow_run:
+                    logger.warning(
+                        f"Failed to dispatch workflow run for queued_run {queued_run.id}; reverting to queued"
+                    )
+                    if concurrency_slot is not None:
+                        try:
+                            await call_concurrency.release_slot(concurrency_slot)
+                        except Exception as slot_err:
+                            logger.debug(
+                                f"Error releasing concurrency slot on None workflow_run: {slot_err}"
+                            )
+                    await db_client.update_queued_run(
+                        queued_run_id=queued_run.id,
+                        state="queued",
+                        processed_at=None,
+                    )
+                    processed_run_ids.add(queued_run.id)
+                    continue
+
                 # Update queued run as processed
                 await db_client.update_queued_run(
                     queued_run_id=queued_run.id,
@@ -677,15 +696,18 @@ class CampaignCallDispatcher:
         max_wait = 10.0  # Allow up to 10s to smoothly acquire tokens across concurrent campaigns
         start_time = time.time()
         effective_rate_limit = max(1, rate_limit or 1)
+        campaign_scope = f"campaign:{campaign_id}" if campaign_id else None
 
         while True:
             # Try to acquire token
-            if await rate_limiter.acquire_token(organization_id, effective_rate_limit):
+            if await rate_limiter.acquire_token(
+                organization_id, effective_rate_limit, scope_key=campaign_scope
+            ):
                 return  # Got permission to proceed
 
             # Check how long to wait
             wait_time = await rate_limiter.get_next_available_slot(
-                organization_id, effective_rate_limit
+                organization_id, effective_rate_limit, scope_key=campaign_scope
             )
 
             # Don't wait forever

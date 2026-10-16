@@ -148,10 +148,11 @@ class CircuitBreaker:
         redis.call('ZREMRANGEBYSCORE', succ_key, 0, window_start)
 
         -- Add the new outcome to the appropriate set
+        local member = tostring(now) .. ":" .. tostring(math.random(1000000))
         if is_failure == 1 then
-            redis.call('ZADD', fail_key, now, now)
+            redis.call('ZADD', fail_key, now, member)
         else
-            redis.call('ZADD', succ_key, now, now)
+            redis.call('ZADD', succ_key, now, member)
         end
 
         -- Refresh TTL on both keys

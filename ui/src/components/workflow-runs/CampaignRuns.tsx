@@ -165,14 +165,15 @@ export function CampaignRuns({ campaignId, workflowId, searchParams, campaignSta
         }
     }, [currentPage, appliedFilters, fetchCampaignRuns, isAuthenticated, sortBy, sortOrder]);
 
-    // Live auto-polling every 4s when campaign is running or syncing
+    // Live auto-polling every 4s when campaign is running or syncing, or when in-flight runs exist
     useEffect(() => {
-        if (!isAuthenticated || !campaignState || !['running', 'syncing'].includes(campaignState)) return;
+        const hasInFlightRuns = runs.some((r) => !r.is_completed);
+        if (!isAuthenticated || (!['running', 'syncing'].includes(campaignState || '') && !hasInFlightRuns)) return;
         const interval = setInterval(() => {
             fetchCampaignRuns(currentPage, appliedFilters, sortBy, sortOrder, true);
         }, 4000);
         return () => clearInterval(interval);
-    }, [campaignState, currentPage, appliedFilters, sortBy, sortOrder, isAuthenticated, fetchCampaignRuns]);
+    }, [campaignState, currentPage, appliedFilters, sortBy, sortOrder, isAuthenticated, fetchCampaignRuns, runs]);
 
     const handleApplyFilters = useCallback(async () => {
         setIsExecutingFilters(true);

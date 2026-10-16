@@ -84,8 +84,11 @@ class CSVSyncService(CampaignSourceSyncService):
         # Create hash of file_key for consistent source_uuid prefix
         file_hash = hashlib.md5(file_key.encode()).hexdigest()[:8]
 
-        # Convert to queued_runs
-        queued_runs = []
+        # Convert to queued_runs in batches of 2000
+        batch_size = 2000
+        current_batch = []
+        total_created = 0
+
         for idx, row_values in enumerate(rows, 1):
             # Pad row to match headers length
             padded_row = row_values + [""] * (len(headers) - len(row_values))
@@ -105,7 +108,7 @@ class CSVSyncService(CampaignSourceSyncService):
             # Generate unique source UUID: csv_{hash(source_id)}_row_{idx}
             source_uuid = f"csv_{file_hash}_row_{idx}"
 
-            queued_runs.append(
+            current_batch.append(
                 {
                     "campaign_id": campaign_id,
                     "source_uuid": source_uuid,
@@ -114,21 +117,27 @@ class CSVSyncService(CampaignSourceSyncService):
                 }
             )
 
-        # Bulk insert
-        if queued_runs:
-            await db_client.bulk_create_queued_runs(queued_runs)
-            logger.info(
-                f"Created {len(queued_runs)} queued runs for campaign {campaign_id}"
-            )
+            if len(current_batch) >= batch_size:
+                await db_client.bulk_create_queued_runs(current_batch, batch_size=batch_size)
+                total_created += len(current_batch)
+                current_batch = []
+
+        if current_batch:
+            await db_client.bulk_create_queued_runs(current_batch, batch_size=batch_size)
+            total_created += len(current_batch)
+
+        logger.info(
+            f"Created {total_created} queued runs for campaign {campaign_id}"
+        )
 
         # Update campaign total_rows
         await db_client.update_campaign(
             campaign_id=campaign_id,
-            total_rows=len(queued_runs),
+            total_rows=total_created,
             source_sync_status="completed",
         )
 
-        return len(queued_runs)
+        return total_created
 
     def _parse_csv(self, csv_content: str) -> list[list[str]]:
         """Parse CSV content into rows"""

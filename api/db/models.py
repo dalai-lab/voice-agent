@@ -597,6 +597,12 @@ class WorkflowRunModel(Base):
         ),
         Index("idx_workflow_runs_workflow_id", "workflow_id"),
         Index("idx_workflow_runs_campaign_id", "campaign_id"),
+        Index(
+            "idx_workflow_runs_campaign_active",
+            "campaign_id",
+            "is_completed",
+            postgresql_where=text("is_completed IS FALSE"),
+        ),
     )
 
 
@@ -714,6 +720,7 @@ class CampaignModel(Base):
             "paused",
             "completed",
             "failed",
+            "cancelled",
             name="campaign_state",
         ),
         nullable=False,

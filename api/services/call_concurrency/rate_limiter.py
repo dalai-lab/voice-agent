@@ -103,7 +103,11 @@ class RateLimiter:
             return False
 
     async def get_next_available_slot(
-        self, organization_id: int, rate_limit: int = 1
+        self,
+        organization_id: int,
+        rate_limit: int = 1,
+        *,
+        scope_key: str | None = None,
     ) -> float:
         """
         Returns seconds until next available slot
@@ -111,7 +115,7 @@ class RateLimiter:
         """
         redis_client = await self._get_redis()
 
-        key = f"rate_limit:{organization_id}"
+        key = f"rate_limit:{scope_key or organization_id}"
 
         try:
             # Get oldest timestamp in current window

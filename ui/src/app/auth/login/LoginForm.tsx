@@ -36,20 +36,8 @@ export function LoginForm({ signupEnabled }: { signupEnabled: boolean }) {
       });
 
       if (res.error || !res.data) {
-        const errorData = res.error as { detail?: string | { code?: string; message?: string; email?: string } };
-        const detail = errorData?.detail;
-        if (typeof detail === "object" && detail?.code === "EMAIL_NOT_VERIFIED") {
-          toast.warning(detail.message || "Please verify your email address to continue.");
-          router.push(`/auth/verify-email?email=${encodeURIComponent(detail.email || email)}`);
-          return;
-        }
-        if (typeof detail === "string" && detail.includes("EMAIL_NOT_VERIFIED")) {
-          toast.warning("Please verify your email address to continue.");
-          router.push(`/auth/verify-email?email=${encodeURIComponent(email)}`);
-          return;
-        }
-        const errorMsg = typeof detail === "string" ? detail : detail?.message || "Login failed";
-        toast.error(errorMsg);
+        const detail = (res.error as { detail?: string })?.detail;
+        toast.error(detail || "Login failed");
         return;
       }
 

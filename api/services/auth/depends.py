@@ -57,17 +57,6 @@ async def get_user(
     if stack_user is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Invariant 1: Zero Unverified Entry — block unverified Stack Auth users
-    if stack_user.get("primary_email_verified") is False:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "code": "EMAIL_NOT_VERIFIED",
-                "message": "Please verify your email address to continue.",
-                "email": stack_user.get("primary_email"),
-            },
-        )
-
     # ------------------------------------------------------------------
     # 2. Ensure the user has a team (Stack "selected_team_id")
     # ------------------------------------------------------------------
@@ -377,25 +366,8 @@ async def _handle_oss_auth(authorization: str | None) -> UserModel:
 
     try:
         payload = decode_jwt_token(token)
-        if payload.get("scope") == "unverified":
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "code": "EMAIL_NOT_VERIFIED",
-                    "message": "Email verification required. Please verify your email to access this workspace.",
-                }
-            )
         user = await db_client.get_user_by_id(int(payload["sub"]))
         if user:
-            if not getattr(user, "is_verified", True):
-                raise HTTPException(
-                    status_code=403,
-                    detail={
-                        "code": "EMAIL_NOT_VERIFIED",
-                        "message": "Email verification required. Please verify your email to access this workspace.",
-                        "email": user.email,
-                    }
-                )
             return user
         raise HTTPException(status_code=401, detail="User not found")
     except HTTPException:

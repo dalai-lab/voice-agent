@@ -27,7 +27,7 @@ fi
 ### 2) Run migrations
 ###############################################################################
 
-alembic -c "$BASE_DIR/api/alembic.ini" upgrade heads
+alembic -c "$BASE_DIR/api/alembic.ini" upgrade head
 
 ###############################################################################
 ### 3) Signal handling — forward TERM/INT to children for clean docker stop

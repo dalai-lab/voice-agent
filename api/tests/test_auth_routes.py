@@ -79,5 +79,4 @@ def test_stack_mode_keeps_current_user_route_available(monkeypatch):
         "organization_id": 42,
         "provider_id": "stack-user-1",
         "talkar_org_type": None,
-        "is_verified": True,
     }

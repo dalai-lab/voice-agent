@@ -117,12 +117,6 @@ function TalkarStatusGate() {
     }
 
     if (!user) return;
-    const isEmailVerified = (user as any)?.is_verified ?? (user as any)?.primaryEmailVerified;
-    if (isEmailVerified === false && !pathname.startsWith('/auth/verify-email') && !pathname.startsWith('/handler/verify-email')) {
-      const email = (user as any)?.email || (user as any)?.primaryEmail || '';
-      router.replace(`/auth/verify-email?email=${encodeURIComponent(email)}`);
-      return;
-    }
     if (TALKAR_ALLOWED_PATHS.some(p => pathname.startsWith(p))) return;
     if (document.cookie.includes('talkar_admin_bypass=true')) return;
     if (!dograhOrgId) return;

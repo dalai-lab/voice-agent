@@ -9,7 +9,7 @@ const OSS_TOKEN_COOKIE = 'dograh_auth_token';
 // `/embed` serves the public website widget (e.g. /embed/dograh-widget.js),
 // which must be fetchable without a session cookie so third-party sites can
 // embed it — otherwise the middleware 307-redirects the asset to /auth/login.
-const PUBLIC_PATHS = ['/auth/login', '/auth/signup', '/auth/verify-email', '/auth/impersonate', '/embed'];
+const PUBLIC_PATHS = ['/auth/login', '/auth/signup', '/auth/impersonate', '/embed'];
 const isPublicPath = (pathname: string) => {
   return pathname === '/' || PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 };
@@ -50,34 +50,6 @@ export async function middleware(request: NextRequest) {
 
   const token = request.cookies.get(OSS_TOKEN_COOKIE)?.value;
   const { pathname } = request.nextUrl;
-
-  // Check unverified scope even on public paths or authenticated paths
-  let isUnverified = false;
-  let userEmail = '';
-  if (token) {
-    try {
-      const parts = token.split('.');
-      if (parts.length >= 2) {
-        const payloadStr = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-        const payload = JSON.parse(payloadStr);
-        if (payload?.scope === 'unverified') {
-          isUnverified = true;
-          userEmail = payload?.email || '';
-        }
-      }
-    } catch {
-      // Ignore token parse failure
-    }
-  }
-
-  // If user is held in unverified state, block them from everywhere EXCEPT verify-email and login/signup
-  if (isUnverified && !pathname.startsWith('/auth/verify-email') && !pathname.startsWith('/auth/login') && !pathname.startsWith('/auth/signup')) {
-    const verifyUrl = new URL('/auth/verify-email', request.url);
-    if (userEmail) {
-      verifyUrl.searchParams.set('email', userEmail);
-    }
-    return NextResponse.redirect(verifyUrl);
-  }
 
   // Allow public paths without auth
   if (isPublicPath(pathname)) {

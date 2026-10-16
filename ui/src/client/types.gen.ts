@@ -333,8 +333,6 @@ export type AuthResponse = {
      */
     token: string;
     user: UserResponse;
-    is_verified?: boolean;
-    message?: string | null;
 };
 
 /**
@@ -7016,10 +7014,6 @@ export type UserResponse = {
      * Talkar Org Type
      */
     talkar_org_type?: string | null;
-    /**
-     * Is Verified
-     */
-    is_verified?: boolean;
 };
 
 /**

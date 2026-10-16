@@ -206,147 +206,16 @@ class UserClient(BaseDBClient):
             return result.scalars().first()
 
     async def create_user_with_email(
-        self,
-        email: str,
-        password_hash: str | None = None,
-        name: str | None = None,
-        is_verified: bool = False,
-        verification_code_hash: str | None = None,
-        verification_code_expires_at: datetime | None = None,
+        self, email: str, password_hash: str, name: str | None = None
     ) -> UserModel:
-        """Create a new user with email and password hash, optionally setting verification state."""
+        """Create a new user with email and password hash."""
         async with self.async_session() as session:
             user = UserModel(
                 provider_id=f"oss_{int(datetime.now(UTC).timestamp())}_{uuid.uuid4()}",
-                email=email.strip().lower(),
+                email=email.lower(),
                 password_hash=password_hash,
-                is_verified=is_verified,
-                verification_code_hash=verification_code_hash,
-                verification_code_expires_at=verification_code_expires_at,
-                verification_attempts=0,
-                last_verification_sent_at=datetime.now(UTC) if verification_code_hash else None,
             )
             session.add(user)
             await session.commit()
             await session.refresh(user)
             return user
-
-    async def update_user_verification_otp(
-        self,
-        user_id: int,
-        verification_code_hash: str,
-        verification_code_expires_at: datetime,
-        new_password_hash: str | None = None,
-    ) -> None:
-        """Update OTP hash and reset attempts for an unverified user."""
-        async with self.async_session() as session:
-            stmt = select(UserModel).where(UserModel.id == user_id)
-            res = await session.execute(stmt)
-            user = res.scalar_one_or_none()
-            if user:
-                user.verification_code_hash = verification_code_hash
-                user.verification_code_expires_at = verification_code_expires_at
-                user.verification_attempts = 0
-                user.last_verification_sent_at = datetime.now(UTC)
-                if new_password_hash:
-                    user.password_hash = new_password_hash
-                await session.commit()
-
-    async def increment_user_verification_attempts(self, user_id: int) -> int:
-        """Increment verification attempts counter and return current value."""
-        async with self.async_session() as session:
-            stmt = select(UserModel).where(UserModel.id == user_id)
-            res = await session.execute(stmt)
-            user = res.scalar_one_or_none()
-            if user:
-                user.verification_attempts = (user.verification_attempts or 0) + 1
-                if user.verification_attempts >= 5:
-                    user.verification_code_hash = None  # Invalidate OTP on 5th attempt
-                await session.commit()
-                return user.verification_attempts
-            return 0
-
-    async def mark_user_email_verified(self, user_id: int) -> None:
-        """Mark user as verified and clear OTP verification metadata."""
-        async with self.async_session() as session:
-            stmt = select(UserModel).where(UserModel.id == user_id)
-            res = await session.execute(stmt)
-            user = res.scalar_one_or_none()
-            if user:
-                user.is_verified = True
-                user.verification_code_hash = None
-                user.verification_code_expires_at = None
-                user.verification_attempts = 0
-                await session.commit()
-
-    async def verify_user_otp_atomic(
-        self, email: str, code: str
-    ) -> tuple[bool, str, UserModel | None, int]:
-        """
-        Atomically verify an OTP code using PostgreSQL row-level locking (SELECT ... FOR UPDATE).
-        Returns:
-            (is_valid: bool, status_reason: str, user: UserModel | None, remaining_attempts: int)
-        """
-        normalized_email = email.strip().lower()
-        async with self.async_session() as session:
-            stmt = (
-                select(UserModel)
-                .where(func.lower(UserModel.email) == normalized_email)
-                .with_for_update()
-            )
-            res = await session.execute(stmt)
-            user = res.scalars().first()
-
-            if not user:
-                return False, "USER_NOT_FOUND", None, 0
-
-            if getattr(user, "is_verified", False):
-                return True, "ALREADY_VERIFIED", user, 0
-
-            # 1. Check max attempts (Max 5)
-            if (user.verification_attempts or 0) >= 5:
-                return False, "MAX_ATTEMPTS_EXCEEDED", user, 0
-
-            # 2. Check expiry with 30-second clock skew grace period
-            if user.verification_code_expires_at:
-                now = datetime.now(UTC)
-                grace_expiry = user.verification_code_expires_at + timedelta(seconds=30)
-                if now > grace_expiry:
-                    return False, "CODE_EXPIRED", user, 0
-
-            # 3. Constant-time verification
-            from api.utils.auth import verify_otp_code
-            if not verify_otp_code(code, user.verification_code_hash):
-                user.verification_attempts = (user.verification_attempts or 0) + 1
-                if user.verification_attempts >= 5:
-                    user.verification_code_hash = None  # Invalidate OTP on 5th attempt
-                await session.commit()
-                remaining = max(0, 5 - user.verification_attempts)
-                return False, "INVALID_CODE", user, remaining
-
-            # 4. Success! Mark verified and clear OTP
-            user.is_verified = True
-            user.verification_code_hash = None
-            user.verification_code_expires_at = None
-            user.verification_attempts = 0
-            await session.commit()
-            await session.refresh(user)
-            return True, "SUCCESS", user, 0
-
-    async def cleanup_abandoned_signups(self, max_age_hours: int = 48) -> int:
-        """Purge unverified user accounts older than max_age_hours that never verified or completed setup."""
-        from sqlalchemy import delete
-        cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
-        async with self.async_session() as session:
-            stmt = (
-                delete(UserModel)
-                .where(
-                    UserModel.is_verified == False,
-                    UserModel.created_at < cutoff,
-                    UserModel.selected_organization_id == None,
-                )
-            )
-            result = await session.execute(stmt)
-            await session.commit()
-            return result.rowcount or 0
-

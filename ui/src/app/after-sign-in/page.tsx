@@ -16,16 +16,6 @@ export default async function AfterSignInPage() {
     const user = await getServerUser();
     logger.debug('[AfterSignInPage] Got user:', { hasUser: !!user, userId: user?.id });
 
-    // Invariant 1: Zero Unverified Entry - under no circumstances allow unverified users past sign-in
-    if (user) {
-        const isEmailVerified = (user as any)?.is_verified ?? (user as any)?.primaryEmailVerified;
-        if (isEmailVerified === false) {
-            const email = (user as any)?.email || (user as any)?.primaryEmail || '';
-            logger.debug('[AfterSignInPage] Unverified user detected, redirecting to /auth/verify-email', { email });
-            redirect(`/auth/verify-email?email=${encodeURIComponent(email)}`);
-        }
-    }
-
     if (authProvider === 'stack' && user && 'getAuthJson' in user) {
         logger.debug('[AfterSignInPage] Stack user detected, getting auth token...');
         const token = await user.getAuthJson();

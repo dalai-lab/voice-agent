@@ -1,10 +1,10 @@
 "use client";
 
 import { StackProvider, useStackApp } from "@stackframe/stack";
-import { ArrowLeft, Edit2, Eye, EyeOff, Loader2, Lock, Mail, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Edit2, Eye, EyeOff, Loader2, Lock, Mail, RefreshCw, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -22,14 +22,25 @@ interface StackSignInFormProps {
 
 function InnerSignInForm({ signupEnabled = true }: { signupEnabled?: boolean }) {
   const app = useStackApp();
-  const user = app.useUser();
+  const user = app.useUser({ includeRestricted: true });
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const emailParam = searchParams.get("email");
+  const checkEmail = searchParams.get("check_email") === "true";
+  const verifiedParam = searchParams.get("verified");
 
   const [mode, setMode] = useState<"password" | "magic-link">("password");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(emailParam || "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Pre-fill email from query param if available
+  useEffect(() => {
+    if (emailParam && !email) {
+      setEmail(emailParam);
+    }
+  }, [emailParam, email]);
 
   // Magic link + OTP state
   const [nonce, setNonce] = useState<string | null>(null);
@@ -45,12 +56,14 @@ function InnerSignInForm({ signupEnabled = true }: { signupEnabled?: boolean }) 
   useEffect(() => {
     if (user) {
       if (user.primaryEmailVerified === false) {
-        router.push("/auth/verify-email");
+        const targetEmail = user.primaryEmail || emailParam || "";
+        const query = targetEmail ? `?email=${encodeURIComponent(targetEmail)}` : "";
+        router.push(`/auth/verify-email${query}`);
       } else {
         router.push("/after-sign-in");
       }
     }
-  }, [user, router]);
+  }, [user, router, emailParam]);
 
   // Query project config on client for OAuth providers
   useEffect(() => {
@@ -90,7 +103,17 @@ function InnerSignInForm({ signupEnabled = true }: { signupEnabled?: boolean }) 
     try {
       const res = await app.signInWithCredential({ email, password });
       if (res.status === "error") {
-        toast.error(res.error.message || "Invalid email or password");
+        const errorMsg = res.error.message || "";
+        if (
+          errorMsg.toLowerCase().includes("verify") ||
+          errorMsg.toLowerCase().includes("restricted") ||
+          errorMsg.toLowerCase().includes("unverified")
+        ) {
+          toast.error("Please verify your email address before signing in.");
+          router.push(`/auth/verify-email?email=${encodeURIComponent(email)}`);
+          return;
+        }
+        toast.error(errorMsg || "Invalid email or password");
         setLoading(false);
         return;
       }
@@ -301,6 +324,31 @@ function InnerSignInForm({ signupEnabled = true }: { signupEnabled?: boolean }) 
           Sign in to your Talkar account
         </p>
       </div>
+
+      {/* Informational banners */}
+      {checkEmail && (
+        <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 p-3.5 text-xs text-orange-200 flex items-start gap-3 text-left">
+          <Mail className="h-4 w-4 text-orange-400 mt-0.5 shrink-0" />
+          <div className="space-y-0.5">
+            <p className="font-semibold text-foreground">Verification email sent</p>
+            <p className="text-muted-foreground leading-relaxed">
+              We&apos;ve sent an activation link to {emailParam ? <span className="font-medium text-foreground">{emailParam}</span> : "your email"}. Please check your inbox and verify your email to continue.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {verifiedParam === "true" && (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-200 flex items-start gap-3 text-left">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
+          <div className="space-y-0.5">
+            <p className="font-semibold text-foreground">Email verified!</p>
+            <p className="text-muted-foreground leading-relaxed">
+              Your email is confirmed. You can now sign in to your workspace.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* OAuth Providers (if configured in Stack console) */}
       {oauthProviders.length > 0 && (
@@ -547,7 +595,9 @@ export function StackSignInForm({
 
   return (
     <StackProvider app={clientApp}>
-      <InnerSignInForm signupEnabled={signupEnabled} />
+      <Suspense fallback={null}>
+        <InnerSignInForm signupEnabled={signupEnabled} />
+      </Suspense>
     </StackProvider>
   );
 }

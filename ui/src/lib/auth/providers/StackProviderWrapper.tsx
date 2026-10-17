@@ -21,7 +21,11 @@ export function getStackClientApp(
       projectId,
       publishableClientKey,
       urls: {
-        afterSignIn: "/after-sign-in"
+        afterSignIn: "/after-sign-in",
+        afterSignUp: "/auth/verify-email",
+        emailVerification: "/handler/email-verification",
+        signIn: "/handler/sign-in",
+        signUp: "/handler/sign-up",
       }
     });
   }
@@ -41,7 +45,7 @@ function StackAuthContextProvider({
   children: React.ReactNode;
   app: StackClientApp<true, string>;
 }) {
-  const stackUser = app.useUser();
+  const stackUser = app.useUser({ includeRestricted: true });
 
   // Store user in ref for callbacks to access latest value without creating new callbacks
   const userRef = useRef(stackUser);

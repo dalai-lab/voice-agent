@@ -26,8 +26,27 @@ export default function AfterSignInPage() {
     }, 3000);
 
     const routeUser = async () => {
+      let currentUser = user;
+
+      // In Stack mode, if user is not yet available in React hook, verify directly via client app
+      if (!currentUser && provider === "stack") {
+        try {
+          const configRes = await fetch("/api/config/auth");
+          if (configRes.ok) {
+            const configData = await configRes.json();
+            if (configData.stack) {
+              const { getStackClientApp } = await import("@/lib/auth/providers/StackProviderWrapper");
+              const stackApp = getStackClientApp(configData.stack.projectId, configData.stack.publishableClientKey);
+              currentUser = await stackApp.getUser({ includeRestricted: true });
+            }
+          }
+        } catch (err) {
+          logger.debug("[AfterSignIn] Async user check fallback failed:", err);
+        }
+      }
+
       // 1. If not authenticated at all, redirect to sign-in
-      if (!user && !isAuthenticated) {
+      if (!currentUser && !isAuthenticated) {
         redirectedRef.current = true;
         clearTimeout(failsafeTimer);
         router.replace("/handler/sign-in");
@@ -35,13 +54,15 @@ export default function AfterSignInPage() {
       }
 
       // 2. Zero unverified entry: redirect unverified Stack users to verification holding page
-      if (provider === "stack" && user) {
-        const isVerified = (user as any).primaryEmailVerified;
+      if (provider === "stack" && currentUser) {
+        const isVerified = (currentUser as any).primaryEmailVerified;
         if (!isVerified) {
           redirectedRef.current = true;
           clearTimeout(failsafeTimer);
           logger.info("[AfterSignIn] Stack user email not verified. Redirecting to /auth/verify-email");
-          router.replace("/auth/verify-email");
+          const email = (currentUser as any).primaryEmail || (currentUser as any).email || "";
+          const query = email ? `?email=${encodeURIComponent(email)}` : "";
+          router.replace(`/auth/verify-email${query}`);
           return;
         }
       }

@@ -2,8 +2,8 @@
 
 import { StackProvider, useStackApp } from "@stackframe/stack";
 import { CheckCircle2, Loader2, LogOut, Mail, RefreshCw } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,10 @@ interface StackVerifyEmailViewProps {
 
 function InnerVerifyEmailView() {
   const app = useStackApp();
-  const user = app.useUser();
+  const user = app.useUser({ includeRestricted: true });
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const emailParam = searchParams.get("email");
 
   const [resending, setResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(60);
@@ -45,11 +47,11 @@ function InnerVerifyEmailView() {
 
   // Polling & focus auto-refresh to detect verification in background
   useEffect(() => {
-    if (!user || user.primaryEmailVerified) return;
+    if (user && user.primaryEmailVerified) return;
 
     const checkVerification = async () => {
       try {
-        const updatedUser = await app.getUser();
+        const updatedUser = await app.getUser({ includeRestricted: true });
         if (updatedUser?.primaryEmailVerified) {
           setIsVerified(true);
         }
@@ -68,14 +70,23 @@ function InnerVerifyEmailView() {
       window.removeEventListener("focus", checkVerification);
       clearInterval(pollInterval);
     };
-  }, [user]);
+  }, [user, app]);
 
   const handleResend = async () => {
-    if (!user || resending || resendCooldown > 0) return;
+    if (resending || resendCooldown > 0) return;
 
     setResending(true);
     try {
-      await user.sendVerificationEmail();
+      if (user) {
+        await user.sendVerificationEmail();
+      } else {
+        const freshUser = await app.getUser({ includeRestricted: true });
+        if (freshUser) {
+          await freshUser.sendVerificationEmail();
+        } else {
+          throw new Error("Unable to identify account. Please check your inbox or sign in again.");
+        }
+      }
       toast.success("Verification link sent! Check your inbox.");
       setResendCooldown(60);
     } catch (err: unknown) {
@@ -94,6 +105,8 @@ function InnerVerifyEmailView() {
     }
     window.location.href = "/handler/sign-in";
   };
+
+  const displayEmail = user?.primaryEmail || emailParam || "your email address";
 
   if (isVerified) {
     return (
@@ -129,10 +142,10 @@ function InnerVerifyEmailView() {
           Check your inbox
         </h1>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          We sent a verification link to
+          We sent an account verification link to
         </p>
         <div className="inline-block rounded-full bg-muted/80 px-3.5 py-1 text-xs font-semibold text-foreground border border-border/80">
-          {user?.primaryEmail || "your email address"}
+          {displayEmail}
         </div>
       </div>
 
@@ -191,7 +204,9 @@ export function StackVerifyEmailView({
 
   return (
     <StackProvider app={clientApp}>
-      <InnerVerifyEmailView />
+      <Suspense fallback={null}>
+        <InnerVerifyEmailView />
+      </Suspense>
     </StackProvider>
   );
 }

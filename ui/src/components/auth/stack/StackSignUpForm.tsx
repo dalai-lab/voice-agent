@@ -4,7 +4,7 @@ import { StackProvider, useStackApp } from "@stackframe/stack";
 import { Check, Eye, EyeOff, Loader2, Lock, Mail, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ interface StackSignUpFormProps {
 
 function InnerSignUpForm() {
   const app = useStackApp();
-  const user = app.useUser();
+  const user = app.useUser({ includeRestricted: true });
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -34,7 +34,8 @@ function InnerSignUpForm() {
   useEffect(() => {
     if (user) {
       if (user.primaryEmailVerified === false) {
-        router.push("/auth/verify-email");
+        const query = user.primaryEmail ? `?email=${encodeURIComponent(user.primaryEmail)}` : "";
+        router.push(`/auth/verify-email${query}`);
       } else {
         router.push("/after-sign-in");
       }
@@ -79,18 +80,20 @@ function InnerSignUpForm() {
 
     setLoading(true);
     try {
-      const res = await app.signUpWithCredential({ email, password });
+      const res = await app.signUpWithCredential({
+        email,
+        password,
+        noRedirect: true,
+      });
       if (res.status === "error") {
         toast.error(res.error.message || "Sign up failed. Please try again.");
         setLoading(false);
         return;
       }
 
-      toast.success("Account created successfully!");
-      // Stack automatically dispatches a verification email. Forward to holding screen.
-      setTimeout(() => {
-        window.location.href = "/auth/verify-email";
-      }, 800);
+      toast.success("Account created! Check your email to verify.");
+      // Forward directly to verification holding screen with the email param
+      window.location.href = `/auth/verify-email?email=${encodeURIComponent(email)}`;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create account. Please try again.";
       toast.error(message);
@@ -339,7 +342,9 @@ export function StackSignUpForm({
 
   return (
     <StackProvider app={clientApp}>
-      <InnerSignUpForm />
+      <Suspense fallback={null}>
+        <InnerSignUpForm />
+      </Suspense>
     </StackProvider>
   );
 }

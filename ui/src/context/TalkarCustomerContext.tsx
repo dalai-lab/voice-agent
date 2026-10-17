@@ -179,6 +179,13 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if ("primaryEmailVerified" in user && !user.primaryEmailVerified) {
+      setIsLoading(false);
+      setTalkarStatus(null);
+      setIsTalkarCustomer(false);
+      return;
+    }
+
     const checkKey = `${dograhOrgId || email}`;
     if (!dograhOrgId && !email) {
       setIsLoading(false);

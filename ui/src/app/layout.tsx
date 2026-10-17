@@ -114,6 +114,19 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Google tag (gtag.js) */}
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-GVCEDTGN3T" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+
+              gtag('config', 'G-GVCEDTGN3T');
+            `,
+          }}
+        />
         <meta name="google-site-verification" content="2KpAIkVZSgDoMxf7Yu0D0jC8VKJhNnObl_zv4GLWx3A" />
         {/* Schema.org JSON-LD for Google Search & Knowledge Graph */}
         <script

@@ -39,7 +39,11 @@ export async function getStackServerApp(): Promise<StackServerApp<boolean, strin
         projectId: stackConfig.projectId,
         publishableClientKey: stackConfig.publishableClientKey,
         urls: {
-          afterSignIn: "/after-sign-in"
+          afterSignIn: "/after-sign-in",
+          afterSignUp: "/auth/verify-email",
+          emailVerification: "/handler/email-verification",
+          signIn: "/handler/sign-in",
+          signUp: "/handler/sign-up",
         }
       });
     }
@@ -58,7 +62,7 @@ export async function getServerUser(): Promise<CurrentUser | LocalUser | null> {
     const app = await getStackServerApp();
     if (app) {
       try {
-        const user = await app.getUser();
+        const user = await app.getUser({ includeRestricted: true });
         return user;
       } catch (error) {
         logger.error('Error getting user from Stack:', error);

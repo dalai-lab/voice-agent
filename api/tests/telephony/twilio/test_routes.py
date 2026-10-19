@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 import pytest
 from api.services.telephony.providers.twilio.provider import TwilioProvider
 from api.services.telephony.providers.twilio.routes import (
+    handle_twilio_inbound_status,
     handle_twilio_status_callback,
     handle_twiml_webhook,
 )
@@ -325,7 +326,10 @@ async def test_twilio_status_callback_persists_answering_machine_detection_resul
     assert result == {"status": "success"}
     db_client.update_workflow_run.assert_awaited_once_with(
         run_id=123,
-        gathered_context={"answered_by": "machine_start"},
+        gathered_context={
+            "answered_by": "machine_start",
+            "call_tags": ["voicemail_detected"],
+        },
     )
 
 
@@ -377,3 +381,53 @@ async def test_twilio_status_callback_continues_when_amd_persistence_fails():
 
     assert result == {"status": "success"}
     process_status.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_handle_twilio_inbound_status_resolves_and_delegates():
+    request = _request(
+        path="/api/v1/telephony/twilio/inbound/status",
+        query={},
+        form_data={"CallSid": "inbound-sid-123", "CallStatus": "completed"},
+    )
+    workflow_run = SimpleNamespace(id=888)
+
+    with (
+        patch("api.services.telephony.providers.twilio.routes.db_client") as mock_db,
+        patch(
+            "api.services.telephony.providers.twilio.routes.handle_twilio_status_callback",
+            new=AsyncMock(return_value={"status": "success"}),
+        ) as mock_handle_callback,
+    ):
+        mock_db.get_workflow_run_by_call_id = AsyncMock(return_value=workflow_run)
+        response = await handle_twilio_inbound_status(request)
+
+    assert response == {"status": "success"}
+    mock_db.get_workflow_run_by_call_id.assert_awaited_once_with("inbound-sid-123")
+    mock_handle_callback.assert_awaited_once_with(888, request)
+
+
+@pytest.mark.asyncio
+async def test_handle_twilio_inbound_status_missing_call_sid():
+    request = _request(
+        path="/api/v1/telephony/twilio/inbound/status",
+        query={},
+        form_data={},
+    )
+    response = await handle_twilio_inbound_status(request)
+    assert response == {"status": "ignored", "reason": "missing_call_sid"}
+
+
+@pytest.mark.asyncio
+async def test_handle_twilio_inbound_status_unmatched_call_sid():
+    request = _request(
+        path="/api/v1/telephony/twilio/inbound/status",
+        query={},
+        form_data={"CallSid": "unknown-sid"},
+    )
+    with patch("api.services.telephony.providers.twilio.routes.db_client") as mock_db:
+        mock_db.get_workflow_run_by_call_id = AsyncMock(return_value=None)
+        response = await handle_twilio_inbound_status(request)
+
+    assert response == {"status": "ignored", "reason": "run_not_found"}
+

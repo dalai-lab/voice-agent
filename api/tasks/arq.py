@@ -47,6 +47,7 @@ from api.tasks.campaign_tasks import (
 from api.tasks.knowledge_base_processing import process_knowledge_base_document
 from api.tasks.mock_telephony_tasks import simulate_mock_call_completion
 from api.tasks.run_integrations import run_integrations_post_workflow_run
+from api.tasks.telephony_tasks import sweep_stuck_telephony_runs
 from api.tasks.text_chat_inactivity import (
     complete_inactive_text_chat_session,
     sweep_inactive_text_chat_sessions,
@@ -66,6 +67,7 @@ class WorkerSettings:
         complete_inactive_text_chat_session,
         simulate_mock_call_completion,
         sweep_stuck_campaign_runs,
+        sweep_stuck_telephony_runs,
     ]
     cron_jobs = [
         # Safety net for webhook deliveries whose ARQ job was lost (worker
@@ -89,6 +91,13 @@ class WorkerSettings:
             sweep_stuck_campaign_runs,
             minute=set(range(0, 60, 5)),
             second=15,
+            run_at_startup=True,
+        ),
+        # Safety net for telephony calls orphaned before media connect or crashed workers.
+        cron(
+            sweep_stuck_telephony_runs,
+            minute=set(range(0, 60, 2)),
+            second=10,
             run_at_startup=True,
         ),
     ]

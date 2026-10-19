@@ -148,6 +148,29 @@ async def handle_plivo_hangup_callback(
     return await _handle_plivo_status_callback(workflow_run_id, request)
 
 
+@router.post("/plivo/inbound/hangup", include_in_schema=False)
+async def handle_plivo_inbound_hangup(request: Request):
+    """Application-level hangup callback for inbound Plivo calls.
+
+    Triggered when an inbound call terminates before the media stream connects
+    or when stream callbacks fail to deliver. Resolves the run via CallUUID.
+    """
+    form_data = await request.form()
+    callback_data = dict(form_data)
+    call_id = callback_data.get("CallUUID") or callback_data.get("call_uuid")
+
+    if not call_id:
+        logger.warning("Plivo inbound hangup callback received with no CallUUID")
+        return {"status": "ignored", "reason": "missing_call_uuid"}
+
+    workflow_run = await db_client.get_workflow_run_by_call_id(call_id)
+    if not workflow_run:
+        logger.info(f"Plivo inbound hangup for unindexed or past call: {call_id}")
+        return {"status": "ignored", "reason": "run_not_found"}
+
+    return await _handle_plivo_status_callback(workflow_run.id, request)
+
+
 @router.post("/plivo/ring-callback/{workflow_run_id}")
 async def handle_plivo_ring_callback(
     workflow_run_id: int,

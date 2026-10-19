@@ -476,14 +476,18 @@ class TwilioProvider(TelephonyProvider):
 
         endpoint = f"{self.base_url}/IncomingPhoneNumbers/{sid}.json"
         if webhook_url:
+            backend_endpoint = webhook_url.split("/api/v1")[0]
             data = {
                 "VoiceUrl": webhook_url,
                 "VoiceMethod": "POST",
+                "StatusCallback": f"{backend_endpoint}/api/v1/telephony/twilio/inbound/status",
+                "StatusCallbackMethod": "POST",
             }
         else:
             # Clearing — Twilio treats empty string as "unset".
             data = {
                 "VoiceUrl": "",
+                "StatusCallback": "",
             }
 
         try:

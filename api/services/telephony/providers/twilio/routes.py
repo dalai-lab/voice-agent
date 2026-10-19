@@ -41,11 +41,8 @@ async def _persist_amd_result_if_present(
             or amd_result.answered_by == "fax"
         ):
             workflow_run = await db_client.get_workflow_run_by_id(workflow_run_id)
-            current_tags = (
-                (workflow_run.gathered_context or {}).get("call_tags", [])
-                if workflow_run
-                else []
-            )
+            context = getattr(workflow_run, "gathered_context", None) or {}
+            current_tags = context.get("call_tags", []) if isinstance(context, dict) else []
             if "voicemail_detected" not in current_tags:
                 updates["call_tags"] = current_tags + ["voicemail_detected"]
 
@@ -95,6 +92,28 @@ async def handle_twiml_webhook(
     )
 
     return HTMLResponse(content=response_content, media_type="application/xml")
+
+
+@router.post("/twilio/inbound/status", include_in_schema=False)
+async def handle_twilio_inbound_status(request: Request):
+    """Application-level status callback for inbound Twilio calls.
+
+    Resolves the run via CallSid and delegates to handle_twilio_status_callback.
+    """
+    form_data = await request.form()
+    callback_data = dict(form_data)
+    call_id = callback_data.get("CallSid") or callback_data.get("call_sid")
+
+    if not call_id:
+        logger.warning("Twilio inbound status callback received with no CallSid")
+        return {"status": "ignored", "reason": "missing_call_sid"}
+
+    workflow_run = await db_client.get_workflow_run_by_call_id(call_id)
+    if not workflow_run:
+        logger.info(f"Twilio inbound status for unindexed or past call: {call_id}")
+        return {"status": "ignored", "reason": "run_not_found"}
+
+    return await handle_twilio_status_callback(workflow_run.id, request)
 
 
 @router.post("/twilio/status-callback/{workflow_run_id}")

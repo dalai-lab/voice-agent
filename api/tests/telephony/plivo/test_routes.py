@@ -9,6 +9,7 @@ import pytest
 from api.services.telephony.providers.plivo.provider import PlivoProvider
 from api.services.telephony.providers.plivo.routes import (
     handle_plivo_hangup_callback,
+    handle_plivo_inbound_hangup,
     handle_plivo_transfer_result,
     handle_plivo_transfer_xml,
     handle_plivo_xml_webhook,
@@ -475,3 +476,52 @@ async def test_transfer_result_rejects_invalid_signature():
     manager.claim_transfer_step.assert_not_awaited()
     manager.publish_transfer_event.assert_not_awaited()
     manager.remove_transfer_context.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_handle_plivo_inbound_hangup_resolves_and_delegates():
+    request = _request(
+        path="/api/v1/telephony/plivo/inbound/hangup",
+        query={},
+        form_data={"CallUUID": "inbound-uuid-123", "CallStatus": "completed"},
+    )
+    workflow_run = SimpleNamespace(id=999)
+
+    with (
+        patch("api.services.telephony.providers.plivo.routes.db_client") as mock_db,
+        patch(
+            "api.services.telephony.providers.plivo.routes._handle_plivo_status_callback",
+            new=AsyncMock(return_value={"status": "success"}),
+        ) as mock_handle_callback,
+    ):
+        mock_db.get_workflow_run_by_call_id = AsyncMock(return_value=workflow_run)
+        response = await handle_plivo_inbound_hangup(request)
+
+    assert response == {"status": "success"}
+    mock_db.get_workflow_run_by_call_id.assert_awaited_once_with("inbound-uuid-123")
+    mock_handle_callback.assert_awaited_once_with(999, request)
+
+
+@pytest.mark.asyncio
+async def test_handle_plivo_inbound_hangup_missing_call_uuid():
+    request = _request(
+        path="/api/v1/telephony/plivo/inbound/hangup",
+        query={},
+        form_data={},
+    )
+    response = await handle_plivo_inbound_hangup(request)
+    assert response == {"status": "ignored", "reason": "missing_call_uuid"}
+
+
+@pytest.mark.asyncio
+async def test_handle_plivo_inbound_hangup_unmatched_call_uuid():
+    request = _request(
+        path="/api/v1/telephony/plivo/inbound/hangup",
+        query={},
+        form_data={"CallUUID": "unknown-uuid"},
+    )
+    with patch("api.services.telephony.providers.plivo.routes.db_client") as mock_db:
+        mock_db.get_workflow_run_by_call_id = AsyncMock(return_value=None)
+        response = await handle_plivo_inbound_hangup(request)
+
+    assert response == {"status": "ignored", "reason": "run_not_found"}

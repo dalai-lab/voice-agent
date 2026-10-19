@@ -1,7 +1,8 @@
+from datetime import UTC, datetime, timedelta
 import uuid
 from typing import Any
 
-from sqlalchemy import func
+from sqlalchemy import func, update
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -591,3 +592,67 @@ class WorkflowRunClient(BaseDBClient):
                 .limit(1)
             )
             return result.scalars().first()
+
+    async def get_stuck_workflow_runs_by_state(
+        self,
+        state: str,
+        threshold_seconds: int = 180,
+        limit: int = 50,
+    ) -> list[WorkflowRunModel]:
+        """Retrieve uncompleted workflow runs stuck in a state beyond the threshold.
+
+        Args:
+            state: The workflow run state to check ('initialized', 'running', etc.)
+            threshold_seconds: Age in seconds beyond which a run in this state is considered stuck
+            limit: Maximum number of candidate runs to retrieve
+
+        Returns:
+            List of matching WorkflowRunModel instances ordered by creation time asc
+        """
+        cutoff = datetime.now(UTC) - timedelta(seconds=threshold_seconds)
+        async with self.async_session() as session:
+            query = (
+                select(WorkflowRunModel)
+                .options(joinedload(WorkflowRunModel.workflow))
+                .where(
+                    WorkflowRunModel.is_completed.is_(False),
+                    WorkflowRunModel.state == state,
+                    WorkflowRunModel.created_at <= cutoff,
+                )
+                .order_by(WorkflowRunModel.id.asc())
+                .limit(limit)
+            )
+            result = await session.execute(query)
+            return list(result.scalars().all())
+
+    async def update_workflow_run_atomic_completion(
+        self,
+        run_id: int,
+        state: str = "completed",
+        gathered_context: dict | None = None,
+        usage_info: dict | None = None,
+    ) -> bool:
+        """Atomically mark a workflow run as completed if it is not already completed.
+
+        Returns True if the row was updated, False if it was already completed.
+        """
+        async with self.async_session() as session:
+            stmt = (
+                update(WorkflowRunModel)
+                .where(
+                    WorkflowRunModel.id == run_id,
+                    WorkflowRunModel.is_completed.is_(False),
+                )
+                .values(
+                    is_completed=True,
+                    state=state,
+                )
+            )
+            if gathered_context is not None:
+                stmt = stmt.values(gathered_context=gathered_context)
+            if usage_info is not None:
+                stmt = stmt.values(usage_info=usage_info)
+
+            result = await session.execute(stmt)
+            await session.commit()
+            return result.rowcount > 0

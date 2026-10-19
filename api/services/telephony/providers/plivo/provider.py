@@ -457,9 +457,14 @@ class PlivoProvider(TelephonyProvider):
             )
 
         app_endpoint = f"{self.base_url}/Application/{self.application_id}/"
+        backend_endpoint = webhook_url.split("/api/v1")[0]
         data = {
             "answer_url": webhook_url,
             "answer_method": "POST",
+            "hangup_url": f"{backend_endpoint}/api/v1/telephony/plivo/inbound/hangup",
+            "hangup_method": "POST",
+            "fallback_answer_url": f"{backend_endpoint}/api/v1/telephony/inbound/fallback",
+            "fallback_method": "POST",
         }
         auth = aiohttp.BasicAuth(self.auth_id, self.auth_token)
 

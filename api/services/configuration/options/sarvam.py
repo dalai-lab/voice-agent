@@ -1,4 +1,4 @@
-SARVAM_TTS_MODELS = ("bulbul:v2", "bulbul:v3")
+SARVAM_TTS_MODELS = ("bulbul:v4-flash", "bulbul:v3", "bulbul:v2")
 SARVAM_V2_VOICES = (
     "anushka",
     "manisha",
@@ -49,6 +49,24 @@ SARVAM_V3_VOICES = (
     "soham",
     "rupali",
 )
+# bulbul:v4-flash supports 200+ persona voice IDs (<name>_<lang>_<style>) as well as all classic voices
+SARVAM_V4_VOICES = (
+    "shubh_enhi_ads",
+    "shubh_enhi_conversational",
+    "ritu_enhi_conversational",
+    "aditya_enhi_conversational",
+    "priya_enhi_conversational",
+    "neha_enhi_conversational",
+    "rahul_enhi_conversational",
+    "pooja_enhi_conversational",
+    "rohan_enhi_conversational",
+    "anand_enhi_conversational",
+    "kavya_enhi_conversational",
+    "amit_enhi_conversational",
+    "dev_enhi_conversational",
+    "ishita_enhi_conversational",
+) + SARVAM_V3_VOICES
+
 SARVAM_LANGUAGES = (
     "bn-IN",
     "en-IN",
@@ -63,7 +81,7 @@ SARVAM_LANGUAGES = (
     "te-IN",
     "as-IN",
 )
-SARVAM_STT_MODELS = ("saarika:v2.5", "saaras:v3")
+SARVAM_STT_MODELS = ("saaras:v4", "saaras:v3", "saarika:v2.5")
 # saarika:v2.5 language codes (unknown = auto-detect)
 SARVAM_STT_LANGUAGES_V25 = (
     "unknown",
@@ -79,7 +97,7 @@ SARVAM_STT_LANGUAGES_V25 = (
     "te-IN",
     "en-IN",
 )
-# saaras:v3 adds these regional languages on top of the v2.5 set. Full list: https://docs.sarvam.ai/api-reference-docs/speech-to-text/transcribe
+# saaras:v3 and saaras:v4 support 23 languages. Full list: https://docs.sarvam.ai/api-reference-docs/speech-to-text/transcribe
 SARVAM_STT_LANGUAGES_V3 = SARVAM_STT_LANGUAGES_V25 + (
     "as-IN",
     "ur-IN",
@@ -94,7 +112,9 @@ SARVAM_STT_LANGUAGES_V3 = SARVAM_STT_LANGUAGES_V25 + (
     "mai-IN",
     "doi-IN",
 )
+SARVAM_STT_LANGUAGES_V4 = SARVAM_STT_LANGUAGES_V3
 SARVAM_LLM_MODELS = (
-    "sarvam-30b",
     "sarvam-105b",
+    "sarvam-105b-conversations",
+    "sarvam-30b",
 )

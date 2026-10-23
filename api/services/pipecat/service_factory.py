@@ -796,9 +796,17 @@ def create_tts_service(
         language = getattr(user_config.tts, "language", None)
         pipecat_language = language_mapping.get(language, Language.HI)
 
-        voice = (
-            getattr(user_config.tts, "voice", None) or ""
-        ).strip().lower() or "anushka"
+        raw_voice = (getattr(user_config.tts, "voice", None) or "").strip().lower()
+        if not raw_voice:
+            tts_model = getattr(user_config.tts, "model", "") or ""
+            if "v4" in tts_model:
+                voice = "shubh_enhi_ads"
+            elif "v3" in tts_model:
+                voice = "shubh"
+            else:
+                voice = "anushka"
+        else:
+            voice = raw_voice
         speed = getattr(user_config.tts, "speed", None)
         settings_kwargs = {
             "model": user_config.tts.model,

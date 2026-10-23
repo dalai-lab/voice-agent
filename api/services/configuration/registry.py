@@ -40,11 +40,13 @@ from api.services.configuration.options import (
     SARVAM_LANGUAGES,
     SARVAM_LLM_MODELS,
     SARVAM_STT_LANGUAGES_V3,
+    SARVAM_STT_LANGUAGES_V4,
     SARVAM_STT_LANGUAGES_V25,
     SARVAM_STT_MODELS,
     SARVAM_TTS_MODELS,
     SARVAM_V2_VOICES,
     SARVAM_V3_VOICES,
+    SARVAM_V4_VOICES,
     SMALLEST_TTS_LANGUAGES,
     SMALLEST_TTS_MODELS,
     SMALLEST_TTS_PRO_VOICES,
@@ -1149,8 +1151,9 @@ class SarvamTTSConfiguration(BaseTTSConfiguration):
             "examples": SARVAM_V2_VOICES,
             "allow_custom_input": True,
             "model_options": {
-                "bulbul:v2": SARVAM_V2_VOICES,
+                "bulbul:v4-flash": SARVAM_V4_VOICES,
                 "bulbul:v3": SARVAM_V3_VOICES,
+                "bulbul:v2": SARVAM_V2_VOICES,
             },
         },
     )
@@ -1575,8 +1578,8 @@ class SarvamSTTConfiguration(BaseSTTConfiguration):
     model: str = Field(
         default="saarika:v2.5",
         description=(
-            "Sarvam STT model. saarika:v2.5 transcribes in the spoken language; "
-            "saaras:v3 is the recommended model with flexible output modes."
+            "Sarvam STT model. saaras:v4 is the latest flagship model with multi-lingual "
+            "and mode support; saaras:v3 and saarika:v2.5 are also available."
         ),
         json_schema_extra={"examples": SARVAM_STT_MODELS},
     )
@@ -1588,8 +1591,9 @@ class SarvamSTTConfiguration(BaseSTTConfiguration):
         json_schema_extra={
             "examples": SARVAM_STT_LANGUAGES_V25,
             "model_options": {
-                "saarika:v2.5": SARVAM_STT_LANGUAGES_V25,
+                "saaras:v4": SARVAM_STT_LANGUAGES_V4,
                 "saaras:v3": SARVAM_STT_LANGUAGES_V3,
+                "saarika:v2.5": SARVAM_STT_LANGUAGES_V25,
             },
         },
     )

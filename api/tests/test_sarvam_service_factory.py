@@ -132,6 +132,7 @@ class TestSarvamTTSServiceFactory:
         assert voice_schema["allow_custom_input"] is True
         assert "bulbul:v2" in voice_schema["model_options"]
         assert "bulbul:v3" in voice_schema["model_options"]
+        assert "bulbul:v4-flash" in voice_schema["model_options"]
 
     def test_create_sarvam_tts_service_maps_speed_to_pace(self):
         user_config = SimpleNamespace(
@@ -205,3 +206,59 @@ class TestSarvamTTSServiceFactory:
 
         kwargs = mock_service.call_args.kwargs
         assert kwargs["settings"].voice == "anushka"
+
+    def test_create_sarvam_tts_service_defaults_blank_voice_id_for_v4(self):
+        user_config = SimpleNamespace(
+            tts=SimpleNamespace(
+                provider=ServiceProviders.SARVAM.value,
+                api_key="test-key",
+                model="bulbul:v4-flash",
+                voice="   ",
+                language="hi-IN",
+                speed=1.0,
+            )
+        )
+        audio_config = AudioConfig(
+            transport_in_sample_rate=16000, transport_out_sample_rate=16000
+        )
+
+        with patch(
+            "api.services.pipecat.service_factory.SarvamTTSService"
+        ) as mock_service:
+            create_tts_service(user_config, audio_config)
+
+        kwargs = mock_service.call_args.kwargs
+        assert kwargs["settings"].voice == "shubh_enhi_ads"
+
+    def test_create_sarvam_tts_service_defaults_blank_voice_id_for_v3(self):
+        user_config = SimpleNamespace(
+            tts=SimpleNamespace(
+                provider=ServiceProviders.SARVAM.value,
+                api_key="test-key",
+                model="bulbul:v3",
+                voice="",
+                language="hi-IN",
+                speed=1.0,
+            )
+        )
+        audio_config = AudioConfig(
+            transport_in_sample_rate=16000, transport_out_sample_rate=16000
+        )
+
+        with patch(
+            "api.services.pipecat.service_factory.SarvamTTSService"
+        ) as mock_service:
+            create_tts_service(user_config, audio_config)
+
+        kwargs = mock_service.call_args.kwargs
+        assert kwargs["settings"].voice == "shubh"
+
+
+class TestSarvamDirectServiceInstantiation:
+    @pytest.mark.parametrize("model", ["sarvam-30b", "sarvam-105b", "sarvam-105b-conversations"])
+    def test_sarvam_llm_service_instantiates_supported_models(self, model):
+        service = RealSarvamLLMService(
+            api_key="sk_test",
+            settings=RealSarvamLLMService.Settings(model=model),
+        )
+        assert service._settings.model == model

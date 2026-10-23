@@ -173,6 +173,12 @@ export interface ModelOverrides {
         api_key?: string;
         [key: string]: unknown;
     };
+    extraction_llm?: {
+        provider?: string;
+        model?: string;
+        api_key?: string;
+        [key: string]: unknown;
+    };
     tts?: {
         provider?: string;
         model?: string;

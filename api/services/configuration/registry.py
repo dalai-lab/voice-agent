@@ -166,6 +166,7 @@ class BaseServiceConfiguration(BaseModel):
 
 class BaseLLMConfiguration(BaseServiceConfiguration):
     model: str
+    temperature: float | None = None
 
 
 class BaseTTSConfiguration(BaseServiceConfiguration):

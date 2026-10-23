@@ -101,6 +101,12 @@ class UserConfigurationValidator:
                 configuration.embeddings, "embeddings", required=False
             )
         )
+        # Extraction LLM is optional - only validate if configured
+        status_list.extend(
+            self._validate_service(
+                configuration.extraction_llm, "extraction_llm", required=False
+            )
+        )
 
         if status_list:
             raise ValueError(status_list)

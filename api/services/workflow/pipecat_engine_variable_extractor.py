@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import TYPE_CHECKING, Any
 
@@ -42,16 +43,25 @@ class VariableExtractionManager:
     # context.  Responses longer than this are truncated with a marker.
     _TOOL_RESPONSE_MAX_CHARS = 2000
 
+    # Aggregate character budget across all turns and tool responses.
+    # When conversation exceeds this, older turns are truncated to protect context limits.
+    _MAX_TOTAL_CONVERSATION_CHARS = 16000
+
     # Transition tool response
     _TRANSITION_RESPONSE = '{"status": "done"}'
 
-    def _build_tool_call_name_lookup(self) -> dict[str, str]:
+    def _build_tool_call_name_lookup(
+        self, messages: list[Any] | None = None
+    ) -> dict[str, str]:
         """Build a mapping of tool_call_id → function name from assistant messages.
 
         This allows labelling tool responses with the function that produced them.
         """
         lookup: dict[str, str] = {}
-        for msg in self._context.messages:
+        msg_list = (
+            messages if messages is not None else getattr(self._context, "messages", [])
+        )
+        for msg in msg_list:
             if not isinstance(msg, dict) or msg.get("role") != "assistant":
                 continue
             for tc in msg.get("tool_calls", []):
@@ -129,16 +139,21 @@ class VariableExtractionManager:
         texts = [t for p in parts_attr if (t := getattr(p, "text", None))]
         return role, (" ".join(texts) if texts else None)
 
-    def _build_conversation_history(self) -> str:
+    def _build_conversation_history(
+        self, messages: list[Any] | None = None
+    ) -> str:
         """Build a text representation of the conversation for the extraction LLM.
 
         Includes assistant/user messages and formatted tool responses (excluding
-        transition tool responses).
+        transition tool responses). Enforces an aggregate total history budget.
         """
-        tool_call_names = self._build_tool_call_name_lookup()
+        msg_list = (
+            messages if messages is not None else getattr(self._context, "messages", [])
+        )
+        tool_call_names = self._build_tool_call_name_lookup(msg_list)
 
         lines: list[str] = []
-        for msg in self._context.messages:
+        for msg in msg_list:
             role, content = self._get_role_and_content(msg)
             if role in ("assistant", "user") and content:
                 lines.append(f"{role}: {content}")
@@ -150,7 +165,64 @@ class VariableExtractionManager:
                 if formatted:
                     lines.append(formatted)
 
-        return "\n".join(lines)
+        total_text = "\n".join(lines)
+        if len(total_text) > self._MAX_TOTAL_CONVERSATION_CHARS:
+            # Aggregate budget truncation: retain most recent turns within budget
+            truncated_lines: list[str] = []
+            current_chars = 0
+            for line in reversed(lines):
+                line_len = len(line) + 1  # newline
+                if current_chars + line_len > self._MAX_TOTAL_CONVERSATION_CHARS:
+                    break
+                truncated_lines.append(line)
+                current_chars += line_len
+            truncated_lines.reverse()
+            return "[...earlier turns truncated...]\n" + "\n".join(truncated_lines)
+
+        return total_text
+
+    @staticmethod
+    def _coerce_variable_types(
+        extracted_data: dict,
+        extraction_variables: list[ExtractionVariableDTO],
+    ) -> dict:
+        """Coerce extracted string values to expected schema types (number, boolean, string)."""
+        var_types: dict[str, str] = {
+            v.name: (v.type.value if hasattr(v.type, "value") else str(v.type))
+            for v in extraction_variables
+        }
+        coerced = dict(extracted_data)
+        for key, val in extracted_data.items():
+            if key not in var_types or val is None:
+                continue
+            expected_type = var_types[key]
+            if expected_type == "number":
+                if isinstance(val, (int, float)) and not isinstance(val, bool):
+                    continue
+                if isinstance(val, str):
+                    cleaned = val.strip().replace(",", "")
+                    try:
+                        if "." in cleaned:
+                            coerced[key] = float(cleaned)
+                        else:
+                            coerced[key] = int(cleaned)
+                    except (ValueError, TypeError):
+                        pass
+            elif expected_type == "boolean":
+                if isinstance(val, bool):
+                    continue
+                if isinstance(val, (int, float)):
+                    coerced[key] = bool(val)
+                elif isinstance(val, str):
+                    cleaned = val.strip().lower()
+                    if cleaned in ("true", "yes", "1", "y", "correct", "true."):
+                        coerced[key] = True
+                    elif cleaned in ("false", "no", "0", "n", "incorrect", "false."):
+                        coerced[key] = False
+            elif expected_type == "string":
+                if not isinstance(val, str) and not isinstance(val, (dict, list)):
+                    coerced[key] = str(val)
+        return coerced
 
     async def _perform_extraction(
         self,
@@ -168,9 +240,10 @@ class VariableExtractionManager:
         )
 
         # ------------------------------------------------------------------
-        # Build a normalized conversation history including tool responses.
+        # Build a normalized conversation history with snapshot isolation.
         # ------------------------------------------------------------------
-        conversation_history = self._build_conversation_history()
+        messages_snapshot = list(getattr(self._context, "messages", []))
+        conversation_history = self._build_conversation_history(messages_snapshot)
 
         system_prompt = (
             "You are an assistant tasked with extracting structured data from the conversation. "
@@ -197,19 +270,45 @@ class VariableExtractionManager:
         extraction_context.set_messages(extraction_messages)
 
         # ------------------------------------------------------------------
-        # Use engine's LLM for out-of-band inference (no pipeline frames).
-        # Pass system_prompt via system_instruction so it overrides the
-        # current node's system prompt that build_chat_completion_params
-        # would otherwise prepend.
+        # Use engine's extraction LLM for out-of-band inference (no pipeline frames).
+        # Automatic Runtime Fallback: If dedicated extraction LLM fails mid-call,
+        # fallback to the primary conversational LLM.
         # ------------------------------------------------------------------
-        llm_response = await self._engine.variable_extraction_llm.run_inference(
-            extraction_context, system_instruction=system_prompt
-        )
+        used_llm = self._engine.variable_extraction_llm
+        llm_response = None
+        try:
+            llm_response = await self._engine.variable_extraction_llm.run_inference(
+                extraction_context, system_instruction=system_prompt
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            fallback_llm = getattr(self._engine, "inference_llm", None) or getattr(
+                self._engine, "llm", None
+            )
+            if (
+                fallback_llm is not None
+                and fallback_llm is not self._engine.variable_extraction_llm
+            ):
+                logger.warning(
+                    f"Variable extraction with dedicated LLM failed: {e}. "
+                    f"Falling back to primary conversation LLM ({fallback_llm.__class__.__name__})."
+                )
+                try:
+                    llm_response = await fallback_llm.run_inference(
+                        extraction_context, system_instruction=system_prompt
+                    )
+                    used_llm = fallback_llm
+                except asyncio.CancelledError:
+                    raise
+                except Exception as fallback_e:
+                    logger.error(f"Fallback extraction LLM also failed: {fallback_e}")
+                    raise fallback_e from e
+            else:
+                raise
 
         # Get model name for tracing
-        model_name = getattr(
-            self._engine.variable_extraction_llm, "model_name", "unknown"
-        )
+        model_name = getattr(used_llm, "model_name", "unknown")
 
         if ensure_tracing():
             tracer = trace.get_tracer("pipecat")
@@ -222,7 +321,7 @@ class VariableExtractionManager:
                 ]
                 add_llm_span_attributes(
                     span,
-                    service_name=self._engine.variable_extraction_llm.__class__.__name__,
+                    service_name=used_llm.__class__.__name__,
                     model=model_name,
                     operation_name="llm-variable-extraction",
                     messages=tracing_messages,
@@ -245,6 +344,10 @@ class VariableExtractionManager:
                 logger.warning(
                     "Extractor returned invalid JSON; storing raw content instead."
                 )
+
+        # Apply strict type coercion according to variable definitions
+        if isinstance(extracted, dict):
+            extracted = self._coerce_variable_types(extracted, extraction_variables)
 
         logger.debug(f"Extracted variables: {extracted}")
         return extracted

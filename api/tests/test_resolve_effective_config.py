@@ -11,7 +11,9 @@ import pytest
 
 from api.schemas.ai_model_configuration import EffectiveAIModelConfiguration
 from api.services.configuration.masking import (
+    check_for_masked_keys,
     contains_masked_key,
+    mask_user_config,
     mask_workflow_configurations,
 )
 from api.services.configuration.merge import merge_workflow_configuration_secrets
@@ -21,6 +23,7 @@ from api.services.configuration.registry import (
     GoogleRealtimeLLMConfiguration,
     GoogleVertexLLMConfiguration,
     GrokRealtimeLLMConfiguration,
+    GroqLLMService,
     OpenAILLMService,
     UltravoxRealtimeLLMConfiguration,
 )
@@ -617,3 +620,133 @@ class TestWorkflowConfigurationSecrets:
 
         assert enriched["stt"]["api_key"] == ["dg-global-1", "dg-global-2"]
         assert enriched["stt"]["language"] == "en"
+
+
+class TestExtractionLLMOverride:
+    def test_override_extraction_llm_model_only(self, global_config):
+        global_config.extraction_llm = GroqLLMService(
+            provider="groq",
+            api_key="gsk-global-extraction",
+            model="llama-3.3-70b-versatile",
+        )
+        overrides = {
+            "extraction_llm": {
+                "model": "llama-3.1-8b-instant",
+            }
+        }
+
+        result = resolve_effective_config(global_config, overrides)
+
+        assert result.extraction_llm is not None
+        assert result.extraction_llm.provider == "groq"
+        assert result.extraction_llm.model == "llama-3.1-8b-instant"
+        assert result.extraction_llm.api_key == "gsk-global-extraction"
+        # Verify conversational llm untouched
+        assert result.llm.model == "gpt-4.1"
+
+    def test_override_extraction_llm_provider_and_api_key(self, global_config):
+        global_config.extraction_llm = GroqLLMService(
+            provider="groq",
+            api_key="gsk-global-extraction",
+            model="llama-3.3-70b-versatile",
+        )
+        overrides = {
+            "extraction_llm": {
+                "provider": "openai",
+                "api_key": "sk-override-extraction",
+                "model": "gpt-4.1-mini",
+            }
+        }
+
+        result = resolve_effective_config(global_config, overrides)
+
+        assert result.extraction_llm is not None
+        assert result.extraction_llm.provider == "openai"
+        assert result.extraction_llm.model == "gpt-4.1-mini"
+        assert result.extraction_llm.api_key == "sk-override-extraction"
+        # Main conversational llm retains its own provider & key
+        assert result.llm.provider == "openai"
+        assert result.llm.api_key == "sk-global-llm"
+        assert result.llm.model == "gpt-4.1"
+
+    def test_override_extraction_llm_when_global_is_none(self, global_config):
+        assert global_config.extraction_llm is None
+        overrides = {
+            "extraction_llm": {
+                "provider": "groq",
+                "api_key": "gsk-override-extraction",
+                "model": "llama-3.3-70b-versatile",
+            }
+        }
+
+        result = resolve_effective_config(global_config, overrides)
+
+        assert result.extraction_llm is not None
+        assert result.extraction_llm.provider == "groq"
+        assert result.extraction_llm.model == "llama-3.3-70b-versatile"
+        assert result.extraction_llm.api_key == "gsk-override-extraction"
+
+    def test_enrich_overrides_with_api_keys_for_extraction_llm(self, global_config):
+        global_config.extraction_llm = GroqLLMService(
+            provider="groq",
+            api_key="gsk-global-extraction",
+            model="llama-3.3-70b-versatile",
+        )
+        overrides = {
+            "extraction_llm": {
+                "provider": "groq",
+                "model": "llama-3.1-8b-instant",
+            }
+        }
+
+        enriched = enrich_overrides_with_api_keys(overrides, global_config)
+
+        assert enriched["extraction_llm"]["api_key"] == "gsk-global-extraction"
+        assert enriched["extraction_llm"]["model"] == "llama-3.1-8b-instant"
+
+    def test_workflow_configuration_masks_and_merges_extraction_llm_secrets(self):
+        existing = {
+            "model_overrides": {
+                "extraction_llm": {
+                    "provider": "groq",
+                    "api_key": "gsk-secret-key-1234",
+                    "model": "llama-3.3-70b-versatile",
+                }
+            }
+        }
+
+        masked = mask_workflow_configurations(existing)
+        assert masked["model_overrides"]["extraction_llm"]["api_key"] != "gsk-secret-key-1234"
+        assert contains_masked_key(masked["model_overrides"]["extraction_llm"]["api_key"])
+
+        # Edit non-secret field on masked payload
+        incoming = dict(masked)
+        incoming["model_overrides"]["extraction_llm"]["model"] = "llama-3.1-8b-instant"
+
+        merged = merge_workflow_configuration_secrets(incoming, existing)
+
+        assert merged["model_overrides"]["extraction_llm"]["api_key"] == "gsk-secret-key-1234"
+        assert merged["model_overrides"]["extraction_llm"]["model"] == "llama-3.1-8b-instant"
+
+    def test_mask_user_config_includes_extraction_llm(self, global_config):
+        global_config.extraction_llm = GroqLLMService(
+            provider="groq",
+            api_key="gsk-real-secret-key-9999",
+            model="llama-3.3-70b-versatile",
+        )
+        masked = mask_user_config(global_config)
+        assert masked["extraction_llm"] is not None
+        assert masked["extraction_llm"]["provider"] == "groq"
+        assert masked["extraction_llm"]["api_key"] != "gsk-real-secret-key-9999"
+        assert contains_masked_key(masked["extraction_llm"]["api_key"])
+
+    def test_check_for_masked_keys_raises_when_extraction_llm_is_masked(self, global_config):
+        global_config.extraction_llm = GroqLLMService(
+            provider="groq",
+            api_key="gsk-****************9999",
+            model="llama-3.3-70b-versatile",
+        )
+        with pytest.raises(ValueError, match="The extraction_llm api_key appears to be masked"):
+            check_for_masked_keys(global_config)
+
+

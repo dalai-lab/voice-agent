@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Plus, X } from "lucide-react";
+import { Brain, ExternalLink, Plus, Sparkles, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -18,7 +18,42 @@ import { LANGUAGE_DISPLAY_NAMES } from "@/constants/languages";
 import { useUserConfig } from "@/context/UserConfigContext";
 import type { ModelOverrides } from "@/types/workflow-configurations";
 
-export type ServiceSegment = "llm" | "tts" | "stt" | "embeddings" | "realtime";
+export type ServiceSegment = "llm" | "extraction_llm" | "tts" | "stt" | "embeddings" | "realtime";
+
+export interface ExtractionModelRecommendation {
+    badge: string;
+    description?: string;
+    highlight?: boolean;
+}
+
+export const EXTRACTION_MODEL_RECOMMENDATIONS: Record<string, Record<string, ExtractionModelRecommendation>> = {
+    groq: {
+        "llama-3.3-70b-versatile": { badge: "⚡ Fastest (~180ms)", highlight: true },
+        "llama-3.1-8b-instant": { badge: "⚡ Ultra-fast (~120ms)" },
+    },
+    openai: {
+        "gpt-4o-mini": { badge: "⚡ Fast (~280ms, Multilingual)", highlight: true },
+        "gpt-4.1-mini": { badge: "⚡ Fast (~260ms)", highlight: true },
+        "gpt-4.1-nano": { badge: "⚡ Ultra-fast (~150ms)" },
+    },
+    google: {
+        "gemini-1.5-flash": { badge: "⚡ Fast (~250ms, Multilingual)", highlight: true },
+        "gemini-2.0-flash": { badge: "⚡ Next-Gen Fast (~220ms)", highlight: true },
+        "gemini-2.5-flash": { badge: "⚡ Fast (~240ms)", highlight: true },
+    },
+    google_vertex: {
+        "gemini-1.5-flash": { badge: "⚡ Fast (~250ms, Multilingual)", highlight: true },
+        "gemini-2.0-flash": { badge: "⚡ Next-Gen Fast (~220ms)", highlight: true },
+    },
+    openrouter: {
+        "openai/gpt-4.1-mini": { badge: "⚡ Fast (~280ms)", highlight: true },
+        "google/gemini-2.5-flash": { badge: "⚡ Fast (~250ms)", highlight: true },
+        "meta-llama/llama-3.3-70b-instruct": { badge: "⚡ Fast (~260ms)", highlight: true },
+    },
+    sarvam: {
+        "sarvam-30b": { badge: "⚡ Fast (~350ms, Indic Specialist)", highlight: true },
+    },
+};
 
 interface SchemaProperty {
     type?: string;
@@ -50,6 +85,7 @@ interface FormValues {
 
 export interface ServiceConfigurationDefaults {
     llm: Record<string, ProviderSchema>;
+    extraction_llm?: Record<string, ProviderSchema>;
     tts: Record<string, ProviderSchema>;
     stt: Record<string, ProviderSchema>;
     embeddings: Record<string, ProviderSchema>;
@@ -59,6 +95,7 @@ export interface ServiceConfigurationDefaults {
 
 const STANDARD_TABS: { key: ServiceSegment; label: string }[] = [
     { key: "llm", label: "LLM" },
+    { key: "extraction_llm", label: "Extraction LLM" },
     { key: "tts", label: "Voice" },
     { key: "stt", label: "Transcriber" },
     { key: "embeddings", label: "Embedding" },
@@ -67,11 +104,13 @@ const STANDARD_TABS: { key: ServiceSegment; label: string }[] = [
 const REALTIME_TABS: { key: ServiceSegment; label: string }[] = [
     { key: "realtime", label: "Realtime Model" },
     { key: "llm", label: "LLM" },
+    { key: "extraction_llm", label: "Extraction LLM" },
     { key: "embeddings", label: "Embedding" },
 ];
 
 const OVERRIDE_STANDARD_TABS: { key: ServiceSegment; label: string }[] = [
     { key: "llm", label: "LLM" },
+    { key: "extraction_llm", label: "Extraction LLM" },
     { key: "tts", label: "Voice" },
     { key: "stt", label: "Transcriber" },
 ];
@@ -79,6 +118,7 @@ const OVERRIDE_STANDARD_TABS: { key: ServiceSegment; label: string }[] = [
 const OVERRIDE_REALTIME_TABS: { key: ServiceSegment; label: string }[] = [
     { key: "realtime", label: "Realtime Model" },
     { key: "llm", label: "LLM" },
+    { key: "extraction_llm", label: "Extraction LLM" },
 ];
 
 // Display names for Sarvam voices
@@ -176,11 +216,12 @@ function getProviderDisplayName(
 function getGlobalSummary(
     config: Record<string, unknown> | null | undefined,
     providerSchema: ProviderSchema | undefined,
+    fallbackText: string = "Not configured",
 ): string {
-    if (!config) return "Not configured";
+    if (!config) return fallbackText;
     const provider = config.provider as string | undefined;
     const model = config.model as string | undefined;
-    if (!provider) return "Not configured";
+    if (!provider) return fallbackText;
     const providerLabel = getProviderDisplayName(provider, providerSchema);
     return model ? `${providerLabel} / ${model}` : providerLabel || provider;
 }
@@ -211,8 +252,13 @@ export function ServiceConfigurationForm({
     const [isSaving, setIsSaving] = useState(false);
     const [isRealtime, setIsRealtime] = useState(forceRealtime ?? false);
     const { userConfig } = useUserConfig();
+    const [useDedicatedExtractionLLM, setUseDedicatedExtractionLLM] = useState<boolean>(() => {
+        const src = (initialConfig ?? userConfig) as Record<string, unknown> | null;
+        return Boolean(src?.extraction_llm && (src.extraction_llm as Record<string, unknown>).provider);
+    });
     const [schemas, setSchemas] = useState<Record<ServiceSegment, Record<string, ProviderSchema>>>({
         llm: {},
+        extraction_llm: {},
         tts: {},
         stt: {},
         embeddings: {},
@@ -220,6 +266,7 @@ export function ServiceConfigurationForm({
     });
     const [serviceProviders, setServiceProviders] = useState<Record<ServiceSegment, string>>({
         llm: "",
+        extraction_llm: "",
         tts: "",
         stt: "",
         embeddings: "",
@@ -227,6 +274,7 @@ export function ServiceConfigurationForm({
     });
     const [apiKeys, setApiKeys] = useState<Record<ServiceSegment, string[]>>({
         llm: [""],
+        extraction_llm: [""],
         tts: [""],
         stt: [""],
         embeddings: [""],
@@ -237,6 +285,7 @@ export function ServiceConfigurationForm({
     // Override-specific state: which services have the override toggle enabled
     const [enabledOverrides, setEnabledOverrides] = useState<Record<string, boolean>>({
         llm: false,
+        extraction_llm: false,
         tts: false,
         stt: false,
         realtime: false,
@@ -258,7 +307,7 @@ export function ServiceConfigurationForm({
         if (mode === 'global' || !currentOverrides) return baseConfig;
         // Merge overrides onto global config for form initialization
         const merged = { ...baseConfig } as Record<string, unknown>;
-        const overrideServices: (keyof ModelOverrides)[] = ["llm", "tts", "stt", "realtime"];
+        const overrideServices: (keyof ModelOverrides)[] = ["llm", "extraction_llm", "tts", "stt", "realtime"];
         for (const svc of overrideServices) {
             if (svc === "is_realtime") continue;
             const overrideVal = currentOverrides[svc];
@@ -286,17 +335,31 @@ export function ServiceConfigurationForm({
             }
 
             const realtimeSchemas = (defaultsData.realtime || {}) as Record<string, ProviderSchema>;
+            const rawExtractionSchemas = (defaultsData.extraction_llm || defaultsData.llm || {}) as Record<string, ProviderSchema>;
+            const extractionSchemas: Record<string, ProviderSchema> = {};
+            for (const [pKey, pSchema] of Object.entries(rawExtractionSchemas)) {
+                if (pKey !== "dograh") {
+                    extractionSchemas[pKey] = pSchema;
+                }
+            }
+
             const pickDefaultProvider = (
                 service: ServiceSegment,
                 schemaMap: Record<string, ProviderSchema>,
             ) => {
                 const preferred = defaultsData.default_providers?.[service];
                 if (preferred && schemaMap[preferred]) return preferred;
+                if (service === "extraction_llm") {
+                    if (schemaMap["groq"]) return "groq";
+                    if (schemaMap["openai"]) return "openai";
+                    if (schemaMap["google"]) return "google";
+                }
                 return Object.keys(schemaMap)[0] || "";
             };
 
             setSchemas({
                 llm: defaultsData.llm,
+                extraction_llm: extractionSchemas,
                 tts: defaultsData.tts,
                 stt: defaultsData.stt,
                 embeddings: defaultsData.embeddings,
@@ -309,9 +372,16 @@ export function ServiceConfigurationForm({
                 setIsRealtime(true);
             }
 
+            // Restore dedicated extraction LLM toggle if configured
+            const extractionConfig = configData?.extraction_llm as Record<string, unknown> | undefined;
+            if (extractionConfig?.provider) {
+                setUseDedicatedExtractionLLM(true);
+            }
+
             const defaultValues: Record<string, string | number | boolean> = {};
             const selectedProviders: Record<ServiceSegment, string> = {
                 llm: pickDefaultProvider("llm", defaultsData.llm),
+                extraction_llm: pickDefaultProvider("extraction_llm", extractionSchemas),
                 tts: pickDefaultProvider("tts", defaultsData.tts),
                 stt: pickDefaultProvider("stt", defaultsData.stt),
                 embeddings: pickDefaultProvider("embeddings", defaultsData.embeddings),
@@ -325,6 +395,7 @@ export function ServiceConfigurationForm({
 
             const loadedApiKeys: Record<ServiceSegment, string[]> = {
                 llm: [""],
+                extraction_llm: [""],
                 tts: [""],
                 stt: [""],
                 embeddings: [""],
@@ -338,7 +409,9 @@ export function ServiceConfigurationForm({
 
                 const schemaSource = service === "realtime"
                     ? realtimeSchemas
-                    : defaultsData[service as "llm" | "tts" | "stt" | "embeddings"] as Record<string, ProviderSchema> | undefined;
+                    : service === "extraction_llm"
+                        ? extractionSchemas
+                        : defaultsData[service as "llm" | "tts" | "stt" | "embeddings"] as Record<string, ProviderSchema> | undefined;
 
                 if (src?.provider) {
                     Object.entries(src).forEach(([field, value]) => {
@@ -390,6 +463,7 @@ export function ServiceConfigurationForm({
             };
 
             setServicePropertyValues("llm");
+            setServicePropertyValues("extraction_llm");
             setServicePropertyValues("tts");
             setServicePropertyValues("stt");
             setServicePropertyValues("embeddings");
@@ -397,8 +471,8 @@ export function ServiceConfigurationForm({
 
             // Detect custom inputs
             const detectedCustomInput: Record<string, boolean> = {};
-            const allSchemas = { ...defaultsData, realtime: realtimeSchemas } as unknown as Record<string, Record<string, ProviderSchema>>;
-            (["llm", "tts", "stt", "embeddings", "realtime"] as ServiceSegment[]).forEach(service => {
+            const allSchemas = { ...defaultsData, extraction_llm: extractionSchemas, realtime: realtimeSchemas } as unknown as Record<string, Record<string, ProviderSchema>>;
+            (["llm", "extraction_llm", "tts", "stt", "embeddings", "realtime"] as ServiceSegment[]).forEach(service => {
                 const provider = selectedProviders[service];
                 const providerSchema = allSchemas[service]?.[provider];
                 if (!providerSchema) return;
@@ -427,6 +501,7 @@ export function ServiceConfigurationForm({
             if (mode === 'override') {
                 setEnabledOverrides({
                     llm: !!currentOverrides?.llm,
+                    extraction_llm: !!currentOverrides?.extraction_llm,
                     tts: !!currentOverrides?.tts,
                     stt: !!currentOverrides?.stt,
                     realtime: !!currentOverrides?.realtime,
@@ -492,6 +567,14 @@ export function ServiceConfigurationForm({
             });
         }
 
+        // Apply fast recommended model defaults for extraction_llm
+        if (service === "extraction_llm") {
+            if (providerName === "groq") preservedValues[`${service}_model`] = "llama-3.3-70b-versatile";
+            else if (providerName === "openai") preservedValues[`${service}_model`] = "gpt-4o-mini";
+            else if (providerName === "google" || providerName === "google_vertex") preservedValues[`${service}_model`] = "gemini-1.5-flash";
+            else if (providerName === "sarvam") preservedValues[`${service}_model`] = "sarvam-30b";
+        }
+
         preservedValues[`${service}_provider`] = providerName;
         reset(preservedValues);
         setServiceProviders(prev => ({ ...prev, [service]: providerName }));
@@ -531,7 +614,9 @@ export function ServiceConfigurationForm({
             if (mode === 'override') {
                 // Build model_overrides for enabled services only
                 const modelOverrides: Record<string, unknown> = {};
-                const services = isRealtime ? ["realtime", "llm"] : ["llm", "tts", "stt"];
+                const services = isRealtime 
+                    ? ["realtime", "llm", "extraction_llm"] 
+                    : ["llm", "extraction_llm", "tts", "stt"];
                 for (const svc of services) {
                     if (enabledOverrides[svc]) {
                         modelOverrides[svc] = buildServiceConfig(svc as ServiceSegment, data);
@@ -553,6 +638,9 @@ export function ServiceConfigurationForm({
                     stt: buildServiceConfig("stt", data),
                     is_realtime: isRealtime,
                 };
+                if (useDedicatedExtractionLLM && serviceProviders.extraction_llm) {
+                    saveConfig.extraction_llm = buildServiceConfig("extraction_llm", data);
+                }
                 if (serviceProviders.realtime) {
                     saveConfig.realtime = buildServiceConfig("realtime", data);
                 }
@@ -586,7 +674,8 @@ export function ServiceConfigurationForm({
     const renderServiceFields = (service: ServiceSegment) => {
         const currentProvider = serviceProviders[service];
         const providerSchema = schemas?.[service]?.[currentProvider];
-        const availableProviders = schemas?.[service] ? Object.keys(schemas[service]) : [];
+        const availableProviders = (schemas?.[service] ? Object.keys(schemas[service]) : [])
+            .filter(provider => service !== "extraction_llm" || provider !== "dograh");
         const configFields = getConfigFields(service);
 
         return (
@@ -820,13 +909,48 @@ export function ServiceConfigurationForm({
                             <SelectValue placeholder={`Select ${field}`} />
                         </SelectTrigger>
                         <SelectContent className="rounded-lg text-xs">
-                            {options.map((value: string) => (
-                                <SelectItem key={value} value={value} className="text-xs">
-                                    {value}
-                                </SelectItem>
-                            ))}
+                            {options.map((value: string) => {
+                                const rec = service === "extraction_llm" && field === "model"
+                                    ? EXTRACTION_MODEL_RECOMMENDATIONS[serviceProviders[service]]?.[value]
+                                    : undefined;
+                                return (
+                                    <SelectItem key={value} value={value} className="text-xs">
+                                        <div className="flex items-center justify-between w-full gap-2">
+                                            <span>{value}</span>
+                                            {rec && (
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                                                    rec.highlight
+                                                        ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                                        : "bg-muted text-muted-foreground"
+                                                }`}>
+                                                    {rec.badge}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </SelectItem>
+                                );
+                            })}
                         </SelectContent>
                     </Select>
+                    {service === "extraction_llm" && field === "model" && EXTRACTION_MODEL_RECOMMENDATIONS[serviceProviders[service]] && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            <span className="text-[10px] text-muted-foreground/70 font-medium">Recommended:</span>
+                            {Object.entries(EXTRACTION_MODEL_RECOMMENDATIONS[serviceProviders[service]]).map(([recModel, recInfo]) => (
+                                <button
+                                    key={recModel}
+                                    type="button"
+                                    onClick={() => setValue(fieldKey, recModel, { shouldDirty: true })}
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                                        watch(fieldKey) === recModel
+                                            ? "bg-primary/10 text-primary border-primary/30 font-semibold"
+                                            : "bg-muted/40 hover:bg-muted text-muted-foreground border-border/60"
+                                    }`}
+                                >
+                                    {recModel} <span className="opacity-80">({recInfo.badge.replace("⚡ ", "")})</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <div className="flex items-center space-x-2">
                         <Checkbox
                             id={`custom-input-${fieldKey}-dropdown`}
@@ -855,24 +979,61 @@ export function ServiceConfigurationForm({
             };
 
             return (
-                <Select
-                    value={watch(`${service}_${field}`) as string || ""}
-                    onValueChange={(value) => {
-                        if (!value) return;
-                        setValue(`${service}_${field}`, value, { shouldDirty: true });
-                    }}
-                >
-                    <SelectTrigger className="h-9 rounded-lg border-border bg-background text-xs w-full">
-                        <SelectValue placeholder={`Select ${field}`} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-lg text-xs">
-                        {dropdownOptions.map((value: string) => (
-                            <SelectItem key={value} value={value} className="text-xs">
-                                {getDisplayName(value)}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <div className="space-y-1.5">
+                    <Select
+                        value={watch(`${service}_${field}`) as string || ""}
+                        onValueChange={(value) => {
+                            if (!value) return;
+                            setValue(`${service}_${field}`, value, { shouldDirty: true });
+                        }}
+                    >
+                        <SelectTrigger className="h-9 rounded-lg border-border bg-background text-xs w-full">
+                            <SelectValue placeholder={`Select ${field}`} />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-lg text-xs">
+                            {dropdownOptions.map((value: string) => {
+                                const rec = service === "extraction_llm" && field === "model"
+                                    ? EXTRACTION_MODEL_RECOMMENDATIONS[serviceProviders[service]]?.[value]
+                                    : undefined;
+                                return (
+                                    <SelectItem key={value} value={value} className="text-xs">
+                                        <div className="flex items-center justify-between w-full gap-2">
+                                            <span>{getDisplayName(value)}</span>
+                                            {rec && (
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                                                    rec.highlight
+                                                        ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                                        : "bg-muted text-muted-foreground"
+                                                }`}>
+                                                    {rec.badge}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </SelectItem>
+                                );
+                            })}
+                        </SelectContent>
+                    </Select>
+                    {service === "extraction_llm" && field === "model" && EXTRACTION_MODEL_RECOMMENDATIONS[serviceProviders[service]] && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            <span className="text-[10px] text-muted-foreground/70 font-medium">Recommended:</span>
+                            {Object.entries(EXTRACTION_MODEL_RECOMMENDATIONS[serviceProviders[service]]).map(([recModel, recInfo]) => (
+                                <button
+                                    key={recModel}
+                                    type="button"
+                                    onClick={() => setValue(`${service}_${field}`, recModel, { shouldDirty: true })}
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                                        watch(`${service}_${field}`) === recModel
+                                            ? "bg-primary/10 text-primary border-primary/30 font-semibold"
+                                            : "bg-muted/40 hover:bg-muted text-muted-foreground border-border/60"
+                                    }`}
+                                >
+                                    {recModel} <span className="opacity-80">({recInfo.badge.replace("⚡ ", "")})</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             );
         }
 
@@ -912,6 +1073,7 @@ export function ServiceConfigurationForm({
         const isEnabled = enabledOverrides[service];
         const globalProvider = globalVal?.provider as string | undefined;
         const globalProviderSchema = globalProvider ? schemas?.[service]?.[globalProvider] : undefined;
+        const fallbackText = service === "extraction_llm" ? "Not configured (uses conversational LLM)" : "Not configured";
 
         return (
             <div className="flex items-center justify-between p-4 border border-border bg-muted/20 rounded-xl mb-4">
@@ -921,7 +1083,7 @@ export function ServiceConfigurationForm({
                     </Label>
                     {!isEnabled && (
                         <p className="text-[10px] text-muted-foreground/60 leading-normal">
-                            Using global: {getGlobalSummary(globalVal, globalProviderSchema)}
+                            Using global: {getGlobalSummary(globalVal, globalProviderSchema, fallbackText)}
                         </p>
                     )}
                 </div>
@@ -930,6 +1092,55 @@ export function ServiceConfigurationForm({
                     checked={isEnabled}
                     onCheckedChange={(checked) => handleOverrideToggle(service, checked)}
                 />
+            </div>
+        );
+    };
+
+    const renderExtractionLLMSection = () => {
+        return (
+            <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 border border-border bg-card rounded-xl">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <Label htmlFor="dedicated-extraction-toggle" className="text-xs font-bold text-foreground cursor-pointer">
+                                Dedicated Variable Extraction LLM
+                            </Label>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                ⚡ Sub-250ms Latency
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/70 leading-normal max-w-xl">
+                            Offload background variable extraction to an ultra-fast LLM (e.g. Groq Llama 3.3 70B, GPT-4o-mini). Prevents extraction delays from blocking speech turns and eliminates race conditions.
+                        </p>
+                    </div>
+                    <Switch
+                        id="dedicated-extraction-toggle"
+                        checked={useDedicatedExtractionLLM}
+                        onCheckedChange={(checked) => {
+                            setUseDedicatedExtractionLLM(checked);
+                            if (checked && !serviceProviders.extraction_llm) {
+                                const available = Object.keys(schemas.extraction_llm).filter(p => p !== "dograh");
+                                const defaultP = available.includes("groq") ? "groq" : available[0] || "";
+                                if (defaultP) {
+                                    handleProviderChange("extraction_llm", defaultP);
+                                }
+                            }
+                        }}
+                    />
+                </div>
+
+                {useDedicatedExtractionLLM ? (
+                    renderServiceFields("extraction_llm")
+                ) : (
+                    <div className="p-4 rounded-xl border border-dashed border-border bg-muted/10 text-center space-y-1.5">
+                        <p className="text-xs font-medium text-foreground">
+                            Using Conversational Voice LLM
+                        </p>
+                        <p className="text-[11px] text-muted-foreground/70 max-w-md mx-auto">
+                            Variable extraction runs on your conversational LLM. Enable dedicated extraction above for faster parallel extraction with zero voice turn interference.
+                        </p>
+                    </div>
+                )}
             </div>
         );
     };
@@ -978,7 +1189,11 @@ export function ServiceConfigurationForm({
                     {visibleTabs.map(({ key, label }) => (
                         <TabsContent key={key} value={key} className="mt-0 focus-visible:outline-none">
                             {mode === 'override' && renderOverrideToggle(key, label)}
-                            {(mode === 'global' || enabledOverrides[key]) && renderServiceFields(key)}
+                            {mode === 'global' ? (
+                                key === "extraction_llm" ? renderExtractionLLMSection() : renderServiceFields(key)
+                            ) : (
+                                enabledOverrides[key] && renderServiceFields(key)
+                            )}
                         </TabsContent>
                     ))}
                 </Tabs>

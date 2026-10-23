@@ -300,6 +300,7 @@ def convert_legacy_ai_model_configuration_to_v2(
                 realtime=BYOKRealtimeAIModelConfiguration(
                     realtime=configuration.realtime,
                     llm=configuration.llm,
+                    extraction_llm=configuration.extraction_llm,
                     embeddings=configuration.embeddings,
                 ),
             ),
@@ -317,6 +318,7 @@ def convert_legacy_ai_model_configuration_to_v2(
             mode="pipeline",
             pipeline=BYOKPipelineAIModelConfiguration(
                 llm=configuration.llm,
+                extraction_llm=configuration.extraction_llm,
                 tts=configuration.tts,
                 stt=configuration.stt,
                 embeddings=configuration.embeddings,
@@ -348,9 +350,9 @@ def _merge_byok_secret_fields(incoming_byok: dict | None, existing_byok: dict | 
     if incoming_mode != existing_mode:
         return
     section_names = (
-        ("llm", "tts", "stt", "embeddings")
+        ("llm", "extraction_llm", "tts", "stt", "embeddings")
         if incoming_mode == "pipeline"
-        else ("realtime", "llm", "embeddings")
+        else ("realtime", "llm", "extraction_llm", "embeddings")
     )
     incoming_container = incoming_byok.get(incoming_mode)
     existing_container = existing_byok.get(existing_mode)
@@ -445,6 +447,7 @@ def _convert_any_dograh_legacy_configuration(
 def _first_dograh_api_key(configuration: EffectiveAIModelConfiguration) -> str | None:
     for service in (
         configuration.llm,
+        configuration.extraction_llm,
         configuration.tts,
         configuration.stt,
         configuration.embeddings,

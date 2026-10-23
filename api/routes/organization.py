@@ -351,6 +351,7 @@ async def get_model_configuration_v2_defaults(
         "byok": {
             "pipeline": {
                 "llm": _byok_provider_schemas(ServiceType.LLM),
+                "extraction_llm": _byok_provider_schemas(ServiceType.LLM),
                 "tts": _byok_provider_schemas(ServiceType.TTS),
                 "stt": _byok_provider_schemas(ServiceType.STT),
                 "embeddings": _byok_provider_schemas(ServiceType.EMBEDDINGS),
@@ -359,6 +360,7 @@ async def get_model_configuration_v2_defaults(
             "realtime": {
                 "realtime": _byok_provider_schemas(ServiceType.REALTIME),
                 "llm": _byok_provider_schemas(ServiceType.LLM),
+                "extraction_llm": _byok_provider_schemas(ServiceType.LLM),
                 "embeddings": _byok_provider_schemas(ServiceType.EMBEDDINGS),
                 "default_providers": byok_default_providers,
             },

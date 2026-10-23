@@ -104,6 +104,7 @@ function isDograhEffectiveConfig(config: Record<string, unknown> | null | undefi
 function byokDefaults(defaults: ModelConfigurationDefaultsV2): ServiceConfigurationDefaults {
     return {
         llm: defaults.byok.pipeline.llm,
+        extraction_llm: defaults.byok.pipeline.extraction_llm || defaults.byok.pipeline.llm,
         tts: defaults.byok.pipeline.tts,
         stt: defaults.byok.pipeline.stt,
         embeddings: defaults.byok.pipeline.embeddings,
@@ -123,6 +124,7 @@ function byokConfigToLegacyShape(config: Record<string, unknown> | null): Record
             is_realtime: true,
             realtime: realtime?.realtime,
             llm: realtime?.llm,
+            extraction_llm: realtime?.extraction_llm,
             embeddings: realtime?.embeddings,
         };
     }
@@ -131,6 +133,7 @@ function byokConfigToLegacyShape(config: Record<string, unknown> | null): Record
     return {
         is_realtime: false,
         llm: pipeline?.llm,
+        extraction_llm: pipeline?.extraction_llm,
         tts: pipeline?.tts,
         stt: pipeline?.stt,
         embeddings: pipeline?.embeddings,
@@ -142,6 +145,7 @@ function effectiveConfigToLegacyShape(config: Record<string, unknown> | null): R
     return {
         is_realtime: Boolean(config.is_realtime),
         llm: config.llm,
+        extraction_llm: config.extraction_llm,
         tts: config.tts,
         stt: config.stt,
         realtime: config.realtime,
@@ -237,7 +241,9 @@ function hasRequiredApiKey(
     if (!provider) return false;
     const providerSchema = service === "realtime"
         ? defaults.realtime?.[provider]
-        : defaults[service as "llm" | "tts" | "stt" | "embeddings"]?.[provider];
+        : service === "extraction_llm"
+            ? (defaults.extraction_llm?.[provider] || defaults.llm?.[provider])
+            : defaults[service as "llm" | "tts" | "stt" | "embeddings"]?.[provider];
     const requiresApiKey = providerSchema?.required?.includes("api_key") ?? false;
     if (!requiresApiKey) return true;
 
@@ -422,6 +428,10 @@ export function AIModelConfigurationV2Editor({
         setError(null);
         const isRealtime = Boolean(config.is_realtime);
         const llm = requireByokService(config, "llm", defaultsForByok);
+        const extractionLlm = optionalByokService(config, "extraction_llm");
+        if (extractionLlm && !hasRequiredApiKey("extraction_llm", extractionLlm, defaultsForByok)) {
+            throw new Error("Extraction LLM configuration requires an API key");
+        }
         const embeddings = optionalByokService(config, "embeddings");
         const body: OrganizationAiModelConfigurationV2 = {
             version: 2,
@@ -432,6 +442,7 @@ export function AIModelConfigurationV2Editor({
                     realtime: {
                         realtime: requireByokService(config, "realtime", defaultsForByok) as never,
                         llm: llm as never,
+                        extraction_llm: (extractionLlm ?? null) as never,
                         ...(embeddings ? { embeddings: embeddings as never } : {}),
                     },
                 }
@@ -439,6 +450,7 @@ export function AIModelConfigurationV2Editor({
                     mode: "pipeline",
                     pipeline: {
                         llm: llm as never,
+                        extraction_llm: (extractionLlm ?? null) as never,
                         tts: requireByokService(config, "tts", defaultsForByok) as never,
                         stt: requireByokService(config, "stt", defaultsForByok) as never,
                         ...(embeddings ? { embeddings: embeddings as never } : {}),

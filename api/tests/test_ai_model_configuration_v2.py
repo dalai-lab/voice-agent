@@ -630,3 +630,161 @@ async def test_migrate_model_configuration_v2_initializes_hosted_mps_billing(
         fallback_user_config=legacy,
     )
     assert response == expected_response
+
+
+def test_byok_pipeline_with_extraction_llm_compiles_successfully():
+    config = OrganizationAIModelConfigurationV2(
+        mode="byok",
+        byok={
+            "mode": "pipeline",
+            "pipeline": {
+                "llm": {
+                    "provider": "sarvam",
+                    "api_key": "sarvam-secret",
+                    "model": "sarvam-2b",
+                },
+                "extraction_llm": {
+                    "provider": "groq",
+                    "api_key": "gsk-secret",
+                    "model": "llama-3.3-70b-versatile",
+                },
+                "tts": {
+                    "provider": "elevenlabs",
+                    "api_key": "el-secret",
+                    "model": "eleven_flash_v2_5",
+                    "voice": "Rachel",
+                },
+                "stt": {
+                    "provider": "deepgram",
+                    "api_key": "dg-secret",
+                    "model": "nova-3-general",
+                },
+            },
+        },
+    )
+
+    effective = compile_ai_model_configuration_v2(config)
+
+    assert effective.is_realtime is False
+    assert effective.llm.provider == "sarvam"
+    assert effective.llm.model == "sarvam-2b"
+    assert effective.extraction_llm is not None
+    assert effective.extraction_llm.provider == "groq"
+    assert effective.extraction_llm.model == "llama-3.3-70b-versatile"
+    assert effective.extraction_llm.api_key == "gsk-secret"
+
+
+def test_byok_pipeline_extraction_llm_rejects_dograh_provider():
+    with pytest.raises(ValidationError, match="BYOK extraction_llm cannot use Dograh provider"):
+        OrganizationAIModelConfigurationV2.model_validate(
+            {
+                "mode": "byok",
+                "byok": {
+                    "mode": "pipeline",
+                    "pipeline": {
+                        "llm": {
+                            "provider": "openai",
+                            "api_key": "sk-secret",
+                            "model": "gpt-4.1",
+                        },
+                        "extraction_llm": {
+                            "provider": "dograh",
+                            "api_key": "mps-secret",
+                            "model": "default",
+                        },
+                        "tts": {
+                            "provider": "elevenlabs",
+                            "api_key": "el-secret",
+                            "model": "eleven_flash_v2_5",
+                            "voice": "Rachel",
+                        },
+                        "stt": {
+                            "provider": "deepgram",
+                            "api_key": "dg-secret",
+                            "model": "nova-3-general",
+                        },
+                    },
+                },
+            }
+        )
+
+
+def test_byok_pipeline_extraction_llm_secret_masking_and_merge():
+    config = OrganizationAIModelConfigurationV2(
+        mode="byok",
+        byok={
+            "mode": "pipeline",
+            "pipeline": {
+                "llm": {
+                    "provider": "openai",
+                    "api_key": "sk-real-secret",
+                    "model": "gpt-4.1",
+                },
+                "extraction_llm": {
+                    "provider": "groq",
+                    "api_key": "gsk-real-extraction-secret",
+                    "model": "llama-3.3-70b-versatile",
+                },
+                "tts": {
+                    "provider": "elevenlabs",
+                    "api_key": "el-real-secret",
+                    "model": "eleven_flash_v2_5",
+                    "voice": "Rachel",
+                },
+                "stt": {
+                    "provider": "deepgram",
+                    "api_key": "dg-real-secret",
+                    "model": "nova-3-general",
+                },
+            },
+        },
+    )
+
+    masked = mask_ai_model_configuration_v2(config)
+    assert masked["byok"]["pipeline"]["extraction_llm"]["api_key"] == mask_key("gsk-real-extraction-secret")
+
+    # Simulate client submitting the masked payload back
+    incoming = OrganizationAIModelConfigurationV2.model_validate(masked)
+    merged = merge_ai_model_configuration_v2_secrets(incoming, config)
+
+    assert merged.byok.pipeline.extraction_llm.api_key == "gsk-real-extraction-secret"
+    check_for_masked_keys_in_ai_model_configuration_v2(merged)
+
+
+def test_legacy_byok_pipeline_conversion_preserves_extraction_llm():
+    from api.services.configuration.registry import GroqLLMService
+
+    legacy = EffectiveAIModelConfiguration(
+        llm=OpenAILLMService(
+            provider="openai",
+            api_key="sk-llm",
+            model="gpt-4.1",
+        ),
+        extraction_llm=GroqLLMService(
+            provider="groq",
+            api_key="gsk-extraction",
+            model="llama-3.3-70b-versatile",
+        ),
+        tts=ElevenlabsTTSConfiguration(
+            provider="elevenlabs",
+            api_key="el-tts",
+            model="eleven_flash_v2_5",
+            voice="Rachel",
+        ),
+        stt=DeepgramSTTConfiguration(
+            provider="deepgram",
+            api_key="dg-stt",
+            model="nova-3-general",
+        ),
+    )
+
+    config = convert_legacy_ai_model_configuration_to_v2(legacy)
+
+    assert config.mode == "byok"
+    assert config.byok.mode == "pipeline"
+    assert config.byok.pipeline.llm.provider == "openai"
+    assert config.byok.pipeline.extraction_llm is not None
+    assert config.byok.pipeline.extraction_llm.provider == "groq"
+    assert config.byok.pipeline.extraction_llm.model == "llama-3.3-70b-versatile"
+    assert config.byok.pipeline.extraction_llm.api_key == "gsk-extraction"
+

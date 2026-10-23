@@ -20,7 +20,7 @@ VISIBLE_CHARS = 4  # number of trailing characters to reveal
 MASK_CHAR = "*"
 MASK_MARKER = "***"  # substring that indicates a masked key
 SERVICE_SECRET_FIELDS = ("api_key", "credentials", "aws_access_key", "aws_secret_key")
-MODEL_OVERRIDE_FIELDS = ("llm", "tts", "stt", "realtime")
+MODEL_OVERRIDE_FIELDS = ("llm", "extraction_llm", "tts", "stt", "realtime")
 
 
 def contains_masked_key(value: str | list[str] | None) -> bool:
@@ -33,7 +33,7 @@ def contains_masked_key(value: str | list[str] | None) -> bool:
 
 def check_for_masked_keys(config: EffectiveAIModelConfiguration) -> None:
     """Raise ValueError if any service in *config* still has a masked secret."""
-    for field in ("llm", "tts", "stt", "embeddings", "realtime"):
+    for field in ("llm", "extraction_llm", "tts", "stt", "embeddings", "realtime"):
         service = getattr(config, field, None)
         if service is None:
             continue
@@ -134,6 +134,7 @@ def mask_user_config(config: EffectiveAIModelConfiguration) -> dict[str, Any]:
 
     return {
         "llm": _mask_service(config.llm),
+        "extraction_llm": _mask_service(config.extraction_llm),
         "tts": _mask_service(config.tts),
         "stt": _mask_service(config.stt),
         "embeddings": _mask_service(config.embeddings),

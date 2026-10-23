@@ -121,6 +121,10 @@ class PipecatEngine:
         # terminal state.
         self._final_extraction_done: bool = False
 
+        # Atomic sequence counter and latest committed sequence tracking for extraction tasks
+        self._extraction_sequence_id: int = 0
+        self._latest_committed_seq: dict[str, int] = {}
+
         # Will be set later in initialize() when we have
         # access to _context
         self._variable_extraction_manager = None
@@ -177,6 +181,11 @@ class PipecatEngine:
         self._context_summarization_manager: ContextSummarizationManager | None = (
             None
         )
+
+    def _next_extraction_seq(self) -> int:
+        """Return the next monotonically increasing extraction task sequence ID."""
+        self._extraction_sequence_id += 1
+        return self._extraction_sequence_id
 
     async def _get_organization_id(self) -> int | None:
         """Get and cache the organization ID from workflow run."""
@@ -556,6 +565,8 @@ class PipecatEngine:
             for v in node.extraction_variables
         ]
 
+        seq_id = self._next_extraction_seq()
+
         async def _do_extraction():
             try:
                 logger.debug(f"Starting variable extraction for node: {node.name}")
@@ -571,13 +582,40 @@ class PipecatEngine:
                         f"skipping update. Data: {extracted_data}"
                     )
                     return
-                self._gathered_context.update(extracted_data)
+
+                # Non-destructive update: filter out None, empty strings, and string "null"
+                valid_extracted = {
+                    k: v
+                    for k, v in extracted_data.items()
+                    if v is not None
+                    and v != ""
+                    and not (isinstance(v, str) and v.strip().lower() == "null")
+                }
+
+                # Sequence generation ID tracking: prevent older tasks from overwriting fresher data
                 extracted_variables = self._gathered_context.setdefault(
                     "extracted_variables", {}
                 )
-                extracted_variables.update(extracted_data)
+                for key, val in valid_extracted.items():
+                    if (
+                        key in self._latest_committed_seq
+                        and seq_id < self._latest_committed_seq[key]
+                    ):
+                        logger.warning(
+                            f"Discarding stale extraction result for {key} "
+                            f"(task seq {seq_id} < latest {self._latest_committed_seq[key]})"
+                        )
+                        continue
+                    self._gathered_context[key] = val
+                    extracted_variables[key] = val
+                    self._latest_committed_seq[key] = seq_id
+
                 logger.debug(
-                    f"Variable extraction completed for node: {node.name}. Extracted: {extracted_data}"
+                    f"Variable extraction completed for node: {node.name}. Extracted: {valid_extracted}"
+                )
+            except asyncio.CancelledError:
+                logger.debug(
+                    f"Variable extraction cancelled for node {node.name} due to caller disconnection or pipeline teardown."
                 )
             except Exception as e:
                 metadata = failure_metadata_for_processor(self.variable_extraction_llm)

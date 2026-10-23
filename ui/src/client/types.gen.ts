@@ -584,6 +584,36 @@ export type ByokPipelineAiModelConfiguration = {
         provider: 'sarvam';
     } & SarvamLlmConfiguration);
     /**
+     * Extraction Llm
+     */
+    extraction_llm?: ({
+        provider: 'openai';
+    } & OpenAillmService) | ({
+        provider: 'atlascloud';
+    } & AtlasCloudLlmService) | ({
+        provider: 'google_vertex';
+    } & GoogleVertexLlmConfiguration) | ({
+        provider: 'groq';
+    } & GroqLlmService) | ({
+        provider: 'openrouter';
+    } & OpenRouterLlmConfiguration) | ({
+        provider: 'google';
+    } & GoogleLlmService) | ({
+        provider: 'azure';
+    } & AzureLlmService) | ({
+        provider: 'dograh';
+    } & DograhLlmService) | ({
+        provider: 'aws_bedrock';
+    } & AwsBedrockLlmConfiguration) | ({
+        provider: 'speaches';
+    } & SpeachesLlmConfiguration) | ({
+        provider: 'huggingface';
+    } & HuggingFaceLlmConfiguration) | ({
+        provider: 'minimax';
+    } & MiniMaxLlmConfiguration) | ({
+        provider: 'sarvam';
+    } & SarvamLlmConfiguration) | null;
+    /**
      * Tts
      */
     tts: ({
@@ -715,6 +745,10 @@ export type ByokRealtimeAiModelConfiguration = {
     } & MiniMaxLlmConfiguration) | ({
         provider: 'sarvam';
     } & SarvamLlmConfiguration);
+    /**
+     * Extraction LLM
+     */
+    extraction_llm?: ByokPipelineAiModelConfiguration['extraction_llm'];
     /**
      * Embeddings
      */

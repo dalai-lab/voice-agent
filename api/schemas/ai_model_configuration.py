@@ -28,6 +28,7 @@ DOGRAH_DEFAULT_LANGUAGE = "multi"
 
 class EffectiveAIModelConfiguration(BaseModel):
     llm: LLMConfig | None = None
+    extraction_llm: LLMConfig | None = None
     stt: STTConfig | None = None
     tts: TTSConfig | None = None
     embeddings: EmbeddingsConfig | None = None
@@ -58,6 +59,7 @@ class DograhManagedAIModelConfiguration(BaseModel):
 
 class BYOKPipelineAIModelConfiguration(BaseModel):
     llm: LLMConfig
+    extraction_llm: LLMConfig | None = None
     tts: TTSConfig
     stt: STTConfig
     embeddings: EmbeddingsConfig | None = None
@@ -65,6 +67,7 @@ class BYOKPipelineAIModelConfiguration(BaseModel):
     @model_validator(mode="after")
     def reject_dograh_providers(self):
         _reject_dograh_provider("llm", self.llm)
+        _reject_dograh_provider("extraction_llm", self.extraction_llm)
         _reject_dograh_provider("tts", self.tts)
         _reject_dograh_provider("stt", self.stt)
         _reject_dograh_provider("embeddings", self.embeddings)
@@ -74,11 +77,13 @@ class BYOKPipelineAIModelConfiguration(BaseModel):
 class BYOKRealtimeAIModelConfiguration(BaseModel):
     realtime: RealtimeConfig
     llm: LLMConfig
+    extraction_llm: LLMConfig | None = None
     embeddings: EmbeddingsConfig | None = None
 
     @model_validator(mode="after")
     def reject_dograh_providers(self):
         _reject_dograh_provider("llm", self.llm)
+        _reject_dograh_provider("extraction_llm", self.extraction_llm)
         _reject_dograh_provider("embeddings", self.embeddings)
         return self
 
@@ -134,6 +139,7 @@ def compile_ai_model_configuration_v2(
         pipeline = configuration.byok.pipeline
         return EffectiveAIModelConfiguration(
             llm=pipeline.llm,
+            extraction_llm=pipeline.extraction_llm,
             tts=pipeline.tts,
             stt=pipeline.stt,
             embeddings=pipeline.embeddings,
@@ -145,6 +151,7 @@ def compile_ai_model_configuration_v2(
     realtime = configuration.byok.realtime
     return EffectiveAIModelConfiguration(
         llm=realtime.llm,
+        extraction_llm=realtime.extraction_llm,
         realtime=realtime.realtime,
         embeddings=realtime.embeddings,
         is_realtime=True,

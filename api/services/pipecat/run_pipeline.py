@@ -823,34 +823,70 @@ async def _run_pipeline_impl(
         llm = create_llm_service(user_config, correlation_id=mps_correlation_id)
         inference_llm = None
 
-        # Pre-warm the LLM HTTP/TLS connection while setup continues and the
-        # greeting plays. This avoids paying the ~800ms cold-start penalty on
-        # the first real user turn. Fire-and-forget: failures are logged.
-        # Operators can disable via run_config `llm_connection_warmup_enabled: false`
-        # if provider rate limits or per-request billing is a concern.
-        # Store the task reference to prevent premature GC (Python best practice).
-        if run_configs.get("llm_connection_warmup_enabled", True):
+    # ------------------------------------------------------------------
+    # Variable Extraction LLM Resolution
+    # ------------------------------------------------------------------
+    variable_extraction_llm = None
+    if getattr(user_config, "extraction_llm", None):
+        try:
+            # Enforce deterministic extraction temperature (0.0)
+            extraction_cfg = user_config.extraction_llm.model_copy(deep=True)
+            if hasattr(extraction_cfg, "temperature"):
+                extraction_cfg.temperature = 0.0
+
+            variable_extraction_llm = create_llm_service(
+                extraction_cfg,
+                correlation_id=mps_correlation_id,
+                usage_context="variable_extraction",
+            )
+            if hasattr(variable_extraction_llm, "_settings") and hasattr(
+                variable_extraction_llm._settings, "temperature"
+            ):
+                variable_extraction_llm._settings.temperature = 0.0
+
+            logger.info(
+                f"Configured dedicated variable extraction LLM: "
+                f"provider={extraction_cfg.provider}, model={extraction_cfg.model}"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to create dedicated extraction LLM "
+                f"({user_config.extraction_llm.provider}/{user_config.extraction_llm.model}): {e}. "
+                f"Falling back to primary conversation LLM."
+            )
+            variable_extraction_llm = None
+
+    if variable_extraction_llm is None:
+        variable_extraction_llm = (
+            create_llm_service(
+                user_config,
+                correlation_id=mps_correlation_id,
+                usage_context="variable_extraction",
+            )
+            if uses_variable_extraction
+            and user_config.llm.provider == ServiceProviders.DOGRAH.value
+            else inference_llm or llm
+        )
+
+    # ------------------------------------------------------------------
+    # Concurrent Connection Pre-warming
+    # ------------------------------------------------------------------
+    if run_configs.get("llm_connection_warmup_enabled", True):
+        # Warm up the voice LLM
+        if not is_realtime and llm is not None:
             _llm_warmup_task = asyncio.create_task(_warmup_llm_connection(llm))
             _llm_warmup_task.add_done_callback(lambda t: t)
 
-    # A shared LLM cannot carry an extraction usage_context without also tagging
-    # normal conversation or context-summarization requests. Create a dedicated
-    # client only for the managed provider; other providers ignore usage_context.
-    variable_extraction_llm = (
-        create_llm_service(
-            user_config,
-            correlation_id=mps_correlation_id,
-            usage_context="variable_extraction",
-        )
-        if uses_variable_extraction
-        and user_config.llm.provider == ServiceProviders.DOGRAH.value
-        else inference_llm or llm
-    )
+        # If extraction uses a separate client, warm it up concurrently
+        if variable_extraction_llm is not None and variable_extraction_llm is not llm:
+            _ext_warmup_task = asyncio.create_task(
+                _warmup_llm_connection(variable_extraction_llm)
+            )
+            _ext_warmup_task.add_done_callback(lambda t: t)
 
-    # Stamp the providers/models actually resolved for this run onto
-    # initial_context so they're available for post-call analytics
-    # (model_overrides may have shifted them away from the org-level
-    # user_config).
+    # ------------------------------------------------------------------
+    # Stamping Runtime Configuration for Analytics & CDR
+    # ------------------------------------------------------------------
     if is_realtime:
         # llm_* refers to the side-channel text LLM (variable extraction,
         # voicemail detection); realtime_* is the speech-to-speech service.
@@ -868,6 +904,16 @@ async def _run_pipeline_impl(
             "tts_model": user_config.tts.model,
             "llm_provider": user_config.llm.provider,
             "llm_model": user_config.llm.model,
+            "extraction_llm_provider": (
+                user_config.extraction_llm.provider
+                if getattr(user_config, "extraction_llm", None)
+                else user_config.llm.provider
+            ),
+            "extraction_llm_model": (
+                user_config.extraction_llm.model
+                if getattr(user_config, "extraction_llm", None)
+                else user_config.llm.model
+            ),
         }
     merged_call_context_vars = {
         **merged_call_context_vars,

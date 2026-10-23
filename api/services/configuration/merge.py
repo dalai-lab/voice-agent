@@ -14,7 +14,7 @@ from api.services.configuration.masking import (
     resolve_masked_api_keys,
 )
 
-SERVICE_FIELDS = ("llm", "tts", "stt", "embeddings", "realtime")
+SERVICE_FIELDS = ("llm", "extraction_llm", "tts", "stt", "embeddings", "realtime")
 
 
 def _same_provider(incoming_cfg: dict, existing_cfg: dict) -> bool:

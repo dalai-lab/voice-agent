@@ -13,6 +13,7 @@ from api.services.configuration.registry import (
 # Maps override key → (EffectiveAIModelConfiguration field, ServiceType for registry lookup)
 _SECTION_MAP: dict[str, ServiceType] = {
     "llm": ServiceType.LLM,
+    "extraction_llm": ServiceType.LLM,
     "tts": ServiceType.TTS,
     "stt": ServiceType.STT,
     "realtime": ServiceType.REALTIME,

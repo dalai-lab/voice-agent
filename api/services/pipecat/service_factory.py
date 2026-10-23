@@ -991,6 +991,9 @@ def create_llm_service_from_provider(
             (e.g. "voicemail_detection"). Sent as request metadata by the Dograh
             provider; ignored by other providers.
     """
+    default_temp = 0.0 if usage_context == "variable_extraction" else 0.1
+    effective_temp = temperature if temperature is not None else default_temp
+
     logger.info(f"Creating LLM service: provider={provider}, model={model}")
     if provider in (
         ServiceProviders.OPENAI.value,
@@ -1011,13 +1014,19 @@ def create_llm_service_from_provider(
             )
         return OpenAILLMService(
             api_key=api_key,
-            settings=OpenAILLMSettings(model=model, temperature=0.1),
+            settings=OpenAILLMSettings(
+                model=model,
+                temperature=effective_temp,
+            ),
             **kwargs,
         )
     elif provider == ServiceProviders.GROQ.value:
         return GroqLLMService(
             api_key=api_key,
-            settings=GroqLLMSettings(model=model, temperature=0.1),
+            settings=GroqLLMSettings(
+                model=model,
+                temperature=effective_temp,
+            ),
         )
     elif provider == ServiceProviders.OPENROUTER.value:
         kwargs = {}
@@ -1026,21 +1035,30 @@ def create_llm_service_from_provider(
             kwargs["base_url"] = base_url
         return OpenRouterLLMService(
             api_key=api_key,
-            settings=OpenRouterLLMSettings(model=model, temperature=0.1),
+            settings=OpenRouterLLMSettings(
+                model=model,
+                temperature=effective_temp,
+            ),
             **kwargs,
         )
     elif provider == ServiceProviders.GOOGLE.value:
         model = _migrate_deprecated_google_model(model)
         return DograhGoogleLLMService(
             api_key=api_key,
-            settings=GoogleLLMSettings(model=model, temperature=0.1),
+            settings=GoogleLLMSettings(
+                model=model,
+                temperature=effective_temp,
+            ),
         )
     elif provider == ServiceProviders.GOOGLE_VERTEX.value:
         return DograhGoogleVertexLLMService(
             credentials=credentials,
             project_id=project_id,
             location=location or "us-east4",
-            settings=GoogleVertexLLMSettings(model=model, temperature=0.1),
+            settings=GoogleVertexLLMSettings(
+                model=model,
+                temperature=effective_temp,
+            ),
         )
     elif provider == ServiceProviders.AZURE.value:
         if endpoint:
@@ -1048,7 +1066,10 @@ def create_llm_service_from_provider(
         return AzureLLMService(
             api_key=api_key,
             endpoint=endpoint,
-            settings=AzureLLMSettings(model=model, temperature=0.1),
+            settings=AzureLLMSettings(
+                model=model,
+                temperature=effective_temp,
+            ),
         )
     elif provider == ServiceProviders.DOGRAH.value:
         return DograhLLMService(
@@ -1318,36 +1339,40 @@ def create_llm_service(
     usage_context: str | None = None,
 ):
     """Create and return appropriate LLM service based on user configuration."""
-    provider = user_config.llm.provider
-    model = user_config.llm.model
-    api_key = user_config.llm.api_key
+    llm_cfg = getattr(user_config, "llm", user_config)
+    provider = llm_cfg.provider
+    model = llm_cfg.model
+    api_key = llm_cfg.api_key
 
     kwargs = {}
     if provider in (
         ServiceProviders.OPENAI.value,
         ServiceProviders.ATLASCLOUD.value,
     ) or provider == ServiceProviders.OPENROUTER.value:
-        kwargs["base_url"] = user_config.llm.base_url
+        kwargs["base_url"] = getattr(llm_cfg, "base_url", None)
     elif provider == ServiceProviders.AZURE.value:
-        kwargs["endpoint"] = user_config.llm.endpoint
+        kwargs["endpoint"] = getattr(llm_cfg, "endpoint", None)
     elif provider == ServiceProviders.SPEACHES.value:
-        kwargs["base_url"] = user_config.llm.base_url
+        kwargs["base_url"] = getattr(llm_cfg, "base_url", None)
     elif provider == ServiceProviders.HUGGINGFACE.value:
-        kwargs["base_url"] = user_config.llm.base_url
-        kwargs["bill_to"] = user_config.llm.bill_to
+        kwargs["base_url"] = getattr(llm_cfg, "base_url", None)
+        kwargs["bill_to"] = getattr(llm_cfg, "bill_to", None)
     elif provider == ServiceProviders.AWS_BEDROCK.value:
-        kwargs["aws_access_key"] = user_config.llm.aws_access_key
-        kwargs["aws_secret_key"] = user_config.llm.aws_secret_key
-        kwargs["aws_region"] = user_config.llm.aws_region
+        kwargs["aws_access_key"] = getattr(llm_cfg, "aws_access_key", None)
+        kwargs["aws_secret_key"] = getattr(llm_cfg, "aws_secret_key", None)
+        kwargs["aws_region"] = getattr(llm_cfg, "aws_region", None)
     elif provider == ServiceProviders.GOOGLE_VERTEX.value:
-        kwargs["project_id"] = user_config.llm.project_id
-        kwargs["location"] = user_config.llm.location
-        kwargs["credentials"] = user_config.llm.credentials
+        kwargs["project_id"] = getattr(llm_cfg, "project_id", None)
+        kwargs["location"] = getattr(llm_cfg, "location", None)
+        kwargs["credentials"] = getattr(llm_cfg, "credentials", None)
     elif provider == ServiceProviders.MINIMAX.value:
-        kwargs["base_url"] = user_config.llm.base_url
-        kwargs["temperature"] = user_config.llm.temperature
+        kwargs["base_url"] = getattr(llm_cfg, "base_url", None)
+        kwargs["temperature"] = getattr(llm_cfg, "temperature", None)
     elif provider == ServiceProviders.SARVAM.value:
-        kwargs["temperature"] = user_config.llm.temperature
+        kwargs["temperature"] = getattr(llm_cfg, "temperature", None)
+
+    if hasattr(llm_cfg, "temperature") and llm_cfg.temperature is not None and "temperature" not in kwargs:
+        kwargs["temperature"] = llm_cfg.temperature
 
     return create_llm_service_from_provider(
         provider,

@@ -478,13 +478,14 @@ def create_stt_service(
         }
         if use_sarvam_vad and user_config.stt.model in {"saaras:v3", "saaras:v4"}:
             # Tune Sarvam server-side VAD frame windows with conversational pacing.
-            # Sarvam operates at 50 fps (20ms/frame). 40 frames ≈ 800ms.
-            negative_frames_count = max(25, min(75, int(turn_silence_timeout_secs * 50)))
+            # Baseline: 18 frames count / 24 frames window for default 0.8s silence.
+            # Ensures responsive ~360-500ms turn-taking without dead-air delays.
+            negative_frames_count = max(12, min(30, int(turn_silence_timeout_secs * 22)))
             sarvam_settings_kwargs["negative_frames_count"] = negative_frames_count
-            sarvam_settings_kwargs["negative_frames_window"] = negative_frames_count + 15
-            # Require 160ms (8 frames) minimum speech before emitting START_SPEECH
-            # to prevent line static/noise bursts from causing false interruptions.
-            sarvam_settings_kwargs["interrupt_min_speech_frames"] = 8
+            sarvam_settings_kwargs["negative_frames_window"] = negative_frames_count + 6
+            # Require 3 frames (~60-100ms) minimum speech to detect quick affirmations
+            # ("haan", "yes", "no") immediately without false rejections.
+            sarvam_settings_kwargs["interrupt_min_speech_frames"] = 3
 
         sarvam_settings = SarvamSTTSettings(**sarvam_settings_kwargs)
         return SarvamSTTService(

@@ -140,9 +140,9 @@ class TestSarvamSTTServiceFactory:
         kwargs = mock_service.call_args.kwargs
         settings = kwargs["settings"]
         assert settings.vad_signals is True
-        assert settings.negative_frames_count == 60
-        assert settings.negative_frames_window == 75
-        assert settings.interrupt_min_speech_frames == 8
+        assert settings.negative_frames_count == 26
+        assert settings.negative_frames_window == 32
+        assert settings.interrupt_min_speech_frames == 3
 
     def test_deepgram_endpointing_scales_with_turn_silence(self):
         user_config = SimpleNamespace(

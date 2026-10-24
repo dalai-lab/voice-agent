@@ -12,7 +12,6 @@ from pipecat.frames.frames import (
     CancelFrame,
     EndFrame,
     FunctionCallResultProperties,
-    InterruptionFrame,
     LLMContextFrame,
     LLMMessagesAppendFrame,
     TTSSpeakFrame,
@@ -407,7 +406,6 @@ class PipecatEngine:
                         logger.warning(
                             f"Failed to fetch transition audio {transition_speech_recording_id}"
                         )
-                        self._queued_speech_mute_state = "idle"
                 elif transition_speech:
                     logger.info(f"Playing transition speech: {transition_speech}")
                     self._queued_speech_mute_state = "waiting"
@@ -1037,17 +1035,6 @@ class PipecatEngine:
         elif isinstance(frame, BotStoppedSpeakingFrame):
             self._bot_is_speaking = False
             self._queued_speech_mute_state = "idle"
-        elif isinstance(frame, InterruptionFrame):
-            # Interruption stops output playback immediately; clear bot speaking
-            # and queued speech state so user audio is not suppressed.
-            self._bot_is_speaking = False
-            self._queued_speech_mute_state = "idle"
-        elif isinstance(frame, UserStartedSpeakingFrame):
-            # If user starts speaking and current node permits interruption,
-            # clear any pending or playing queued speech state immediately.
-            if not self._current_node or self._current_node.allow_interrupt:
-                self._bot_is_speaking = False
-                self._queued_speech_mute_state = "idle"
 
         # Always mute if pipeline is shutting down
         if self._mute_pipeline:

@@ -115,60 +115,6 @@ class TestSarvamSTTServiceFactory:
         kwargs = mock_service.call_args.kwargs
         assert kwargs["settings"].language == expected_language
 
-    def test_sarvam_stt_vad_parameters_scale_with_turn_silence(self):
-        user_config = SimpleNamespace(
-            stt=SimpleNamespace(
-                provider=ServiceProviders.SARVAM.value,
-                model="saaras:v4",
-                api_key="test-key",
-                language="hi-IN",
-            )
-        )
-        audio_config = AudioConfig(
-            transport_in_sample_rate=16000, transport_out_sample_rate=16000
-        )
-
-        with patch(
-            "api.services.pipecat.service_factory.SarvamSTTService"
-        ) as mock_service:
-            create_stt_service(
-                user_config,
-                audio_config,
-                run_configs={"turn_silence_timeout_secs": 1.2},
-            )
-
-        kwargs = mock_service.call_args.kwargs
-        settings = kwargs["settings"]
-        assert settings.vad_signals is True
-        assert settings.negative_frames_count == 26
-        assert settings.negative_frames_window == 32
-        assert settings.interrupt_min_speech_frames == 3
-
-    def test_deepgram_endpointing_scales_with_turn_silence(self):
-        user_config = SimpleNamespace(
-            stt=SimpleNamespace(
-                provider=ServiceProviders.DEEPGRAM.value,
-                model="nova-2",
-                api_key="test-key",
-                language="en",
-            )
-        )
-        audio_config = AudioConfig(
-            transport_in_sample_rate=16000, transport_out_sample_rate=16000
-        )
-
-        with patch(
-            "api.services.pipecat.service_factory.DeepgramSTTService"
-        ) as mock_service:
-            create_stt_service(
-                user_config,
-                audio_config,
-                run_configs={"turn_silence_timeout_secs": 1.0},
-            )
-
-        kwargs = mock_service.call_args.kwargs
-        assert kwargs["settings"].endpointing == 500
-
 
 class TestSarvamTTSServiceFactory:
     def test_sarvam_tts_configuration_defaults(self):

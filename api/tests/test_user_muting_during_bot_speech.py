@@ -19,7 +19,6 @@ from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
     Frame,
-    InterruptionFrame,
     LLMContextFrame,
     TranscriptionFrame,
     UserStartedSpeakingFrame,
@@ -472,43 +471,3 @@ class TestUserMutingDuringBotSpeech:
         assert observer.mute_status_on_bot_stopped[1] is False, (
             "Pipeline should be unmuted at second BotStoppedSpeaking"
         )
-
-
-class TestShouldMuteUserEdgeCases:
-    """Direct unit tests for should_mute_user frame handling and state transitions."""
-
-    @pytest.mark.asyncio
-    async def test_interruption_frame_resets_bot_speaking_and_queued_speech(self):
-        engine = PipecatEngine(
-            llm=AsyncMock(),
-            context=LLMContext(),
-            workflow=AsyncMock(),
-            call_context_vars={},
-            workflow_run_id=1,
-        )
-        engine._bot_is_speaking = True
-        engine._queued_speech_mute_state = "waiting"
-
-        result = await engine.should_mute_user(InterruptionFrame())
-        assert result is False
-        assert engine._bot_is_speaking is False
-        assert engine._queued_speech_mute_state == "idle"
-
-    @pytest.mark.asyncio
-    async def test_user_started_speaking_resets_mute_when_interrupt_allowed(self):
-        engine = PipecatEngine(
-            llm=AsyncMock(),
-            context=LLMContext(),
-            workflow=AsyncMock(),
-            call_context_vars={},
-            workflow_run_id=1,
-        )
-        engine._bot_is_speaking = True
-        engine._queued_speech_mute_state = "waiting"
-        engine._current_node = AsyncMock(allow_interrupt=True)
-
-        result = await engine.should_mute_user(UserStartedSpeakingFrame())
-        assert result is False
-        assert engine._bot_is_speaking is False
-        assert engine._queued_speech_mute_state == "idle"
-

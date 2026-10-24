@@ -10,7 +10,6 @@ from api.errors.failure import (
     classify_exception,
     log_failure,
 )
-from api.schemas.workflow_configurations import DEFAULT_TURN_SILENCE_TIMEOUT_SECS
 from api.services.configuration.options import (
     DEEPGRAM_FLUX_MODELS,
     DEEPGRAM_FLUX_MULTILINGUAL_LANGUAGE_OPTIONS,
@@ -220,15 +219,6 @@ def _elevenlabs_realtime_stt_host(base_url: str) -> str:
     return websocket_url
 
 
-# Sarvam saaras:v3 and saaras:v4 support fine-grained server-side VAD that
-# emits proper UserStartedSpeakingFrame / UserStoppedSpeakingFrame events.
-# When vad_signals is enabled, these models own the turn boundary — local
-# Silero VAD must not also drive turns or a race condition causes deadlocks
-# where Silero re-fires VADUserStartedSpeakingFrame after flush(), wiping
-# pending turn state and preventing the LLM from ever firing.
-SARVAM_EXTERNAL_TURNS_MODELS = frozenset({"saaras:v3", "saaras:v4"})
-
-
 def stt_uses_external_turns(user_config) -> bool:
     if user_config.stt.provider == ServiceProviders.DEEPGRAM.value:
         return user_config.stt.model in DEEPGRAM_FLUX_MODELS
@@ -236,11 +226,6 @@ def stt_uses_external_turns(user_config) -> bool:
         return dograh_stt_uses_flux_language(getattr(user_config.stt, "language", None))
     if user_config.stt.provider == ServiceProviders.CARTESIA.value:
         return user_config.stt.model == "ink-2"
-    if user_config.stt.provider == ServiceProviders.SARVAM.value:
-        # saaras:v3 and saaras:v4 have server-side VAD (vad_signals=True);
-        # they own their own turn boundaries via UserStartedSpeakingFrame /
-        # UserStoppedSpeakingFrame so local Silero must not also drive turns.
-        return user_config.stt.model in SARVAM_EXTERNAL_TURNS_MODELS
     return False
 
 
@@ -281,7 +266,6 @@ def create_stt_service(
     keyterms: list[str] | None = None,
     correlation_id: str | None = None,
     boost_affirmations: bool = True,
-    run_configs: dict | None = None,
 ):
     """Create and return appropriate STT service based on user configuration
 
@@ -324,16 +308,6 @@ def create_stt_service(
             )
 
         # Other models than flux
-        # Resolve turn_silence_timeout_secs from run_configs if present, falling back to schema default (0.8s)
-        turn_silence_timeout_secs = float(
-            (run_configs or {}).get(
-                "turn_silence_timeout_secs", DEFAULT_TURN_SILENCE_TIMEOUT_SECS
-            )
-        )
-        # Scale Deepgram endpointing with conversational pacing (min 300ms, max 800ms)
-        # Prevents premature cut-offs during normal 300-500ms mid-sentence breaths.
-        endpointing_ms = max(300, min(800, int(turn_silence_timeout_secs * 500)))
-
         # Use language from user config, defaulting to "multi" for multilingual support
         language = getattr(user_config.stt, "language", None) or "multi"
         return DeepgramSTTService(
@@ -341,7 +315,7 @@ def create_stt_service(
             settings=DeepgramSTTSettings(
                 language=language,
                 profanity_filter=False,
-                endpointing=endpointing_ms,
+                endpointing=100,
                 model=user_config.stt.model,
                 keyterm=keyterms or [],
             ),
@@ -458,39 +432,12 @@ def create_stt_service(
         else:
             # Unmapped BCP-47 codes pass through; Sarvam accepts them per https://docs.sarvam.ai/api-reference-docs/speech-to-text/transcribe
             pipecat_language = language
-        # Enable Sarvam's server-side VAD for models that support it (saaras:v3,
-        # saaras:v4). This causes Sarvam to emit UserStartedSpeakingFrame /
-        # UserStoppedSpeakingFrame so the pipeline can use ExternalUserTurnStopStrategy
-        # and avoid the Silero race condition (Silero re-firing VADUserStartedSpeakingFrame
-        # after flush() wipes pending turn state and deadlocks the pipeline).
-        # For other models (saarika:v2.5, saaras:v2.5) that don't support vad_signals,
-        # leave it at None so the Pipecat VAD / timeout fallback path is used.
-        use_sarvam_vad = user_config.stt.model in SARVAM_EXTERNAL_TURNS_MODELS
-        turn_silence_timeout_secs = float(
-            (run_configs or {}).get(
-                "turn_silence_timeout_secs", DEFAULT_TURN_SILENCE_TIMEOUT_SECS
-            )
-        )
-        sarvam_settings_kwargs = {
-            "model": user_config.stt.model,
-            "language": pipecat_language,
-            "vad_signals": True if use_sarvam_vad else None,
-        }
-        if use_sarvam_vad and user_config.stt.model in {"saaras:v3", "saaras:v4"}:
-            # Tune Sarvam server-side VAD frame windows with conversational pacing.
-            # Baseline: 18 frames count / 24 frames window for default 0.8s silence.
-            # Ensures responsive ~360-500ms turn-taking without dead-air delays.
-            negative_frames_count = max(12, min(30, int(turn_silence_timeout_secs * 22)))
-            sarvam_settings_kwargs["negative_frames_count"] = negative_frames_count
-            sarvam_settings_kwargs["negative_frames_window"] = negative_frames_count + 6
-            # Require 3 frames (~60-100ms) minimum speech to detect quick affirmations
-            # ("haan", "yes", "no") immediately without false rejections.
-            sarvam_settings_kwargs["interrupt_min_speech_frames"] = 3
-
-        sarvam_settings = SarvamSTTSettings(**sarvam_settings_kwargs)
         return SarvamSTTService(
             api_key=user_config.stt.api_key,
-            settings=sarvam_settings,
+            settings=SarvamSTTSettings(
+                model=user_config.stt.model,
+                language=pipecat_language,
+            ),
             sample_rate=audio_config.transport_in_sample_rate,
         )
     elif user_config.stt.provider == ServiceProviders.SPEACHES.value:

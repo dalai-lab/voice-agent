@@ -19,7 +19,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 # and console-scripts inside the venv reference the correct runtime location
 # after COPY --from.
 ENV VIRTUAL_ENV=/opt/venv \
-    PATH=/opt/venv/bin:$PATH
+    PATH=/opt/venv/bin:$PATH \
+    UV_HTTP_TIMEOUT=300 \
+    UV_REQUEST_RETRY_COUNT=5 \
+    UV_CONCURRENT_DOWNLOADS=8
 RUN python -m venv "$VIRTUAL_ENV"
 
 # Layer 1: API deps. Cache invalidates only when requirements.txt changes.

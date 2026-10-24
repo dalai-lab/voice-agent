@@ -814,6 +814,7 @@ async def _run_pipeline_impl(
             keyterms=keyterms,
             correlation_id=mps_correlation_id,
             boost_affirmations=bool(run_configs.get("boost_affirmations", True)),
+            run_configs=run_configs,
         )
         tts = create_tts_service(
             user_config,

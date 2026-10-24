@@ -10,6 +10,7 @@ from api.errors.failure import (
     classify_exception,
     log_failure,
 )
+from api.schemas.workflow_configurations import DEFAULT_TURN_SILENCE_TIMEOUT_SECS
 from api.services.configuration.options import (
     DEEPGRAM_FLUX_MODELS,
     DEEPGRAM_FLUX_MULTILINGUAL_LANGUAGE_OPTIONS,
@@ -280,6 +281,7 @@ def create_stt_service(
     keyterms: list[str] | None = None,
     correlation_id: str | None = None,
     boost_affirmations: bool = True,
+    run_configs: dict | None = None,
 ):
     """Create and return appropriate STT service based on user configuration
 
@@ -322,6 +324,16 @@ def create_stt_service(
             )
 
         # Other models than flux
+        # Resolve turn_silence_timeout_secs from run_configs if present, falling back to schema default (0.8s)
+        turn_silence_timeout_secs = float(
+            (run_configs or {}).get(
+                "turn_silence_timeout_secs", DEFAULT_TURN_SILENCE_TIMEOUT_SECS
+            )
+        )
+        # Scale Deepgram endpointing with conversational pacing (min 300ms, max 800ms)
+        # Prevents premature cut-offs during normal 300-500ms mid-sentence breaths.
+        endpointing_ms = max(300, min(800, int(turn_silence_timeout_secs * 500)))
+
         # Use language from user config, defaulting to "multi" for multilingual support
         language = getattr(user_config.stt, "language", None) or "multi"
         return DeepgramSTTService(
@@ -329,7 +341,7 @@ def create_stt_service(
             settings=DeepgramSTTSettings(
                 language=language,
                 profanity_filter=False,
-                endpointing=100,
+                endpointing=endpointing_ms,
                 model=user_config.stt.model,
                 keyterm=keyterms or [],
             ),
@@ -454,11 +466,27 @@ def create_stt_service(
         # For other models (saarika:v2.5, saaras:v2.5) that don't support vad_signals,
         # leave it at None so the Pipecat VAD / timeout fallback path is used.
         use_sarvam_vad = user_config.stt.model in SARVAM_EXTERNAL_TURNS_MODELS
-        sarvam_settings = SarvamSTTSettings(
-            model=user_config.stt.model,
-            language=pipecat_language,
-            vad_signals=True if use_sarvam_vad else None,
+        turn_silence_timeout_secs = float(
+            (run_configs or {}).get(
+                "turn_silence_timeout_secs", DEFAULT_TURN_SILENCE_TIMEOUT_SECS
+            )
         )
+        sarvam_settings_kwargs = {
+            "model": user_config.stt.model,
+            "language": pipecat_language,
+            "vad_signals": True if use_sarvam_vad else None,
+        }
+        if use_sarvam_vad and user_config.stt.model in {"saaras:v3", "saaras:v4"}:
+            # Tune Sarvam server-side VAD frame windows with conversational pacing.
+            # Sarvam operates at 50 fps (20ms/frame). 40 frames ≈ 800ms.
+            negative_frames_count = max(25, min(75, int(turn_silence_timeout_secs * 50)))
+            sarvam_settings_kwargs["negative_frames_count"] = negative_frames_count
+            sarvam_settings_kwargs["negative_frames_window"] = negative_frames_count + 15
+            # Require 160ms (8 frames) minimum speech before emitting START_SPEECH
+            # to prevent line static/noise bursts from causing false interruptions.
+            sarvam_settings_kwargs["interrupt_min_speech_frames"] = 8
+
+        sarvam_settings = SarvamSTTSettings(**sarvam_settings_kwargs)
         return SarvamSTTService(
             api_key=user_config.stt.api_key,
             settings=sarvam_settings,

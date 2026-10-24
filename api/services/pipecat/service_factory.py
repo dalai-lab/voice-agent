@@ -219,6 +219,15 @@ def _elevenlabs_realtime_stt_host(base_url: str) -> str:
     return websocket_url
 
 
+# Sarvam saaras:v3 and saaras:v4 support fine-grained server-side VAD that
+# emits proper UserStartedSpeakingFrame / UserStoppedSpeakingFrame events.
+# When vad_signals is enabled, these models own the turn boundary — local
+# Silero VAD must not also drive turns or a race condition causes deadlocks
+# where Silero re-fires VADUserStartedSpeakingFrame after flush(), wiping
+# pending turn state and preventing the LLM from ever firing.
+SARVAM_EXTERNAL_TURNS_MODELS = frozenset({"saaras:v3", "saaras:v4"})
+
+
 def stt_uses_external_turns(user_config) -> bool:
     if user_config.stt.provider == ServiceProviders.DEEPGRAM.value:
         return user_config.stt.model in DEEPGRAM_FLUX_MODELS
@@ -226,6 +235,11 @@ def stt_uses_external_turns(user_config) -> bool:
         return dograh_stt_uses_flux_language(getattr(user_config.stt, "language", None))
     if user_config.stt.provider == ServiceProviders.CARTESIA.value:
         return user_config.stt.model == "ink-2"
+    if user_config.stt.provider == ServiceProviders.SARVAM.value:
+        # saaras:v3 and saaras:v4 have server-side VAD (vad_signals=True);
+        # they own their own turn boundaries via UserStartedSpeakingFrame /
+        # UserStoppedSpeakingFrame so local Silero must not also drive turns.
+        return user_config.stt.model in SARVAM_EXTERNAL_TURNS_MODELS
     return False
 
 
@@ -432,12 +446,22 @@ def create_stt_service(
         else:
             # Unmapped BCP-47 codes pass through; Sarvam accepts them per https://docs.sarvam.ai/api-reference-docs/speech-to-text/transcribe
             pipecat_language = language
+        # Enable Sarvam's server-side VAD for models that support it (saaras:v3,
+        # saaras:v4). This causes Sarvam to emit UserStartedSpeakingFrame /
+        # UserStoppedSpeakingFrame so the pipeline can use ExternalUserTurnStopStrategy
+        # and avoid the Silero race condition (Silero re-firing VADUserStartedSpeakingFrame
+        # after flush() wipes pending turn state and deadlocks the pipeline).
+        # For other models (saarika:v2.5, saaras:v2.5) that don't support vad_signals,
+        # leave it at None so the Pipecat VAD / timeout fallback path is used.
+        use_sarvam_vad = user_config.stt.model in SARVAM_EXTERNAL_TURNS_MODELS
+        sarvam_settings = SarvamSTTSettings(
+            model=user_config.stt.model,
+            language=pipecat_language,
+            vad_signals=True if use_sarvam_vad else None,
+        )
         return SarvamSTTService(
             api_key=user_config.stt.api_key,
-            settings=SarvamSTTSettings(
-                model=user_config.stt.model,
-                language=pipecat_language,
-            ),
+            settings=sarvam_settings,
             sample_rate=audio_config.transport_in_sample_rate,
         )
     elif user_config.stt.provider == ServiceProviders.SPEACHES.value:

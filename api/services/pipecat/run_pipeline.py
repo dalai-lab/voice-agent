@@ -1132,12 +1132,18 @@ async def _run_pipeline_impl(
         realtime_service_mode=is_realtime,
     )
 
+    async def _logged_llm_text_frame_callback(text: str):
+        logger.info(
+            f"[DEBUG-TRACE: PIPELINE] LLMTextFrame passing downstream to TTS ({len(text)} chars): '{text[:60]}...'"
+        )
+        await engine.handle_llm_text_frame(text)
+
     # Create usage metrics aggregator with engine's callback
     pipeline_engine_callback_processor = PipelineEngineCallbacksProcessor(
         max_call_duration_seconds=max_call_duration_seconds,
         max_duration_end_task_callback=engine.create_max_duration_callback(),
         generation_started_callback=engine.create_generation_started_callback(),
-        llm_text_frame_callback=engine.handle_llm_text_frame,
+        llm_text_frame_callback=_logged_llm_text_frame_callback,
         dtmf_callback=engine.handle_dtmf_event,
     )
 
@@ -1155,11 +1161,19 @@ async def _run_pipeline_impl(
 
     @user_context_aggregator.event_handler("on_user_turn_idle")
     async def on_user_turn_idle(aggregator):
+        logger.info("[DEBUG-TRACE: TURN] User idle detected")
         await user_idle_handler.handle_idle(aggregator)
 
     @user_context_aggregator.event_handler("on_user_turn_started")
     async def on_user_turn_started(aggregator, strategy):
+        strat_name = strategy.__class__.__name__ if strategy else "unknown"
+        logger.info(f"[DEBUG-TRACE: TURN] User turn STARTED (strategy={strat_name})")
         user_idle_handler.reset()
+
+    @user_context_aggregator.event_handler("on_user_turn_stopped")
+    async def on_user_turn_stopped(aggregator, strategy, *args):
+        strat_name = strategy.__class__.__name__ if strategy else "unknown"
+        logger.info(f"[DEBUG-TRACE: TURN] User turn STOPPED (strategy={strat_name}) -> passing context to LLM")
 
     voicemail_detector = None
     recording_router = None

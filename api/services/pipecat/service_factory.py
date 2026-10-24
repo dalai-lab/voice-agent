@@ -82,11 +82,20 @@ from pipecat.services.openai.stt import (
 from pipecat.services.openai.tts import OpenAITTSService, OpenAITTSSettings
 from pipecat.services.openrouter.llm import OpenRouterLLMService, OpenRouterLLMSettings
 from pipecat.services.rime.tts import RimeTTSService, RimeTTSSettings
-from pipecat.services.sarvam.llm import SarvamLLMService, SarvamLLMSettings
-from pipecat.services.sarvam.stt import SarvamSTTService, SarvamSTTSettings
+from pipecat.services.sarvam.llm import (
+    SarvamLLMService as BaseSarvamLLMService,
+    SarvamLLMSettings,
+)
+from pipecat.services.sarvam.stt import (
+    SarvamSTTService as BaseSarvamSTTService,
+    SarvamSTTSettings,
+)
 from pipecat.services.sarvam.tts import SarvamTTSService, SarvamTTSSettings
 from pipecat.services.smallest.stt import SmallestSTTService, SmallestSTTSettings
-from pipecat.services.smallest.tts import SmallestTTSService, SmallestTTSSettings
+from pipecat.services.smallest.tts import (
+    SmallestTTSService as BaseSmallestTTSService,
+    SmallestTTSSettings,
+)
 from pipecat.services.speaches.llm import SpeachesLLMService, SpeachesLLMSettings
 from pipecat.services.speaches.stt import SpeachesSTTService, SpeachesSTTSettings
 from pipecat.services.speaches.tts import SpeachesTTSService, SpeachesTTSSettings
@@ -257,6 +266,379 @@ AFFIRMATION_KEYTERMS: list[str] = [
     "sure",
     "okay",
 ]
+
+
+import base64
+import json
+import time
+from contextlib import asynccontextmanager
+
+from pipecat.frames.frames import (
+    FunctionCallsFromLLMInfoFrame,
+    LLMTextFrame,
+    TTSAudioRawFrame,
+    TTSStoppedFrame,
+)
+from pipecat.metrics.metrics import LLMTokenUsage
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.frame_processor import FrameDirection
+from pipecat.services.llm_service import FunctionCallFromLLM
+from pipecat.services.settings import assert_given
+from pipecat.utils.tracing.service_decorators import traced_llm
+
+
+class SarvamSTTService(BaseSarvamSTTService):
+    """Sarvam STT service with debug and latency tracing."""
+
+    Settings = BaseSarvamSTTService.Settings
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._debug_speech_start_time = None
+        self._debug_speech_stop_time = None
+
+    async def _handle_message(self, message):
+        if hasattr(message, "type"):
+            if message.type == "events" and hasattr(message, "data"):
+                signal = getattr(message.data, "signal_type", None)
+                occured_at = getattr(message.data, "occured_at", None)
+                if signal == "START_SPEECH":
+                    self._debug_speech_start_time = time.monotonic()
+                    logger.info(
+                        f"[DEBUG-TRACE: STT] User STARTED speaking (VAD START_SPEECH, occurred_at={occured_at})"
+                    )
+                elif signal == "END_SPEECH":
+                    self._debug_speech_stop_time = time.monotonic()
+                    dur = (
+                        ((self._debug_speech_stop_time - self._debug_speech_start_time) * 1000)
+                        if self._debug_speech_start_time
+                        else 0
+                    )
+                    logger.info(
+                        f"[DEBUG-TRACE: STT] User STOPPED speaking (VAD END_SPEECH, occurred_at={occured_at}, duration={dur:.1f}ms)"
+                    )
+            elif message.type == "data" and hasattr(message, "data"):
+                transcript = getattr(message.data, "transcript", "")
+                lang = getattr(message.data, "language_code", "")
+                since_stop = (
+                    ((time.monotonic() - self._debug_speech_stop_time) * 1000)
+                    if self._debug_speech_stop_time
+                    else None
+                )
+                since_str = (
+                    f" [transcript received {since_stop:.1f}ms after speech stop]"
+                    if since_stop is not None
+                    else ""
+                )
+                logger.info(
+                    f"[DEBUG-TRACE: STT] Final transcript received{since_str}: '{transcript}' (lang={lang})"
+                )
+
+        return await super()._handle_message(message)
+
+
+class SmallestTTSService(BaseSmallestTTSService):
+    """Smallest TTS service with debug and latency tracing."""
+
+    Settings = BaseSmallestTTSService.Settings
+
+    async def run_tts(self, text: str, context_id: str):
+        t0 = time.monotonic()
+        logger.info(
+            f"[DEBUG-TRACE: TTS] run_tts received text ({len(text)} chars): '{text[:80]}' (context_id={context_id})"
+        )
+        async for frame in super().run_tts(text, context_id):
+            yield frame
+
+    async def _receive_messages(self):
+        first_audio_seen = False
+        t_recv = time.monotonic()
+        async for message in self._get_websocket():
+            msg = json.loads(message)
+            status = msg.get("status")
+
+            if status == "complete":
+                first_audio_seen = False
+                logger.info("[DEBUG-TRACE: TTS] Smallest audio synthesis complete")
+                await self.stop_all_metrics()
+            elif status == "chunk":
+                if not first_audio_seen:
+                    first_audio_seen = True
+                    logger.info(
+                        f"[DEBUG-TRACE: TTS] First audio chunk received from Smallest WebSocket (+{(time.monotonic() - t_recv)*1000:.1f}ms)"
+                    )
+                await self.stop_ttfb_metrics()
+                context_id = self.get_active_audio_context_id()
+                frame = TTSAudioRawFrame(
+                    audio=base64.b64decode(msg["data"]["audio"]),
+                    sample_rate=self.sample_rate,
+                    num_channels=1,
+                    context_id=context_id,
+                )
+                await self.append_to_audio_context(context_id, frame)
+            elif status == "word_timestamp":
+                self._advance_word_timestamp_request(msg.get("request_id"))
+                data = msg.get("data", {})
+                word = data.get("word")
+                start = data.get("start")
+                end = data.get("end")
+                if word is not None and start is not None:
+                    context_id = self.get_active_audio_context_id()
+                    await self.add_word_timestamps(
+                        [(word, start + self._cumulative_time)], context_id
+                    )
+                    if end is not None:
+                        self._request_end_time = max(self._request_end_time, end)
+            elif status == "error":
+                context_id = self.get_active_audio_context_id()
+                await self.push_frame(TTSStoppedFrame(context_id=context_id))
+                await self.stop_all_metrics()
+                logger.error(f"[DEBUG-TRACE: TTS] Smallest TTS error: {msg.get('error', msg)}")
+                await self.push_error(error_msg=f"Smallest TTS error: {msg.get('error', msg)}")
+            else:
+                logger.warning(f"{self} unknown message status: {msg}")
+
+
+class SarvamLLMService(BaseSarvamLLMService):
+    """Sarvam LLM service with detailed debug logging and reasoning detection."""
+
+    Settings = BaseSarvamLLMService.Settings
+
+    async def get_chat_completions(self, context: LLMContext):
+        t0 = time.monotonic()
+        adapter = self.get_llm_adapter()
+        messages = (
+            adapter.get_messages_for_logging(context)
+            if hasattr(adapter, "get_messages_for_logging")
+            else []
+        )
+        last_msg = messages[-1] if messages else {}
+        last_role = last_msg.get("role") if isinstance(last_msg, dict) else "?"
+        last_content = (
+            last_msg.get("content") if isinstance(last_msg, dict) else str(last_msg)
+        )
+
+        params_from_context = adapter.get_llm_invocation_params(
+            context,
+            system_instruction=assert_given(self._settings.system_instruction),
+            convert_developer_to_user=not self.supports_developer_role,
+        )
+        params = self.build_chat_completion_params(params_from_context)
+        model = params.get("model")
+        temp = params.get("temperature")
+        effort = params.get("reasoning_effort")
+        tools = params.get("tools")
+        tool_names = (
+            [t.get("function", {}).get("name") for t in tools]
+            if isinstance(tools, list)
+            else []
+        )
+
+        logger.info(
+            f"[DEBUG-TRACE: LLM] Request START -> model={model}, temp={temp}, "
+            f"reasoning_effort={effort}, tools={tool_names}, "
+            f"total_messages={len(messages)}, last_role={last_role}, "
+            f"last_user_prompt={repr(str(last_content)[:140])}"
+        )
+        try:
+            stream = await super().get_chat_completions(context)
+            logger.info(
+                f"[DEBUG-TRACE: LLM] HTTP stream connection response received in {(time.monotonic() - t0)*1000:.1f}ms"
+            )
+            return stream
+        except Exception as e:
+            logger.error(
+                f"[DEBUG-TRACE: LLM] HTTP stream connection FAILED after {(time.monotonic() - t0)*1000:.1f}ms: {e}"
+            )
+            raise
+
+    @traced_llm
+    async def _process_context(self, context: LLMContext):
+        functions_list = []
+        arguments_list = []
+        tool_id_list = []
+        func_idx = 0
+        function_name = ""
+        arguments = ""
+        tool_call_id = ""
+
+        self._pending_node_transition_function_calls = []
+        text_generated_signal = False
+
+        await self.start_ttfb_metrics()
+
+        t_start = time.monotonic()
+        chunk_stream = await self.get_chat_completions(context)
+
+        @asynccontextmanager
+        async def _closing(stream):
+            chunk_iter = stream.__aiter__()
+            try:
+                yield chunk_iter
+            finally:
+                if hasattr(chunk_iter, "aclose"):
+                    await chunk_iter.aclose()
+                if hasattr(stream, "close"):
+                    await stream.close()
+                elif hasattr(stream, "aclose"):
+                    await stream.aclose()
+
+        chunk_count = 0
+        first_chunk_time = None
+        first_content_time = None
+        reasoning_chars = 0
+        content_chars = 0
+        finish_reason = None
+        tool_call_chunks = 0
+        last_reasoning_log_time = t_start
+
+        async with _closing(chunk_stream) as chunk_iter:
+            async for chunk in chunk_iter:
+                chunk_count += 1
+                now = time.monotonic()
+                if first_chunk_time is None:
+                    first_chunk_time = now
+                    logger.info(
+                        f"[DEBUG-TRACE: LLM] FIRST chunk arrived from Sarvam in {(first_chunk_time - t_start)*1000:.1f}ms (TTFB)"
+                    )
+
+                if chunk.usage:
+                    cached_tokens = (
+                        chunk.usage.prompt_tokens_details.cached_tokens
+                        if chunk.usage.prompt_tokens_details
+                        else None
+                    )
+                    reasoning_tokens = (
+                        chunk.usage.completion_tokens_details.reasoning_tokens
+                        if chunk.usage.completion_tokens_details
+                        else None
+                    )
+                    tokens = LLMTokenUsage(
+                        prompt_tokens=chunk.usage.prompt_tokens,
+                        completion_tokens=chunk.usage.completion_tokens,
+                        total_tokens=chunk.usage.total_tokens,
+                        cache_read_input_tokens=cached_tokens,
+                        reasoning_tokens=reasoning_tokens,
+                    )
+                    await self.start_llm_usage_metrics(tokens)
+
+                if chunk.model and self.get_full_model_name() != chunk.model:
+                    self.set_full_model_name(chunk.model)
+
+                if chunk.choices is None or len(chunk.choices) == 0:
+                    continue
+
+                choice = chunk.choices[0]
+                if choice.finish_reason:
+                    finish_reason = choice.finish_reason
+
+                delta = choice.delta
+                if not delta:
+                    continue
+
+                # Check for reasoning tokens/traces (e.g. reasoning_content)
+                delta_reasoning = getattr(delta, "reasoning_content", None) or getattr(delta, "reasoning", None)
+                if not delta_reasoning and hasattr(delta, "model_extra") and delta.model_extra:
+                    delta_reasoning = delta.model_extra.get("reasoning_content") or delta.model_extra.get("reasoning")
+
+                if delta_reasoning:
+                    reasoning_chars += len(delta_reasoning)
+                    if (now - last_reasoning_log_time) >= 1.5 or chunk_count <= 2:
+                        last_reasoning_log_time = now
+                        logger.info(
+                            f"[DEBUG-TRACE: LLM: REASONING] Chunk #{chunk_count} (+{(now - t_start)*1000:.1f}ms): "
+                            f"accumulated {reasoning_chars} reasoning chars | latest: {repr(delta_reasoning[:60])}"
+                        )
+
+                if delta.tool_calls:
+                    tool_call_chunks += 1
+                    tool_call = delta.tool_calls[0]
+                    if tool_call.index != func_idx:
+                        functions_list.append(function_name)
+                        arguments_list.append(arguments or "{}")
+                        tool_id_list.append(tool_call_id)
+                        function_name = ""
+                        arguments = ""
+                        tool_call_id = ""
+                        func_idx += 1
+                    if tool_call.function and tool_call.function.name:
+                        function_name += tool_call.function.name
+                        tool_call_id = tool_call.id
+                        logger.info(
+                            f"[DEBUG-TRACE: LLM: TOOL CALL] Tool name: '{tool_call.function.name}' (+{(now - t_start)*1000:.1f}ms)"
+                        )
+                    if tool_call.function and tool_call.function.arguments:
+                        arguments += tool_call.function.arguments
+
+                elif delta.content:
+                    if first_content_time is None:
+                        first_content_time = now
+                        await self.stop_ttfb_metrics()
+                        logger.info(
+                            f"[DEBUG-TRACE: LLM: FIRST CONTENT CHUNK] (+{(first_content_time - t_start)*1000:.1f}ms from stream start, "
+                            f"reasoning_chars_before_content={reasoning_chars}): text={repr(delta.content)}"
+                        )
+                    content_chars += len(delta.content)
+                    text_generated_signal = True
+                    await self._push_llm_text(delta.content)
+
+                elif (
+                    hasattr(delta, "audio")
+                    and delta.audio
+                    and delta.audio.get("transcript")
+                ):
+                    await self.push_frame(LLMTextFrame(delta.audio["transcript"]))
+
+        t_end = time.monotonic()
+        total_duration_ms = (t_end - t_start) * 1000
+        logger.info(
+            f"[DEBUG-TRACE: LLM] Stream COMPLETED in {total_duration_ms:.1f}ms: "
+            f"chunks={chunk_count}, content_chars={content_chars}, reasoning_chars={reasoning_chars}, "
+            f"finish_reason={finish_reason}, "
+            f"first_content_latency={(first_content_time - t_start)*1000 if first_content_time else -1:.1f}ms, "
+            f"tool_call_chunks={tool_call_chunks}"
+        )
+
+        if content_chars == 0 and not function_name:
+            logger.warning(
+                f"[DEBUG-TRACE: LLM] DEAD AIR WARNING: LLM stream produced 0 content text and NO tool calls! "
+                f"Total reasoning chars: {reasoning_chars}, finish_reason: {finish_reason}"
+            )
+
+        if function_name:
+            functions_list.append(function_name)
+            arguments_list.append(arguments or "{}")
+            tool_id_list.append(tool_call_id)
+
+            function_calls = []
+            for function_name, arguments, tool_id in zip(
+                functions_list, arguments_list, tool_id_list
+            ):
+                try:
+                    arguments = json.loads(arguments)
+                except json.JSONDecodeError:
+                    logger.warning(f"{self}: Failed to parse function call arguments: {arguments}")
+                    continue
+                function_calls.append(
+                    FunctionCallFromLLM(
+                        context=context,
+                        tool_call_id=tool_id,
+                        function_name=function_name,
+                        arguments=arguments,
+                    )
+                )
+
+            logger.info(
+                f"[DEBUG-TRACE: LLM] Dispatching function calls: {[fc.function_name for fc in function_calls]}"
+            )
+            await self.push_frame(
+                FunctionCallsFromLLMInfoFrame(function_calls=function_calls),
+                direction=FrameDirection.DOWNSTREAM,
+            )
+            await self._run_or_defer_function_calls(
+                function_calls,
+                text_generated=text_generated_signal,
+            )
 
 
 @_report_service_factory_failures(ErrorSource.STT, config_section="stt")

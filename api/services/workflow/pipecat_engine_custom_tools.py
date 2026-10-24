@@ -634,6 +634,8 @@ class CustomToolManager:
                                 transcript=result.transcript,
                                 persist_to_logs=True,
                             )
+                        else:
+                            self._engine._queued_speech_mute_state = "idle"
                 elif custom_message:
                     logger.info(
                         f"Playing custom message before HTTP tool: {custom_message}"

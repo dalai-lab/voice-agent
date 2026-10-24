@@ -251,14 +251,18 @@ def _create_non_realtime_user_turn_stop_strategies(
 ):
     """Return user turn stop strategies for non-realtime pipelines."""
 
-    if uses_external_turns:
-        return [ExternalUserTurnStopStrategy()]
-
     silence_secs = float(
         run_configs.get(
             "turn_silence_timeout_secs", DEFAULT_TURN_SILENCE_TIMEOUT_SECS
         )
     )
+
+    if uses_external_turns:
+        return [
+            ExternalUserTurnStopStrategy(),
+            # Safety fallback: prevents orphaned or delayed turns if external STT VAD stalls
+            SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=silence_secs + 0.4),
+        ]
 
     if run_configs.get("turn_stop_strategy") == "turn_analyzer":
         smart_turn_params = SmartTurnParams(

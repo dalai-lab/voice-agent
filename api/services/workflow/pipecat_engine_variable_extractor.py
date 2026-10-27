@@ -9,6 +9,7 @@ from api.services.pipecat.tracing_config import ensure_tracing
 from api.services.workflow.dto import ExtractionVariableDTO
 from loguru import logger
 from opentelemetry import trace
+from pipecat.metrics.metrics import LLMUsageMetricsData
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.utils.tracing.service_attributes import add_llm_span_attributes
 
@@ -276,10 +277,20 @@ class VariableExtractionManager:
         # ------------------------------------------------------------------
         used_llm = self._engine.variable_extraction_llm
         llm_response = None
+        token_usage = None
         try:
-            llm_response = await self._engine.variable_extraction_llm.run_inference(
-                extraction_context, system_instruction=system_prompt
-            )
+            if hasattr(used_llm, "run_inference_with_usage"):
+                llm_response, token_usage = await used_llm.run_inference_with_usage(
+                    extraction_context, system_instruction=system_prompt
+                )
+            else:
+                res = await used_llm.run_inference(
+                    extraction_context, system_instruction=system_prompt
+                )
+                if isinstance(res, tuple):
+                    llm_response, token_usage = res
+                else:
+                    llm_response = res
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -295,9 +306,18 @@ class VariableExtractionManager:
                     f"Falling back to primary conversation LLM ({fallback_llm.__class__.__name__})."
                 )
                 try:
-                    llm_response = await fallback_llm.run_inference(
-                        extraction_context, system_instruction=system_prompt
-                    )
+                    if hasattr(fallback_llm, "run_inference_with_usage"):
+                        llm_response, token_usage = await fallback_llm.run_inference_with_usage(
+                            extraction_context, system_instruction=system_prompt
+                        )
+                    else:
+                        res = await fallback_llm.run_inference(
+                            extraction_context, system_instruction=system_prompt
+                        )
+                        if isinstance(res, tuple):
+                            llm_response, token_usage = res
+                        else:
+                            llm_response = res
                     used_llm = fallback_llm
                 except asyncio.CancelledError:
                     raise
@@ -307,8 +327,26 @@ class VariableExtractionManager:
             else:
                 raise
 
-        # Get model name for tracing
+        # Get model name for tracing and telemetry
         model_name = getattr(used_llm, "model_name", "unknown")
+
+        # Record extraction token usage in pipeline_metrics_aggregator
+        aggregator = getattr(self._engine, "_pipeline_metrics_aggregator", None) or getattr(
+            self._engine, "pipeline_metrics_aggregator", None
+        )
+        if aggregator is not None and token_usage is not None:
+            usage_data = LLMUsageMetricsData(
+                processor="variable_extraction:extraction",
+                model=model_name,
+                value=token_usage,
+            )
+            try:
+                if hasattr(aggregator, "_handle_llm_usage_metrics"):
+                    res = aggregator._handle_llm_usage_metrics(usage_data)
+                    if asyncio.iscoroutine(res):
+                        await res
+            except Exception as metric_err:
+                logger.warning(f"Failed to record extraction LLM usage metrics: {metric_err}")
 
         if ensure_tracing():
             tracer = trace.get_tracer("pipecat")

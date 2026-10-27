@@ -638,6 +638,7 @@ async def execute_text_chat_pending_turn(
     # from the browser pipeline so TTS/recording helpers still have sane defaults.
     audio_config = create_audio_config(WorkflowRunMode.SMALLWEBRTC.value)
     pipeline_metrics_aggregator = PipelineMetricsAggregator()
+    engine.set_pipeline_metrics_aggregator(pipeline_metrics_aggregator)
 
     # Stitch every per-turn pipeline of this session into one Langfuse trace by
     # handing each task the same remote parent context (derived from the run id).

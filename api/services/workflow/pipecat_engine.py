@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from api.db import db_client
 from api.enums import ToolCategory
@@ -87,9 +87,11 @@ class PipecatEngine:
         context_compaction_enabled: bool = False,
         enable_dtmf: bool = False,
         cross_node_variable_injection_enabled: bool = False,
+        pipeline_metrics_aggregator: Any | None = None,
     ):
         self.task = task
         self.llm = llm
+        self._pipeline_metrics_aggregator = pipeline_metrics_aggregator
         # LLM used for out-of-band inference (variable extraction, context
         # summarization). Falls back to the pipeline LLM when not provided.
         # In realtime mode the pipeline LLM is a speech-to-speech service
@@ -1110,6 +1112,15 @@ class PipecatEngine:
     def user_aggregator(self):
         """Return the user context aggregator, or None if not yet set."""
         return self._user_aggregator
+
+    def set_pipeline_metrics_aggregator(self, pipeline_metrics_aggregator) -> None:
+        """Set the pipeline metrics aggregator for usage and telemetry recording."""
+        self._pipeline_metrics_aggregator = pipeline_metrics_aggregator
+
+    @property
+    def pipeline_metrics_aggregator(self):
+        """Return the pipeline metrics aggregator, or None if not set."""
+        return self._pipeline_metrics_aggregator
 
     def set_transport_output(self, transport_output) -> None:
         """Set the transport output processor for direct audio playback.

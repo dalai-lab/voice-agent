@@ -262,7 +262,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "8005:8000"
+      - "${API_PORT:-8005}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -325,7 +325,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "3010:3010"
+      - "${UI_PORT:-3010}:3010"
     depends_on:
       api:
         condition: service_healthy
@@ -386,4 +386,5 @@ volumes:
 
 networks:
   app-network:
+    name: voice-agent_app-network
     driver: bridge

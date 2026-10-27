@@ -1154,6 +1154,7 @@ async def _run_pipeline_impl(
     )
 
     pipeline_metrics_aggregator = PipelineMetricsAggregator()
+    engine.set_pipeline_metrics_aggregator(pipeline_metrics_aggregator)
 
     user_context_aggregator = context_aggregator.user()
     assistant_context_aggregator = context_aggregator.assistant()

@@ -328,7 +328,15 @@ class VariableExtractionManager:
                 raise
 
         # Get model name for tracing and telemetry
-        model_name = getattr(used_llm, "model_name", "unknown")
+        model_name = (
+            getattr(getattr(used_llm, "_settings", None), "model", None)
+            or getattr(getattr(used_llm, "settings", None), "model", None)
+            or getattr(used_llm, "model_name", None)
+            or getattr(used_llm, "model", None)
+            or getattr(used_llm, "_model_name", None)
+            or getattr(used_llm, "_model", None)
+            or "unknown"
+        )
 
         # Record extraction token usage in pipeline_metrics_aggregator
         aggregator = getattr(self._engine, "_pipeline_metrics_aggregator", None) or getattr(

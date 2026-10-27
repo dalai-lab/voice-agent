@@ -363,6 +363,16 @@ def register_event_handlers(
 
         usage_info = pipeline_metrics_aggregator.get_all_usage_metrics_serialized()
 
+        # If STT usage is empty, record full duplex audio duration for the configured STT model
+        if not usage_info.get("stt") and workflow_run and workflow_run.initial_context:
+            rc = workflow_run.initial_context.get("runtime_configuration") or {}
+            stt_p = rc.get("stt_provider")
+            stt_m = rc.get("stt_model")
+            dur = usage_info.get("call_duration_seconds", 0)
+            if stt_p or stt_m:
+                stt_key = f"{stt_p or 'sarvam'}|||{stt_m or 'saaras:v4'}"
+                usage_info["stt"] = {stt_key: {"audio_seconds": float(dur)}}
+
         logger.debug(
             f"Usage metrics: {usage_info}, Gathered context: {gathered_context}"
         )

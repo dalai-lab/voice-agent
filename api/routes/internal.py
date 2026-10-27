@@ -148,6 +148,18 @@ async def get_internal_run(
     if run.workflow:
         org_id = run.workflow.organization_id
 
+    runtime_config = {}
+    init_ctx = getattr(run, "initial_context", None)
+    if init_ctx:
+        if isinstance(init_ctx, str):
+            try:
+                import json
+                init_ctx = json.loads(init_ctx)
+            except Exception:
+                init_ctx = {}
+        if isinstance(init_ctx, dict):
+            runtime_config = init_ctx.get("runtime_configuration") or {}
+
     return {
         "id": run.id,
         "organization_id": org_id,
@@ -156,6 +168,7 @@ async def get_internal_run(
         "mode": run.mode,
         "duration_seconds": dur,
         "usage_info": run.usage_info or {},
+        "runtime_configuration": runtime_config,
     }
 
 

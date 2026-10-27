@@ -155,6 +155,7 @@ async def get_internal_run(
         "status": getattr(run.state, "value", str(run.state)),
         "mode": run.mode,
         "duration_seconds": dur,
+        "usage_info": run.usage_info or {},
     }
 
 

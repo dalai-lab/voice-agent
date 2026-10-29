@@ -10,6 +10,15 @@ const nextConfig: NextConfig = {
   experimental: {
     serverSourceMaps: true,
   },
+  async redirects() {
+    return [
+      {
+        source: "/models",
+        destination: "/overview",
+        permanent: false,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {

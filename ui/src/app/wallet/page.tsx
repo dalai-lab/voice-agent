@@ -209,7 +209,7 @@ export default function WalletPage() {
     ? (isCustomPlan
         ? (subscription?.custom_activation_deposit_paise ?? 600000) / 100
         : PLAN_MINIMUMS[currentPlan] ?? 6000)
-    : 500;
+    : 1;
 
   const currentMinuteRate = subscription?.per_minute_rate_paise ? subscription.per_minute_rate_paise / 100 : (currentPlan === "pro" ? 18 : 6);
   const parsedTopupAmount = parseInt(topupAmount) || 0;
@@ -636,7 +636,9 @@ export default function WalletPage() {
   const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
   const currentTransactions = filteredTransactions.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
-  const quickPresets = [2000, 5000, 10000, 25000];
+  const quickPresets = isActivationNeeded
+    ? [minTopup, minTopup + 5000, minTopup + 10000, minTopup + 20000]
+    : [2000, 5000, 10000, 25000];
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 space-y-8 bg-background text-foreground font-sans">
@@ -675,21 +677,21 @@ export default function WalletPage() {
       </div>
 
       {/* Alerts */}
-      {isActivation && (
-        <div className="border border-border bg-card p-4 rounded-xl flex items-start gap-3.5 shadow-2xs">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0 mt-0.5">
-            <ShieldCheck className="w-4 h-4" />
+      {isActivationNeeded && (
+        <div className="border border-blue-500/20 bg-blue-500/5 dark:bg-blue-500/10 p-4 rounded-xl flex items-start gap-3.5 text-blue-900 dark:text-blue-300 shadow-2xs">
+          <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">
+            <Sparkles className="w-4 h-4" />
           </div>
           <div>
             <h4 className="text-xs font-semibold text-foreground">Activation Deposit Required</h4>
             <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-              Add at least ₹{minTopup.toLocaleString()} to initialize your voice lines and complete workspace onboarding.
+              Your workspace is awaiting activation. A minimum deposit of <strong className="text-foreground">₹{minTopup.toLocaleString()}</strong> is required to initialize your voice lines, configure AI models, and complete onboarding.
             </p>
           </div>
         </div>
       )}
 
-      {isZero && !isActivation && (
+      {isZero && !isActivationNeeded && (
         <div className="border border-rose-500/20 bg-rose-500/5 dark:bg-rose-500/10 p-4 rounded-xl flex items-start gap-3.5 text-rose-800 dark:text-rose-300">
           <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <div>
@@ -901,7 +903,14 @@ export default function WalletPage() {
 
           {/* Custom Input */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Or Enter Custom Amount</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground">Or Enter Custom Amount</label>
+              {isActivationNeeded && (
+                <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                  Min. activation deposit: ₹{minTopup.toLocaleString()}
+                </span>
+              )}
+            </div>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">₹</span>
               <Input
@@ -909,10 +918,15 @@ export default function WalletPage() {
                 min={minTopup}
                 value={topupAmount}
                 onChange={(e) => setTopupAmount(e.target.value)}
-                placeholder={`Minimum ₹${minTopup}`}
+                placeholder={`Minimum ₹${minTopup.toLocaleString()}`}
                 className="pl-8 h-10 rounded-lg text-sm bg-background border-border"
               />
             </div>
+            {isActivationNeeded && parseInt(topupAmount || "0") < minTopup && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                A minimum deposit of ₹{minTopup.toLocaleString()} is required to activate your workspace lines.
+              </p>
+            )}
           </div>
 
           {/* Estimated Talk Time Banner */}
@@ -932,7 +946,11 @@ export default function WalletPage() {
               disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing}
               className="w-full sm:flex-1 h-10 rounded-lg text-xs font-semibold bg-foreground text-background hover:bg-foreground/90 shadow-xs"
             >
-              {isProcessing ? "Opening Checkout..." : `Pay ₹${parsedTopupAmount > 0 ? parsedTopupAmount.toLocaleString() : "0"} Securely`}
+              {isProcessing
+                ? "Opening Checkout..."
+                : isActivationNeeded
+                ? `Pay ₹${parsedTopupAmount > 0 ? parsedTopupAmount.toLocaleString() : "0"} & Activate Workspace`
+                : `Pay ₹${parsedTopupAmount > 0 ? parsedTopupAmount.toLocaleString() : "0"} Securely`}
             </Button>
           </div>
         </div>

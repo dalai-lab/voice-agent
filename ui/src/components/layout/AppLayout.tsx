@@ -144,8 +144,6 @@ function TalkarStatusGate() {
         <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
         <span>Workspace activation pending. Add credits to your wallet to activate your agent.</span>
         <Link href="/wallet" className="ml-1 font-semibold underline underline-offset-4 hover:opacity-80">Go to Wallet →</Link>
-        <span className="opacity-40">|</span>
-        <Link href="/onboarding/select-plan" className="font-semibold underline underline-offset-4 hover:opacity-80">Change Plan</Link>
       </div>
     );
   }

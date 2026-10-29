@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
         destination: "/overview",
         permanent: false,
       },
+      {
+        source: "/onboarding/select-plan",
+        destination: "/wallet",
+        permanent: false,
+      },
     ];
   },
   async rewrites() {

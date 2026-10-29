@@ -209,7 +209,7 @@ export default function WalletPage() {
     ? (isCustomPlan
         ? (subscription?.custom_activation_deposit_paise ?? 600000) / 100
         : PLAN_MINIMUMS[currentPlan] ?? 6000)
-    : 1;
+    : 500;
 
   const currentMinuteRate = subscription?.per_minute_rate_paise ? subscription.per_minute_rate_paise / 100 : (currentPlan === "pro" ? 18 : 6);
   const parsedTopupAmount = parseInt(topupAmount) || 0;

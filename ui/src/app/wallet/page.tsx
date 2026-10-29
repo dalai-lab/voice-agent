@@ -413,22 +413,53 @@ export default function WalletPage() {
     }
     const dograhOrgId = resolvedOrgId;
     try {
-      const custRes = await fetch(`${TALKAR}/billing/razorpay-customer/create`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          dograh_org_id: dograhOrgId, 
-          name: (user as any)?.name || (user as any)?.displayName, 
-          email: (user as any)?.email || (user as any)?.primaryEmail 
-        })
-      });
-      const customer = await custRes.json();
+      const userName =
+        (user as any)?.name ||
+        (user as any)?.displayName ||
+        email?.split("@")[0] ||
+        "Customer";
+      const userEmail =
+        email ||
+        (user as any)?.email ||
+        (user as any)?.primaryEmail ||
+        "";
+
+      let customerId: string | undefined;
+      try {
+        const custRes = await fetch(`${TALKAR}/billing/razorpay-customer/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            dograh_org_id: dograhOrgId, 
+            name: userName, 
+            email: userEmail 
+          })
+        });
+        if (custRes.ok) {
+          const customer = await custRes.json().catch(() => ({}));
+          customerId = customer.razorpay_customer_id;
+        }
+      } catch (e) {
+        console.warn("Failed to create Razorpay customer ahead of session:", e);
+      }
       
       const sessionRes = await fetch(`${TALKAR}/billing/wallet/add-card/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dograh_org_id: dograhOrgId })
       });
+      
+      if (!sessionRes.ok) {
+        const errText = await sessionRes.text().catch(() => "");
+        let errMsg = "Failed to initiate card setup";
+        try {
+          const errData = JSON.parse(errText);
+          errMsg = errData.detail || errData.message || errMsg;
+        } catch {
+          if (errText) errMsg = errText;
+        }
+        throw new Error(errMsg);
+      }
       const session = await sessionRes.json();
 
       if (isMock) {
@@ -449,22 +480,27 @@ export default function WalletPage() {
       }
 
       const statusRes = await fetch(`${TALKAR}/customers/status?dograh_org_id=${dograhOrgId}`);
-      const statusData = await statusRes.json();
-      const rzpKey = statusData.razorpay_key_id;
+      const statusData = await statusRes.json().catch(() => ({}));
+      const rzpKey = statusData?.razorpay_key_id;
 
       if (!rzpKey) {
         alert("Payment gateway key missing.");
         return;
       }
 
-      const rzp = new (window as any).Razorpay({
+      if (!session.razorpay_order_id) {
+        throw new Error("Missing verification order ID from gateway session");
+      }
+
+      const finalCustomerId = session.razorpay_customer_id || customerId;
+
+      const rzpOptions: any = {
         key: rzpKey,
-        amount: session.amount_paise,
+        amount: session.amount_paise || 200,
         currency: "INR",
         name: "Verify Payment Method",
         description: "Zero-charge authorization for automated reloads",
         order_id: session.razorpay_order_id,
-        customer_id: customer.razorpay_customer_id,
         recurring: "1",
         handler: async (response: any) => {
           const confirmRes = await fetch(`${TALKAR}/billing/confirm-add-card`, {
@@ -480,17 +516,26 @@ export default function WalletPage() {
           if (confirmRes.ok) {
             setHasSavedCard(true);
             alert("Card authorized successfully.");
+          } else {
+            const err = await confirmRes.json().catch(() => ({}));
+            alert(err.detail || "Failed to confirm card verification");
           }
         },
         prefill: {
-          name: (user as any)?.name || "",
-          email: (user as any)?.email || "",
+          name: userName,
+          email: userEmail,
         }
-      });
+      };
+
+      if (finalCustomerId) {
+        rzpOptions.customer_id = finalCustomerId;
+      }
+
+      const rzp = new (window as any).Razorpay(rzpOptions);
       rzp.open();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to initiate card setup");
+      alert(err.message || "Failed to initiate card setup");
     }
   };
 

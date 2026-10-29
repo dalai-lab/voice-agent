@@ -74,6 +74,12 @@ async function proxy(request: NextRequest, method: string, path: string) {
       return NextResponse.json(data, { status: upstream.status });
     }
     const text = await upstream.text();
+    if (upstream.status >= 400) {
+      return NextResponse.json(
+        { detail: text || `Upstream service error (${upstream.status})` },
+        { status: upstream.status }
+      );
+    }
     return new NextResponse(text, {
       status: upstream.status,
       headers: { "Content-Type": contentType || "text/plain" },

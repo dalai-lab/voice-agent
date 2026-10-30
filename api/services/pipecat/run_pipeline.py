@@ -266,15 +266,16 @@ def _create_non_realtime_user_turn_stop_strategies(
                 "smart_turn_stop_secs", DEFAULT_SMART_TURN_STOP_SECS
             )
         )
+        fallback_timeout = max(silence_secs + 0.6, float(smart_turn_params.stop_secs) + 0.5)
         logger.info(
-            f"[DEBUG-TRACE: TURN-STRATEGY] Enabled TurnAnalyzerUserTurnStopStrategy (stop_secs={smart_turn_params.stop_secs}s, fallback_timeout={silence_secs + 0.6}s)"
+            f"[DEBUG-TRACE: TURN-STRATEGY] Enabled TurnAnalyzerUserTurnStopStrategy (stop_secs={smart_turn_params.stop_secs}s, fallback_timeout={fallback_timeout}s)"
         )
         return [
             TurnAnalyzerUserTurnStopStrategy(
                 turn_analyzer=LocalSmartTurnAnalyzerV3(params=smart_turn_params)
             ),
             # Safety fallback: prevents orphaned turns if ML model stalls on single words
-            SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=silence_secs + 0.6),
+            SpeechTimeoutUserTurnStopStrategy(user_speech_timeout=fallback_timeout),
         ]
 
     logger.info(

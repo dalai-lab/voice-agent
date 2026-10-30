@@ -43,6 +43,10 @@ async def get_user(
     if x_api_key:
         return await _handle_api_key_auth(x_api_key)
 
+    if authorization and (authorization.startswith("Bearer dgr_") or authorization.startswith("dgr_")):
+        token = authorization[7:].strip() if authorization.startswith("Bearer ") else authorization.strip()
+        return await _handle_api_key_auth(token)
+
     # ------------------------------------------------------------------
     # Check if we're using local (email/password) auth
     # ------------------------------------------------------------------
@@ -399,8 +403,9 @@ async def _handle_api_key_auth(api_key: str) -> UserModel:
     # Set the organization context to the API key's organization
     user.selected_organization_id = api_key_model.organization_id
 
+    key_pfx = getattr(api_key_model, "key_prefix", "dgr_")
     logger.debug(
-        f"Authenticated via API key: {api_key_model.key_prefix}... "
+        f"Authenticated via API key: {key_pfx}... "
         f"(user_id={user.id}, org_id={api_key_model.organization_id})"
     )
 

@@ -232,6 +232,9 @@ class PipecatEngine:
             # Helper that encapsulates context summarization
             if self._context_compaction_enabled:
                 self._context_summarization_manager = ContextSummarizationManager(self)
+                logger.info("[CONTEXT-COMPACTION] Context compaction enabled and manager initialized for this call")
+            else:
+                logger.debug("[CONTEXT-COMPACTION] Context compaction is disabled for this call")
 
             call_id = self._call_context_vars.get("call_id")
             if call_id:

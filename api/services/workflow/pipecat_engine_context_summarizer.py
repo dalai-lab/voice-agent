@@ -85,7 +85,16 @@ class ContextSummarizationManager:
             messages = context.messages
             # Not worth summarizing if context is small
             if len(messages) <= 6:
+                logger.debug(
+                    f"[CONTEXT-COMPACTION] Context has {len(messages)} messages (threshold: <= 6), skipping summarization."
+                )
                 return
+
+            model_name = getattr(llm, "model_name", llm.__class__.__name__)
+            logger.info(
+                f"[CONTEXT-COMPACTION] Triggered for node '{current_node.name}': "
+                f"evaluating {len(messages)} messages using model '{model_name}'..."
+            )
 
             config = self._config
             request_frame = LLMContextSummaryRequestFrame(
@@ -180,8 +189,9 @@ class ContextSummarizationManager:
 
             context.set_messages(new_messages)
             logger.info(
-                f"Background context summarization applied: "
-                f"{len(current_messages)} -> {len(new_messages)} messages"
+                f"[CONTEXT-COMPACTION] Successfully applied: "
+                f"{len(current_messages)} -> {len(new_messages)} messages "
+                f"(compressed {last_index + 1} messages into summary, kept {len(recent_messages)} recent turns verbatim)."
             )
         except asyncio.CancelledError:
             logger.debug("Context summarization cancelled (new transition started)")

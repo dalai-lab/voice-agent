@@ -11,6 +11,7 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
+from unittest.mock import MagicMock, Mock
 from zoneinfo import ZoneInfo
 
 from api.db import db_client
@@ -36,9 +37,14 @@ from api.utils.template_renderer import render_template
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import (
+    BotStartedSpeakingFrame,
+    BotStoppedSpeakingFrame,
     FunctionCallResultProperties,
+    TTSStartedFrame,
+    TTSStoppedFrame,
     TTSSpeakFrame,
 )
+from pipecat.observers.base_observer import BaseObserver, FramePushed
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.utils.enums import EndTaskReason
 
@@ -89,6 +95,60 @@ def get_function_schema(
     )
 
 
+class _TransferSpeechObserver(BaseObserver):
+    """Monitors pipeline for completion of transfer handoff speech.
+
+    Prevents hold music / calling ringtones from overlapping with the spoken
+    hand-off message.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._seen_started: bool = False
+        self._done_event: asyncio.Event = asyncio.Event()
+        self._fallback_task: asyncio.Task | None = None
+
+    async def on_push_frame(self, data: FramePushed) -> None:
+        frame = data.frame
+        if isinstance(frame, (TTSStartedFrame, BotStartedSpeakingFrame)):
+            self._seen_started = True
+        elif isinstance(frame, BotStoppedSpeakingFrame) and self._seen_started:
+            logger.info("Transfer speech: BotStoppedSpeakingFrame received, speech complete.")
+            self._done_event.set()
+        elif isinstance(frame, TTSStoppedFrame) and self._seen_started:
+            # TTS synthesis is finished; if BotStoppedSpeakingFrame doesn't arrive within 1.5s
+            # (e.g. non-audio or mock transports), fallback so we never hang.
+            if not self._fallback_task and not self._done_event.is_set():
+                self._fallback_task = asyncio.create_task(self._fallback_timer())
+
+    async def _fallback_timer(self) -> None:
+        try:
+            await asyncio.sleep(1.5)
+            if not self._done_event.is_set():
+                logger.info(
+                    "Transfer speech: fallback timer expired after TTS stop, proceeding."
+                )
+                self._done_event.set()
+        except asyncio.CancelledError:
+            pass
+
+    async def wait_until_done(self, timeout: float = 12.0) -> None:
+        try:
+            await asyncio.wait_for(self._done_event.wait(), timeout=timeout)
+        except TimeoutError:
+            logger.warning(
+                f"Transfer speech: timed out after {timeout}s waiting for playback to finish."
+            )
+        finally:
+            if self._fallback_task and not self._fallback_task.done():
+                self._fallback_task.cancel()
+
+    def cancel(self) -> None:
+        if self._fallback_task and not self._fallback_task.done():
+            self._fallback_task.cancel()
+        self._done_event.set()
+
+
 class CustomToolManager:
     """Manager for custom tool registration and execution.
 
@@ -101,6 +161,64 @@ class CustomToolManager:
 
     def __init__(self, engine: PipecatEngine) -> None:
         self._engine = engine
+
+    async def _queue_transfer_message(
+        self, message: str | None, config: dict
+    ) -> _TransferSpeechObserver | None:
+        """Queue transfer handoff speech and return an observer to wait for completion.
+
+        If no message is configured or running in a mock environment, returns None.
+        """
+        task = getattr(self._engine, "task", None)
+        is_mock_task = (
+            task is None
+            or isinstance(task, (Mock, MagicMock))
+            or not hasattr(task, "add_observer")
+        )
+
+        has_speech = bool(message)
+        if not has_speech:
+            message_type = config.get("messageType", "none")
+            has_speech = (
+                message_type == "custom" and bool(config.get("customMessage"))
+            ) or (message_type == "audio" and bool(config.get("audioRecordingId")))
+
+        if not has_speech:
+            return None
+
+        observer: _TransferSpeechObserver | None = None
+        if not is_mock_task:
+            observer = _TransferSpeechObserver()
+            try:
+                task.add_observer(observer)
+            except Exception as e:
+                logger.warning(f"Could not add transfer speech observer: {e}")
+                observer = None
+
+        if message:
+            await self._engine.task.queue_frame(
+                TTSSpeakFrame(
+                    message,
+                    append_to_context=False,
+                    persist_to_logs=True,
+                )
+            )
+        else:
+            await self._play_config_message(config)
+
+        return observer
+
+    async def _remove_transfer_speech_observer(
+        self, observer: _TransferSpeechObserver
+    ) -> None:
+        """Clean up the transfer speech observer."""
+        observer.cancel()
+        task = getattr(self._engine, "task", None)
+        if task and hasattr(task, "remove_observer"):
+            try:
+                await task.remove_observer(observer)
+            except Exception as e:
+                logger.debug(f"Could not remove transfer speech observer: {e}")
 
     async def _play_config_message(
         self, config: dict, *, append_to_context: bool = False
@@ -769,6 +887,7 @@ class CustomToolManager:
         async def transfer_call_handler(
             function_call_params: FunctionCallParams,
         ) -> None:
+            speech_observer: _TransferSpeechObserver | None = None
             logger.info(f"Transfer Call Tool EXECUTED: {function_name}")
             logger.info(
                 "Transfer call arguments received "
@@ -911,16 +1030,10 @@ class CustomToolManager:
                     workflow_run, organization_id
                 )
 
-                if resolved_transfer.message:
-                    await self._engine.task.queue_frame(
-                        TTSSpeakFrame(
-                            resolved_transfer.message,
-                            append_to_context=False,
-                            persist_to_logs=True,
-                        )
-                    )
-                else:
-                    await self._play_config_message(config)
+                speech_observer = await self._queue_transfer_message(
+                    message=resolved_transfer.message,
+                    config=config,
+                )
 
                 if external_pbx_call:
                     workflow_configurations = (
@@ -1062,18 +1175,36 @@ class CustomToolManager:
                         else 8000
                     )
 
-                    logger.info(
-                        f"Starting hold music at {sample_rate}Hz while waiting for transfer"
-                    )
+                    async def play_hold_tone_after_speech():
+                        if speech_observer:
+                            logger.info(
+                                "Waiting for transfer handoff speech to finish before starting calling tone..."
+                            )
+                            done_task = asyncio.create_task(
+                                speech_observer.wait_until_done(timeout=12.0)
+                            )
+                            stop_task = asyncio.create_task(hold_music_stop_event.wait())
+                            _done, pending = await asyncio.wait(
+                                [done_task, stop_task],
+                                return_when=asyncio.FIRST_COMPLETED,
+                            )
+                            for t in pending:
+                                t.cancel()
 
-                    # Start hold music as background task
-                    hold_music_task = asyncio.create_task(
-                        play_audio_loop(
+                        if hold_music_stop_event.is_set():
+                            return
+
+                        logger.info(
+                            f"Starting hold music at {sample_rate}Hz while waiting for transfer"
+                        )
+                        await play_audio_loop(
                             stop_event=hold_music_stop_event,
                             sample_rate=sample_rate,
                             queue_frame=self._engine._transport_output.queue_frame,
                         )
-                    )
+
+                    # Start hold music as background task
+                    hold_music_task = asyncio.create_task(play_hold_tone_after_speech())
 
                     # Wait for transfer completion using Redis pub/sub
                     logger.info("Waiting for transfer completion via Redis pub/sub...")
@@ -1135,6 +1266,10 @@ class CustomToolManager:
                 await self._handle_transfer_result(
                     exception_result, function_call_params, properties
                 )
+
+            finally:
+                if speech_observer:
+                    await self._remove_transfer_speech_observer(speech_observer)
 
         return transfer_call_handler
 

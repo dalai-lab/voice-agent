@@ -31,12 +31,24 @@ class ContextSummarizationManager:
         self._config = LLMContextSummaryConfig(
             target_context_tokens=4000,
             min_messages_after_summary=2,
-            summarization_timeout=30.0,
+            summarization_timeout=15.0,
         )
 
     @property
     def config(self) -> LLMContextSummaryConfig:
         return self._config
+
+    def _resolve_summarization_llm(self):
+        """Resolve the most appropriate LLM for background context summarization.
+
+        Prefers the dedicated variable_extraction_llm (configured in UI via Extraction LLM),
+        then inference_llm, falling back to the primary conversational llm.
+        """
+        return (
+            getattr(self._engine, "variable_extraction_llm", None)
+            or getattr(self._engine, "inference_llm", None)
+            or self._engine.llm
+        )
 
     def start(self) -> None:
         """Kick off background context summarization, cancelling any in-flight one."""
@@ -62,7 +74,11 @@ class ContextSummarizationManager:
         orphaned tool calls from previous nodes) with a concise summary.
         """
         context = self._engine.context
-        llm = self._engine.inference_llm
+        llm = self._resolve_summarization_llm()
+        if not llm:
+            logger.warning("No LLM available for context summarization, skipping")
+            return
+
         current_node = self._engine._current_node
 
         try:
@@ -89,7 +105,7 @@ class ContextSummarizationManager:
                 timeout=config.summarization_timeout,
             )
 
-            if not summary_text or last_index < 0:
+            if not summary_text or not summary_text.strip() or last_index < 0:
                 logger.warning(
                     "Context summarization returned empty result, keeping full context"
                 )
@@ -134,11 +150,16 @@ class ContextSummarizationManager:
             # Snapshot current messages at apply-time (not request-time)
             # to preserve anything added while the summary was generating
             current_messages = context.messages
-            recent_messages = current_messages[last_index + 1 :]
+            recent_messages = list(current_messages[last_index + 1 :])
+
+            # Ensure recent_messages does not start with an orphaned tool response
+            # whose corresponding assistant tool_calls was summarized
+            while recent_messages and isinstance(recent_messages[0], dict) and recent_messages[0].get("role") in ("tool", "function"):
+                recent_messages.pop(0)
 
             summary_message = {
                 "role": "user",
-                "content": config.summary_message_template.format(summary=summary_text),
+                "content": config.summary_message_template.format(summary=summary_text.strip()),
             }
 
             # Preserve the current system message (already set by the new node)
@@ -164,9 +185,10 @@ class ContextSummarizationManager:
             )
         except asyncio.CancelledError:
             logger.debug("Context summarization cancelled (new transition started)")
+            raise
         except TimeoutError:
             logger.warning(
-                f"Context summarization timed out after {self._config.summarization_timeout}s"
+                f"Context summarization timed out after {self._config.summarization_timeout}s; keeping full context"
             )
         except Exception as e:
-            logger.error(f"Background context summarization failed: {e}")
+            logger.error(f"Background context summarization failed ({e}); keeping full context")

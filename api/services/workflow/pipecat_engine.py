@@ -93,11 +93,11 @@ class PipecatEngine:
         self.llm = llm
         self._pipeline_metrics_aggregator = pipeline_metrics_aggregator
         # LLM used for out-of-band inference (variable extraction, context
-        # summarization). Falls back to the pipeline LLM when not provided.
-        # In realtime mode the pipeline LLM is a speech-to-speech service
-        # that does not implement run_inference, so a separate text LLM
-        # must be passed in.
-        self.inference_llm = inference_llm or llm
+        # summarization). Falls back to the dedicated variable extraction LLM,
+        # then the pipeline LLM when not provided. In realtime mode the pipeline
+        # LLM is a speech-to-speech service that does not implement run_inference,
+        # so a separate text LLM must be passed in.
+        self.inference_llm = inference_llm or variable_extraction_llm or llm
         # Variable extraction can use a separately tagged managed-model client
         # without rerouting normal conversation or context-summarization calls.
         self.variable_extraction_llm = variable_extraction_llm or self.inference_llm

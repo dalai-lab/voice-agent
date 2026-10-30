@@ -306,6 +306,20 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
     talkarStatus === "rejected" ||
     (talkarStatus === "agent_building" && !hasOnboardingForm);
 
+  // Redirect unauthenticated users on protected routes to sign in
+  useEffect(() => {
+    if (isPublicRoute || auth.loading) return;
+    if (!auth.user) {
+      try {
+        if (typeof window !== "undefined") {
+          const currentUrl = pathname + (window.location.search || "");
+          sessionStorage.setItem("talkar_redirect_after_login", currentUrl);
+        }
+      } catch {}
+      auth.redirectToLogin();
+    }
+  }, [isPublicRoute, auth.loading, auth.user, auth.redirectToLogin, pathname]);
+
   // Prevent unverified Stack users from hanging in protected routes
   useEffect(() => {
     if (
@@ -355,6 +369,11 @@ function TalkarLayoutGate({ children }: { children: ReactNode }) {
     !isPublicRoute
   ) {
     return <SpinLoader label="Redirecting to email verification..." />;
+  }
+
+  // Redirecting unauthenticated user away from protected routes
+  if (!isPublicRoute && !auth.loading && !auth.user) {
+    return <SpinLoader label="Redirecting to sign in..." />;
   }
 
   // Full-level blockage when Talkar billing/backend is down

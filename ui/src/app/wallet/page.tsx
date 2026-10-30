@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 
 export default function WalletPage() {
-  const { user } = useAuth();
+  const { user, redirectToLogin, loading: authLoading } = useAuth();
   const { orgContext } = useOrgConfig();
   const email = (user as any)?.primaryEmail ?? (user as any)?.email;
   const searchParams = useSearchParams();
@@ -48,6 +48,17 @@ export default function WalletPage() {
   const plan = searchParams.get("plan") || "starter";
   const PLAN_MINIMUMS: Record<string, number> = { starter: 6000, growth: 6000, pro: 8000 };
   const TALKAR = "/api/talkar";
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      try {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("talkar_redirect_after_login", "/wallet");
+        }
+      } catch {}
+      redirectToLogin();
+    }
+  }, [authLoading, user, redirectToLogin]);
 
   const [wallet, setWallet] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);

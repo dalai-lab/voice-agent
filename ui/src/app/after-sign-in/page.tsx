@@ -90,6 +90,15 @@ export default function AfterSignInPage() {
       }
 
       // 4. Talkar Onboarding & Customer Status Gate
+      let targetRedirect: string | null = null;
+      try {
+        const stored = typeof window !== "undefined" ? sessionStorage.getItem("talkar_redirect_after_login") : null;
+        if (stored && stored.startsWith("/") && !stored.startsWith("//") && !stored.includes(":")) {
+          targetRedirect = stored;
+          sessionStorage.removeItem("talkar_redirect_after_login");
+        }
+      } catch {}
+
       const email = (user as any)?.primaryEmail || (user as any)?.email;
       const query = email ? `contact_email=${encodeURIComponent(email)}` : "";
 
@@ -110,10 +119,10 @@ export default function AfterSignInPage() {
           logger.info(`[AfterSignIn] Customer status is '${customer.status}'`);
 
           if (customer.status === "active") {
-            router.replace("/overview");
+            router.replace(targetRedirect || "/overview");
           } else if (customer.status === "agent_building") {
             if (customer.has_onboarding_form) {
-              router.replace("/overview");
+              router.replace(targetRedirect || "/overview");
             } else {
               router.replace("/onboarding");
             }

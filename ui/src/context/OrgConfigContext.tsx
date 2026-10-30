@@ -138,7 +138,14 @@ export function OrgConfigProvider({ children }: { children: ReactNode }) {
     }, []);
 
     useEffect(() => {
-        if (auth.loading || !auth.isAuthenticated || hasFetchedConfig.current) {
+        if (auth.loading) {
+            return;
+        }
+        if (!auth.isAuthenticated) {
+            setLoading(false);
+            return;
+        }
+        if (hasFetchedConfig.current) {
             return;
         }
         hasFetchedConfig.current = true;

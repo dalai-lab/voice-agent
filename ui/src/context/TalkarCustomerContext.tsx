@@ -171,13 +171,14 @@ export function TalkarCustomerProvider({ children }: { children: ReactNode }) {
 
   // Trigger status check whenever user or org settles
   useEffect(() => {
-    if (authLoading || orgLoading) return;
+    if (authLoading) return;
     if (!user) {
       setIsLoading(false);
       setTalkarStatus(null);
       setIsTalkarCustomer(false);
       return;
     }
+    if (orgLoading) return;
 
     if ("primaryEmailVerified" in user && !user.primaryEmailVerified) {
       setIsLoading(false);

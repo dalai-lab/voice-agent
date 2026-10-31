@@ -28,6 +28,7 @@ from api.services.workflow.dto import ReactFlowDTO
 from api.services.workflow.initial_context import merge_external_initial_context
 from api.services.workflow.pipecat_engine import PipecatEngine
 from api.services.workflow.workflow_graph import WorkflowGraph
+from loguru import logger
 from fastapi.encoders import jsonable_encoder
 from pipecat.bus.serializers.json import JSONMessageSerializer
 from pipecat.frames.frames import (
@@ -485,21 +486,60 @@ async def execute_text_chat_pending_turn(
 
     llm = create_llm_service(user_config, correlation_id=mps_correlation_id)
     inference_llm = llm
-    variable_extraction_llm = (
-        create_llm_service(
-            user_config,
-            correlation_id=mps_correlation_id,
-            usage_context="variable_extraction",
+
+    # Dedicated Variable Extraction LLM Resolution
+    variable_extraction_llm = None
+    if getattr(user_config, "extraction_llm", None):
+        try:
+            extraction_cfg = user_config.extraction_llm.model_copy(deep=True)
+            if hasattr(extraction_cfg, "temperature"):
+                extraction_cfg.temperature = 0.0
+
+            variable_extraction_llm = create_llm_service(
+                extraction_cfg,
+                correlation_id=mps_correlation_id,
+                usage_context="variable_extraction",
+            )
+            if hasattr(variable_extraction_llm, "_settings") and hasattr(
+                variable_extraction_llm._settings, "temperature"
+            ):
+                variable_extraction_llm._settings.temperature = 0.0
+
+            logger.info(
+                f"Configured dedicated variable extraction LLM for text chat: "
+                f"provider={extraction_cfg.provider}, model={extraction_cfg.model}"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to create dedicated extraction LLM in text chat "
+                f"({user_config.extraction_llm.provider}/{user_config.extraction_llm.model}): {e}. "
+                f"Falling back to primary conversation LLM."
+            )
+            variable_extraction_llm = None
+
+    if variable_extraction_llm is None:
+        variable_extraction_llm = (
+            create_llm_service(
+                user_config,
+                correlation_id=mps_correlation_id,
+                usage_context="variable_extraction",
+            )
+            if workflow_graph.uses_variable_extraction()
+            and user_config.llm.provider == ServiceProviders.DOGRAH.value
+            else llm
         )
-        if workflow_graph.uses_variable_extraction()
-        and user_config.llm.provider == ServiceProviders.DOGRAH.value
-        else llm
-    )
 
     runtime_configuration = {
         "llm_provider": user_config.llm.provider,
         "llm_model": user_config.llm.model,
     }
+    if getattr(user_config, "extraction_llm", None):
+        runtime_configuration["extraction_llm_provider"] = (
+            user_config.extraction_llm.provider
+        )
+        runtime_configuration["extraction_llm_model"] = (
+            user_config.extraction_llm.model
+        )
     initial_context = {
         **base_initial_context,
         "runtime_configuration": runtime_configuration,

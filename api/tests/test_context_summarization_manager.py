@@ -230,3 +230,27 @@ async def test_start_cancels_previous_task(mock_engine):
     await manager.cleanup()
     await asyncio.sleep(0)
     assert task2.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_compaction_invokes_variable_extraction_llm_if_available(mock_engine):
+    """Ensure background context summarization invokes the extraction LLM when configured."""
+    mock_extraction_llm = MagicMock(name="variable_extraction_llm")
+    mock_extraction_llm.model_name = "gpt-4.1-mini"
+    mock_extraction_llm._generate_summary = AsyncMock(return_value=("GPT-4.1 summary", 4))
+    mock_engine.variable_extraction_llm = mock_extraction_llm
+
+    mock_engine.context.set_messages([
+        {"role": "system", "content": "Prompt"},
+        {"role": "user", "content": "1"}, {"role": "assistant", "content": "2"},
+        {"role": "user", "content": "3"}, {"role": "assistant", "content": "4"},
+        {"role": "user", "content": "5"}, {"role": "assistant", "content": "6"},
+    ])
+
+    manager = ContextSummarizationManager(mock_engine)
+    await manager._summarize_context_in_background()
+
+    # The dedicated extraction LLM should be invoked, NOT primary llm
+    mock_extraction_llm._generate_summary.assert_awaited_once()
+    mock_engine.llm._generate_summary.assert_not_called()
+    assert mock_engine.context.messages[1]["content"] == "Conversation summary: GPT-4.1 summary"

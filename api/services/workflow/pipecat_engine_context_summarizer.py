@@ -61,6 +61,25 @@ class ContextSummarizationManager:
             name=f"ctx-summarize:{current_node.name}",
         )
 
+    async def await_pending(self, timeout: float = 10.0) -> None:
+        """Wait for in-flight background context summarization to complete.
+
+        Used in text chat and turn teardown to ensure the compacted context
+        is applied and persisted to the checkpoint rather than being cancelled.
+        """
+        if self._summarization_task and not self._summarization_task.done():
+            logger.debug(
+                f"[CONTEXT-COMPACTION] Awaiting in-flight summarization ({self._summarization_task.get_name()})..."
+            )
+            try:
+                done, _ = await asyncio.wait([self._summarization_task], timeout=timeout)
+                if not done:
+                    logger.warning(
+                        f"[CONTEXT-COMPACTION] Summarization timed out after {timeout}s during turn flush; proceeding with uncompacted context."
+                    )
+            except Exception as e:
+                logger.error(f"[CONTEXT-COMPACTION] Error awaiting summarization: {e}")
+
     async def cleanup(self) -> None:
         """Cancel any in-flight background summarization."""
         if self._summarization_task and not self._summarization_task.done():

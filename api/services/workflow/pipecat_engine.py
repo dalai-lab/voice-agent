@@ -1242,6 +1242,11 @@ class PipecatEngine:
                 logger.warning(f"Error closing MCP session {tool_uuid}: {e}")
         self._mcp_sessions = {}
 
+    async def await_pending_context_summarization(self, timeout: float = 10.0) -> None:
+        """Wait for background context summarization to finish before persisting state."""
+        if self._context_summarization_manager:
+            await self._context_summarization_manager.await_pending(timeout=timeout)
+
     async def cleanup(self):
         """Clean up engine resources on disconnect.
 

@@ -767,6 +767,12 @@ async def execute_text_chat_pending_turn(
             )
     finally:
         try:
+            # Let in-flight context summarization finish so compacted messages are persisted
+            await engine.await_pending_context_summarization(timeout=10.0)
+        except Exception as e:
+            logger.warning(f"Error awaiting context summarization in text chat: {e}")
+
+        try:
             if not task.has_finished():
                 await task.cancel(reason=TEXT_CHAT_INTERNAL_CANCEL_REASON)
             await runner_task

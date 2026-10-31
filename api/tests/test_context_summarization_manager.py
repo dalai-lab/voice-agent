@@ -254,3 +254,30 @@ async def test_compaction_invokes_variable_extraction_llm_if_available(mock_engi
     mock_extraction_llm._generate_summary.assert_awaited_once()
     mock_engine.llm._generate_summary.assert_not_called()
     assert mock_engine.context.messages[1]["content"] == "Conversation summary: GPT-4.1 summary"
+
+
+@pytest.mark.asyncio
+async def test_await_pending_waits_for_inflight_task(mock_engine):
+    """Ensure await_pending allows an in-flight background task to complete before returning."""
+    async def delayed_summary(*args, **kwargs):
+        await asyncio.sleep(0.05)
+        return ("Delayed summary", 4)
+
+    mock_engine.llm._generate_summary = AsyncMock(side_effect=delayed_summary)
+    mock_engine.context.set_messages([
+        {"role": "system", "content": "Prompt"},
+        {"role": "user", "content": "1"}, {"role": "assistant", "content": "2"},
+        {"role": "user", "content": "3"}, {"role": "assistant", "content": "4"},
+        {"role": "user", "content": "5"}, {"role": "assistant", "content": "6"},
+    ])
+
+    manager = ContextSummarizationManager(mock_engine)
+    manager.start()
+    assert manager._summarization_task is not None
+    assert not manager._summarization_task.done()
+
+    # Await pending should flush the task
+    await manager.await_pending(timeout=1.0)
+    assert manager._summarization_task.done()
+    assert len(mock_engine.context.messages) == 4
+    assert mock_engine.context.messages[1]["content"] == "Conversation summary: Delayed summary"

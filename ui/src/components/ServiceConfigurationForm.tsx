@@ -653,8 +653,8 @@ export function ServiceConfigurationForm({
             if (mode === 'override') {
                 // Build model_overrides for enabled services only
                 const modelOverrides: Record<string, unknown> = {};
-                const services = isRealtime 
-                    ? ["realtime", "llm", "extraction_llm"] 
+                const services = isRealtime
+                    ? ["realtime", "llm", "extraction_llm"]
                     : ["llm", "extraction_llm", "tts", "stt"];
                 for (const svc of services) {
                     if (enabledOverrides[svc]) {
@@ -893,6 +893,22 @@ export function ServiceConfigurationForm({
             }
         }
 
+        const getDisplayName = (value: string) => {
+            if (value === "__default__") return "Default (Automatic)";
+            if (field === "reasoning_effort") {
+                if (value === "none") return "None (Disabled)";
+                return value.charAt(0).toUpperCase() + value.slice(1);
+            }
+            if (field === "language") {
+                if (value === "multi") return "Multilingual (Auto-detect)";
+                return LANGUAGE_DISPLAY_NAMES[value] || (value === "auto" ? "Auto-detect" : value);
+            }
+            if (field === "voice") {
+                return VOICE_DISPLAY_NAMES[value] || value.charAt(0).toUpperCase() + value.slice(1);
+            }
+            return value;
+        };
+
         if (actualSchema?.allow_custom_input && dropdownOptions && dropdownOptions.length > 0) {
             const fieldKey = `${service}_${field}`;
             const currentValue = watch(fieldKey) as string || "";
@@ -950,13 +966,12 @@ export function ServiceConfigurationForm({
                                 return (
                                     <SelectItem key={strVal} value={strVal} className="text-xs">
                                         <div className="flex items-center justify-between w-full gap-2">
-                                            <span>{strVal}</span>
+                                            <span>{getDisplayName(strVal)}</span>
                                             {rec && (
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                                                    rec.highlight
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${rec.highlight
                                                         ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
                                                         : "bg-muted text-muted-foreground"
-                                                }`}>
+                                                    }`}>
                                                     {rec.badge}
                                                 </span>
                                             )}
@@ -974,11 +989,10 @@ export function ServiceConfigurationForm({
                                     key={recModel}
                                     type="button"
                                     onClick={() => setValue(fieldKey, recModel, { shouldDirty: true })}
-                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
-                                        watch(fieldKey) === recModel
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${watch(fieldKey) === recModel
                                             ? "bg-primary/10 text-primary border-primary/30 font-semibold"
                                             : "bg-muted/40 hover:bg-muted text-muted-foreground border-border/60"
-                                    }`}
+                                        }`}
                                 >
                                     {recModel} <span className="opacity-80">({recInfo.badge.replace("⚡ ", "")})</span>
                                 </button>
@@ -1003,21 +1017,6 @@ export function ServiceConfigurationForm({
 
         if (dropdownOptions && dropdownOptions.length > 0) {
             const isRequired = providerSchema.required?.includes(field);
-            const getDisplayName = (value: string) => {
-                if (value === "__default__") return "Default (Automatic)";
-                if (field === "reasoning_effort") {
-                    if (value === "none") return "None (Disabled)";
-                    return value.charAt(0).toUpperCase() + value.slice(1);
-                }
-                if (field === "language") {
-                    if (value === "multi") return "Multilingual (Auto-detect)";
-                    return LANGUAGE_DISPLAY_NAMES[value] || (value === "auto" ? "Auto-detect" : value);
-                }
-                if (field === "voice") {
-                    return VOICE_DISPLAY_NAMES[value] || value.charAt(0).toUpperCase() + value.slice(1);
-                }
-                return value;
-            };
 
             const rawVal = watch(`${service}_${field}`);
             const selectValue = (rawVal === undefined || rawVal === null || rawVal === "")
@@ -1059,11 +1058,10 @@ export function ServiceConfigurationForm({
                                         <div className="flex items-center justify-between w-full gap-2">
                                             <span>{getDisplayName(strVal)}</span>
                                             {rec && (
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                                                    rec.highlight
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${rec.highlight
                                                         ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
                                                         : "bg-muted text-muted-foreground"
-                                                }`}>
+                                                    }`}>
                                                     {rec.badge}
                                                 </span>
                                             )}
@@ -1081,11 +1079,10 @@ export function ServiceConfigurationForm({
                                     key={recModel}
                                     type="button"
                                     onClick={() => setValue(`${service}_${field}`, recModel, { shouldDirty: true })}
-                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
-                                        watch(`${service}_${field}`) === recModel
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${watch(`${service}_${field}`) === recModel
                                             ? "bg-primary/10 text-primary border-primary/30 font-semibold"
                                             : "bg-muted/40 hover:bg-muted text-muted-foreground border-border/60"
-                                    }`}
+                                        }`}
                                 >
                                     {recModel} <span className="opacity-80">({recInfo.badge.replace("⚡ ", "")})</span>
                                 </button>

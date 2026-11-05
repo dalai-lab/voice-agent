@@ -1,7 +1,7 @@
 import random
 from collections.abc import Iterable
 from enum import Enum, auto
-from typing import Annotated, Literal, TypeVar
+from typing import Annotated, Any, Literal, TypeVar
 
 from api.services.configuration.options import (
     AZURE_EMBEDDING_MODELS,
@@ -54,7 +54,8 @@ from api.services.configuration.options import (
     SPEECHMATICS_STT_LANGUAGES,
 )
 from api.services.configuration.options.google import GOOGLE_VERTEX_MODELS
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+import math
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 
 class ServiceType(Enum):
@@ -134,6 +135,17 @@ class BaseServiceConfiguration(BaseModel):
         ServiceProviders.LMNT,
     ]
     api_key: str | list[str]
+
+    @model_validator(mode="before")
+    @classmethod
+    def sanitize_empty_and_nan(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            return {
+                k: v
+                for k, v in data.items()
+                if not (k != "api_key" and (v == "" or (isinstance(v, float) and math.isnan(v))))
+            }
+        return data
 
     @field_validator("api_key")
     @classmethod
@@ -413,6 +425,50 @@ class OpenAILLMService(BaseLLMConfiguration):
         default="https://api.openai.com/v1",
         description="Override only if using an OpenAI-compatible API (e.g. local LLM, proxy).",
     )
+    temperature: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Sampling temperature (0.0 to 2.0). Omit for reasoning models (o1, o3-mini, gpt-5).",
+    )
+    reasoning_effort: Literal["minimal", "low", "medium", "high"] | None = Field(
+        default=None,
+        description="Reasoning effort for reasoning models (o1, o3-mini, gpt-5). If unset, gpt-5 defaults to 'minimal'.",
+    )
+    max_completion_tokens: int | None = Field(
+        default=None,
+        ge=1,
+        le=16384,
+        description="Upper bound on response tokens. Keeps spoken responses succinct.",
+    )
+    max_tokens: int | None = Field(
+        default=None,
+        ge=1,
+        le=16384,
+        description="Maximum generation tokens (auto-mapped to max_completion_tokens for reasoning models).",
+    )
+    top_p: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Nucleus sampling probability.",
+    )
+    frequency_penalty: float | None = Field(
+        default=None,
+        ge=-2.0,
+        le=2.0,
+        description="Penalizes repetitive phrasing (-2.0 to 2.0).",
+    )
+    presence_penalty: float | None = Field(
+        default=None,
+        ge=-2.0,
+        le=2.0,
+        description="Encourages introducing new concepts (-2.0 to 2.0).",
+    )
+    seed: int | None = Field(
+        default=None,
+        description="Deterministic sampling seed for reproducible testing.",
+    )
 
 
 @register_llm
@@ -656,6 +712,42 @@ class SarvamLLMConfiguration(BaseLLMConfiguration):
             "Sampling temperature. Sarvam recommends 0.5 for balanced "
             "conversational responses."
         ),
+    )
+    reasoning_effort: Literal["low", "medium", "high"] | None = Field(
+        default=None,
+        description="Reasoning effort level for models like glm5.3 or deepseekv4.1-flash. Set to 'low' for fast voice replies.",
+    )
+    max_tokens: int | None = Field(
+        default=None,
+        ge=1,
+        le=8192,
+        description="Maximum generation tokens. Set to 150-250 to keep voice responses concise.",
+    )
+    top_p: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Nucleus sampling probability (Sarvam API default: 0.95).",
+    )
+    frequency_penalty: float | None = Field(
+        default=None,
+        ge=-2.0,
+        le=2.0,
+        description="Penalize repeated phrases (-2.0 to 2.0).",
+    )
+    presence_penalty: float | None = Field(
+        default=None,
+        ge=-2.0,
+        le=2.0,
+        description="Encourage new topics (-2.0 to 2.0).",
+    )
+    wiki_grounding: bool | None = Field(
+        default=None,
+        description="Enable Sarvam's built-in Wikipedia search grounding.",
+    )
+    base_url: str = Field(
+        default="https://api.sarvam.ai/v1",
+        description="Sarvam API base URL. Can be set to https://api.sarvam.ai/v2 for the v2 chat endpoint.",
     )
 
 
@@ -1169,6 +1261,40 @@ class SarvamTTSConfiguration(BaseTTSConfiguration):
         le=2.0,
         description="Speech speed multiplier.",
     )
+    temperature: float | None = Field(
+        default=None,
+        ge=0.01,
+        le=1.0,
+        description="Prosody expressiveness/variance (0.01 to 1.0) for bulbul:v3 and bulbul:v4-flash. Leave empty for model default (0.6).",
+    )
+    min_buffer_size: int | None = Field(
+        default=None,
+        ge=10,
+        le=200,
+        description="Character buffer before streaming audio starts (default: 50). Set to 20-30 to drop initial speaking delay.",
+    )
+    max_chunk_length: int | None = Field(
+        default=None,
+        ge=50,
+        le=500,
+        description="Max character length per synthesized sentence chunk (default: 150).",
+    )
+    enable_preprocessing: bool | None = Field(
+        default=None,
+        description="Normalize numbers and currencies into spoken words (bulbul:v2 only; v3/v4 have this permanently enabled).",
+    )
+    pitch: float | None = Field(
+        default=None,
+        ge=-0.75,
+        le=0.75,
+        description="Vocal pitch offset (-0.75 to +0.75, bulbul:v2 only).",
+    )
+    loudness: float | None = Field(
+        default=None,
+        ge=0.3,
+        le=3.0,
+        description="Volume multiplier (0.3 to 3.0, bulbul:v2 only).",
+    )
 
 
 CAMB_TTS_MODELS = ["mars-flash", "mars-pro", "mars-instruct"]
@@ -1358,9 +1484,9 @@ class SmallestAITTSConfiguration(BaseTTSConfiguration):
     )
     language: str = Field(
         default="en",
-        description="ISO 639-1 language code for synthesis.",
+        description="ISO 639-1 language code for synthesis, or 'auto' for cross-language auto-detect.",
         json_schema_extra={
-            "examples": SMALLEST_TTS_LANGUAGES,
+            "examples": ["auto"] + list(SMALLEST_TTS_LANGUAGES),
             "allow_custom_input": True,
         },
     )
@@ -1369,6 +1495,15 @@ class SmallestAITTSConfiguration(BaseTTSConfiguration):
         ge=0.5,
         le=2.0,
         description="Speech speed multiplier (0.5 to 2.0).",
+    )
+    word_timestamps: bool = Field(
+        default=True,
+        description="Enable per-word timestamp alignment events for supported English and Hindi voices.",
+    )
+    sample_rate: int | None = Field(
+        default=None,
+        description="Audio sample rate in Hz (e.g. 8000, 16000, 24000, 44100). Leave blank to use pipeline default.",
+        json_schema_extra={"examples": [8000, 16000, 24000, 44100]},
     )
 
 
@@ -1465,6 +1600,52 @@ class DeepgramSTTConfiguration(BaseSTTConfiguration):
                 "flux-general-multi": DEEPGRAM_FLUX_MULTILINGUAL_LANGUAGE_OPTIONS,
             },
         },
+    )
+    endpointing: int = Field(
+        default=100,
+        ge=10,
+        le=1000,
+        description="Silence duration in ms before marking turn speech_final. Default: 100ms.",
+    )
+    profanity_filter: bool = Field(
+        default=False,
+        description="Filter profanity from transcription output. Default: False.",
+    )
+    smart_format: bool | None = Field(
+        default=None,
+        description="Apply smart formatting (dates, currency, capitalization).",
+    )
+    punctuate: bool | None = Field(
+        default=None,
+        description="Add punctuation to transcription results.",
+    )
+    numerals: bool | None = Field(
+        default=None,
+        description="Convert spoken numbers to digits (e.g. 'twenty five' -> '25'). Essential for phone numbers/order IDs.",
+    )
+    utterance_end_ms: int | None = Field(
+        default=None,
+        ge=500,
+        le=5000,
+        description="Silence duration in ms to trigger an utterance-end event.",
+    )
+    eot_threshold: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Flux: End-of-turn confidence threshold (default: 0.7).",
+    )
+    eot_timeout_ms: int = Field(
+        default=3000,
+        ge=500,
+        le=10000,
+        description="Flux: Timeout in ms to finalize turn regardless of confidence (default: 3000ms).",
+    )
+    eager_eot_threshold: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Flux: Early speculative turn threshold (default: 0.5).",
     )
 
 
@@ -1577,7 +1758,7 @@ class SarvamSTTConfiguration(BaseSTTConfiguration):
     model_config = SARVAM_PROVIDER_MODEL_CONFIG
     provider: Literal[ServiceProviders.SARVAM] = ServiceProviders.SARVAM
     model: str = Field(
-        default="saarika:v2.5",
+        default="saaras:v4",
         description=(
             "Sarvam STT model. saaras:v4 is the latest flagship model with multi-lingual "
             "and mode support; saaras:v3 and saarika:v2.5 are also available."
@@ -1597,6 +1778,28 @@ class SarvamSTTConfiguration(BaseSTTConfiguration):
                 "saarika:v2.5": SARVAM_STT_LANGUAGES_V25,
             },
         },
+    )
+    high_vad_sensitivity: bool = Field(
+        default=False,
+        description="Enable aggressive VAD sensitivity preset. Keep OFF (disabled) to suppress ambient room chatter.",
+    )
+    start_speech_volume_threshold: float = Field(
+        default=-30.0,
+        ge=-60.0,
+        le=0.0,
+        description="Volume floor in dB (-60 to 0). Speech quieter than this (distant voices, background babble) is ignored.",
+    )
+    positive_speech_threshold: float = Field(
+        default=0.70,
+        ge=0.0,
+        le=1.0,
+        description="Neural probability threshold (0.0–1.0) required to classify audio as human speech.",
+    )
+    min_speech_frames: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="Minimum consecutive speech frames needed to start speech recognition (ignores clicks/coughs).",
     )
 
 

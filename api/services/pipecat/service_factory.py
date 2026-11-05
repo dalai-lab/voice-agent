@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode, urlparse, urlunparse
 
 import aiohttp
@@ -254,6 +254,18 @@ def _validate_runtime_service_url(url: str, field_name: str) -> None:
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+def _extract_clean_setting(config_obj: Any, attr_name: str, caster: Any) -> Any:
+    val = getattr(config_obj, attr_name, None)
+    if val is None or val == "":
+        return None
+    if isinstance(val, float) and val != val:  # NaN check
+        return None
+    try:
+        return caster(val)
+    except (ValueError, TypeError):
+        return None
 
 
 AFFIRMATION_KEYTERMS: list[str] = [
@@ -669,13 +681,25 @@ def create_stt_service(
     )
     if user_config.stt.provider == ServiceProviders.DEEPGRAM.value:
         if user_config.stt.model in DEEPGRAM_FLUX_MODELS:
+            eot_timeout_ms = _extract_clean_setting(user_config.stt, "eot_timeout_ms", int) or 3000
+            eot_threshold = _extract_clean_setting(user_config.stt, "eot_threshold", float)
+            if eot_threshold is None:
+                eot_threshold = 0.7
+            eager_eot = _extract_clean_setting(user_config.stt, "eager_eot_threshold", float)
+            if eager_eot is None:
+                eager_eot = 0.5
+
             settings_kwargs = {
                 "model": user_config.stt.model,
-                "eot_timeout_ms": 3000,
-                "eot_threshold": 0.7,
-                "eager_eot_threshold": 0.5,
+                "eot_timeout_ms": eot_timeout_ms,
+                "eot_threshold": eot_threshold,
+                "eager_eot_threshold": eager_eot,
                 "keyterm": keyterms or [],
             }
+            numerals = getattr(user_config.stt, "numerals", None)
+            if numerals is not None and numerals != "":
+                settings_kwargs["numerals"] = bool(numerals)
+
             if user_config.stt.model == "flux-general-multi":
                 language = getattr(user_config.stt, "language", None)
                 language_hint = DEEPGRAM_FLUX_LANGUAGE_HINTS.get(language)
@@ -692,15 +716,30 @@ def create_stt_service(
         # Other models than flux
         # Use language from user config, defaulting to "multi" for multilingual support
         language = getattr(user_config.stt, "language", None) or "multi"
+        endpointing = _extract_clean_setting(user_config.stt, "endpointing", int)
+        if endpointing is None:
+            endpointing = 100
+        profanity = getattr(user_config.stt, "profanity_filter", False)
+
+        settings_kwargs = {
+            "language": language,
+            "profanity_filter": bool(profanity) if profanity is not None and profanity != "" else False,
+            "endpointing": endpointing,
+            "model": user_config.stt.model,
+            "keyterm": keyterms or [],
+        }
+        for opt_bool in ("smart_format", "punctuate", "numerals"):
+            v = getattr(user_config.stt, opt_bool, None)
+            if v is not None and v != "":
+                settings_kwargs[opt_bool] = bool(v)
+
+        utt_end = _extract_clean_setting(user_config.stt, "utterance_end_ms", int)
+        if utt_end is not None:
+            settings_kwargs["utterance_end_ms"] = utt_end
+
         return DeepgramSTTService(
             api_key=user_config.stt.api_key,
-            settings=DeepgramSTTSettings(
-                language=language,
-                profanity_filter=False,
-                endpointing=100,
-                model=user_config.stt.model,
-                keyterm=keyterms or [],
-            ),
+            settings=DeepgramSTTSettings(**settings_kwargs),
             should_interrupt=False,  # Let UserAggregator take care of sending InterruptionFrame
             sample_rate=audio_config.transport_in_sample_rate,
         )
@@ -814,12 +853,33 @@ def create_stt_service(
         else:
             # Unmapped BCP-47 codes pass through; Sarvam accepts them per https://docs.sarvam.ai/api-reference-docs/speech-to-text/transcribe
             pipecat_language = language
+
+        stt_model = user_config.stt.model
+        is_vad_supported = stt_model in {"saaras:v4", "saaras:v3"}
+
+        settings_kwargs: dict[str, Any] = {
+            "model": stt_model,
+            "language": pipecat_language,
+            "high_vad_sensitivity": getattr(user_config.stt, "high_vad_sensitivity", False),
+        }
+
+        # Guard fine-grained VAD parameters to prevent ValueError on models like saarika:v2.5
+        if is_vad_supported:
+            vol_thresh = getattr(user_config.stt, "start_speech_volume_threshold", None)
+            if vol_thresh is not None:
+                settings_kwargs["start_speech_volume_threshold"] = float(vol_thresh)
+
+            pos_thresh = getattr(user_config.stt, "positive_speech_threshold", None)
+            if pos_thresh is not None:
+                settings_kwargs["positive_speech_threshold"] = float(pos_thresh)
+
+            min_frames = getattr(user_config.stt, "min_speech_frames", None)
+            if min_frames is not None:
+                settings_kwargs["min_speech_frames"] = int(min_frames)
+
         return SarvamSTTService(
             api_key=user_config.stt.api_key,
-            settings=SarvamSTTSettings(
-                model=user_config.stt.model,
-                language=pipecat_language,
-            ),
+            settings=SarvamSTTSettings(**settings_kwargs),
             sample_rate=audio_config.transport_in_sample_rate,
         )
     elif user_config.stt.provider == ServiceProviders.SPEACHES.value:
@@ -1189,14 +1249,40 @@ def create_tts_service(
                 voice = "anushka"
         else:
             voice = raw_voice
-        speed = getattr(user_config.tts, "speed", None)
-        settings_kwargs = {
-            "model": user_config.tts.model,
+        tts_model = user_config.tts.model
+        speed = _extract_clean_setting(user_config.tts, "speed", float)
+        settings_kwargs: dict[str, Any] = {
+            "model": tts_model,
             "voice": voice,
             "language": pipecat_language,
         }
         if speed and speed != 1.0:
             settings_kwargs["pace"] = speed
+
+        temp = _extract_clean_setting(user_config.tts, "temperature", float)
+        if temp is not None and ("v3" in tts_model or "v4" in tts_model):
+            settings_kwargs["temperature"] = temp
+
+        min_buf = _extract_clean_setting(user_config.tts, "min_buffer_size", int)
+        if min_buf is not None:
+            settings_kwargs["min_buffer_size"] = min_buf
+
+        max_chunk = _extract_clean_setting(user_config.tts, "max_chunk_length", int)
+        if max_chunk is not None:
+            settings_kwargs["max_chunk_length"] = max_chunk
+
+        preproc = getattr(user_config.tts, "enable_preprocessing", None)
+        if preproc is not None and preproc != "":
+            settings_kwargs["enable_preprocessing"] = bool(preproc)
+
+        pitch = _extract_clean_setting(user_config.tts, "pitch", float)
+        if pitch is not None and "v2" in tts_model:
+            settings_kwargs["pitch"] = pitch
+
+        loudness = _extract_clean_setting(user_config.tts, "loudness", float)
+        if loudness is not None and "v2" in tts_model:
+            settings_kwargs["loudness"] = loudness
+
         return SarvamTTSService(
             api_key=user_config.tts.api_key,
             settings=SarvamTTSSettings(**settings_kwargs),
@@ -1262,11 +1348,15 @@ def create_tts_service(
         )
     elif user_config.tts.provider == ServiceProviders.SMALLEST.value:
         language_code = getattr(user_config.tts, "language", None) or "en"
-        try:
-            pipecat_language = Language(language_code)
-        except ValueError:
-            pipecat_language = Language.EN
-        speed = getattr(user_config.tts, "speed", None)
+        if language_code.lower() == "auto":
+            pipecat_language = "auto"
+        else:
+            try:
+                pipecat_language = Language(language_code)
+            except ValueError:
+                pipecat_language = language_code
+
+        speed = _extract_clean_setting(user_config.tts, "speed", float)
         model = user_config.tts.model.replace("lightning-v", "lightning_v")
         settings_kwargs = SmallestTTSSettings(
             model=model,
@@ -1275,13 +1365,24 @@ def create_tts_service(
         )
         if speed and speed != 1.0:
             settings_kwargs.speed = speed
-        return SmallestTTSService(
-            api_key=user_config.tts.api_key,
-            settings=settings_kwargs,
-            text_filters=[xml_function_tag_filter],
-            skip_aggregator_types=["recording_router", "recording"],
-            silence_time_s=1.0,
-        )
+
+        custom_sample_rate = _extract_clean_setting(user_config.tts, "sample_rate", int)
+        word_timestamps = getattr(user_config.tts, "word_timestamps", True)
+        if word_timestamps is None or word_timestamps == "":
+            word_timestamps = True
+
+        service_kwargs: dict[str, Any] = {
+            "api_key": user_config.tts.api_key,
+            "settings": settings_kwargs,
+            "word_timestamps": bool(word_timestamps),
+            "text_filters": [xml_function_tag_filter],
+            "skip_aggregator_types": ["recording_router", "recording"],
+            "silence_time_s": 1.0,
+        }
+        if custom_sample_rate:
+            service_kwargs["sample_rate"] = custom_sample_rate
+
+        return SmallestTTSService(**service_kwargs)
     elif user_config.tts.provider == ServiceProviders.XAI.value:
         voice = getattr(user_config.tts, "voice", None) or "eve"
         language_code = getattr(user_config.tts, "language", None) or "en"
@@ -1363,6 +1464,15 @@ def create_llm_service_from_provider(
     temperature: float | None = None,
     bill_to: str | None = None,
     usage_context: str | None = None,
+    reasoning_effort: str | None = None,
+    max_tokens: int | None = None,
+    max_completion_tokens: int | None = None,
+    top_p: float | None = None,
+    frequency_penalty: float | None = None,
+    presence_penalty: float | None = None,
+    seed: int | None = None,
+    wiki_grounding: bool | None = None,
+    **extra_kwargs,
 ):
     """Create an LLM service from explicit provider/model/api_key.
 
@@ -1381,26 +1491,71 @@ def create_llm_service_from_provider(
         ServiceProviders.OPENAI.value,
         ServiceProviders.ATLASCLOUD.value,
     ):
-        kwargs = {}
+        service_kwargs = {}
         if base_url:
             _validate_runtime_service_url(base_url, "base_url")
-            kwargs["base_url"] = base_url
-        if "gpt-5" in model:
-            return OpenAILLMService(
-                api_key=api_key,
-                settings=OpenAILLMSettings(
-                    model=model,
-                    extra={"reasoning_effort": "minimal", "verbosity": "low"},
-                ),
-                **kwargs,
-            )
+            service_kwargs["base_url"] = base_url
+
+        settings_dict: dict[str, Any] = {
+            "model": model,
+        }
+
+        is_reasoning_model = any(prefix in model.lower() for prefix in ("gpt-5", "o1", "o3", "o4"))
+        user_reasoning = reasoning_effort if reasoning_effort and reasoning_effort != "" else None
+
+        if user_reasoning:
+            settings_dict["extra"] = {"reasoning_effort": user_reasoning}
+        elif "gpt-5" in model:
+            # Preserves EXACT existing hardcoded behavior!
+            settings_dict["extra"] = {"reasoning_effort": "minimal", "verbosity": "low"}
+        elif not is_reasoning_model:
+            # ONLY pass temperature to non-reasoning models (reasoning models return 400 Bad Request)
+            settings_dict["temperature"] = effective_temp
+
+        # Token handling: auto-map max_tokens to max_completion_tokens for reasoning models
+        if max_completion_tokens is not None and max_completion_tokens != "":
+            try:
+                settings_dict["max_completion_tokens"] = int(max_completion_tokens)
+            except (ValueError, TypeError):
+                pass
+        elif max_tokens is not None and max_tokens != "":
+            try:
+                tok_val = int(max_tokens)
+                if is_reasoning_model:
+                    settings_dict["max_completion_tokens"] = tok_val
+                else:
+                    settings_dict["max_tokens"] = tok_val
+            except (ValueError, TypeError):
+                pass
+
+        if top_p is not None and top_p != "" and not is_reasoning_model:
+            try:
+                settings_dict["top_p"] = float(top_p)
+            except (ValueError, TypeError):
+                pass
+
+        if frequency_penalty is not None and frequency_penalty != "" and not is_reasoning_model:
+            try:
+                settings_dict["frequency_penalty"] = float(frequency_penalty)
+            except (ValueError, TypeError):
+                pass
+
+        if presence_penalty is not None and presence_penalty != "" and not is_reasoning_model:
+            try:
+                settings_dict["presence_penalty"] = float(presence_penalty)
+            except (ValueError, TypeError):
+                pass
+
+        if seed is not None and seed != "":
+            try:
+                settings_dict["seed"] = int(seed)
+            except (ValueError, TypeError):
+                pass
+
         return OpenAILLMService(
             api_key=api_key,
-            settings=OpenAILLMSettings(
-                model=model,
-                temperature=effective_temp,
-            ),
-            **kwargs,
+            settings=OpenAILLMSettings(**settings_dict),
+            **service_kwargs,
         )
     elif provider == ServiceProviders.GROQ.value:
         return GroqLLMService(
@@ -1497,12 +1652,45 @@ def create_llm_service_from_provider(
             ),
         )
     elif provider == ServiceProviders.SARVAM.value:
+        settings_dict: dict[str, Any] = {
+            "model": model,
+            "temperature": temperature if temperature is not None else 0.5,
+        }
+        if reasoning_effort in ("low", "medium", "high"):
+            settings_dict["reasoning_effort"] = reasoning_effort
+
+        if wiki_grounding is not None and wiki_grounding != "":
+            settings_dict["wiki_grounding"] = bool(wiki_grounding)
+
+        if max_tokens is not None and max_tokens != "":
+            try:
+                settings_dict["max_tokens"] = int(max_tokens)
+            except (ValueError, TypeError):
+                pass
+
+        if top_p is not None and top_p != "":
+            try:
+                settings_dict["top_p"] = float(top_p)
+            except (ValueError, TypeError):
+                pass
+
+        if frequency_penalty is not None and frequency_penalty != "":
+            try:
+                settings_dict["frequency_penalty"] = float(frequency_penalty)
+            except (ValueError, TypeError):
+                pass
+
+        if presence_penalty is not None and presence_penalty != "":
+            try:
+                settings_dict["presence_penalty"] = float(presence_penalty)
+            except (ValueError, TypeError):
+                pass
+
+        sarvam_base_url = base_url or "https://api.sarvam.ai/v1"
         return SarvamLLMService(
             api_key=api_key,
-            settings=SarvamLLMSettings(
-                model=model,
-                temperature=temperature if temperature is not None else 0.5,
-            ),
+            base_url=sarvam_base_url,
+            settings=SarvamLLMSettings(**settings_dict),
         )
     else:
         raise HTTPException(status_code=400, detail=f"Invalid LLM provider {provider}")
@@ -1732,6 +1920,13 @@ def create_llm_service(
         ServiceProviders.ATLASCLOUD.value,
     ) or provider == ServiceProviders.OPENROUTER.value:
         kwargs["base_url"] = getattr(llm_cfg, "base_url", None)
+        kwargs["reasoning_effort"] = getattr(llm_cfg, "reasoning_effort", None)
+        kwargs["max_completion_tokens"] = getattr(llm_cfg, "max_completion_tokens", None)
+        kwargs["max_tokens"] = getattr(llm_cfg, "max_tokens", None)
+        kwargs["top_p"] = getattr(llm_cfg, "top_p", None)
+        kwargs["frequency_penalty"] = getattr(llm_cfg, "frequency_penalty", None)
+        kwargs["presence_penalty"] = getattr(llm_cfg, "presence_penalty", None)
+        kwargs["seed"] = getattr(llm_cfg, "seed", None)
     elif provider == ServiceProviders.AZURE.value:
         kwargs["endpoint"] = getattr(llm_cfg, "endpoint", None)
     elif provider == ServiceProviders.SPEACHES.value:
@@ -1751,7 +1946,14 @@ def create_llm_service(
         kwargs["base_url"] = getattr(llm_cfg, "base_url", None)
         kwargs["temperature"] = getattr(llm_cfg, "temperature", None)
     elif provider == ServiceProviders.SARVAM.value:
+        kwargs["base_url"] = getattr(llm_cfg, "base_url", None)
         kwargs["temperature"] = getattr(llm_cfg, "temperature", None)
+        kwargs["reasoning_effort"] = getattr(llm_cfg, "reasoning_effort", None)
+        kwargs["max_tokens"] = getattr(llm_cfg, "max_tokens", None)
+        kwargs["top_p"] = getattr(llm_cfg, "top_p", None)
+        kwargs["frequency_penalty"] = getattr(llm_cfg, "frequency_penalty", None)
+        kwargs["presence_penalty"] = getattr(llm_cfg, "presence_penalty", None)
+        kwargs["wiki_grounding"] = getattr(llm_cfg, "wiki_grounding", None)
 
     if hasattr(llm_cfg, "temperature") and llm_cfg.temperature is not None and "temperature" not in kwargs:
         kwargs["temperature"] = llm_cfg.temperature

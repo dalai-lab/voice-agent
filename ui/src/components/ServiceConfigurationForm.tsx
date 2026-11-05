@@ -56,10 +56,11 @@ export const EXTRACTION_MODEL_RECOMMENDATIONS: Record<string, Record<string, Ext
 };
 
 interface SchemaProperty {
+    title?: string;
     type?: string;
     default?: string | number | boolean;
-    enum?: string[];
-    examples?: string[];
+    enum?: (string | number)[];
+    examples?: (string | number)[];
     model_options?: Record<string, string[]>;
     allow_custom_input?: boolean;
     $ref?: string;
@@ -67,6 +68,36 @@ interface SchemaProperty {
     format?: string;
     multiline?: boolean;
     docs_url?: string;
+    minimum?: number;
+    maximum?: number;
+    anyOf?: SchemaProperty[];
+}
+
+export function resolvePropertySchema(
+    schema: SchemaProperty | undefined,
+    providerSchema: ProviderSchema | undefined,
+): SchemaProperty | undefined {
+    if (!schema) return undefined;
+    let actualSchema = schema.$ref && providerSchema?.$defs
+        ? providerSchema.$defs[schema.$ref.split('/').pop() || '']
+        : schema;
+
+    if (actualSchema?.anyOf && actualSchema.anyOf.length > 0) {
+        const nonNull = actualSchema.anyOf.find(s => s.type !== "null") || actualSchema.anyOf[0];
+        const resolvedNonNull = nonNull.$ref && providerSchema?.$defs
+            ? providerSchema.$defs[nonNull.$ref.split('/').pop() || '']
+            : nonNull;
+        actualSchema = {
+            ...resolvedNonNull,
+            ...actualSchema,
+            type: resolvedNonNull.type || actualSchema.type,
+            enum: resolvedNonNull.enum || actualSchema.enum,
+            examples: actualSchema.examples || resolvedNonNull.examples,
+            minimum: resolvedNonNull.minimum !== undefined ? resolvedNonNull.minimum : actualSchema.minimum,
+            maximum: resolvedNonNull.maximum !== undefined ? resolvedNonNull.maximum : actualSchema.maximum,
+        };
+    }
+    return actualSchema;
 }
 
 export interface ProviderSchema {
@@ -229,7 +260,7 @@ function getGlobalSummary(
 function getSchemaDropdownOptions(
     schema: SchemaProperty | undefined,
     modelValue?: string,
-): string[] | undefined {
+): (string | number)[] | undefined {
     let dropdownOptions = schema?.enum || schema?.examples;
 
     if (schema?.model_options && modelValue && schema.model_options[modelValue]) {
@@ -482,9 +513,7 @@ export function ServiceConfigurationForm({
                     : (configSource as Record<string, unknown> | null)?.[service] as Record<string, unknown> | undefined;
 
                 Object.entries(providerSchema.properties).forEach(([field, schema]) => {
-                    const actualSchema = (schema as SchemaProperty).$ref && providerSchema.$defs
-                        ? providerSchema.$defs[(schema as SchemaProperty).$ref!.split('/').pop() || '']
-                        : schema as SchemaProperty;
+                    const actualSchema = resolvePropertySchema(schema as SchemaProperty, providerSchema);
 
                     if (!actualSchema?.allow_custom_input) return;
 
@@ -590,7 +619,7 @@ export function ServiceConfigurationForm({
     };
 
     const buildServiceConfig = (service: ServiceSegment, data: FormValues) => {
-        const config: Record<string, string | number | string[]> = {
+        const config: Record<string, string | number | boolean | string[]> = {
             provider: serviceProviders[service],
         };
         const keys = apiKeys[service].map(k => k.trim()).filter(k => k.length > 0);
@@ -601,7 +630,17 @@ export function ServiceConfigurationForm({
             if (!property.startsWith(`${service}_`)) return;
             const field = property.slice(service.length + 1);
             if (field === "api_key" || field === "provider") return;
-            config[field] = value as string | number;
+            // Omit unset, empty strings, __default__, or NaN so defaults/None apply cleanly
+            if (
+                value === undefined ||
+                value === null ||
+                value === "" ||
+                value === "__default__" ||
+                (typeof value === "number" && isNaN(value))
+            ) {
+                return;
+            }
+            config[field] = value as string | number | boolean;
         });
         return config;
     };
@@ -729,9 +768,7 @@ export function ServiceConfigurationForm({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {configFields.slice(1).map((field) => {
                             const fieldSchema = providerSchema.properties[field];
-                            const actualFieldSchema = fieldSchema?.$ref && providerSchema.$defs
-                                ? providerSchema.$defs[fieldSchema.$ref.split('/').pop() || '']
-                                : fieldSchema;
+                            const actualFieldSchema = resolvePropertySchema(fieldSchema, providerSchema);
                             const fullWidth = actualFieldSchema?.multiline;
                             return (
                                 <div key={field} className={`space-y-2 ${fullWidth ? "col-span-1 sm:col-span-2" : ""}`}>
@@ -805,9 +842,7 @@ export function ServiceConfigurationForm({
     const renderFieldDescription = (field: string, providerSchema: ProviderSchema) => {
         const schema = providerSchema.properties[field];
         if (!schema) return null;
-        const actualSchema = schema.$ref && providerSchema.$defs
-            ? providerSchema.$defs[schema.$ref.split('/').pop() || '']
-            : schema;
+        const actualSchema = resolvePropertySchema(schema, providerSchema);
         if (!actualSchema?.description && !actualSchema?.docs_url) return null;
         return (
             <p className="text-xs text-muted-foreground">
@@ -837,9 +872,7 @@ export function ServiceConfigurationForm({
 
     const renderFieldInput = (service: ServiceSegment, field: string, providerSchema: ProviderSchema) => {
         const schema = providerSchema.properties[field];
-        const actualSchema = schema.$ref && providerSchema.$defs
-            ? providerSchema.$defs[schema.$ref.split('/').pop() || '']
-            : schema;
+        const actualSchema = resolvePropertySchema(schema, providerSchema);
         const dropdownOptions = getSchemaDropdownOptions(
             actualSchema,
             watch(`${service}_model`) as string | undefined,
@@ -909,14 +942,15 @@ export function ServiceConfigurationForm({
                             <SelectValue placeholder={`Select ${field}`} />
                         </SelectTrigger>
                         <SelectContent className="rounded-lg text-xs">
-                            {options.map((value: string) => {
+                            {options.map((value: string | number) => {
+                                const strVal = String(value);
                                 const rec = service === "extraction_llm" && field === "model"
-                                    ? EXTRACTION_MODEL_RECOMMENDATIONS[serviceProviders[service]]?.[value]
+                                    ? EXTRACTION_MODEL_RECOMMENDATIONS[serviceProviders[service]]?.[strVal]
                                     : undefined;
                                 return (
-                                    <SelectItem key={value} value={value} className="text-xs">
+                                    <SelectItem key={strVal} value={strVal} className="text-xs">
                                         <div className="flex items-center justify-between w-full gap-2">
-                                            <span>{value}</span>
+                                            <span>{strVal}</span>
                                             {rec && (
                                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                                                     rec.highlight
@@ -968,9 +1002,11 @@ export function ServiceConfigurationForm({
         }
 
         if (dropdownOptions && dropdownOptions.length > 0) {
+            const isRequired = providerSchema.required?.includes(field);
             const getDisplayName = (value: string) => {
+                if (value === "__default__") return "Default (Automatic)";
                 if (field === "language") {
-                    return LANGUAGE_DISPLAY_NAMES[value] || value;
+                    return LANGUAGE_DISPLAY_NAMES[value] || (value === "auto" ? "Auto-detect" : value);
                 }
                 if (field === "voice") {
                     return VOICE_DISPLAY_NAMES[value] || value.charAt(0).toUpperCase() + value.slice(1);
@@ -978,27 +1014,45 @@ export function ServiceConfigurationForm({
                 return value;
             };
 
+            const rawVal = watch(`${service}_${field}`);
+            const selectValue = (rawVal === undefined || rawVal === null || rawVal === "")
+                ? (isRequired ? "" : "__default__")
+                : String(rawVal);
+
             return (
                 <div className="space-y-1.5">
                     <Select
-                        value={watch(`${service}_${field}`) as string || ""}
+                        value={selectValue}
                         onValueChange={(value) => {
                             if (!value) return;
-                            setValue(`${service}_${field}`, value, { shouldDirty: true });
+                            if (value === "__default__") {
+                                setValue(`${service}_${field}`, undefined as never, { shouldDirty: true });
+                                return;
+                            }
+                            const finalValue = (actualSchema?.type === "number" || actualSchema?.type === "integer")
+                                ? Number(value)
+                                : value;
+                            setValue(`${service}_${field}`, finalValue, { shouldDirty: true });
                         }}
                     >
                         <SelectTrigger className="h-9 rounded-lg border-border bg-background text-xs w-full">
                             <SelectValue placeholder={`Select ${field}`} />
                         </SelectTrigger>
                         <SelectContent className="rounded-lg text-xs">
-                            {dropdownOptions.map((value: string) => {
+                            {!isRequired && (
+                                <SelectItem value="__default__" className="text-xs text-muted-foreground italic">
+                                    Default (Automatic)
+                                </SelectItem>
+                            )}
+                            {dropdownOptions.map((value: string | number) => {
+                                const strVal = String(value);
                                 const rec = service === "extraction_llm" && field === "model"
-                                    ? EXTRACTION_MODEL_RECOMMENDATIONS[serviceProviders[service]]?.[value]
+                                    ? EXTRACTION_MODEL_RECOMMENDATIONS[serviceProviders[service]]?.[strVal]
                                     : undefined;
                                 return (
-                                    <SelectItem key={value} value={value} className="text-xs">
+                                    <SelectItem key={strVal} value={strVal} className="text-xs">
                                         <div className="flex items-center justify-between w-full gap-2">
-                                            <span>{getDisplayName(value)}</span>
+                                            <span>{getDisplayName(strVal)}</span>
                                             {rec && (
                                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                                                     rec.highlight
@@ -1050,15 +1104,35 @@ export function ServiceConfigurationForm({
             );
         }
 
+        if (actualSchema?.type === "boolean") {
+            const fieldKey = `${service}_${field}`;
+            return (
+                <div className="flex items-center space-x-2 pt-1.5">
+                    <Switch
+                        id={fieldKey}
+                        checked={Boolean(watch(fieldKey))}
+                        onCheckedChange={(checked) => setValue(fieldKey, checked, { shouldDirty: true })}
+                    />
+                    <Label htmlFor={fieldKey} className="text-xs text-muted-foreground font-medium cursor-pointer">
+                        {Boolean(watch(fieldKey)) ? "Enabled" : field === "high_vad_sensitivity" ? "Disabled (Recommended for Calls)" : "Disabled"}
+                    </Label>
+                </div>
+            );
+        }
+
         return (
             <Input
-                type={actualSchema?.type === "number" ? "number" : "text"}
-                {...(actualSchema?.type === "number" && { step: "any" })}
+                type={actualSchema?.type === "number" || actualSchema?.type === "integer" ? "number" : "text"}
+                {...((actualSchema?.type === "number" || actualSchema?.type === "integer") && {
+                    step: actualSchema?.type === "integer" ? 1 : 0.05,
+                    min: actualSchema?.minimum,
+                    max: actualSchema?.maximum,
+                })}
                 placeholder={`Enter ${field}`}
                 className="h-9 rounded-lg border-border bg-background text-xs"
                 {...register(`${service}_${field}`, {
                     required: service !== "embeddings" && providerSchema.required?.includes(field),
-                    valueAsNumber: actualSchema?.type === "number"
+                    valueAsNumber: actualSchema?.type === "number" || actualSchema?.type === "integer",
                 })}
             />
         );

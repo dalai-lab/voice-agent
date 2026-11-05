@@ -680,6 +680,29 @@ def create_stt_service(
         f"Creating STT service: provider={user_config.stt.provider}, model={user_config.stt.model}"
     )
     if user_config.stt.provider == ServiceProviders.DEEPGRAM.value:
+        # Parse custom keywords and merge with affirmation keyterms
+        raw_keywords = getattr(user_config.stt, "keywords", None)
+        custom_keyterms = []
+        if raw_keywords and str(raw_keywords).strip():
+            import re
+            for part in str(raw_keywords).split(","):
+                clean = part.strip()
+                if not clean:
+                    continue
+                # Strip intensifier suffixes like :2 or :1.5 for Deepgram Nova-3/Flux
+                clean = re.sub(r":\d+(\.\d+)?$", "", clean).strip()
+                if clean:
+                    custom_keyterms.append(clean)
+
+        merged_deepgram_terms = []
+        seen_dg = set()
+        for term in custom_keyterms + (keyterms or []):
+            t_low = term.lower()
+            if t_low not in seen_dg:
+                seen_dg.add(t_low)
+                merged_deepgram_terms.append(term)
+        final_deepgram_terms = merged_deepgram_terms[:100]
+
         if user_config.stt.model in DEEPGRAM_FLUX_MODELS:
             eot_timeout_ms = _extract_clean_setting(user_config.stt, "eot_timeout_ms", int) or 3000
             eot_threshold = _extract_clean_setting(user_config.stt, "eot_threshold", float)
@@ -694,7 +717,7 @@ def create_stt_service(
                 "eot_timeout_ms": eot_timeout_ms,
                 "eot_threshold": eot_threshold,
                 "eager_eot_threshold": eager_eot,
-                "keyterm": keyterms or [],
+                "keyterm": final_deepgram_terms,
             }
             numerals = getattr(user_config.stt, "numerals", None)
             if numerals is not None and numerals != "":
@@ -726,7 +749,7 @@ def create_stt_service(
             "profanity_filter": bool(profanity) if profanity is not None and profanity != "" else False,
             "endpointing": endpointing,
             "model": user_config.stt.model,
-            "keyterm": keyterms or [],
+            "keyterm": final_deepgram_terms,
         }
         for opt_bool in ("smart_format", "punctuate", "numerals"):
             v = getattr(user_config.stt, opt_bool, None)
@@ -1007,9 +1030,28 @@ def create_stt_service(
             if val is not None and val != "":
                 settings_kwargs[bool_field] = bool(val)
 
-        keywords = getattr(user_config.stt, "keywords", None)
-        if keywords and str(keywords).strip():
-            settings_kwargs["keywords"] = str(keywords).strip()
+        raw_smallest_keywords = getattr(user_config.stt, "keywords", None)
+        smallest_terms = []
+        seen_smallest = set()
+        if raw_smallest_keywords and str(raw_smallest_keywords).strip():
+            for part in str(raw_smallest_keywords).split(","):
+                clean = part.strip()
+                if not clean:
+                    continue
+                base = clean.split(":")[0].strip().lower()
+                if base not in seen_smallest:
+                    seen_smallest.add(base)
+                    smallest_terms.append(clean)
+
+        if boost_affirmations:
+            for aff in AFFIRMATION_KEYTERMS:
+                if aff.lower() not in seen_smallest:
+                    seen_smallest.add(aff.lower())
+                    smallest_terms.append(aff)
+
+        final_smallest_keywords = ",".join(smallest_terms[:100])
+        if final_smallest_keywords:
+            settings_kwargs["keywords"] = final_smallest_keywords
 
         eou_timeout = _extract_clean_setting(user_config.stt, "eou_timeout_ms", int)
         if eou_timeout is not None:
@@ -1060,14 +1102,48 @@ def create_tts_service(
     # Create function call filter to prevent TTS from speaking function call tags
     xml_function_tag_filter = XMLFunctionTagFilter()
     if user_config.tts.provider == ServiceProviders.DEEPGRAM.value:
-        return DeepgramTTSService(
-            api_key=user_config.tts.api_key,
-            sample_rate=audio_config.transport_out_sample_rate,
-            settings=DeepgramTTSSettings(voice=user_config.tts.voice),
-            text_filters=[xml_function_tag_filter],
-            skip_aggregator_types=["recording_router", "recording"],
-            silence_time_s=1.0,
-        )
+        voice = (getattr(user_config.tts, "voice", None) or "aura-2-helena-en").strip()
+        speed = _extract_clean_setting(user_config.tts, "speed", float) or 1.0
+        mip_opt_out = getattr(user_config.tts, "mip_opt_out", None)
+        clean_mip = bool(mip_opt_out) if mip_opt_out is not None and mip_opt_out != "" else None
+        tag = getattr(user_config.tts, "tag", None)
+        clean_tag = [str(tag).strip()] if tag and str(tag).strip() else None
+
+        if "flux" in voice.lower():
+            from pipecat.services.deepgram.flux.tts import (
+                DeepgramFluxTTSService,
+                DeepgramFluxTTSSettings,
+            )
+            flux_settings = DeepgramFluxTTSSettings(voice=voice)
+            if speed and speed != 1.0:
+                flux_settings.speed = speed
+            return DeepgramFluxTTSService(
+                api_key=user_config.tts.api_key,
+                sample_rate=audio_config.transport_out_sample_rate,
+                mip_opt_out=clean_mip,
+                tag=clean_tag,
+                settings=flux_settings,
+                text_filters=[xml_function_tag_filter],
+                skip_aggregator_types=["recording_router", "recording"],
+                silence_time_s=1.0,
+            )
+
+        deepgram_settings = DeepgramTTSSettings(voice=voice)
+        if speed and speed != 1.0:
+            deepgram_settings.speed = speed
+
+        deepgram_kwargs: dict[str, Any] = {
+            "api_key": user_config.tts.api_key,
+            "sample_rate": audio_config.transport_out_sample_rate,
+            "settings": deepgram_settings,
+            "text_filters": [xml_function_tag_filter],
+            "skip_aggregator_types": ["recording_router", "recording"],
+            "silence_time_s": 1.0,
+        }
+        if clean_mip is not None:
+            deepgram_kwargs["mip_opt_out"] = clean_mip
+
+        return DeepgramTTSService(**deepgram_kwargs)
     elif user_config.tts.provider == ServiceProviders.OPENAI.value:
         kwargs = {}
         base_url = getattr(user_config.tts, "base_url", None)

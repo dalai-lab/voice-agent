@@ -109,7 +109,7 @@ def test_create_smallest_stt_service_passes_advanced_parameters():
     with patch(
         "api.services.pipecat.service_factory.SmallestSTTService"
     ) as mock_service:
-        create_stt_service(user_config, audio_config)
+        create_stt_service(user_config, audio_config, boost_affirmations=False)
 
     assert mock_service.call_count == 1
     kwargs = mock_service.call_args.kwargs

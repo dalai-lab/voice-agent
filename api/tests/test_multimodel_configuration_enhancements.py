@@ -7,6 +7,7 @@ from pipecat.transcriptions.language import Language
 
 from api.services.configuration.registry import (
     DeepgramSTTConfiguration,
+    DeepgramTTSConfiguration,
     OpenAILLMService,
     SarvamLLMConfiguration,
     SarvamTTSConfiguration,
@@ -176,6 +177,116 @@ class TestDeepgramSTTConfigurationEnhancements:
         assert settings.eager_eot_threshold == 0.6
         assert settings.numerals is True
 
+    def test_deepgram_stt_keywords_and_affirmations_merged(self, audio_config):
+        user_config = SimpleNamespace(
+            stt=SimpleNamespace(
+                provider=ServiceProviders.DEEPGRAM.value,
+                api_key="test-key",
+                model="nova-3-general",
+                language="en",
+                keywords="Talkar:2, Delivery:1.5, Bengaluru, YES",
+            )
+        )
+        with patch("api.services.pipecat.service_factory.DeepgramSTTService") as mock_service:
+            create_stt_service(user_config, audio_config, boost_affirmations=True)
+
+        settings = mock_service.call_args.kwargs["settings"]
+        # Intensifiers (:2, :1.5) must be stripped for Deepgram
+        # Case-insensitive deduplication must preserve first occurrence ("YES") and omit duplicate affirmation "yes"
+        assert settings.keyterm == [
+            "Talkar",
+            "Delivery",
+            "Bengaluru",
+            "YES",
+            "no",
+            "yeah",
+            "correct",
+            "yep",
+            "nope",
+            "sure",
+            "okay",
+        ]
+
+    def test_smallest_stt_applies_boost_affirmations(self, audio_config):
+        user_config = SimpleNamespace(
+            stt=SimpleNamespace(
+                provider=ServiceProviders.SMALLEST.value,
+                api_key="test-key",
+                model="pulse",
+                language="en",
+                keywords="Talkar:2, Bengaluru, YES",
+            )
+        )
+        with patch("api.services.pipecat.service_factory.SmallestSTTService") as mock_service:
+            create_stt_service(user_config, audio_config, boost_affirmations=True)
+
+        settings = mock_service.call_args.kwargs["settings"]
+        # Smallest AI supports intensifier weights, deduplicates by base word case-insensitively,
+        # merges affirmation keyterms, and joins as comma-separated string
+        assert (
+            settings.keywords
+            == "Talkar:2,Bengaluru,YES,no,yeah,correct,yep,nope,sure,okay"
+        )
+
+
+class TestDeepgramTTSConfigurationEnhancements:
+    def test_schema_defaults_and_computed_model(self):
+        config_default = DeepgramTTSConfiguration(api_key="test-key")
+        assert config_default.voice == "aura-2-helena-en"
+        assert config_default.speed == 1.0
+        assert config_default.mip_opt_out is None
+        assert config_default.tag is None
+        assert config_default.model == "aura-2"
+
+        config_flux = DeepgramTTSConfiguration(api_key="test-key", voice="flux-alexis-en")
+        assert config_flux.model == "flux"
+
+        config_aura1 = DeepgramTTSConfiguration(api_key="test-key", voice="aura-asteria-en")
+        assert config_aura1.model == "aura-1"
+
+    def test_factory_routes_flux_voices_to_flux_service(self, audio_config):
+        user_config = SimpleNamespace(
+            tts=SimpleNamespace(
+                provider=ServiceProviders.DEEPGRAM.value,
+                model="flux",
+                api_key="test-key",
+                voice="flux-alexis-en",
+                speed=1.1,
+                mip_opt_out=True,
+                tag="test-tag",
+            )
+        )
+        with patch("pipecat.services.deepgram.flux.tts.DeepgramFluxTTSService") as mock_flux_service:
+            create_tts_service(user_config, audio_config)
+
+        kwargs = mock_flux_service.call_args.kwargs
+        assert kwargs["settings"].voice == "flux-alexis-en"
+        assert kwargs["settings"].speed == 1.1
+        assert kwargs["mip_opt_out"] is True
+        assert kwargs["tag"] == ["test-tag"]
+        assert kwargs["sample_rate"] == audio_config.transport_out_sample_rate
+
+    def test_factory_routes_aura_voices_to_v1_service(self, audio_config):
+        user_config = SimpleNamespace(
+            tts=SimpleNamespace(
+                provider=ServiceProviders.DEEPGRAM.value,
+                model="aura-2",
+                api_key="test-key",
+                voice="aura-2-helena-en",
+                speed=1.2,
+                mip_opt_out=False,
+                tag="aura-tag",
+            )
+        )
+        with patch("api.services.pipecat.service_factory.DeepgramTTSService") as mock_tts_service:
+            create_tts_service(user_config, audio_config)
+
+        kwargs = mock_tts_service.call_args.kwargs
+        assert kwargs["settings"].voice == "aura-2-helena-en"
+        assert kwargs["settings"].speed == 1.2
+        assert kwargs["mip_opt_out"] is False
+        assert kwargs["sample_rate"] == audio_config.transport_out_sample_rate
+
 
 class TestOpenAILLMConfigurationEnhancements:
     def test_schema_defaults(self):
@@ -342,4 +453,17 @@ class TestSanitizationEnhancements:
         assert smallest_stt_cfg.eou_timeout_ms is None
         assert smallest_stt_cfg.keywords is None
         assert smallest_stt_cfg.emotion_detection is None
+
+        # Test Deepgram TTS with empty string and NaN
+        deepgram_tts_cfg = DeepgramTTSConfiguration.model_validate({
+            "provider": "deepgram",
+            "api_key": "test-key",
+            "voice": "aura-2-helena-en",
+            "speed": float("nan"),
+            "mip_opt_out": "",
+            "tag": "",
+        })
+        assert deepgram_tts_cfg.speed == 1.0
+        assert deepgram_tts_cfg.mip_opt_out is None
+        assert deepgram_tts_cfg.tag is None
 

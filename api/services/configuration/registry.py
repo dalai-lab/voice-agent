@@ -1008,20 +1008,36 @@ class DeepgramTTSConfiguration(BaseServiceConfiguration):
     provider: Literal[ServiceProviders.DEEPGRAM] = ServiceProviders.DEEPGRAM
     voice: str = Field(
         default="aura-2-helena-en",
-        description="Deepgram voice ID (model is inferred from the 'aura-N' prefix).",
+        description="Deepgram voice ID. Supports Aura-2 (e.g. aura-2-helena-en), Aura-1 (aura-asteria-en), and Flux (flux-alexis-en).",
+    )
+    speed: float = Field(
+        default=1.0,
+        ge=0.5,
+        le=1.5,
+        description="Speech pacing multiplier (0.5x to 1.5x, default: 1.0x).",
+    )
+    mip_opt_out: bool | None = Field(
+        default=None,
+        description="Opt out of Deepgram Model Improvement Program (keeps data private for HIPAA/GDPR compliance).",
+    )
+    tag: str | None = Field(
+        default=None,
+        description="Optional tag for grouping and filtering usage reports in your Deepgram Console.",
     )
 
     @computed_field
     @property
     def model(self) -> str:
         # Deepgram model's name is inferred using the voice name.
-        # It can either contain aura-2 or aura-1
-        if "aura-2" in self.voice:
+        # It can contain flux, aura-2 or aura-1
+        v = (self.voice or "").lower()
+        if "flux" in v:
+            return "flux"
+        elif "aura-2" in v:
             return "aura-2"
-        elif "aura-1" in self.voice:
+        elif "aura-1" in v or "aura-" in v:
             return "aura-1"
         else:
-            # Default fallback
             return "aura-2"
 
 
@@ -1600,6 +1616,10 @@ class DeepgramSTTConfiguration(BaseSTTConfiguration):
                 "flux-general-multi": DEEPGRAM_FLUX_MULTILINGUAL_LANGUAGE_OPTIONS,
             },
         },
+    )
+    keywords: str | None = Field(
+        default=None,
+        description="Comma-separated custom keywords or keyterms (e.g. 'Talkar, Delivery, Bengaluru') to boost speech recognition accuracy.",
     )
     endpointing: int = Field(
         default=100,

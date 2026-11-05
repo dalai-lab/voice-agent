@@ -1030,8 +1030,12 @@ def create_stt_service(
             sample_rate=audio_config.transport_in_sample_rate,
         )
     elif user_config.stt.provider == ServiceProviders.SMALLEST.value:
+        stt_model = user_config.stt.model
         language_code = getattr(user_config.stt, "language", None) or "en"
-        if language_code in ("multi", "auto"):
+        if stt_model == "pulse-2":
+            # pulse-2 is strictly English-only
+            pipecat_language = Language.EN
+        elif language_code in ("multi", "auto"):
             pipecat_language = "multi"
         else:
             try:
@@ -1040,7 +1044,7 @@ def create_stt_service(
                 pipecat_language = Language.EN
 
         settings_kwargs: dict[str, Any] = {
-            "model": user_config.stt.model,
+            "model": stt_model,
             "language": pipecat_language,
         }
 

@@ -89,7 +89,7 @@ def test_create_smallest_stt_service_passes_advanced_parameters():
             provider=ServiceProviders.SMALLEST.value,
             api_key="test-key",
             model="pulse-2",
-            language="multi",
+            language="en",
             keywords="Talkar:2,Nvidia:3",
             itn_normalize=True,
             format=True,
@@ -115,7 +115,7 @@ def test_create_smallest_stt_service_passes_advanced_parameters():
     kwargs = mock_service.call_args.kwargs
     settings = kwargs["settings"]
     assert settings.model == "pulse-2"
-    assert settings.language == "multi"
+    assert settings.language == "en"
     assert settings.keywords == "Talkar:2,Nvidia:3"
     assert settings.itn_normalize is True
     assert settings.format is True
@@ -128,6 +128,48 @@ def test_create_smallest_stt_service_passes_advanced_parameters():
     assert settings.eou_timeout_ms == 500
     assert settings.emotion_detection is True
     assert settings.gender_detection is True
+
+
+def test_smallest_stt_pulse_supports_multilingual_auto():
+    from pipecat.transcriptions.language import Language
+
+    user_config = SimpleNamespace(
+        stt=SimpleNamespace(
+            provider=ServiceProviders.SMALLEST.value,
+            api_key="test-key",
+            model="pulse",
+            language="multi",
+        )
+    )
+    audio_config = SimpleNamespace(transport_in_sample_rate=16000)
+
+    with patch("api.services.pipecat.service_factory.SmallestSTTService") as mock_service:
+        create_stt_service(user_config, audio_config, boost_affirmations=False)
+
+    settings = mock_service.call_args.kwargs["settings"]
+    assert settings.model == "pulse"
+    assert settings.language == "multi"
+
+
+def test_smallest_stt_pulse_2_forces_english():
+    from pipecat.transcriptions.language import Language
+
+    user_config = SimpleNamespace(
+        stt=SimpleNamespace(
+            provider=ServiceProviders.SMALLEST.value,
+            api_key="test-key",
+            model="pulse-2",
+            language="auto",
+        )
+    )
+    audio_config = SimpleNamespace(transport_in_sample_rate=16000)
+
+    with patch("api.services.pipecat.service_factory.SmallestSTTService") as mock_service:
+        create_stt_service(user_config, audio_config, boost_affirmations=False)
+
+    settings = mock_service.call_args.kwargs["settings"]
+    assert settings.model == "pulse-2"
+    assert settings.language == Language.EN
 
 
 def test_smallest_stt_sample_rate_and_query_params():
@@ -191,4 +233,33 @@ def test_smallest_stt_pulse_model_omits_emotion_and_gender():
     # pulse (multilingual) model must omit emotion_detection and gender_detection
     assert "emotion_detection" not in captured_uri
     assert "gender_detection" not in captured_uri
+
+
+def test_smallest_stt_pulse_2_overrides_multi_to_en_during_handshake():
+    from pipecat.services.smallest.stt import SmallestSTTService, SmallestSTTSettings
+    from unittest.mock import AsyncMock
+
+    service = SmallestSTTService(
+        api_key="test-key",
+        sample_rate=16000,
+        settings=SmallestSTTSettings(model="pulse-2", language="multi"),
+    )
+
+    captured_uri = None
+    async def mock_connect(uri, **kwargs):
+        nonlocal captured_uri
+        captured_uri = uri
+        mock_ws = AsyncMock()
+        mock_ws.state.name = "OPEN"
+        return mock_ws
+
+    with patch.object(service, "_websocket_connect", side_effect=mock_connect):
+        import asyncio
+        asyncio.run(service._connect_websocket())
+
+    assert captured_uri is not None
+    # For pulse-2, language=multi must be overridden to language=en to prevent Smallest AI server rejection
+    assert "language=en" in captured_uri
+    assert "language=multi" not in captured_uri
+
 

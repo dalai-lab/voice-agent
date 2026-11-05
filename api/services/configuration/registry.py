@@ -2070,9 +2070,13 @@ class SmallestAISTTConfiguration(BaseSTTConfiguration):
     )
     language: str = Field(
         default="en",
-        description="ISO 639-1 language code, or 'multi' for multilingual auto-detection.",
+        description="ISO 639-1 language code, or 'multi' for multilingual auto-detection on pulse. Note: pulse-2 is English-only.",
         json_schema_extra={
             "examples": SMALLEST_STT_LANGUAGES,
+            "model_options": {
+                "pulse": SMALLEST_STT_LANGUAGES,
+                "pulse-2": ["en"],
+            },
             "allow_custom_input": True,
         },
     )

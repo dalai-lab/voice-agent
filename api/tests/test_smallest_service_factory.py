@@ -128,3 +128,67 @@ def test_create_smallest_stt_service_passes_advanced_parameters():
     assert settings.eou_timeout_ms == 500
     assert settings.emotion_detection is True
     assert settings.gender_detection is True
+
+
+def test_smallest_stt_sample_rate_and_query_params():
+    from pipecat.services.smallest.stt import SmallestSTTService, SmallestSTTSettings
+    from unittest.mock import AsyncMock
+
+    service = SmallestSTTService(
+        api_key="test-key",
+        sample_rate=16000,
+        settings=SmallestSTTSettings(model="pulse-2"),
+    )
+    # Sample rate must be initialized immediately, not 0
+    assert service.sample_rate == 16000
+
+    # Test query params construction during connection
+    captured_uri = None
+    async def mock_connect(uri, **kwargs):
+        nonlocal captured_uri
+        captured_uri = uri
+        mock_ws = AsyncMock()
+        mock_ws.state.name = "OPEN"
+        return mock_ws
+
+    with patch.object(service, "_websocket_connect", side_effect=mock_connect):
+        import asyncio
+        asyncio.run(service._connect_websocket())
+
+    assert captured_uri is not None
+    assert "sample_rate=16000" in captured_uri
+    assert "sample_rate=0" not in captured_uri
+    # pulse-2 model should include emotion_detection and gender_detection
+    assert "emotion_detection=" in captured_uri
+    assert "gender_detection=" in captured_uri
+
+
+def test_smallest_stt_pulse_model_omits_emotion_and_gender():
+    from pipecat.services.smallest.stt import SmallestSTTService, SmallestSTTSettings
+    from unittest.mock import AsyncMock
+
+    service = SmallestSTTService(
+        api_key="test-key",
+        sample_rate=8000,
+        settings=SmallestSTTSettings(model="pulse"),
+    )
+    assert service.sample_rate == 8000
+
+    captured_uri = None
+    async def mock_connect(uri, **kwargs):
+        nonlocal captured_uri
+        captured_uri = uri
+        mock_ws = AsyncMock()
+        mock_ws.state.name = "OPEN"
+        return mock_ws
+
+    with patch.object(service, "_websocket_connect", side_effect=mock_connect):
+        import asyncio
+        asyncio.run(service._connect_websocket())
+
+    assert captured_uri is not None
+    assert "sample_rate=8000" in captured_uri
+    # pulse (multilingual) model must omit emotion_detection and gender_detection
+    assert "emotion_detection" not in captured_uri
+    assert "gender_detection" not in captured_uri
+

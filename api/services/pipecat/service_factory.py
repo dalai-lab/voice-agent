@@ -879,12 +879,42 @@ def create_stt_service(
 
         stt_model = user_config.stt.model
         is_vad_supported = stt_model in {"saaras:v4", "saaras:v3"}
+        mode = getattr(user_config.stt, "mode", None) or "transcribe"
+
+        # Process custom keywords and merge with affirmation keyterms for saaras:v4
+        raw_sarvam_keywords = getattr(user_config.stt, "keywords", None)
+        custom_sarvam_terms = []
+        if raw_sarvam_keywords and str(raw_sarvam_keywords).strip():
+            import re
+            for part in str(raw_sarvam_keywords).split(","):
+                clean = part.strip()
+                if not clean:
+                    continue
+                # Strip intensifier suffixes like :2 or :1.5 for Sarvam
+                clean = re.sub(r":\d+(\.\d+)?$", "", clean).strip()
+                if clean:
+                    custom_sarvam_terms.append(clean[:64])
+
+        merged_sarvam_terms = []
+        seen_sarvam = set()
+        for term in custom_sarvam_terms + (keyterms or []):
+            t_low = term.lower()
+            if t_low not in seen_sarvam:
+                seen_sarvam.add(t_low)
+                merged_sarvam_terms.append(term[:64])
+        final_sarvam_terms = merged_sarvam_terms[:50]
 
         settings_kwargs: dict[str, Any] = {
             "model": stt_model,
             "language": pipecat_language,
             "high_vad_sensitivity": getattr(user_config.stt, "high_vad_sensitivity", False),
         }
+
+        if is_vad_supported:
+            settings_kwargs["mode"] = mode
+
+        if stt_model == "saaras:v4" and final_sarvam_terms:
+            settings_kwargs["keyterms"] = final_sarvam_terms
 
         # Guard fine-grained VAD parameters to prevent ValueError on models like saarika:v2.5
         if is_vad_supported:

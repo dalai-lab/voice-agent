@@ -899,6 +899,16 @@ export function ServiceConfigurationForm({
                 if (value === "none") return "None (Disabled)";
                 return value.charAt(0).toUpperCase() + value.slice(1);
             }
+            if (field === "mode") {
+                const MODE_LABELS: Record<string, string> = {
+                    transcribe: "Transcribe (Native Script)",
+                    translate: "Translate (Real-time to English)",
+                    verbatim: "Verbatim (Word-for-word with Fillers)",
+                    translit: "Transliterate (Latin Script)",
+                    codemix: "Code-mix (Preserve English Loanwords)",
+                };
+                return MODE_LABELS[value] || value.charAt(0).toUpperCase() + value.slice(1);
+            }
             if (field === "language") {
                 if (value === "multi") return "Multilingual (Auto-detect)";
                 return LANGUAGE_DISPLAY_NAMES[value] || (value === "auto" ? "Auto-detect" : value);

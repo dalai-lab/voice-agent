@@ -1773,6 +1773,9 @@ class DograhSTTService(BaseSTTConfiguration):
     )
 
 
+SARVAM_STT_MODES = ["transcribe", "translate", "verbatim", "translit", "codemix"]
+
+
 @register_stt
 class SarvamSTTConfiguration(BaseSTTConfiguration):
     model_config = SARVAM_PROVIDER_MODEL_CONFIG
@@ -1798,6 +1801,22 @@ class SarvamSTTConfiguration(BaseSTTConfiguration):
                 "saarika:v2.5": SARVAM_STT_LANGUAGES_V25,
             },
         },
+    )
+    mode: str = Field(
+        default="transcribe",
+        description="Output transformation mode (transcribe, translate, verbatim, translit, codemix).",
+        json_schema_extra={
+            "examples": SARVAM_STT_MODES,
+            "model_options": {
+                "saaras:v4": SARVAM_STT_MODES,
+                "saaras:v3": SARVAM_STT_MODES,
+                "saarika:v2.5": ["transcribe"],
+            },
+        },
+    )
+    keywords: str | None = Field(
+        default=None,
+        description="Comma-separated custom keyterms (e.g. 'Talkar, Delhivery, Bengaluru') to boost speech recognition accuracy for saaras:v4.",
     )
     high_vad_sensitivity: bool = Field(
         default=False,

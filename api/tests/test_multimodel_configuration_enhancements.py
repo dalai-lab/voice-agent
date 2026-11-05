@@ -10,6 +10,7 @@ from api.services.configuration.registry import (
     DeepgramTTSConfiguration,
     OpenAILLMService,
     SarvamLLMConfiguration,
+    SarvamSTTConfiguration,
     SarvamTTSConfiguration,
     ServiceProviders,
     SmallestAISTTConfiguration,
@@ -228,6 +229,87 @@ class TestDeepgramSTTConfigurationEnhancements:
             settings.keywords
             == "Talkar:2,Bengaluru:1,YES:1,no:1,yeah:1,correct:1,yep:1,nope:1,sure:1,okay:1"
         )
+
+
+class TestSarvamSTTConfigurationEnhancements:
+    def test_schema_defaults(self):
+        config = SarvamSTTConfiguration(api_key="test-key")
+        assert config.model == "saaras:v4"
+        assert config.mode == "transcribe"
+        assert config.keywords is None
+        assert config.high_vad_sensitivity is False
+        assert config.positive_speech_threshold == 0.70
+        assert config.min_speech_frames == 3
+
+    def test_factory_passes_mode_and_keywords_for_saaras_v4(self, audio_config):
+        user_config = SimpleNamespace(
+            stt=SimpleNamespace(
+                provider=ServiceProviders.SARVAM.value,
+                api_key="test-key",
+                model="saaras:v4",
+                language="hi-IN",
+                mode="codemix",
+                keywords="Talkar:2, Delhivery:1.5, Bengaluru, YES",
+            )
+        )
+        with patch("api.services.pipecat.service_factory.SarvamSTTService") as mock_service:
+            create_stt_service(user_config, audio_config, boost_affirmations=True)
+
+        settings = mock_service.call_args.kwargs["settings"]
+        assert settings.model == "saaras:v4"
+        assert settings.mode == "codemix"
+        # Intensifiers (:2, :1.5) must be stripped for Sarvam, affirmations merged, capped at 50
+        assert settings.keyterms == [
+            "Talkar",
+            "Delhivery",
+            "Bengaluru",
+            "YES",
+            "no",
+            "yeah",
+            "correct",
+            "yep",
+            "nope",
+            "sure",
+            "okay",
+        ]
+
+    def test_factory_guards_keyterms_from_saaras_v3(self, audio_config):
+        user_config = SimpleNamespace(
+            stt=SimpleNamespace(
+                provider=ServiceProviders.SARVAM.value,
+                api_key="test-key",
+                model="saaras:v3",
+                language="hi-IN",
+                mode="translate",
+                keywords="Talkar:2, Bengaluru",
+            )
+        )
+        with patch("api.services.pipecat.service_factory.SarvamSTTService") as mock_service:
+            create_stt_service(user_config, audio_config, boost_affirmations=True)
+
+        settings = mock_service.call_args.kwargs["settings"]
+        assert settings.model == "saaras:v3"
+        assert settings.mode == "translate"
+        # saaras:v3 does NOT support keyterms, so keyterms must not be passed
+        assert getattr(settings, "keyterms", None) in (None, NOT_GIVEN)
+
+    def test_factory_guards_mode_from_saarika_v2_5(self, audio_config):
+        user_config = SimpleNamespace(
+            stt=SimpleNamespace(
+                provider=ServiceProviders.SARVAM.value,
+                api_key="test-key",
+                model="saarika:v2.5",
+                language="hi-IN",
+                mode="translate",
+            )
+        )
+        with patch("api.services.pipecat.service_factory.SarvamSTTService") as mock_service:
+            create_stt_service(user_config, audio_config)
+
+        settings = mock_service.call_args.kwargs["settings"]
+        assert settings.model == "saarika:v2.5"
+        # saarika:v2.5 does NOT support mode
+        assert getattr(settings, "mode", None) in (None, NOT_GIVEN)
 
 
 class TestDeepgramTTSConfigurationEnhancements:
@@ -467,4 +549,15 @@ class TestSanitizationEnhancements:
         assert deepgram_tts_cfg.speed == 1.0
         assert deepgram_tts_cfg.mip_opt_out is None
         assert deepgram_tts_cfg.tag is None
+
+        # Test Sarvam STT with empty string
+        sarvam_stt_cfg = SarvamSTTConfiguration.model_validate({
+            "provider": "sarvam",
+            "api_key": "test-key",
+            "model": "saaras:v4",
+            "mode": "",
+            "keywords": "",
+        })
+        assert sarvam_stt_cfg.mode == "transcribe"
+        assert sarvam_stt_cfg.keywords is None
 

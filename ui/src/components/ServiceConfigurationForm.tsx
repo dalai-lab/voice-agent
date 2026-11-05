@@ -653,8 +653,8 @@ export function ServiceConfigurationForm({
             if (mode === 'override') {
                 // Build model_overrides for enabled services only
                 const modelOverrides: Record<string, unknown> = {};
-                const services = isRealtime
-                    ? ["realtime", "llm", "extraction_llm"]
+                const services = isRealtime 
+                    ? ["realtime", "llm", "extraction_llm"] 
                     : ["llm", "extraction_llm", "tts", "stt"];
                 for (const svc of services) {
                     if (enabledOverrides[svc]) {
@@ -968,10 +968,11 @@ export function ServiceConfigurationForm({
                                         <div className="flex items-center justify-between w-full gap-2">
                                             <span>{getDisplayName(strVal)}</span>
                                             {rec && (
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${rec.highlight
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                                                    rec.highlight
                                                         ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
                                                         : "bg-muted text-muted-foreground"
-                                                    }`}>
+                                                }`}>
                                                     {rec.badge}
                                                 </span>
                                             )}
@@ -989,10 +990,11 @@ export function ServiceConfigurationForm({
                                     key={recModel}
                                     type="button"
                                     onClick={() => setValue(fieldKey, recModel, { shouldDirty: true })}
-                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${watch(fieldKey) === recModel
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                                        watch(fieldKey) === recModel
                                             ? "bg-primary/10 text-primary border-primary/30 font-semibold"
                                             : "bg-muted/40 hover:bg-muted text-muted-foreground border-border/60"
-                                        }`}
+                                    }`}
                                 >
                                     {recModel} <span className="opacity-80">({recInfo.badge.replace("⚡ ", "")})</span>
                                 </button>
@@ -1058,10 +1060,11 @@ export function ServiceConfigurationForm({
                                         <div className="flex items-center justify-between w-full gap-2">
                                             <span>{getDisplayName(strVal)}</span>
                                             {rec && (
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${rec.highlight
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                                                    rec.highlight
                                                         ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
                                                         : "bg-muted text-muted-foreground"
-                                                    }`}>
+                                                }`}>
                                                     {rec.badge}
                                                 </span>
                                             )}
@@ -1079,10 +1082,11 @@ export function ServiceConfigurationForm({
                                     key={recModel}
                                     type="button"
                                     onClick={() => setValue(`${service}_${field}`, recModel, { shouldDirty: true })}
-                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${watch(`${service}_${field}`) === recModel
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                                        watch(`${service}_${field}`) === recModel
                                             ? "bg-primary/10 text-primary border-primary/30 font-semibold"
                                             : "bg-muted/40 hover:bg-muted text-muted-foreground border-border/60"
-                                        }`}
+                                    }`}
                                 >
                                     {recModel} <span className="opacity-80">({recInfo.badge.replace("⚡ ", "")})</span>
                                 </button>

@@ -1041,13 +1041,16 @@ def create_stt_service(
                 base = clean.split(":")[0].strip().lower()
                 if base not in seen_smallest:
                     seen_smallest.add(base)
+                    # Smallest AI requires KEYWORD:INTENSIFIER; default to :1 if omitted
+                    if ":" not in clean:
+                        clean = f"{clean}:1"
                     smallest_terms.append(clean)
 
         if boost_affirmations:
             for aff in AFFIRMATION_KEYTERMS:
                 if aff.lower() not in seen_smallest:
                     seen_smallest.add(aff.lower())
-                    smallest_terms.append(aff)
+                    smallest_terms.append(f"{aff}:1")
 
         final_smallest_keywords = ",".join(smallest_terms[:100])
         if final_smallest_keywords:

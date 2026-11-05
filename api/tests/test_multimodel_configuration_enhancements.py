@@ -221,11 +221,12 @@ class TestDeepgramSTTConfigurationEnhancements:
             create_stt_service(user_config, audio_config, boost_affirmations=True)
 
         settings = mock_service.call_args.kwargs["settings"]
-        # Smallest AI supports intensifier weights, deduplicates by base word case-insensitively,
-        # merges affirmation keyterms, and joins as comma-separated string
+        # Smallest AI supports intensifier weights, formats missing weights as :1,
+        # deduplicates by base word case-insensitively, merges affirmation keyterms,
+        # and joins as comma-separated string
         assert (
             settings.keywords
-            == "Talkar:2,Bengaluru,YES,no,yeah,correct,yep,nope,sure,okay"
+            == "Talkar:2,Bengaluru:1,YES:1,no:1,yeah:1,correct:1,yep:1,nope:1,sure:1,okay:1"
         )
 
 

@@ -268,6 +268,24 @@ class TestSarvamLLMConfigurationEnhancements:
         assert settings.presence_penalty == 0.1
         assert settings.wiki_grounding is True
 
+    def test_sarvam_reasoning_effort_none_supported(self):
+        config = SarvamLLMConfiguration(api_key="test-key", reasoning_effort="none")
+        assert config.reasoning_effort == "none"
+
+        user_config = SimpleNamespace(
+            llm=SimpleNamespace(
+                provider=ServiceProviders.SARVAM.value,
+                api_key="test-key",
+                model="sarvam-105b",
+                reasoning_effort="none",
+            )
+        )
+        with patch("api.services.pipecat.service_factory.SarvamLLMService") as mock_service:
+            create_llm_service(user_config)
+
+        settings = mock_service.call_args.kwargs["settings"]
+        assert settings.reasoning_effort == "none"
+
 
 class TestSanitizationEnhancements:
     def test_sanitize_empty_and_nan(self):

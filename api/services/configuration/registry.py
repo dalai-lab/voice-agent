@@ -713,9 +713,9 @@ class SarvamLLMConfiguration(BaseLLMConfiguration):
             "conversational responses."
         ),
     )
-    reasoning_effort: Literal["low", "medium", "high"] | None = Field(
+    reasoning_effort: Literal["none", "low", "medium", "high"] | None = Field(
         default=None,
-        description="Reasoning effort level for models like glm5.3 or deepseekv4.1-flash. Set to 'low' for fast voice replies.",
+        description="Reasoning effort level for sarvam-105b, glm5.3, or deepseekv4.1-flash. Set to 'none' to disable reasoning for low-latency voice, or 'low' for fast thinking.",
     )
     max_tokens: int | None = Field(
         default=None,

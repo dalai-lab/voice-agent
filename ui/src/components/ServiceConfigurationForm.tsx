@@ -1005,6 +1005,10 @@ export function ServiceConfigurationForm({
             const isRequired = providerSchema.required?.includes(field);
             const getDisplayName = (value: string) => {
                 if (value === "__default__") return "Default (Automatic)";
+                if (field === "reasoning_effort") {
+                    if (value === "none") return "None (Disabled)";
+                    return value.charAt(0).toUpperCase() + value.slice(1);
+                }
                 if (field === "language") {
                     return LANGUAGE_DISPLAY_NAMES[value] || (value === "auto" ? "Auto-detect" : value);
                 }

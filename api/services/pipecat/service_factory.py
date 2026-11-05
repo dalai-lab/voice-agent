@@ -1656,7 +1656,7 @@ def create_llm_service_from_provider(
             "model": model,
             "temperature": temperature if temperature is not None else 0.5,
         }
-        if reasoning_effort in ("low", "medium", "high"):
+        if reasoning_effort in ("none", "low", "medium", "high"):
             settings_dict["reasoning_effort"] = reasoning_effort
 
         if wiki_grounding is not None and wiki_grounding != "":

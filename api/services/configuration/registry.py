@@ -1949,8 +1949,9 @@ class AzureSpeechSTTConfiguration(BaseSTTConfiguration):
     )
 
 
-SMALLEST_STT_MODELS = ["pulse"]
+SMALLEST_STT_MODELS = ["pulse", "pulse-2"]
 SMALLEST_STT_LANGUAGES = [
+    "multi",
     "en",
     "hi",
     "fr",
@@ -2025,16 +2026,66 @@ class SmallestAISTTConfiguration(BaseSTTConfiguration):
     provider: Literal[ServiceProviders.SMALLEST] = ServiceProviders.SMALLEST
     model: str = Field(
         default="pulse",
-        description="Smallest AI STT model. Supports 38 languages with real-time streaming.",
+        description="Smallest AI STT model. pulse: 38-language multilingual streaming; pulse-2: English-only with native emotion, gender, and turn detection.",
         json_schema_extra={"examples": SMALLEST_STT_MODELS},
     )
     language: str = Field(
         default="en",
-        description="ISO 639-1 language code for transcription.",
+        description="ISO 639-1 language code, or 'multi' for multilingual auto-detection.",
         json_schema_extra={
             "examples": SMALLEST_STT_LANGUAGES,
             "allow_custom_input": True,
         },
+    )
+    keywords: str | None = Field(
+        default=None,
+        description="Comma-separated KEYWORD:BOOST pairs (e.g. 'Talkar:2,Delivery:3') to boost recognition accuracy.",
+    )
+    itn_normalize: bool | None = Field(
+        default=True,
+        description="Inverse Text Normalization: formats spoken numbers, dates, and currencies into digits (e.g. '25 dollars').",
+    )
+    format: bool | None = Field(
+        default=True,
+        description="Apply automatic punctuation and capitalization to transcripts.",
+    )
+    word_timestamps: bool | None = Field(
+        default=None,
+        description="Include per-word start and end timestamps.",
+    )
+    sentence_timestamps: bool | None = Field(
+        default=None,
+        description="Include sentence-level timestamp boundaries.",
+    )
+    diarize: bool | None = Field(
+        default=None,
+        description="Enable multi-speaker diarization to separate distinct speakers.",
+    )
+    redact_pii: bool | None = Field(
+        default=None,
+        description="Redact Personally Identifiable Information (phone numbers, IDs, names).",
+    )
+    redact_pci: bool | None = Field(
+        default=None,
+        description="Redact payment card numbers (PCI compliance).",
+    )
+    endpointing: bool | None = Field(
+        default=True,
+        description="Enable server-side trailing silence detection for speech finalization.",
+    )
+    eou_timeout_ms: int | None = Field(
+        default=None,
+        ge=100,
+        le=5000,
+        description="Trailing silence timeout in milliseconds before completing an utterance (default: 480).",
+    )
+    emotion_detection: bool | None = Field(
+        default=None,
+        description="Detect speaker emotional tone (pulse-2 model only).",
+    )
+    gender_detection: bool | None = Field(
+        default=None,
+        description="Estimate speaker gender (pulse-2 model only).",
     )
 
 

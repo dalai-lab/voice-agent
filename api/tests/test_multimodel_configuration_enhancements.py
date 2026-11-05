@@ -11,6 +11,7 @@ from api.services.configuration.registry import (
     SarvamLLMConfiguration,
     SarvamTTSConfiguration,
     ServiceProviders,
+    SmallestAISTTConfiguration,
     SmallestAITTSConfiguration,
 )
 from api.services.pipecat.audio_config import AudioConfig
@@ -327,4 +328,18 @@ class TestSanitizationEnhancements:
         assert sarvam_cfg.temperature is None
         assert sarvam_cfg.min_buffer_size is None
         assert sarvam_cfg.pitch is None
+
+        # Test Smallest STT with empty strings and defaults
+        smallest_stt_cfg = SmallestAISTTConfiguration.model_validate({
+            "provider": "smallest",
+            "api_key": "test-key",
+            "model": "pulse-2",
+            "eou_timeout_ms": "",
+            "keywords": "",
+            "emotion_detection": "",
+        })
+        assert smallest_stt_cfg.model == "pulse-2"
+        assert smallest_stt_cfg.eou_timeout_ms is None
+        assert smallest_stt_cfg.keywords is None
+        assert smallest_stt_cfg.emotion_detection is None
 

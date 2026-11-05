@@ -1010,6 +1010,7 @@ export function ServiceConfigurationForm({
                     return value.charAt(0).toUpperCase() + value.slice(1);
                 }
                 if (field === "language") {
+                    if (value === "multi") return "Multilingual (Auto-detect)";
                     return LANGUAGE_DISPLAY_NAMES[value] || (value === "auto" ? "Auto-detect" : value);
                 }
                 if (field === "voice") {

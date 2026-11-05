@@ -978,16 +978,46 @@ def create_stt_service(
         )
     elif user_config.stt.provider == ServiceProviders.SMALLEST.value:
         language_code = getattr(user_config.stt, "language", None) or "en"
-        try:
-            pipecat_language = Language(language_code)
-        except ValueError:
-            pipecat_language = Language.EN
+        if language_code in ("multi", "auto"):
+            pipecat_language = "multi"
+        else:
+            try:
+                pipecat_language = Language(language_code)
+            except ValueError:
+                pipecat_language = Language.EN
+
+        settings_kwargs: dict[str, Any] = {
+            "model": user_config.stt.model,
+            "language": pipecat_language,
+        }
+
+        for bool_field in (
+            "itn_normalize",
+            "format",
+            "word_timestamps",
+            "sentence_timestamps",
+            "diarize",
+            "redact_pii",
+            "redact_pci",
+            "endpointing",
+            "emotion_detection",
+            "gender_detection",
+        ):
+            val = getattr(user_config.stt, bool_field, None)
+            if val is not None and val != "":
+                settings_kwargs[bool_field] = bool(val)
+
+        keywords = getattr(user_config.stt, "keywords", None)
+        if keywords and str(keywords).strip():
+            settings_kwargs["keywords"] = str(keywords).strip()
+
+        eou_timeout = _extract_clean_setting(user_config.stt, "eou_timeout_ms", int)
+        if eou_timeout is not None:
+            settings_kwargs["eou_timeout_ms"] = eou_timeout
+
         return SmallestSTTService(
             api_key=user_config.stt.api_key,
-            settings=SmallestSTTSettings(
-                model=user_config.stt.model,
-                language=pipecat_language,
-            ),
+            settings=SmallestSTTSettings(**settings_kwargs),
             sample_rate=audio_config.transport_in_sample_rate,
         )
     elif user_config.stt.provider == ServiceProviders.ELEVENLABS.value:

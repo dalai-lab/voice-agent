@@ -9,7 +9,10 @@ from api.services.configuration.registry import (
     SmallestAISTTConfiguration,
     SmallestAITTSConfiguration,
 )
-from api.services.pipecat.service_factory import create_tts_service
+from api.services.pipecat.service_factory import (
+    create_stt_service,
+    create_tts_service,
+)
 
 
 def test_smallest_tts_configuration_defaults_and_registry():
@@ -78,3 +81,50 @@ def test_create_smallest_tts_service_normalizes_hyphenated_model_values():
     assert mock_service.call_count == 1
     kwargs = mock_service.call_args.kwargs
     assert kwargs["settings"].model == "lightning_v3.1"
+
+
+def test_create_smallest_stt_service_passes_advanced_parameters():
+    user_config = SimpleNamespace(
+        stt=SimpleNamespace(
+            provider=ServiceProviders.SMALLEST.value,
+            api_key="test-key",
+            model="pulse-2",
+            language="multi",
+            keywords="Talkar:2,Nvidia:3",
+            itn_normalize=True,
+            format=True,
+            word_timestamps=True,
+            sentence_timestamps=True,
+            diarize=True,
+            redact_pii=True,
+            redact_pci=True,
+            endpointing=True,
+            eou_timeout_ms=500,
+            emotion_detection=True,
+            gender_detection=True,
+        )
+    )
+    audio_config = SimpleNamespace(transport_in_sample_rate=16000)
+
+    with patch(
+        "api.services.pipecat.service_factory.SmallestSTTService"
+    ) as mock_service:
+        create_stt_service(user_config, audio_config)
+
+    assert mock_service.call_count == 1
+    kwargs = mock_service.call_args.kwargs
+    settings = kwargs["settings"]
+    assert settings.model == "pulse-2"
+    assert settings.language == "multi"
+    assert settings.keywords == "Talkar:2,Nvidia:3"
+    assert settings.itn_normalize is True
+    assert settings.format is True
+    assert settings.word_timestamps is True
+    assert settings.sentence_timestamps is True
+    assert settings.diarize is True
+    assert settings.redact_pii is True
+    assert settings.redact_pci is True
+    assert settings.endpointing is True
+    assert settings.eou_timeout_ms == 500
+    assert settings.emotion_detection is True
+    assert settings.gender_detection is True

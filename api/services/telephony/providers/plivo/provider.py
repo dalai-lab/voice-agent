@@ -14,6 +14,7 @@ from api.db import db_client
 from api.enums import TelephonyCallStatus, WorkflowRunMode
 from api.services.telephony import ws_auth
 from api.services.telephony.base import (
+    AnsweringMachineDetectionResult,
     CallInitiationResult,
     NormalizedInboundData,
     ProviderPhoneNumberLookupError,
@@ -47,6 +48,7 @@ class PlivoProvider(TelephonyProvider):
         if isinstance(self.from_numbers, str):
             self.from_numbers = [self.from_numbers]
 
+        self.amd_enabled: bool = bool(config.get("amd_enabled", False))
         self.base_url = f"https://api.plivo.com/v1/Account/{self.auth_id}"
 
     async def initiate_call(
@@ -80,6 +82,11 @@ class PlivoProvider(TelephonyProvider):
                     "ring_url": f"{backend_endpoint}/api/v1/telephony/plivo/ring-callback/{workflow_run_id}",
                     "ring_method": "POST",
                 }
+            )
+            data = self.apply_answering_machine_detection_call_params(
+                data,
+                workflow_run_id=workflow_run_id,
+                backend_endpoint=backend_endpoint,
             )
 
         data.update(kwargs)
@@ -675,3 +682,48 @@ class PlivoProvider(TelephonyProvider):
 
     def supports_transfers(self) -> bool:
         return True
+
+    def supports_answering_machine_detection(self) -> bool:
+        """Return whether Plivo AMD is enabled on this provider instance."""
+        return self.amd_enabled
+
+    def apply_answering_machine_detection_call_params(
+        self,
+        data: dict[str, Any],
+        *,
+        workflow_run_id: int | None = None,
+        backend_endpoint: str | None = None,
+    ) -> dict[str, Any]:
+        """Inject Plivo-specific AMD parameters into outbound Call request."""
+        if not self.amd_enabled or not workflow_run_id or not backend_endpoint:
+            return data
+
+        amd_callback_url = (
+            f"{backend_endpoint}/api/v1/telephony/plivo/amd-callback/{workflow_run_id}"
+        )
+        data.update(
+            {
+                "machine_detection": "true",
+                "machine_detection_time": 5000,
+                "machine_detection_url": amd_callback_url,
+                "machine_detection_method": "POST",
+            }
+        )
+        return data
+
+    def parse_answering_machine_detection_result(
+        self, data: dict[str, Any]
+    ) -> AnsweringMachineDetectionResult | None:
+        """Normalize Plivo AMD callback payload."""
+        machine_raw = str(data.get("Machine", "")).strip().lower()
+        if machine_raw not in ("true", "false", "1", "0"):
+            return None
+
+        is_machine = machine_raw in ("true", "1")
+        answered_by = "machine_start" if is_machine else "human"
+
+        return AnsweringMachineDetectionResult(
+            call_id=data.get("CallUUID", "") or data.get("RequestUUID", ""),
+            answered_by=answered_by,
+            raw_data=data,
+        )

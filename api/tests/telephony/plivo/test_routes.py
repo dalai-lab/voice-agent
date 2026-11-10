@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 import pytest
 from api.services.telephony.providers.plivo.provider import PlivoProvider
 from api.services.telephony.providers.plivo.routes import (
+    handle_plivo_amd_callback,
     handle_plivo_hangup_callback,
     handle_plivo_inbound_hangup,
     handle_plivo_transfer_result,
@@ -15,6 +16,7 @@ from api.services.telephony.providers.plivo.routes import (
     handle_plivo_xml_webhook,
 )
 from api.services.telephony.transfer_event_protocol import TransferContext
+from fastapi import HTTPException
 from starlette.requests import Request
 
 
@@ -525,3 +527,262 @@ async def test_handle_plivo_inbound_hangup_unmatched_call_uuid():
         response = await handle_plivo_inbound_hangup(request)
 
     assert response == {"status": "ignored", "reason": "run_not_found"}
+
+
+class _MockDeleteResponse:
+    def __init__(self, status: int = 204):
+        self.status = status
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return None
+
+    async def text(self):
+        return ""
+
+
+class _MockDeleteSession:
+    def __init__(self, status: int = 204):
+        self.delete_calls = []
+        self.status = status
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return None
+
+    def delete(self, endpoint, *, auth):
+        self.delete_calls.append((endpoint, auth))
+        return _MockDeleteResponse(self.status)
+
+
+@pytest.mark.asyncio
+async def test_plivo_amd_callback_invalid_signature_raises_401():
+    provider = _provider()
+    workflow_run = SimpleNamespace(
+        id=123,
+        workflow_id=7,
+        campaign_id=None,
+        queued_run_id=None,
+        is_completed=False,
+        gathered_context={},
+    )
+    workflow = SimpleNamespace(id=7, organization_id=11)
+
+    request = _request(
+        path="/api/v1/telephony/plivo/amd-callback/123",
+        query={},
+        form_data={"CallUUID": "call-123", "Machine": "true"},
+        headers={"x-plivo-signature-v3": "invalid-sig", "x-plivo-signature-v3-nonce": "n"},
+    )
+
+    with (
+        patch("api.services.telephony.providers.plivo.routes.db_client") as mock_db,
+        patch(
+            "api.services.telephony.providers.plivo.routes.get_telephony_provider_for_run",
+            new=AsyncMock(return_value=provider),
+        ),
+        patch.object(provider, "verify_inbound_signature", new=AsyncMock(return_value=False)),
+    ):
+        mock_db.get_workflow_run_by_id = AsyncMock(return_value=workflow_run)
+        mock_db.get_workflow_by_id = AsyncMock(return_value=workflow)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await handle_plivo_amd_callback(123, request)
+        assert exc_info.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_plivo_amd_callback_inconclusive_is_ignored():
+    provider = _provider()
+    workflow_run = SimpleNamespace(
+        id=123,
+        workflow_id=7,
+        campaign_id=None,
+        queued_run_id=None,
+        is_completed=False,
+        gathered_context={},
+    )
+    workflow = SimpleNamespace(id=7, organization_id=11)
+
+    request = _request(
+        path="/api/v1/telephony/plivo/amd-callback/123",
+        query={},
+        form_data={"CallUUID": "call-123", "Machine": "unknown"},
+    )
+
+    with (
+        patch("api.services.telephony.providers.plivo.routes.db_client") as mock_db,
+        patch(
+            "api.services.telephony.providers.plivo.routes.get_telephony_provider_for_run",
+            new=AsyncMock(return_value=provider),
+        ),
+        patch.object(provider, "verify_inbound_signature", new=AsyncMock(return_value=True)),
+    ):
+        mock_db.get_workflow_run_by_id = AsyncMock(return_value=workflow_run)
+        mock_db.get_workflow_by_id = AsyncMock(return_value=workflow)
+        mock_db.update_workflow_run = AsyncMock()
+
+        response = await handle_plivo_amd_callback(123, request)
+
+    assert response.status_code == 200
+    mock_db.update_workflow_run.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_plivo_amd_callback_human_detection():
+    provider = _provider()
+    workflow_run = SimpleNamespace(
+        id=123,
+        workflow_id=7,
+        campaign_id=None,
+        queued_run_id=None,
+        is_completed=False,
+        gathered_context={"existing_key": "val"},
+    )
+    workflow = SimpleNamespace(id=7, organization_id=11)
+
+    request = _request(
+        path="/api/v1/telephony/plivo/amd-callback/123",
+        query={},
+        form_data={"CallUUID": "call-123", "Machine": "false"},
+    )
+
+    delete_session = _MockDeleteSession()
+
+    with (
+        patch("api.services.telephony.providers.plivo.routes.db_client") as mock_db,
+        patch(
+            "api.services.telephony.providers.plivo.routes.get_telephony_provider_for_run",
+            new=AsyncMock(return_value=provider),
+        ),
+        patch.object(provider, "verify_inbound_signature", new=AsyncMock(return_value=True)),
+        patch(
+            "api.services.telephony.providers.plivo.routes.aiohttp.ClientSession",
+            return_value=delete_session,
+        ),
+    ):
+        mock_db.get_workflow_run_by_id = AsyncMock(return_value=workflow_run)
+        mock_db.get_workflow_by_id = AsyncMock(return_value=workflow)
+        mock_db.update_workflow_run = AsyncMock()
+
+        response = await handle_plivo_amd_callback(123, request)
+
+    assert response.status_code == 200
+    mock_db.update_workflow_run.assert_awaited_once_with(
+        run_id=123,
+        gathered_context={"answered_by": "human"},
+    )
+    assert len(delete_session.delete_calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_plivo_amd_callback_machine_detection_hangs_up_and_tags():
+    provider = _provider()
+    workflow_run = SimpleNamespace(
+        id=123,
+        workflow_id=7,
+        campaign_id=None,
+        queued_run_id=None,
+        is_completed=False,
+        gathered_context={"call_tags": ["existing_tag"]},
+    )
+    workflow = SimpleNamespace(id=7, organization_id=11)
+
+    request = _request(
+        path="/api/v1/telephony/plivo/amd-callback/123",
+        query={},
+        form_data={"CallUUID": "call-123", "Machine": "true"},
+    )
+
+    delete_session = _MockDeleteSession(status=204)
+
+    with (
+        patch("api.services.telephony.providers.plivo.routes.db_client") as mock_db,
+        patch(
+            "api.services.telephony.providers.plivo.routes.get_telephony_provider_for_run",
+            new=AsyncMock(return_value=provider),
+        ),
+        patch.object(provider, "verify_inbound_signature", new=AsyncMock(return_value=True)),
+        patch(
+            "api.services.telephony.providers.plivo.routes.aiohttp.ClientSession",
+            return_value=delete_session,
+        ),
+    ):
+        mock_db.get_workflow_run_by_id = AsyncMock(return_value=workflow_run)
+        mock_db.get_workflow_by_id = AsyncMock(return_value=workflow)
+        mock_db.update_workflow_run = AsyncMock()
+
+        response = await handle_plivo_amd_callback(123, request)
+
+    assert response.status_code == 200
+    mock_db.update_workflow_run.assert_awaited_once_with(
+        run_id=123,
+        gathered_context={
+            "answered_by": "machine_start",
+            "call_tags": ["existing_tag", "voicemail_detected", "telephony_voicemail"],
+            "call_disposition": "voicemail",
+            "mapped_call_disposition": "voicemail",
+        },
+    )
+    assert len(delete_session.delete_calls) == 1
+    endpoint, auth = delete_session.delete_calls[0]
+    assert endpoint == f"https://api.plivo.com/v1/Account/{provider.auth_id}/Call/call-123/"
+    assert auth.login == provider.auth_id
+    assert auth.password == provider.auth_token
+
+
+@pytest.mark.asyncio
+async def test_plivo_amd_callback_late_machine_triggers_campaign_retry():
+    provider = _provider()
+    workflow_run = SimpleNamespace(
+        id=123,
+        workflow_id=7,
+        campaign_id=42,
+        queued_run_id=88,
+        is_completed=True,  # late arrival on already completed run
+        gathered_context={},
+    )
+    workflow = SimpleNamespace(id=7, organization_id=11)
+
+    request = _request(
+        path="/api/v1/telephony/plivo/amd-callback/123",
+        query={},
+        form_data={"CallUUID": "call-123", "Machine": "true"},
+    )
+
+    delete_session = _MockDeleteSession(status=404)  # 404 because call already ended
+    mock_publisher = AsyncMock()
+
+    with (
+        patch("api.services.telephony.providers.plivo.routes.db_client") as mock_db,
+        patch(
+            "api.services.telephony.providers.plivo.routes.get_telephony_provider_for_run",
+            new=AsyncMock(return_value=provider),
+        ),
+        patch.object(provider, "verify_inbound_signature", new=AsyncMock(return_value=True)),
+        patch(
+            "api.services.telephony.providers.plivo.routes.aiohttp.ClientSession",
+            return_value=delete_session,
+        ),
+        patch(
+            "api.services.telephony.providers.plivo.routes.get_campaign_event_publisher",
+            new=AsyncMock(return_value=mock_publisher),
+        ),
+    ):
+        mock_db.get_workflow_run_by_id = AsyncMock(return_value=workflow_run)
+        mock_db.get_workflow_by_id = AsyncMock(return_value=workflow)
+        mock_db.update_workflow_run = AsyncMock()
+
+        response = await handle_plivo_amd_callback(123, request)
+
+    assert response.status_code == 200
+    mock_publisher.publish_retry_needed.assert_awaited_once_with(
+        workflow_run_id=123,
+        reason="voicemail",
+        campaign_id=42,
+        queued_run_id=88,
+    )

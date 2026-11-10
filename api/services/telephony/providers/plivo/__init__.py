@@ -28,6 +28,7 @@ def _config_loader(value: dict[str, Any]) -> dict[str, Any]:
         "auth_token": value.get("auth_token"),
         "application_id": value.get("application_id"),
         "from_numbers": value.get("from_numbers", []),
+        "amd_enabled": value.get("amd_enabled", False),
     }
 
 
@@ -122,6 +123,13 @@ _UI_METADATA = ProviderUIMetadata(
             label="Phone Numbers",
             type="string-array",
             description="E.164-formatted Plivo phone numbers used for outbound calls",
+        ),
+        ProviderUIField(
+            name="amd_enabled",
+            label="Answering Machine Detection (AMD)",
+            type="boolean",
+            required=False,
+            description="Detect voicemails and automated machines on outbound calls to prevent bot confusion and enable auto-retries.",
         ),
     ],
 )

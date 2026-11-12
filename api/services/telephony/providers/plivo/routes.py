@@ -5,9 +5,14 @@ provider registry — see ProviderSpec.router.
 """
 
 import json
+from typing import Any
 from xml.sax.saxutils import escape
 
+import aiohttp
 from api.db import db_client
+from api.services.campaign.campaign_event_publisher import (
+    get_campaign_event_publisher,
+)
 from api.services.telephony.call_transfer_manager import get_call_transfer_manager
 from api.services.telephony.factory import get_telephony_provider_for_run
 from api.services.telephony.status_processor import (
@@ -18,7 +23,7 @@ from api.services.telephony.transfer_event_protocol import (
     TransferEvent,
     TransferEventType,
 )
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 from pipecat.utils.run_context import set_current_run_id
 from starlette.responses import HTMLResponse
@@ -364,3 +369,112 @@ async def handle_plivo_transfer_result(transfer_id: str, request: Request):
     await call_transfer_manager.publish_transfer_event(transfer_event)
     await call_transfer_manager.remove_transfer_context(transfer_id)
     return {"status": "success"}
+
+
+@router.post("/plivo/amd-callback/{workflow_run_id}", include_in_schema=False)
+async def handle_plivo_amd_callback(workflow_run_id: int, request: Request):
+    """Handle asynchronous Answering Machine Detection results from Plivo."""
+    set_current_run_id(workflow_run_id)
+
+    form_data = await request.form()
+    data = dict(form_data)
+    call_uuid = data.get("CallUUID", "")
+
+    workflow_run = await db_client.get_workflow_run_by_id(workflow_run_id)
+    if not workflow_run:
+        logger.warning(
+            f"[Plivo AMD] Run {workflow_run_id} not found for CallUUID={call_uuid}"
+        )
+        return HTMLResponse(content="", status_code=200)
+
+    workflow = await db_client.get_workflow_by_id(workflow_run.workflow_id)
+    if not workflow:
+        return HTMLResponse(content="", status_code=200)
+
+    provider = await get_telephony_provider_for_run(
+        workflow_run, workflow.organization_id
+    )
+
+    # 1. Cryptographic Signature Validation
+    is_valid = await provider.verify_inbound_signature(
+        str(request.url), data, dict(request.headers)
+    )
+    if not is_valid:
+        logger.warning(f"[Plivo AMD] Invalid signature on run {workflow_run_id}")
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    # 2. Parse AMD Result
+    amd_result = provider.parse_answering_machine_detection_result(data)
+    if not amd_result:
+        logger.info(
+            f"[Plivo AMD] Inconclusive or missing Machine parameter for run {workflow_run_id}"
+        )
+        return HTMLResponse(content="", status_code=200)
+
+    logger.info(
+        f"[Plivo AMD] Run {workflow_run_id} AnsweredBy={amd_result.answered_by} (CallUUID={call_uuid})"
+    )
+
+    # 3. Update Workflow Run Context & Disposition
+    context = getattr(workflow_run, "gathered_context", None) or {}
+    current_tags = (
+        list(context.get("call_tags", [])) if isinstance(context, dict) else []
+    )
+    is_machine = amd_result.answered_by.startswith("machine_")
+
+    updates: dict[str, Any] = {"answered_by": amd_result.answered_by}
+    if is_machine:
+        new_tags = list(current_tags)
+        for tag in ("voicemail_detected", "telephony_voicemail"):
+            if tag not in new_tags:
+                new_tags.append(tag)
+        updates["call_tags"] = new_tags
+        updates["call_disposition"] = "voicemail"
+        updates["mapped_call_disposition"] = "voicemail"
+
+    await db_client.update_workflow_run(
+        run_id=workflow_run_id,
+        gathered_context=updates,
+    )
+
+    # 4. Immediate Call Disconnect on Machine Detection
+    if is_machine and call_uuid:
+        logger.info(
+            f"[Plivo AMD] Machine detected. Terminating call {call_uuid} to save credits."
+        )
+        try:
+            endpoint = f"https://api.plivo.com/v1/Account/{provider.auth_id}/Call/{call_uuid}/"
+            auth = aiohttp.BasicAuth(provider.auth_id, provider.auth_token)
+            async with aiohttp.ClientSession() as session:
+                async with session.delete(endpoint, auth=auth) as resp:
+                    if resp.status in (204, 404):
+                        logger.info(
+                            f"[Plivo AMD] Terminated call {call_uuid} (HTTP {resp.status})"
+                        )
+                    else:
+                        body = await resp.text()
+                        logger.warning(
+                            f"[Plivo AMD] Hangup call returned HTTP {resp.status}: {body}"
+                        )
+        except Exception as exc:
+            logger.warning(
+                f"[Plivo AMD] Failed to execute instant hangup for {call_uuid}: {exc}"
+            )
+
+    # 5. Late-Callback Safety: Trigger retry if run was already marked completed
+    if is_machine and workflow_run.campaign_id and workflow_run.is_completed:
+        logger.info(
+            f"[Plivo AMD] Late callback on completed run {workflow_run_id}; triggering retry."
+        )
+        try:
+            publisher = await get_campaign_event_publisher()
+            await publisher.publish_retry_needed(
+                workflow_run_id=workflow_run_id,
+                reason="voicemail",
+                campaign_id=workflow_run.campaign_id,
+                queued_run_id=workflow_run.queued_run_id,
+            )
+        except Exception as exc:
+            logger.warning(f"[Plivo AMD] Failed to publish late retry event: {exc}")
+
+    return HTMLResponse(content="", status_code=200)

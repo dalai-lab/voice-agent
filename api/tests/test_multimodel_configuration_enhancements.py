@@ -530,12 +530,12 @@ class TestSanitizationEnhancements:
             "model": "pulse-2",
             "eou_timeout_ms": "",
             "keywords": "",
-            "emotion_detection": "",
+            "redact_pii": "",
         })
         assert smallest_stt_cfg.model == "pulse-2"
         assert smallest_stt_cfg.eou_timeout_ms is None
         assert smallest_stt_cfg.keywords is None
-        assert smallest_stt_cfg.emotion_detection is None
+        assert smallest_stt_cfg.redact_pii is None
 
         # Test Deepgram TTS with empty string and NaN
         deepgram_tts_cfg = DeepgramTTSConfiguration.model_validate({

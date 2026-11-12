@@ -93,15 +93,10 @@ def test_create_smallest_stt_service_passes_advanced_parameters():
             keywords="Talkar:2,Nvidia:3",
             itn_normalize=True,
             format=True,
-            word_timestamps=True,
-            sentence_timestamps=True,
-            diarize=True,
             redact_pii=True,
             redact_pci=True,
             endpointing=True,
             eou_timeout_ms=500,
-            emotion_detection=True,
-            gender_detection=True,
         )
     )
     audio_config = SimpleNamespace(transport_in_sample_rate=16000)
@@ -119,15 +114,10 @@ def test_create_smallest_stt_service_passes_advanced_parameters():
     assert settings.keywords == "Talkar:2,Nvidia:3"
     assert settings.itn_normalize is True
     assert settings.format is True
-    assert settings.word_timestamps is True
-    assert settings.sentence_timestamps is True
-    assert settings.diarize is True
     assert settings.redact_pii is True
     assert settings.redact_pci is True
     assert settings.endpointing is True
     assert settings.eou_timeout_ms == 500
-    assert settings.emotion_detection is True
-    assert settings.gender_detection is True
 
 
 def test_smallest_stt_pulse_supports_multilingual_auto():
@@ -179,7 +169,11 @@ def test_smallest_stt_sample_rate_and_query_params():
     service = SmallestSTTService(
         api_key="test-key",
         sample_rate=16000,
-        settings=SmallestSTTSettings(model="pulse-2"),
+        settings=SmallestSTTSettings(
+            model="pulse-2",
+            emotion_detection=True,
+            gender_detection=True,
+        ),
     )
     # Sample rate must be initialized immediately, not 0
     assert service.sample_rate == 16000

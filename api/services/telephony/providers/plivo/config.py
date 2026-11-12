@@ -23,6 +23,10 @@ class PlivoConfigurationRequest(BaseModel):
     from_numbers: list[str] = Field(
         default_factory=list, description="List of Plivo phone numbers"
     )
+    amd_enabled: bool = Field(
+        default=False,
+        description="Enable carrier Answering Machine Detection (AMD) for outbound calls.",
+    )
 
 
 class PlivoConfigurationResponse(BaseModel):
@@ -33,3 +37,4 @@ class PlivoConfigurationResponse(BaseModel):
     auth_token: str  # Masked
     application_id: str | None = None
     from_numbers: list[str]
+    amd_enabled: bool = False

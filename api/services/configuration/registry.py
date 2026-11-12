@@ -2065,7 +2065,7 @@ class SmallestAISTTConfiguration(BaseSTTConfiguration):
     provider: Literal[ServiceProviders.SMALLEST] = ServiceProviders.SMALLEST
     model: str = Field(
         default="pulse",
-        description="Smallest AI STT model. pulse: 38-language multilingual streaming; pulse-2: English-only with native emotion, gender, and turn detection.",
+        description="Smallest AI STT model. pulse: 38-language multilingual streaming; pulse-2: English-only low-latency turn streaming.",
         json_schema_extra={"examples": SMALLEST_STT_MODELS},
     )
     language: str = Field(
@@ -2092,18 +2092,6 @@ class SmallestAISTTConfiguration(BaseSTTConfiguration):
         default=True,
         description="Apply automatic punctuation and capitalization to transcripts.",
     )
-    word_timestamps: bool | None = Field(
-        default=None,
-        description="Include per-word start and end timestamps.",
-    )
-    sentence_timestamps: bool | None = Field(
-        default=None,
-        description="Include sentence-level timestamp boundaries.",
-    )
-    diarize: bool | None = Field(
-        default=None,
-        description="Enable multi-speaker diarization to separate distinct speakers.",
-    )
     redact_pii: bool | None = Field(
         default=None,
         description="Redact Personally Identifiable Information (phone numbers, IDs, names).",
@@ -2121,14 +2109,6 @@ class SmallestAISTTConfiguration(BaseSTTConfiguration):
         ge=100,
         le=5000,
         description="Trailing silence timeout in milliseconds before completing an utterance (default: 480).",
-    )
-    emotion_detection: bool | None = Field(
-        default=None,
-        description="Detect speaker emotional tone (pulse-2 model only).",
-    )
-    gender_detection: bool | None = Field(
-        default=None,
-        description="Estimate speaker gender (pulse-2 model only).",
     )
 
 

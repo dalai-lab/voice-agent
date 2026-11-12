@@ -1051,14 +1051,9 @@ def create_stt_service(
         for bool_field in (
             "itn_normalize",
             "format",
-            "word_timestamps",
-            "sentence_timestamps",
-            "diarize",
             "redact_pii",
             "redact_pci",
             "endpointing",
-            "emotion_detection",
-            "gender_detection",
         ):
             val = getattr(user_config.stt, bool_field, None)
             if val is not None and val != "":

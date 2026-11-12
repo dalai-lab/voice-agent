@@ -235,6 +235,10 @@ class CampaignResponse(BaseModel):
     failed_calls_count: int = 0
     completed_calls_count: int = 0
     unanswered_calls_count: int = 0
+    connected_leads_count: int = 0
+    unreached_leads_count: int = 0
+    total_duration_seconds: int = 0
+    avg_connected_duration_seconds: int = 0
     parent_campaign_id: int | None = None
     redialed_campaign_id: int | None = None
     telephony_configuration_id: int | None = None
@@ -297,6 +301,10 @@ def _build_campaign_response(
     failed_calls_count = 0
     completed_calls_count = 0
     unanswered_calls_count = 0
+    connected_leads_count = 0
+    unreached_leads_count = 0
+    total_duration_seconds = 0
+    avg_connected_duration_seconds = 0
     if stats:
         executed_count = stats.get("executed", 0)
         total_queued_count = stats.get("total", 0)
@@ -307,10 +315,29 @@ def _build_campaign_response(
         failed_calls_count = stats.get("failed_calls", 0)
         completed_calls_count = stats.get("completed_calls", 0)
         unanswered_calls_count = stats.get("unanswered_calls", 0)
+        connected_leads_count = stats.get("connected_leads", completed_calls_count)
+        unreached_leads_count = stats.get("unreached_leads", 0)
+        total_duration_seconds = stats.get("total_duration_seconds", 0)
+        avg_connected_duration_seconds = stats.get("avg_connected_duration_seconds", 0)
 
-    # Reconcile campaign failed_rows and processed_rows against ground-truth workflow stats
-    effective_failed_rows = max(campaign.failed_rows or 0, failed_calls_count)
-    effective_processed_rows = max(campaign.processed_rows or 0, completed_calls_count)
+    # Reconcile lead-level processed_rows and failed_rows against unique-lead ground truth
+    total_rows = campaign.total_rows or 0
+    if stats and "unreached_leads" in stats:
+        effective_failed_rows = (
+            min(total_rows, unreached_leads_count)
+            if total_rows > 0
+            else unreached_leads_count
+        )
+        raw_processed = max(
+            campaign.processed_rows or 0,
+            stats.get("processed_leads", 0),
+        )
+        effective_processed_rows = (
+            min(total_rows, raw_processed) if total_rows > 0 else raw_processed
+        )
+    else:
+        effective_failed_rows = max(campaign.failed_rows or 0, failed_calls_count)
+        effective_processed_rows = max(campaign.processed_rows or 0, completed_calls_count)
 
     # Get retry_config from campaign or use defaults
     retry_config = (
@@ -378,6 +405,10 @@ def _build_campaign_response(
         failed_calls_count=failed_calls_count,
         completed_calls_count=completed_calls_count,
         unanswered_calls_count=unanswered_calls_count,
+        connected_leads_count=connected_leads_count,
+        unreached_leads_count=unreached_leads_count,
+        total_duration_seconds=total_duration_seconds,
+        avg_connected_duration_seconds=avg_connected_duration_seconds,
         parent_campaign_id=parent_campaign_id,
         redialed_campaign_id=redialed_campaign_id,
         telephony_configuration_id=campaign.telephony_configuration_id,
@@ -825,6 +856,10 @@ async def get_campaign_runs(
     sort_order: str | None = Query(
         "desc", description="Sort order ('asc' or 'desc')"
     ),
+    latest_per_lead: bool = Query(
+        False,
+        description="When true, return only the winning/latest call attempt per unique lead",
+    ),
     user: UserModel = Depends(get_user),
 ) -> CampaignRunsResponse:
     """Get campaign workflow runs with pagination, filters and sorting"""
@@ -862,6 +897,7 @@ async def get_campaign_runs(
             filters=filter_criteria if filter_criteria else None,
             sort_by=sort_by,
             sort_order=sort_order,
+            latest_per_lead=latest_per_lead,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

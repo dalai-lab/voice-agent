@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
     BarChart,
     Bar,
@@ -26,25 +26,52 @@ export function CampaignAnalytics({ campaignId, campaign }: CampaignAnalyticsPro
     const { isAuthenticated } = useAuth();
     const [loading, setLoading] = useState(true);
     const [runs, setRuns] = useState<any[]>([]);
+    const isFetchingRef = useRef(false);
 
     const campaignState = campaign?.state;
 
     const fetchRuns = useCallback(async (silent = false) => {
+        if (isFetchingRef.current) return;
+        isFetchingRef.current = true;
         try {
             if (!silent) {
                 setLoading(true);
             }
-            const res = await getCampaignRunsApiV1CampaignCampaignIdRunsGet({
+            const firstRes = await getCampaignRunsApiV1CampaignCampaignIdRunsGet({
                 path: { campaign_id: campaignId },
-                query: { limit: 100 }
+                query: { page: 1, limit: 100 }
             });
             
-            if (res.data?.runs) {
-                setRuns(res.data.runs);
+            const firstRuns = firstRes.data?.runs ?? [];
+            const totalPages = firstRes.data?.total_pages ?? 1;
+            let allRuns = [...firstRuns];
+
+            if (totalPages > 1) {
+                const maxPages = Math.min(totalPages, 50);
+                for (let start = 2; start <= maxPages; start += 5) {
+                    const pagePromises = [];
+                    for (let p = start; p < start + 5 && p <= maxPages; p++) {
+                        pagePromises.push(
+                            getCampaignRunsApiV1CampaignCampaignIdRunsGet({
+                                path: { campaign_id: campaignId },
+                                query: { page: p, limit: 100 }
+                            })
+                        );
+                    }
+                    const pageResults = await Promise.all(pagePromises);
+                    for (const pageRes of pageResults) {
+                        if (pageRes.data?.runs) {
+                            allRuns = allRuns.concat(pageRes.data.runs);
+                        }
+                    }
+                }
             }
+
+            setRuns(allRuns);
         } catch (error) {
             console.error("Failed to fetch campaign runs for analytics", error);
         } finally {
+            isFetchingRef.current = false;
             if (!silent) {
                 setLoading(false);
             }
@@ -71,9 +98,10 @@ export function CampaignAnalytics({ campaignId, campaign }: CampaignAnalyticsPro
         const dispMap: Record<string, number> = {};
 
         runs.forEach(run => {
-            const duration = (run as any).cost_info?.call_duration_seconds 
-                          ?? (run as any).usage_info?.call_duration_seconds 
-                          ?? (run as any).call_duration_seconds 
+            const duration = (run as any).duration_seconds
+                          ?? (run as any).usage_info?.call_duration_seconds
+                          ?? (run as any).cost_info?.call_duration_seconds
+                          ?? (run as any).call_duration_seconds
                           ?? 0;
             const durNum = Number(duration) || 0;
             totalDuration += durNum;
@@ -81,11 +109,11 @@ export function CampaignAnalytics({ campaignId, campaign }: CampaignAnalyticsPro
                 sampleCallsWithDuration++;
             }
             
-            // Map disposition from gathered_context or fallback to disposition
-            let disp = (run.gathered_context as any)?.mapped_call_disposition;
-            if (!disp && run.disposition) {
-                disp = run.disposition;
-            }
+            // Map disposition from canonical field, gathered_context, or fallback
+            let disp = (run as any).disposition
+                || (run.gathered_context as any)?.mapped_call_disposition
+                || (run.gathered_context as any)?.call_disposition
+                || run.disposition;
             if (!disp) disp = "Unknown";
             
             dispMap[disp] = (dispMap[disp] || 0) + 1;
@@ -99,14 +127,15 @@ export function CampaignAnalytics({ campaignId, campaign }: CampaignAnalyticsPro
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value);
 
+        // Do NOT add failed_calls_count on top of unanswered_calls_count (executed_count already counts all attempts)
         const totalCalls = Math.max(
             campaign?.executed_count ?? 0,
-            (campaign?.completed_calls_count ?? 0) + (campaign?.failed_calls_count ?? 0) + (campaign?.unanswered_calls_count ?? 0) + (campaign?.active_count ?? 0),
             runs.length
         );
         const completedCalls = campaign?.completed_calls_count ?? sampleCompletedCalls;
         const durationDivisor = sampleCallsWithDuration > 0 ? sampleCallsWithDuration : (runs.length > 0 ? runs.length : 1);
-        const avgDuration = runs.length > 0 ? Math.round(totalDuration / durationDivisor) : 0;
+        const avgDuration = (campaign as any)?.avg_connected_duration_seconds
+            ?? (runs.length > 0 ? Math.round(totalDuration / durationDivisor) : 0);
 
         return {
             kpis: {

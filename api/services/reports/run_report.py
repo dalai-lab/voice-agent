@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from api.db import db_client
+from api.services.workflow.run_usage_response import resolve_call_duration_seconds
 from api.utils.artifacts import artifact_url
 
 
@@ -53,7 +54,9 @@ def build_run_report_csv(runs: list[Any]) -> io.StringIO:
     for run in runs:
         initial = run.initial_context or {}
         gathered = run.gathered_context or {}
-        usage = run.usage_info or {}
+        resolved_duration = resolve_call_duration_seconds(
+            run.usage_info, getattr(run, "cost_info", None)
+        )
 
         call_tags = gathered.get("call_tags", [])
         if isinstance(call_tags, list):
@@ -67,7 +70,7 @@ def build_run_report_csv(runs: list[Any]) -> io.StringIO:
             run.created_at.isoformat() if run.created_at else "",
             initial.get("phone_number", ""),
             gathered.get("mapped_call_disposition", ""),
-            usage.get("call_duration_seconds", ""),
+            resolved_duration if resolved_duration is not None else "",
         ]
 
         extracted = gathered.get("extracted_variables", {})

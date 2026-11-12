@@ -17,8 +17,7 @@ from api.db.models import (
 )
 from api.enums import CallType, StorageBackend
 from api.schemas.workflow import WorkflowRunResponseSchema
-from api.services.workflow.run_usage_response import format_public_cost_info
-from api.utils.recording_artifacts import get_recording_storage_key
+from api.services.workflow.run_usage_response import build_workflow_run_payload
 
 _UNSET = object()
 
@@ -310,32 +309,7 @@ class WorkflowRunClient(BaseDBClient):
                 base_query.order_by(order_clause).limit(limit).offset(offset)
             )
             runs = [
-                WorkflowRunResponseSchema.model_validate(
-                    {
-                        "id": run.id,
-                        "workflow_id": run.workflow_id,
-                        "name": run.name,
-                        "mode": run.mode,
-                        "created_at": run.created_at,
-                        "is_completed": run.is_completed,
-                        "recording_url": run.recording_url,
-                        "transcript_url": run.transcript_url,
-                        "user_recording_url": get_recording_storage_key(
-                            run.extra, "user"
-                        ),
-                        "bot_recording_url": get_recording_storage_key(
-                            run.extra, "bot"
-                        ),
-                        "cost_info": format_public_cost_info(
-                            run.cost_info, run.usage_info
-                        ),
-                        "definition_id": run.definition_id,
-                        "initial_context": run.initial_context,
-                        "gathered_context": run.gathered_context,
-                        "call_type": run.call_type,
-                        "extracted_data": run.extracted_data,
-                    }
-                )
+                WorkflowRunResponseSchema.model_validate(build_workflow_run_payload(run))
                 for run in result.scalars().all()
             ]
             return runs, total_count
@@ -378,31 +352,7 @@ class WorkflowRunClient(BaseDBClient):
                 wf_name = row[1]
                 runs.append(
                     WorkflowRunResponseSchema.model_validate(
-                        {
-                            "id": run.id,
-                            "workflow_id": run.workflow_id,
-                            "name": run.name,
-                            "workflow_name": wf_name,
-                            "mode": run.mode,
-                            "created_at": run.created_at,
-                            "is_completed": run.is_completed,
-                            "recording_url": run.recording_url,
-                            "transcript_url": run.transcript_url,
-                            "user_recording_url": get_recording_storage_key(
-                                run.extra, "user"
-                            ),
-                            "bot_recording_url": get_recording_storage_key(
-                                run.extra, "bot"
-                            ),
-                            "cost_info": format_public_cost_info(
-                                run.cost_info, run.usage_info
-                            ),
-                            "definition_id": run.definition_id,
-                            "initial_context": run.initial_context,
-                            "gathered_context": run.gathered_context,
-                            "call_type": run.call_type,
-                            "extracted_data": run.extracted_data,
-                        }
+                        build_workflow_run_payload(run, workflow_name=wf_name)
                     )
                 )
             return runs, total_count

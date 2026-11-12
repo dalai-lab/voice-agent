@@ -53,10 +53,7 @@ from api.services.workflow.dto import ReactFlowDTO, sanitize_workflow_definition
 from api.services.workflow.duplicate import duplicate_workflow
 from api.services.workflow.errors import ItemKind, WorkflowError
 from api.services.workflow.run_creation import prepare_workflow_run_inputs
-from api.services.workflow.run_usage_response import (
-    format_public_cost_info,
-    format_public_usage_info,
-)
+from api.services.workflow.run_usage_response import build_workflow_run_payload
 from api.services.workflow.tool_name_validation import (
     validate_workflow_tool_name_collisions,
 )
@@ -1439,8 +1436,6 @@ async def get_workflow_run(
         raise HTTPException(status_code=404, detail="Workflow run not found")
 
     public_access_token = run.public_access_token
-    user_recording_url = get_recording_storage_key(run.extra, "user")
-    bot_recording_url = get_recording_storage_key(run.extra, "bot")
     has_user_recording = has_recording_track(run.extra, "user")
     has_bot_recording = has_recording_track(run.extra, "bot")
     if (
@@ -1451,40 +1446,11 @@ async def get_workflow_run(
     ) and not public_access_token:
         public_access_token = await db_client.ensure_public_access_token(run.id)
 
-    return {
-        "id": run.id,
-        "workflow_id": run.workflow_id,
-        "name": run.name,
-        "mode": run.mode,
-        "is_completed": run.is_completed,
-        "transcript_url": run.transcript_url,
-        "recording_url": run.recording_url,
-        "user_recording_url": user_recording_url,
-        "bot_recording_url": bot_recording_url,
-        "transcript_public_url": artifact_url(public_access_token, "transcript"),
-        "recording_public_url": artifact_url(public_access_token, "recording"),
-        "user_recording_public_url": (
-            artifact_url(public_access_token, "user_recording")
-            if has_user_recording
-            else None
-        ),
-        "bot_recording_public_url": (
-            artifact_url(public_access_token, "bot_recording")
-            if has_bot_recording
-            else None
-        ),
-        "public_access_token": public_access_token,
-        "cost_info": format_public_cost_info(run.cost_info, run.usage_info),
-        "usage_info": format_public_usage_info(run.usage_info),
-        "created_at": run.created_at,
-        "definition_id": run.definition_id,
-        "initial_context": run.initial_context,
-        "gathered_context": run.gathered_context,
-        "call_type": run.call_type,
-        "logs": run.logs,
-        "annotations": run.annotations,
-        "extracted_data": run.extracted_data,
-    }
+    return build_workflow_run_payload(
+        run,
+        public_access_token=public_access_token,
+        include_logs_and_annotations=True,
+    )
 
 
 class WorkflowRunsResponse(BaseModel):

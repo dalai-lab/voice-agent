@@ -231,13 +231,42 @@ class CampaignRunnerService:
 
         stats_map = await db_client.get_queued_runs_stats_for_campaigns([campaign_id])
         stats = stats_map.get(campaign_id, {})
-        failed_calls = max(campaign.failed_rows or 0, stats.get("failed_calls", 0))
-        completed_calls = stats.get("completed_calls", 0)
-        dispatched_rows = campaign.processed_rows or 0
         total_rows = campaign.total_rows or 0
-        # processed_rows tracks unique contact leads dispatched.
-        # resolved_rows must not add dispatched_rows + failed_calls (which double-counts failed leads).
-        resolved_rows = min(total_rows, max(dispatched_rows, completed_calls + failed_calls))
+        completed_calls = stats.get("completed_calls", 0)
+        unanswered_calls = stats.get("unanswered_calls", 0)
+        failed_calls = stats.get("failed_calls", 0)
+        active_count = stats.get("active", 0)
+        pending_count = stats.get("pending", 0)
+        scheduled_retries = stats.get("scheduled_retries", 0)
+        executed_attempts = stats.get("executed", 0)
+
+        if "unreached_leads" in stats:
+            connected_leads = stats.get("connected_leads", 0)
+            unreached_leads = stats.get("unreached_leads", 0)
+            processed_leads = max(campaign.processed_rows or 0, stats.get("processed_leads", 0))
+            dispatched_rows = min(total_rows, processed_leads) if total_rows > 0 else processed_leads
+            terminal_leads = connected_leads + unreached_leads
+            resolved_rows = min(total_rows, terminal_leads) if total_rows > 0 else terminal_leads
+            failed_leads = min(total_rows, unreached_leads) if total_rows > 0 else unreached_leads
+        else:
+            dispatched_rows = campaign.processed_rows or 0
+            failed_leads = max(campaign.failed_rows or 0, failed_calls)
+            resolved_rows = min(total_rows, max(dispatched_rows, completed_calls + failed_leads))
+
+        has_in_flight = (
+            campaign.state not in ("completed", "failed")
+            and (active_count > 0 or scheduled_retries > 0 or pending_count > 0)
+        )
+        if total_rows > 0:
+            raw_pct = min(100.0, (resolved_rows / total_rows) * 100.0)
+            if campaign.state in ("completed", "failed"):
+                progress_pct = 100.0 if (resolved_rows >= total_rows or campaign.state == "completed") else raw_pct
+            elif has_in_flight and raw_pct >= 100.0:
+                progress_pct = 99.9
+            else:
+                progress_pct = raw_pct
+        else:
+            progress_pct = 0.0
 
         return {
             "campaign_id": campaign_id,
@@ -245,11 +274,13 @@ class CampaignRunnerService:
             "total_rows": total_rows,
             "processed_rows": dispatched_rows,
             "failed_calls": failed_calls,
-            "progress_percentage": (
-                min(100.0, (resolved_rows / total_rows * 100))
-                if total_rows > 0
-                else 0.0
-            ),
+            "failed_leads": failed_leads,
+            "completed_calls": completed_calls,
+            "unanswered_calls": unanswered_calls,
+            "executed_attempts": executed_attempts,
+            "scheduled_retries": scheduled_retries,
+            "active_calls": active_count,
+            "progress_percentage": round(progress_pct, 2),
             "source_sync": {
                 "status": campaign.source_sync_status,
                 "last_synced_at": campaign.source_last_synced_at,

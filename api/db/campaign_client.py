@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import and_, case, func, or_, text, update
+from sqlalchemy import Float, String, and_, case, cast, func, or_, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.future import select
 
@@ -12,8 +12,27 @@ from api.db.base_client import BaseDBClient
 from api.db.filters import apply_workflow_run_filters, get_workflow_run_order_clause
 from api.db.models import CampaignModel, QueuedRunModel, WorkflowRunModel
 from api.schemas.workflow import WorkflowRunResponseSchema
-from api.services.workflow.run_usage_response import format_public_cost_info
-from api.utils.recording_artifacts import get_recording_storage_key
+from api.services.workflow.run_usage_response import build_workflow_run_payload
+
+FAILED_CALL_DISPOSITIONS = (
+    "failed",
+    "error",
+    "canceled",
+    "cancelled",
+    "quota_exhausted",
+)
+UNANSWERED_CALL_DISPOSITIONS = (
+    "busy",
+    "no-answer",
+    "no_answer",
+    "unanswered",
+    "voicemail",
+    "rejected",
+    "timeout",
+)
+NON_CONNECTED_CALL_DISPOSITIONS = (
+    FAILED_CALL_DISPOSITIONS + UNANSWERED_CALL_DISPOSITIONS
+)
 
 ReportRunRow = namedtuple(
     "ReportRunRow",
@@ -243,6 +262,7 @@ class CampaignClient(BaseDBClient):
         filters: list[dict[str, Any]] | None = None,
         sort_by: str | None = None,
         sort_order: str | None = "desc",
+        latest_per_lead: bool = False,
     ) -> tuple[list[WorkflowRunResponseSchema], int]:
         """Get workflow runs for a campaign with pagination, filters and sorting"""
         async with self.async_session() as session:
@@ -265,6 +285,56 @@ class CampaignClient(BaseDBClient):
             # Apply filters
             base_query = apply_workflow_run_filters(base_query, filters)
 
+            if latest_per_lead:
+                wf_disp = func.coalesce(
+                    WorkflowRunModel.gathered_context.op("->>")(
+                        "mapped_call_disposition"
+                    ),
+                    WorkflowRunModel.gathered_context.op("->>")("call_disposition"),
+                )
+                is_connected_expr = case(
+                    (
+                        and_(
+                            WorkflowRunModel.is_completed.is_(True),
+                            or_(
+                                wf_disp.is_(None),
+                                wf_disp.notin_(NON_CONNECTED_CALL_DISPOSITIONS),
+                            ),
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+                lead_key_expr = func.coalesce(
+                    func.nullif(
+                        WorkflowRunModel.initial_context.op("->>")("source_uuid"),
+                        "",
+                    ),
+                    func.nullif(
+                        WorkflowRunModel.initial_context.op("->>")("phone_number"),
+                        "",
+                    ),
+                    cast(WorkflowRunModel.id, String),
+                )
+                ranked_subq = base_query.add_columns(
+                    func.row_number()
+                    .over(
+                        partition_by=lead_key_expr,
+                        order_by=(
+                            is_connected_expr.desc(),
+                            WorkflowRunModel.is_completed.desc(),
+                            WorkflowRunModel.created_at.desc(),
+                            WorkflowRunModel.id.desc(),
+                        ),
+                    )
+                    .label("_lead_rn")
+                ).subquery()
+                base_query = select(WorkflowRunModel).where(
+                    WorkflowRunModel.id.in_(
+                        select(ranked_subq.c.id).where(ranked_subq.c._lead_rn == 1)
+                    )
+                )
+
             # Count total with filters
             count_query = base_query.with_only_columns(func.count(WorkflowRunModel.id))
             count_result = await session.execute(count_query)
@@ -277,31 +347,7 @@ class CampaignClient(BaseDBClient):
             )
 
             runs = [
-                WorkflowRunResponseSchema.model_validate(
-                    {
-                        "id": run.id,
-                        "workflow_id": run.workflow_id,
-                        "name": run.name,
-                        "mode": run.mode,
-                        "created_at": run.created_at,
-                        "is_completed": run.is_completed,
-                        "recording_url": run.recording_url,
-                        "transcript_url": run.transcript_url,
-                        "user_recording_url": get_recording_storage_key(
-                            run.extra, "user"
-                        ),
-                        "bot_recording_url": get_recording_storage_key(
-                            run.extra, "bot"
-                        ),
-                        "cost_info": format_public_cost_info(
-                            run.cost_info, run.usage_info
-                        ),
-                        "definition_id": run.definition_id,
-                        "initial_context": run.initial_context,
-                        "gathered_context": run.gathered_context,
-                        "call_type": run.call_type,
-                    }
-                )
+                WorkflowRunResponseSchema.model_validate(build_workflow_run_payload(run))
                 for run in result.scalars().all()
             ]
             return runs, total_count
@@ -863,10 +909,13 @@ class CampaignClient(BaseDBClient):
                     "completed_calls": 0,
                     "failed_calls": 0,
                     "unanswered_calls": 0,
+                    "total_duration_seconds": 0,
+                    "avg_connected_duration_seconds": 0,
                 }
                 for cid in campaign_ids
             }
             failed_queued: dict[int, int] = {cid: 0 for cid in campaign_ids}
+            wf_failed_map: dict[int, int] = {cid: 0 for cid in campaign_ids}
             for campaign_id, state, is_sched, is_ret, count in result.all():
                 stats[campaign_id]["total"] += count
                 if is_ret:
@@ -883,7 +932,12 @@ class CampaignClient(BaseDBClient):
 
             # Ground-truth call outcome aggregates from workflow runs
             try:
-                wf_disp = WorkflowRunModel.gathered_context.op("->>")("mapped_call_disposition")
+                wf_disp = func.coalesce(
+                    WorkflowRunModel.gathered_context.op("->>")(
+                        "mapped_call_disposition"
+                    ),
+                    WorkflowRunModel.gathered_context.op("->>")("call_disposition"),
+                )
                 wf_query = (
                     select(
                         WorkflowRunModel.campaign_id,
@@ -895,35 +949,13 @@ class CampaignClient(BaseDBClient):
                         ).label("active_calls"),
                         func.count(
                             case(
-                                (
-                                    wf_disp.in_(
-                                        [
-                                            "failed",
-                                            "error",
-                                            "canceled",
-                                            "cancelled",
-                                            "quota_exhausted",
-                                        ]
-                                    ),
-                                    1,
-                                ),
+                                (wf_disp.in_(FAILED_CALL_DISPOSITIONS), 1),
                                 else_=None,
                             )
                         ).label("failed_calls"),
                         func.count(
                             case(
-                                (
-                                    wf_disp.in_(
-                                        [
-                                            "busy",
-                                            "no-answer",
-                                            "no_answer",
-                                            "unanswered",
-                                            "voicemail",
-                                        ]
-                                    ),
-                                    1,
-                                ),
+                                (wf_disp.in_(UNANSWERED_CALL_DISPOSITIONS), 1),
                                 else_=None,
                             )
                         ).label("unanswered_calls"),
@@ -935,18 +967,7 @@ class CampaignClient(BaseDBClient):
                                         or_(
                                             wf_disp.is_(None),
                                             wf_disp.notin_(
-                                                [
-                                                    "failed",
-                                                    "error",
-                                                    "busy",
-                                                    "no-answer",
-                                                    "no_answer",
-                                                    "unanswered",
-                                                    "voicemail",
-                                                    "canceled",
-                                                    "cancelled",
-                                                    "quota_exhausted",
-                                                ]
+                                                NON_CONNECTED_CALL_DISPOSITIONS
                                             ),
                                         ),
                                     ),
@@ -960,14 +981,189 @@ class CampaignClient(BaseDBClient):
                     .group_by(WorkflowRunModel.campaign_id)
                 )
                 wf_result = await session.execute(wf_query)
-                for cid, act_calls, f_calls, u_calls, c_calls in wf_result.all():
+                for row in wf_result.all():
+                    cid, act_calls, f_calls, u_calls, c_calls = row[:5]
                     if cid in stats:
+                        wf_f = f_calls or 0
+                        wf_u = u_calls or 0
+                        wf_c = c_calls or 0
+                        wf_executed = wf_f + wf_u + wf_c
+                        # Only add QueuedRun failures that have no WorkflowRun representation
+                        # (preflight failures), never double-counting retry-exhausted runs.
+                        orphaned_failed_fallback = min(
+                            failed_queued.get(cid, 0),
+                            max(0, stats[cid]["executed"] - wf_executed),
+                        )
                         stats[cid]["active"] = act_calls or 0
-                        stats[cid]["failed_calls"] = max(failed_queued.get(cid, 0), f_calls or 0)
-                        stats[cid]["unanswered_calls"] = u_calls or 0
-                        stats[cid]["completed_calls"] = c_calls or 0
+                        wf_failed_map[cid] = wf_f
+                        stats[cid]["failed_calls"] = wf_f + orphaned_failed_fallback
+                        stats[cid]["unanswered_calls"] = wf_u
+                        stats[cid]["completed_calls"] = wf_c
             except Exception as e:
                 logger.warning(f"Failed to query workflow run stats for campaigns: {e}")
+
+            # Supplemental lead-level & exact duration reconciliation
+            try:
+                wf_disp = func.coalesce(
+                    WorkflowRunModel.gathered_context.op("->>")(
+                        "mapped_call_disposition"
+                    ),
+                    WorkflowRunModel.gathered_context.op("->>")("call_disposition"),
+                )
+                subq_wf_qids = select(WorkflowRunModel.queued_run_id).where(
+                    WorkflowRunModel.campaign_id.in_(campaign_ids),
+                    WorkflowRunModel.queued_run_id.is_not(None),
+                )
+                subq_child_parents = select(QueuedRunModel.parent_queued_run_id).where(
+                    QueuedRunModel.campaign_id.in_(campaign_ids),
+                    QueuedRunModel.parent_queued_run_id.is_not(None),
+                )
+                orphaned_q = (
+                    select(QueuedRunModel.campaign_id, func.count(QueuedRunModel.id))
+                    .where(
+                        QueuedRunModel.campaign_id.in_(campaign_ids),
+                        QueuedRunModel.state == "failed",
+                        QueuedRunModel.id.not_in(subq_wf_qids),
+                        QueuedRunModel.id.not_in(subq_child_parents),
+                    )
+                    .group_by(QueuedRunModel.campaign_id)
+                )
+                orphaned_res = await session.execute(orphaned_q)
+                orphaned_map = {cid: (cnt or 0) for cid, cnt in orphaned_res.all()}
+                for cid in campaign_ids:
+                    if cid in stats:
+                        stats[cid]["failed_calls"] = wf_failed_map.get(
+                            cid, 0
+                        ) + orphaned_map.get(cid, 0)
+
+                # Lead-level aggregation deduplicated by source_uuid
+                lead_subq = (
+                    select(
+                        QueuedRunModel.campaign_id.label("campaign_id"),
+                        QueuedRunModel.source_uuid.label("source_uuid"),
+                        func.max(
+                            case(
+                                (
+                                    and_(
+                                        WorkflowRunModel.is_completed.is_(True),
+                                        or_(
+                                            wf_disp.is_(None),
+                                            wf_disp.notin_(
+                                                NON_CONNECTED_CALL_DISPOSITIONS
+                                            ),
+                                        ),
+                                    ),
+                                    1,
+                                ),
+                                else_=0,
+                            )
+                        ).label("lead_connected"),
+                        func.max(
+                            case(
+                                (
+                                    or_(
+                                        QueuedRunModel.state.in_(
+                                            ["queued", "processing"]
+                                        ),
+                                        WorkflowRunModel.is_completed.is_(False),
+                                    ),
+                                    1,
+                                ),
+                                else_=0,
+                            )
+                        ).label("lead_pending"),
+                        func.max(
+                            case(
+                                (
+                                    or_(
+                                        QueuedRunModel.state.in_(
+                                            ["processed", "failed", "cancelled"]
+                                        ),
+                                        WorkflowRunModel.id.is_not(None),
+                                    ),
+                                    1,
+                                ),
+                                else_=0,
+                            )
+                        ).label("lead_attempted"),
+                    )
+                    .select_from(QueuedRunModel)
+                    .outerjoin(
+                        WorkflowRunModel,
+                        WorkflowRunModel.queued_run_id == QueuedRunModel.id,
+                    )
+                    .where(QueuedRunModel.campaign_id.in_(campaign_ids))
+                    .group_by(QueuedRunModel.campaign_id, QueuedRunModel.source_uuid)
+                    .subquery()
+                )
+                lead_agg_q = select(
+                    lead_subq.c.campaign_id,
+                    func.coalesce(func.sum(lead_subq.c.lead_connected), 0),
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (
+                                    and_(
+                                        lead_subq.c.lead_connected == 0,
+                                        lead_subq.c.lead_pending == 0,
+                                        lead_subq.c.lead_attempted == 1,
+                                    ),
+                                    1,
+                                ),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ),
+                    func.coalesce(func.sum(lead_subq.c.lead_attempted), 0),
+                ).group_by(lead_subq.c.campaign_id)
+                lead_res = await session.execute(lead_agg_q)
+                for cid, c_leads, u_leads, p_leads in lead_res.all():
+                    if cid in stats:
+                        stats[cid]["connected_leads"] = int(c_leads or 0)
+                        stats[cid]["unreached_leads"] = int(u_leads or 0)
+                        stats[cid]["processed_leads"] = int(p_leads or 0)
+
+                # Duration totals from WorkflowRunModel (usage_info or cost_info)
+                dur_text_expr = func.coalesce(
+                    func.nullif(
+                        WorkflowRunModel.usage_info.op("->>")("call_duration_seconds"),
+                        "",
+                    ),
+                    func.nullif(
+                        WorkflowRunModel.cost_info.op("->>")("call_duration_seconds"),
+                        "",
+                    ),
+                )
+                dur_num_expr = case(
+                    (
+                        dur_text_expr.op("~")(r"^[0-9]+(\.[0-9]+)?$"),
+                        cast(dur_text_expr, Float),
+                    ),
+                    else_=0.0,
+                )
+                dur_q = (
+                    select(
+                        WorkflowRunModel.campaign_id,
+                        func.coalesce(func.sum(dur_num_expr), 0.0),
+                        func.count(case((dur_num_expr > 0, 1), else_=None)),
+                    )
+                    .where(WorkflowRunModel.campaign_id.in_(campaign_ids))
+                    .group_by(WorkflowRunModel.campaign_id)
+                )
+                dur_res = await session.execute(dur_q)
+                for cid, sum_dur, dur_cnt in dur_res.all():
+                    if cid in stats:
+                        tot_dur = int(round(float(sum_dur or 0)))
+                        stats[cid]["total_duration_seconds"] = tot_dur
+                        divisor = int(dur_cnt or 0) or stats[cid]["completed_calls"]
+                        stats[cid]["avg_connected_duration_seconds"] = (
+                            int(round(tot_dur / divisor)) if divisor > 0 else 0
+                        )
+            except Exception as e:
+                logger.debug(
+                    f"Supplemental lead/duration campaign stats skipped or unavailable: {e}"
+                )
 
             return stats
 

@@ -32,3 +32,9 @@ class WorkflowRunResponseSchema(BaseModel):
     logs: dict[str, Any] | None = None
     annotations: dict[str, Any] | None = None
     extracted_data: dict[str, Any] | None = None
+    duration_seconds: int | None = None
+    disposition: str | None = None
+    phone_number: str | None = None
+    attempt_number: int | None = None
+    is_retry: bool | None = None
+    lead_id: str | None = None

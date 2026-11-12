@@ -775,7 +775,74 @@ async def test_plivo_amd_callback_late_machine_triggers_campaign_retry():
     ):
         mock_db.get_workflow_run_by_id = AsyncMock(return_value=workflow_run)
         mock_db.get_workflow_by_id = AsyncMock(return_value=workflow)
-        mock_db.update_workflow_run = AsyncMock()
+        mock_db.update_workflow_run = AsyncMock(return_value=workflow_run)
+
+        response = await handle_plivo_amd_callback(123, request)
+
+    assert response.status_code == 200
+    mock_publisher.publish_retry_needed.assert_awaited_once_with(
+        workflow_run_id=123,
+        reason="voicemail",
+        campaign_id=42,
+        queued_run_id=88,
+    )
+
+
+@pytest.mark.asyncio
+async def test_plivo_amd_callback_concurrent_completion_triggers_retry():
+    """If hangup-callback marked run completed during AMD processing, retry still fires."""
+    provider = _provider()
+    stale_run = SimpleNamespace(
+        id=123,
+        workflow_id=7,
+        campaign_id=42,
+        queued_run_id=88,
+        is_completed=False,
+        gathered_context={},
+    )
+    completed_run = SimpleNamespace(
+        id=123,
+        workflow_id=7,
+        campaign_id=42,
+        queued_run_id=88,
+        is_completed=True,
+        gathered_context={
+            "answered_by": "machine_start",
+            "call_tags": ["voicemail_detected", "telephony_voicemail"],
+            "call_disposition": "voicemail",
+            "mapped_call_disposition": "voicemail",
+        },
+    )
+    workflow = SimpleNamespace(id=7, organization_id=11)
+
+    request = _request(
+        path="/api/v1/telephony/plivo/amd-callback/123",
+        query={},
+        form_data={"CallUUID": "call-123", "Machine": "true"},
+    )
+
+    delete_session = _MockDeleteSession(status=404)
+    mock_publisher = AsyncMock()
+
+    with (
+        patch("api.services.telephony.providers.plivo.routes.db_client") as mock_db,
+        patch(
+            "api.services.telephony.providers.plivo.routes.get_telephony_provider_for_run",
+            new=AsyncMock(return_value=provider),
+        ),
+        patch.object(provider, "verify_inbound_signature", new=AsyncMock(return_value=True)),
+        patch(
+            "api.services.telephony.providers.plivo.routes.aiohttp.ClientSession",
+            return_value=delete_session,
+        ),
+        patch(
+            "api.services.telephony.providers.plivo.routes.get_campaign_event_publisher",
+            new=AsyncMock(return_value=mock_publisher),
+        ),
+    ):
+        mock_db.get_workflow_run_by_id = AsyncMock(return_value=stale_run)
+        mock_db.get_workflow_by_id = AsyncMock(return_value=workflow)
+        mock_db.update_workflow_run = AsyncMock(return_value=completed_run)
 
         response = await handle_plivo_amd_callback(123, request)
 

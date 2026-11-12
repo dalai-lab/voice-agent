@@ -6,6 +6,7 @@ provider registry — see ProviderSpec.router.
 
 import json
 from typing import Any
+from urllib.parse import quote
 from xml.sax.saxutils import escape
 
 import aiohttp
@@ -432,20 +433,28 @@ async def handle_plivo_amd_callback(workflow_run_id: int, request: Request):
         updates["call_disposition"] = "voicemail"
         updates["mapped_call_disposition"] = "voicemail"
 
-    await db_client.update_workflow_run(
+    updated_run = await db_client.update_workflow_run(
         run_id=workflow_run_id,
         gathered_context=updates,
     )
+    latest_run = (
+        updated_run
+        if isinstance(getattr(updated_run, "is_completed", None), bool)
+        else workflow_run
+    )
 
     # 4. Immediate Call Disconnect on Machine Detection
-    if is_machine and call_uuid:
+    if is_machine and call_uuid and provider.auth_id and provider.auth_token:
         logger.info(
             f"[Plivo AMD] Machine detected. Terminating call {call_uuid} to save credits."
         )
         try:
-            endpoint = f"https://api.plivo.com/v1/Account/{provider.auth_id}/Call/{call_uuid}/"
+            safe_auth_id = quote(str(provider.auth_id), safe="")
+            safe_call_uuid = quote(str(call_uuid), safe="")
+            endpoint = f"https://api.plivo.com/v1/Account/{safe_auth_id}/Call/{safe_call_uuid}/"
             auth = aiohttp.BasicAuth(provider.auth_id, provider.auth_token)
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.delete(endpoint, auth=auth) as resp:
                     if resp.status in (204, 404):
                         logger.info(
@@ -462,7 +471,7 @@ async def handle_plivo_amd_callback(workflow_run_id: int, request: Request):
             )
 
     # 5. Late-Callback Safety: Trigger retry if run was already marked completed
-    if is_machine and workflow_run.campaign_id and workflow_run.is_completed:
+    if is_machine and latest_run.campaign_id and latest_run.is_completed:
         logger.info(
             f"[Plivo AMD] Late callback on completed run {workflow_run_id}; triggering retry."
         )
@@ -471,8 +480,8 @@ async def handle_plivo_amd_callback(workflow_run_id: int, request: Request):
             await publisher.publish_retry_needed(
                 workflow_run_id=workflow_run_id,
                 reason="voicemail",
-                campaign_id=workflow_run.campaign_id,
-                queued_run_id=workflow_run.queued_run_id,
+                campaign_id=latest_run.campaign_id,
+                queued_run_id=latest_run.queued_run_id,
             )
         except Exception as exc:
             logger.warning(f"[Plivo AMD] Failed to publish late retry event: {exc}")

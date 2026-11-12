@@ -989,17 +989,60 @@ class PipecatEngine:
             CancelFrame(reason=reason) if abort_immediately else EndFrame(reason=reason)
         )
 
-        # Record the call disposition: prefer one extracted from the conversation,
-        # otherwise fall back to the disconnect reason.
-        call_disposition = self._gathered_context.get("call_disposition", "") or reason
-        self._gathered_context["call_disposition"] = call_disposition
-        self._gathered_context["mapped_call_disposition"] = call_disposition
+        # Record the call disposition: prefer one extracted from the conversation
+        # or already written out-of-band by a telephony AMD webhook, otherwise
+        # fall back to the disconnect reason.
+        db_gathered: dict[str, Any] = {}
+        if self._workflow_run_id:
+            try:
+                existing_run = await db_client.get_workflow_run_by_id(
+                    self._workflow_run_id
+                )
+                if existing_run and isinstance(
+                    getattr(existing_run, "gathered_context", None), dict
+                ):
+                    db_gathered = existing_run.gathered_context
+            except Exception as exc:
+                logger.warning(
+                    f"Could not read latest gathered context before hangup: {exc}"
+                )
 
-        if call_disposition:
-            call_tags = self._gathered_context.get("call_tags", [])
-            if call_disposition not in call_tags:
-                call_tags.append(call_disposition)
-            self._gathered_context["call_tags"] = call_tags
+        db_disposition = db_gathered.get("call_disposition", "")
+        db_tags = list(db_gathered.get("call_tags", []) or [])
+        db_answered_by = str(db_gathered.get("answered_by", "") or "")
+        is_db_voicemail = (
+            db_disposition in ("voicemail", EndTaskReason.VOICEMAIL_DETECTED.value)
+            or "voicemail_detected" in db_tags
+            or db_answered_by.startswith("machine_")
+            or db_answered_by == "fax"
+        )
+
+        call_disposition = self._gathered_context.get("call_disposition", "")
+        if not call_disposition:
+            if is_db_voicemail:
+                call_disposition = db_disposition or "voicemail"
+            else:
+                call_disposition = reason
+
+        self._gathered_context["call_disposition"] = call_disposition
+        self._gathered_context["mapped_call_disposition"] = (
+            db_gathered.get("mapped_call_disposition") or call_disposition
+            if is_db_voicemail and not self._gathered_context.get("mapped_call_disposition")
+            else call_disposition
+        )
+
+        merged_tags = list(
+            dict.fromkeys(
+                [
+                    *db_tags,
+                    *(self._gathered_context.get("call_tags", []) or []),
+                ]
+            )
+        )
+        if call_disposition and call_disposition not in merged_tags:
+            merged_tags.append(call_disposition)
+        if merged_tags:
+            self._gathered_context["call_tags"] = merged_tags
 
         # Hangup strategies run while serializing the terminal frame. Persist
         # the final extracted values first so external-PBX adapters can apply

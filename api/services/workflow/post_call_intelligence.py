@@ -36,8 +36,12 @@ async def run_post_call_intelligence(
 
     gathered_context = workflow_run.gathered_context or {}
     call_disposition = gathered_context.get("call_disposition", "")
+    call_tags = gathered_context.get("call_tags") or []
 
-    if call_disposition == EndTaskReason.VOICEMAIL_DETECTED.value:
+    if (
+        call_disposition in (EndTaskReason.VOICEMAIL_DETECTED.value, "voicemail")
+        or "voicemail_detected" in call_tags
+    ):
         logger.info(f"Skipping PCI for run {workflow_run.id}: voicemail")
         return {"_error": "skipped", "reason": "voicemail"}
 

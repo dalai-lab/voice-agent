@@ -154,17 +154,21 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
                 workflow_run.campaign_id, is_failure=False
             )
 
+        latest_run = workflow_run
         if not already_finalized:
-            await db_client.update_workflow_run(
+            updated_run = await db_client.update_workflow_run(
                 run_id=workflow_run_id,
                 is_completed=True,
                 state=WorkflowRunState.COMPLETED.value,
             )
+            if isinstance(getattr(updated_run, "gathered_context", None), dict):
+                latest_run = updated_run
 
-        if workflow_run.campaign_id is not None:
-            call_tags = (workflow_run.gathered_context or {}).get("call_tags", [])
+        if latest_run.campaign_id is not None:
+            latest_context = latest_run.gathered_context or {}
+            call_tags = latest_context.get("call_tags", [])
             answered_by = (
-                (workflow_run.gathered_context or {}).get("answered_by")
+                latest_context.get("answered_by")
                 or (status.extra or {}).get("AnsweredBy")
                 or (status.extra or {}).get("answered_by")
                 or ""
@@ -180,8 +184,8 @@ async def _process_status_update(workflow_run_id: int, status: StatusCallbackReq
                 await publisher.publish_retry_needed(
                     workflow_run_id=workflow_run_id,
                     reason="voicemail",
-                    campaign_id=workflow_run.campaign_id,
-                    queued_run_id=workflow_run.queued_run_id,
+                    campaign_id=latest_run.campaign_id,
+                    queued_run_id=latest_run.queued_run_id,
                 )
 
     elif normalized_status in TERMINAL_NOT_CONNECTED_STATUSES:

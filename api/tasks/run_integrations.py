@@ -58,7 +58,11 @@ def _should_skip_qa(
     if not qa_data.qa_voicemail_calls:
         gathered_context = workflow_run.gathered_context or {}
         call_disposition = gathered_context.get("call_disposition", "")
-        if call_disposition == EndTaskReason.VOICEMAIL_DETECTED.value:
+        call_tags = gathered_context.get("call_tags") or []
+        if (
+            call_disposition in (EndTaskReason.VOICEMAIL_DETECTED.value, "voicemail")
+            or "voicemail_detected" in call_tags
+        ):
             return "voicemail call and QA voicemail calls is disabled"
 
     if qa_data.qa_sample_rate < 100:

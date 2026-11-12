@@ -283,11 +283,14 @@ def register_event_handlers(
                     gathered_context["trace_url"] = trace_url
                     logger.debug(f"Added trace URL to gathered_context: {trace_url}")
 
-        # also consider existing gathered context in workflow_run
-        gathered_context = {**workflow_run.gathered_context, **gathered_context}
+        # also consider existing gathered context in workflow_run (preserve carrier AMD tags)
+        db_gathered = (workflow_run.gathered_context if workflow_run else None) or {}
+        db_tags = list(db_gathered.get("call_tags", []) or [])
+        engine_tags = list(gathered_context.get("call_tags", []) or [])
+        gathered_context = {**db_gathered, **gathered_context}
 
         # Set user_speech call tag
-        call_tags = gathered_context.get("call_tags", [])
+        call_tags = list(dict.fromkeys([*db_tags, *engine_tags]))
 
         try:
             has_user_speech = in_memory_logs_buffer.contains_user_speech()

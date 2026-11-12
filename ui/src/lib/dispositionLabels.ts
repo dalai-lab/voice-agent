@@ -17,6 +17,7 @@ const DISPOSITION_MAP: Record<string, { label: string; className: string }> = {
     'call_transferred': { label: 'Call Transferred', className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800/80 font-semibold' },
     'end_call_tool': { label: 'Completed by Agent', className: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-indigo-800/80 font-semibold' },
     'voicemail_detected': { label: 'Voicemail Reached', className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-800/80 font-semibold' },
+    'voicemail': { label: 'Voicemail Reached', className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-800/80 font-semibold' },
     'user_qualified': { label: 'Lead Qualified', className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800/80 font-semibold' },
     'user_disqualified': { label: 'Not Interested / Unqualified', className: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-800/80 font-semibold' },
     'call_duration_exceeded': { label: 'Max Duration Reached', className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-800/80 font-semibold' },

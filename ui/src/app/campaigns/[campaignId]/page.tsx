@@ -846,7 +846,7 @@ export default function CampaignDetailPage() {
                                             <span className="text-amber-600 dark:text-amber-400 font-semibold">{unanswered} unanswered</span>
                                         </div>
                                         <p className="text-[9px] text-muted-foreground/75 mt-1">
-                                            {retries} redials • {initialDials} initial
+                                            {retries} redials • {initialDials} initial (all call attempts)
                                         </p>
                                     </>
                                 );
@@ -858,8 +858,11 @@ export default function CampaignDetailPage() {
                 {/* Multi-Segment Audience Progress Bar */}
                 {(() => {
                     const totalAudience = campaign.total_rows && campaign.total_rows > 0 ? campaign.total_rows : 0;
-                    const failedRows = campaign.failed_rows ?? 0;
-                    const completedRows = campaign.completed_calls_count ?? 0;
+                    const completedRows = campaign.connected_leads_count ?? campaign.completed_calls_count ?? 0;
+                    const rawFailedRows = campaign.unreached_leads_count ?? campaign.failed_rows ?? 0;
+                    const failedRows = totalAudience > 0
+                        ? Math.min(rawFailedRows, Math.max(0, totalAudience - completedRows))
+                        : rawFailedRows;
                     const activeRows = campaign.active_count ?? 0;
                     const retriesInCooldown = campaign.scheduled_retries_count ?? 0;
                     const resolvedRows = Math.min(totalAudience, completedRows + failedRows);
@@ -1041,8 +1044,11 @@ export default function CampaignDetailPage() {
                             <dd className="mt-1 text-xs font-bold text-foreground">
                                 {(() => {
                                     const totalAudience = campaign.total_rows && campaign.total_rows > 0 ? campaign.total_rows : 0;
-                                    const failed = campaign.failed_rows ?? 0;
-                                    const completed = campaign.completed_calls_count ?? 0;
+                                    const completed = campaign.connected_leads_count ?? campaign.completed_calls_count ?? 0;
+                                    const rawFailed = campaign.unreached_leads_count ?? campaign.failed_rows ?? 0;
+                                    const failed = totalAudience > 0
+                                        ? Math.min(rawFailed, Math.max(0, totalAudience - completed))
+                                        : rawFailed;
                                     const active = campaign.active_count ?? 0;
                                     const retries = campaign.scheduled_retries_count ?? 0;
                                     const resolved = Math.min(totalAudience, completed + failed);

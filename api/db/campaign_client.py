@@ -1036,11 +1036,17 @@ class CampaignClient(BaseDBClient):
                             cid, 0
                         ) + orphaned_map.get(cid, 0)
 
-                # Lead-level aggregation deduplicated by source_uuid
+                # Lead-level aggregation deduplicated by root lead (collapse retry
+                # suffixes like `_retry_1` / `_retry_1_retry_2` into one unique lead)
+                root_source_uuid = func.regexp_replace(
+                    QueuedRunModel.source_uuid,
+                    r"(_retry_[0-9]+)+$",
+                    "",
+                ).label("root_source_uuid")
                 lead_subq = (
                     select(
                         QueuedRunModel.campaign_id.label("campaign_id"),
-                        QueuedRunModel.source_uuid.label("source_uuid"),
+                        root_source_uuid,
                         func.max(
                             case(
                                 (
@@ -1093,7 +1099,7 @@ class CampaignClient(BaseDBClient):
                         WorkflowRunModel.queued_run_id == QueuedRunModel.id,
                     )
                     .where(QueuedRunModel.campaign_id.in_(campaign_ids))
-                    .group_by(QueuedRunModel.campaign_id, QueuedRunModel.source_uuid)
+                    .group_by(QueuedRunModel.campaign_id, root_source_uuid)
                     .subquery()
                 )
                 lead_agg_q = select(

@@ -167,8 +167,11 @@ export default function CampaignsPage() {
                         <TableBody>
                             {campaignsData.campaigns.map((campaign) => {
                                 const totalContacts = campaign.total_rows ?? 0;
-                                const failedContacts = campaign.failed_rows ?? 0;
-                                const completedContacts = campaign.completed_calls_count ?? 0;
+                                const completedContacts = campaign.connected_leads_count ?? campaign.completed_calls_count ?? 0;
+                                const rawFailedContacts = campaign.unreached_leads_count ?? campaign.failed_rows ?? 0;
+                                const failedContacts = totalContacts > 0
+                                    ? Math.min(rawFailedContacts, Math.max(0, totalContacts - completedContacts))
+                                    : rawFailedContacts;
                                 const activeCount = campaign.active_count ?? 0;
                                 const retriesCount = campaign.retry_attempts_count ?? 0;
                                 const scheduledRetriesCount = campaign.scheduled_retries_count ?? 0;
@@ -224,7 +227,7 @@ export default function CampaignsPage() {
                                                 <div className="flex items-center justify-between text-[9px] text-muted-foreground/80">
                                                     <span>
                                                         {totalDials} dials{retriesCount > 0 ? ` (${retriesCount} retries)` : ''}
-                                                        {campaign.failed_rows > 0 ? ` • ${campaign.failed_rows} failed` : ''}
+                                                        {failedContacts > 0 ? ` • ${failedContacts} unreached` : ''}
                                                         {scheduledRetriesCount > 0 ? ` • ${scheduledRetriesCount} in cool-down` : ''}
                                                     </span>
                                                     {activeCount > 0 && (

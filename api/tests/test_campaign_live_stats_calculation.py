@@ -116,3 +116,53 @@ def test_build_campaign_response_stats_alignment():
     assert resp.pending_count == 975
     assert resp.completed_calls_count == 4
     assert resp.failed_calls_count == 1
+
+
+@pytest.mark.asyncio
+async def test_get_queued_runs_stats_collapses_retry_source_uuids_for_lead_counts():
+    from sqlalchemy.dialects import postgresql
+
+    client = CampaignClient()
+    mock_session = AsyncMock()
+    client.async_session = MagicMock(return_value=mock_session)
+    mock_session.__aenter__.return_value = mock_session
+
+    mock_queued_result = MagicMock()
+    mock_queued_result.all.return_value = [
+        (3, "processed", 0, 0, 38),
+        (3, "processed", 0, 1, 30),
+    ]
+    mock_wf_result = MagicMock()
+    mock_wf_result.all.return_value = [(3, 0, 0, 40, 28)]
+    mock_orphaned_result = MagicMock()
+    mock_orphaned_result.all.return_value = []
+    mock_lead_result = MagicMock()
+    mock_lead_result.all.return_value = [(3, 28, 10, 38)]
+    mock_dur_result = MagicMock()
+    mock_dur_result.all.return_value = [(3, 4200.0, 28)]
+
+    mock_session.execute.side_effect = [
+        mock_queued_result,
+        mock_wf_result,
+        mock_orphaned_result,
+        mock_lead_result,
+        mock_dur_result,
+    ]
+
+    stats = await client.get_queued_runs_stats_for_campaigns([3])
+
+    assert stats[3]["connected_leads"] == 28
+    assert stats[3]["unreached_leads"] == 10
+    assert stats[3]["processed_leads"] == 38
+
+    # Verify the lead-level aggregation SQL normalizes _retry_<N> suffixes before grouping
+    lead_stmt = mock_session.execute.call_args_list[3].args[0]
+    compiled_sql = str(
+        lead_stmt.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+    assert "regexp_replace" in compiled_sql
+    assert "_retry_[0-9]+" in compiled_sql
+    assert "GROUP BY queued_runs.campaign_id, root_source_uuid" in compiled_sql

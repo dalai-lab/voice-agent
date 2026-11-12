@@ -1101,6 +1101,14 @@ export type CampaignResponse = {
      */
     unanswered_calls_count?: number;
     /**
+     * Connected Leads Count
+     */
+    connected_leads_count?: number;
+    /**
+     * Unreached Leads Count
+     */
+    unreached_leads_count?: number;
+    /**
      * Parent Campaign Id
      */
     parent_campaign_id?: number | null;

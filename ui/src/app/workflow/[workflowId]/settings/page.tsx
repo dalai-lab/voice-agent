@@ -1510,20 +1510,29 @@ function PostCallIntelligenceSection({
     onSave: (schema: Record<string, unknown>[] | null) => Promise<void>;
 }) {
     const defaultSchemaStr = "[\n  {\n    \"name\": \"summary\",\n    \"type\": \"string\",\n    \"description\": \"A brief summary of the call\"\n  }\n]";
-    const initialStr = postCallSchema ? JSON.stringify(postCallSchema, null, 2) : defaultSchemaStr;
+    const hasSchema = Boolean(postCallSchema && Array.isArray(postCallSchema) && postCallSchema.length > 0);
+    const initialStr = hasSchema ? JSON.stringify(postCallSchema, null, 2) : defaultSchemaStr;
     const [schemaStr, setSchemaStr] = useState(initialStr);
-    const [isEnabled, setIsEnabled] = useState(postCallSchema !== null);
+    const [isEnabled, setIsEnabled] = useState(hasSchema);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const isDirty = isEnabled !== (postCallSchema !== null) || (isEnabled && schemaStr !== initialStr);
+    useEffect(() => {
+        const enabled = Boolean(postCallSchema && Array.isArray(postCallSchema) && postCallSchema.length > 0);
+        setIsEnabled(enabled);
+        if (enabled && postCallSchema) {
+            setSchemaStr(JSON.stringify(postCallSchema, null, 2));
+        }
+    }, [postCallSchema]);
+
+    const isDirty = isEnabled !== hasSchema || (isEnabled && schemaStr !== initialStr);
     useUnsavedChanges("pci", isDirty);
 
     const handleSave = async () => {
         setIsSaving(true);
         setError(null);
         try {
-            let parsedSchema: Record<string, unknown>[] | null = null;
+            let parsedSchema: Record<string, unknown>[] | null = [];
             if (isEnabled) {
                 try {
                     parsedSchema = JSON.parse(schemaStr);
@@ -1553,7 +1562,7 @@ function PostCallIntelligenceSection({
                     Post-Call Intelligence
                 </CardTitle>
                 <CardDescription>
-                    Automatically extract structured data using an LLM after the call ends.
+                    Automatically extract structured data using your workflow's Intelligence LLM after the call ends.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -2149,6 +2158,11 @@ function WorkflowSettingsInner({
         [workflow],
     );
 
+    const initialPostCallSchema = useMemo(
+        () => (workflow.post_call_schema as Record<string, unknown>[] | null) || null,
+        [workflow],
+    );
+
     const {
         workflowName,
         workflowConfigurations,
@@ -2166,6 +2180,7 @@ function WorkflowSettingsInner({
         initialFlow,
         initialTemplateContextVariables,
         initialWorkflowConfigurations,
+        initialPostCallSchema,
         user,
     });
     const resolvedWorkflowConfigurationsForRender = workflowConfigurations

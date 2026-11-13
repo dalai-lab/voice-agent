@@ -132,6 +132,7 @@ export default function WorkflowDetailPage() {
                         ? (workflow.workflow_configurations as WorkflowConfigurations)
                         : undefined
                 }
+                initialPostCallSchema={(workflow.post_call_schema as Record<string, unknown>[] | null) || null}
                 initialVersionNumber={workflow.version_number ?? null}
                 initialVersionStatus={workflow.version_status ?? null}
                 user={stableUser}

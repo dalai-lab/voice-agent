@@ -125,8 +125,8 @@ export interface ServiceConfigurationDefaults {
 }
 
 const STANDARD_TABS: { key: ServiceSegment; label: string }[] = [
-    { key: "llm", label: "LLM" },
-    { key: "extraction_llm", label: "Extraction LLM" },
+    { key: "llm", label: "Conversational LLM" },
+    { key: "extraction_llm", label: "Intelligence LLM" },
     { key: "tts", label: "Voice" },
     { key: "stt", label: "Transcriber" },
     { key: "embeddings", label: "Embedding" },
@@ -134,22 +134,22 @@ const STANDARD_TABS: { key: ServiceSegment; label: string }[] = [
 
 const REALTIME_TABS: { key: ServiceSegment; label: string }[] = [
     { key: "realtime", label: "Realtime Model" },
-    { key: "llm", label: "LLM" },
-    { key: "extraction_llm", label: "Extraction LLM" },
+    { key: "llm", label: "Conversational LLM" },
+    { key: "extraction_llm", label: "Intelligence LLM" },
     { key: "embeddings", label: "Embedding" },
 ];
 
 const OVERRIDE_STANDARD_TABS: { key: ServiceSegment; label: string }[] = [
-    { key: "llm", label: "LLM" },
-    { key: "extraction_llm", label: "Extraction LLM" },
+    { key: "llm", label: "Conversational LLM" },
+    { key: "extraction_llm", label: "Intelligence LLM" },
     { key: "tts", label: "Voice" },
     { key: "stt", label: "Transcriber" },
 ];
 
 const OVERRIDE_REALTIME_TABS: { key: ServiceSegment; label: string }[] = [
     { key: "realtime", label: "Realtime Model" },
-    { key: "llm", label: "LLM" },
-    { key: "extraction_llm", label: "Extraction LLM" },
+    { key: "llm", label: "Conversational LLM" },
+    { key: "extraction_llm", label: "Intelligence LLM" },
 ];
 
 // Display names for Sarvam voices
@@ -1193,14 +1193,14 @@ export function ServiceConfigurationForm({
                     <div className="space-y-1">
                         <div className="flex items-center gap-2">
                             <Label htmlFor="dedicated-extraction-toggle" className="text-xs font-bold text-foreground cursor-pointer">
-                                Dedicated Variable Extraction LLM
+                                Dedicated Intelligence & Extraction LLM
                             </Label>
                             <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                 ⚡ Sub-250ms Latency
                             </span>
                         </div>
                         <p className="text-[10px] text-muted-foreground/70 leading-normal max-w-xl">
-                            Offload background variable extraction to an ultra-fast LLM (e.g. Groq Llama 3.3 70B, GPT-4o-mini). Prevents extraction delays from blocking speech turns and eliminates race conditions.
+                            Offload background tasks (Variable Extraction, Context Compaction, Post-Call Intelligence, and QA Analysis) to a fast, cost-effective LLM (e.g. Groq Llama 3.3 70B, GPT-4o-mini). Prevents background tasks from blocking speech turns and burning conversational voice quota.
                         </p>
                     </div>
                     <Switch
@@ -1227,7 +1227,7 @@ export function ServiceConfigurationForm({
                             Using Conversational Voice LLM
                         </p>
                         <p className="text-[11px] text-muted-foreground/70 max-w-md mx-auto">
-                            Variable extraction runs on your conversational LLM. Enable dedicated extraction above for faster parallel extraction with zero voice turn interference.
+                            Variable extraction, context compaction, Post-Call Intelligence, and QA run on your conversational LLM. Enable dedicated intelligence above for faster parallel processing with zero voice turn interference.
                         </p>
                     </div>
                 )}

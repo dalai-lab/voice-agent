@@ -251,7 +251,7 @@ export const useWorkflowState = ({
             resolvedInitialWorkflowConfigurations.dictionary ?? '',
             initialPostCallSchema
         );
-    }, [workflowId, initialWorkflowName, initialFlow?.nodes, initialFlow?.edges, initialTemplateContextVariables, initialWorkflowConfigurations, initializeWorkflow, specsLoading, bySpecName, workflowConfigurationDefaultsLoaded, workflowConfigurationDefaults]);
+    }, [workflowId, initialWorkflowName, initialFlow?.nodes, initialFlow?.edges, initialTemplateContextVariables, initialWorkflowConfigurations, initialPostCallSchema, initializeWorkflow, specsLoading, bySpecName, workflowConfigurationDefaultsLoaded, workflowConfigurationDefaults]);
 
     // Set up keyboard shortcuts for undo/redo
     useEffect(() => {

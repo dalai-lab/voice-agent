@@ -430,7 +430,7 @@ export function AIModelConfigurationV2Editor({
         const llm = requireByokService(config, "llm", defaultsForByok);
         const extractionLlm = optionalByokService(config, "extraction_llm");
         if (extractionLlm && !hasRequiredApiKey("extraction_llm", extractionLlm, defaultsForByok)) {
-            throw new Error("Extraction LLM configuration requires an API key");
+            throw new Error("Intelligence LLM configuration requires an API key");
         }
         const embeddings = optionalByokService(config, "embeddings");
         const body: OrganizationAiModelConfigurationV2 = {

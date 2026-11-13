@@ -57,6 +57,7 @@ interface RenderWorkflowProps {
     };
     initialTemplateContextVariables?: Record<string, string>;
     initialWorkflowConfigurations?: WorkflowConfigurations;
+    initialPostCallSchema?: Record<string, unknown>[] | null;
     initialVersionNumber?: number | null;
     initialVersionStatus?: string | null;
     user: { id: string; email?: string };
@@ -71,6 +72,7 @@ function RenderWorkflow({
     initialFlow,
     initialTemplateContextVariables,
     initialWorkflowConfigurations,
+    initialPostCallSchema,
     initialVersionNumber,
     initialVersionStatus,
     user,
@@ -125,6 +127,7 @@ function RenderWorkflow({
         initialFlow,
         initialTemplateContextVariables,
         initialWorkflowConfigurations,
+        initialPostCallSchema,
         user,
     });
 

@@ -1,0 +1,170 @@
+{
+  "name": "NovaTech - Demo Booking & Lead Qualification (QA & Extraction Test)",
+  "post_call_schema": [
+    {
+      "name": "lead_status",
+      "type": "string",
+      "description": "Final qualification status: 'qualified_demo_booked', 'nurture_inquiry', 'unqualified_wrong_fit', or 'withdrawn'."
+    },
+    {
+      "name": "executive_call_summary",
+      "type": "string",
+      "description": "2-3 sentence overview of the caller's stated use case, volume requirements, and scheduled next steps."
+    }
+  ],
+  "workflow_definition": {
+    "nodes": [
+      {
+        "id": "0",
+        "type": "globalNode",
+        "position": {
+          "x": -600,
+          "y": 200
+        },
+        "data": {
+          "name": "Global Persona & Voice Rules",
+          "prompt": "# ROLE & IDENTITY\nYou are Rhea, a consultative sales representative at NovaTech calling regarding our AI Voice Platform.\n- Goal: Greet the lead, understand their voice automation use case (inbound support vs. outbound campaigns), and book a 15-minute live demo.\n- Style: Conversational, warm, and concise. Max 2 short sentences per turn. Never speak bullet points or robotic disclaimers.\n\n# GENERAL RULES\n- If caller asks if you are AI: \"Yes, I'm NovaTech's AI voice assistant! I'm calling to quickly see how we can assist with your calling workflows.\"\n- If caller is busy: Ask politely for a preferred callback day/time, then transition to End Call.\n- Never invent custom pricing: Mention that pricing depends on concurrency and call volume, which the solutions engineer will present during the demo.",
+          "allow_interrupt": false
+        }
+      },
+      {
+        "id": "1",
+        "type": "startCall",
+        "position": {
+          "x": 0,
+          "y": 200
+        },
+        "data": {
+          "name": "Opening & Use Case Discovery",
+          "is_start": true,
+          "add_global_prompt": true,
+          "allow_interrupt": false,
+          "greeting_type": "text",
+          "delayed_start": false,
+          "delayed_start_duration": 1,
+          "pre_call_fetch_enabled": false,
+          "greeting": "Hi {{first_name | there}}, this is Rhea from NovaTech. I saw you were exploring our AI Voice platform. Are you looking to automate inbound customer support or outbound sales campaigns?",
+          "prompt": "# OBJECTIVE\nConfirm the caller's primary voice automation use case, their approximate monthly call volume or team size, and whether they would like to see a quick 15-minute product walkthrough.\n\n# GUIDELINES\n- If they mention inbound support: Acknowledge and ask approximately how many support tickets or calls they receive daily.\n- If they mention outbound campaigns: Ask if they are looking into lead qualification, appointment reminders, or collections.\n- Once they share their use case and express interest: Call the 'schedule_demo' transition edge to move to scheduling.\n- If they say wrong number, not interested, or tell you to remove them: Be polite, say goodbye, and call the 'decline_or_busy' transition edge immediately.",
+          "extraction_enabled": true,
+          "extraction_prompt": "Extract the caller's primary voice use case, team size or call volume, and whether they are open to evaluating the software.",
+          "extraction_variables": [
+            {
+              "name": "primary_use_case",
+              "type": "string",
+              "prompt": "One of: 'inbound_support', 'outbound_sales', 'mixed', or 'exploring'."
+            },
+            {
+              "name": "monthly_call_volume",
+              "type": "string",
+              "prompt": "Estimated call volume, agent team size, or scale mentioned by the caller. Leave empty if unstated."
+            },
+            {
+              "name": "is_evaluating_software",
+              "type": "boolean",
+              "prompt": "true if caller confirmed interest in adopting or evaluating voice automation; false if they refused or are not looking."
+            }
+          ]
+        }
+      },
+      {
+        "id": "2",
+        "type": "agentNode",
+        "position": {
+          "x": 450,
+          "y": 200
+        },
+        "data": {
+          "name": "Demo Slot Booking",
+          "add_global_prompt": true,
+          "allow_interrupt": false,
+          "prompt": "# OBJECTIVE\nPropose available demo times and confirm the caller's preferred slot and contact phone number.\n\n# SLOTS AVAILABLE\n- Tomorrow at 2:00 PM IST\n- Thursday at 11:00 AM IST\n\n# GUIDELINES\n- Offer both options clearly: \"We have slots available tomorrow at 2 PM or Thursday at 11 AM IST. Which one works best for you?\"\n- If they offer a different specific time, accept it.\n- Confirm the WhatsApp/SMS phone number where the calendar invite should be sent: \"And may I confirm the best phone number to send your calendar invite and reminder?\"\n- Once the slot and number are confirmed: Call the 'confirm_and_close' edge to finish.",
+          "extraction_enabled": true,
+          "extraction_prompt": "Extract the agreed demo date/time slot and the confirmed mobile number for the calendar invite.",
+          "extraction_variables": [
+            {
+              "name": "confirmed_demo_slot",
+              "type": "string",
+              "prompt": "The selected day and time for the demo (e.g. 'Tomorrow 2 PM IST' or 'Thursday 11 AM IST')."
+            },
+            {
+              "name": "invite_phone_number",
+              "type": "string",
+              "prompt": "The 10-digit mobile number confirmed by caller for calendar invite dispatch."
+            }
+          ]
+        }
+      },
+      {
+        "id": "3",
+        "type": "endCall",
+        "position": {
+          "x": 900,
+          "y": 200
+        },
+        "data": {
+          "name": "Closing Confirmation",
+          "is_end": true,
+          "add_global_prompt": true,
+          "prompt": "# OBJECTIVE\nDeliver a crisp, professional sign-off confirming their selected slot ({{gathered_context.confirmed_demo_slot | your scheduled demo time}}). Remind them that a calendar invite has been sent to their phone, thank them, and end the call politely."
+        }
+      },
+      {
+        "id": "4",
+        "type": "qa",
+        "position": {
+          "x": 450,
+          "y": -150
+        },
+        "data": {
+          "name": "Post-Call Quality & Compliance Audit",
+          "qa_enabled": true,
+          "qa_use_workflow_llm": true,
+          "qa_min_call_duration": 15,
+          "qa_voicemail_calls": false,
+          "qa_sample_rate": 100,
+          "qa_system_prompt": "You are the Senior Conversation QA and Compliance Auditor evaluating this NovaTech voice agent interaction.\n\n## Node Under Review\n{{node_summary}}\n\n## Context from Preceding Nodes\n{{previous_conversation_summary}}\n\n## Spoken Transcript\n{{transcript}}\n\n## Computed Call Metrics\n{{metrics}}\n\n## Evaluation Criteria\n1. Active Listening & Empathy: Did the agent listen attentively, avoid interrupting, and respond directly to the caller's questions?\n2. Qualification Rigor: Did the agent capture the use case and volume details accurately?\n3. Scheduling Protocol: Did the agent offer specific slots and verify the contact number before handoff?\n\nReturn strictly valid JSON with this exact structure:\n{\n  \"call_quality_score\": 9,\n  \"overall_sentiment\": \"positive\",\n  \"tags\": [\"clear_discovery\", \"polite_agent\", \"demo_scheduled\"],\n  \"summary\": \"The agent executed discovery smoothly, answered questions concisely, and successfully booked a Thursday demo slot.\"\n}"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1-2",
+        "source": "1",
+        "target": "2",
+        "data": {
+          "label": "schedule_demo",
+          "condition": "Caller shared their voice automation requirements and agreed to view a demo.",
+          "transition_speech_type": "text",
+          "transition_speech": "Awesome, let's find a time that fits your schedule."
+        }
+      },
+      {
+        "id": "e1-3",
+        "source": "1",
+        "target": "3",
+        "data": {
+          "label": "decline_or_busy",
+          "condition": "Caller is not interested, wrong number, or asks not to be contacted.",
+          "transition_speech_type": "text",
+          "transition_speech": "Understood, thank you for your time today."
+        }
+      },
+      {
+        "id": "e2-3",
+        "source": "2",
+        "target": "3",
+        "data": {
+          "label": "confirm_and_close",
+          "condition": "Preferred slot selected and contact number confirmed.",
+          "transition_speech_type": "text",
+          "transition_speech": "Perfect, I've got you down for that time."
+        }
+      }
+    ],
+    "viewport": {
+      "x": 200,
+      "y": 100,
+      "zoom": 0.85
+    }
+  }
+}

@@ -274,3 +274,57 @@ def test_model_override_wrapper_preserves_provider_specific_fields():
     assert delegated_config.llm.base_url == "https://router.huggingface.co/v1"
     assert delegated_config.llm.bill_to == "billing-org"
     assert config.llm.model == "configured-model"
+
+
+@pytest.mark.asyncio
+async def test_workflow_llm_prefers_extraction_llm_when_present():
+    config = EffectiveAIModelConfiguration(
+        llm=OpenAILLMConfiguration(api_key="voice-key", model="gpt-4o"),
+        extraction_llm=OpenAILLMConfiguration(api_key="extract-key", model="gpt-4o-mini"),
+    )
+    run = _workflow_run()
+    service = object()
+    factory = Mock(return_value=service)
+
+    with (
+        patch(_CONFIG_FN, AsyncMock(return_value=config)),
+        patch("api.services.workflow.qa.llm_config.create_llm_service", factory),
+    ):
+        result = await create_qa_llm_service(
+            _qa(qa_use_workflow_llm=True, qa_model="default"),
+            run,
+        )
+
+    assert result == (service, "gpt-4o-mini")
+    factory.assert_called_once_with(
+        config.extraction_llm,
+        correlation_id=None,
+        usage_context="qa_analysis",
+    )
+
+
+@pytest.mark.asyncio
+async def test_workflow_with_only_extraction_llm_and_no_conversational_llm():
+    config = EffectiveAIModelConfiguration(
+        llm=None,
+        extraction_llm=OpenAILLMConfiguration(api_key="extract-key", model="gpt-4o-mini"),
+    )
+    run = _workflow_run()
+    service = object()
+    factory = Mock(return_value=service)
+
+    with (
+        patch(_CONFIG_FN, AsyncMock(return_value=config)),
+        patch("api.services.workflow.qa.llm_config.create_llm_service", factory),
+    ):
+        result = await create_qa_llm_service(
+            _qa(qa_use_workflow_llm=True, qa_model="default"),
+            run,
+        )
+
+    assert result == (service, "gpt-4o-mini")
+    factory.assert_called_once_with(
+        config.extraction_llm,
+        correlation_id=None,
+        usage_context="qa_analysis",
+    )

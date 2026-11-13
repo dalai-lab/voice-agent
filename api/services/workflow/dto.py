@@ -832,7 +832,7 @@ class WebhookNodeData(BaseNodeData):
         "qa_use_workflow_llm": {
             "display_name": "Use Workflow's LLM",
             "description": (
-                "When true, the QA pass uses the same LLM the workflow runs with. "
+                "When true, the QA pass uses the workflow's configured Intelligence LLM (falling back to Conversational LLM). "
                 "Set false to specify a separate provider/model."
             ),
         },

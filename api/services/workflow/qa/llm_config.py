@@ -8,6 +8,7 @@ from api.services.configuration.ai_model_configuration import (
 )
 from api.services.managed_model_services import get_mps_correlation_id
 from api.services.pipecat.service_factory import (
+    create_llm_service,
     create_llm_service_from_provider,
     create_llm_service_with_model_override,
 )
@@ -63,15 +64,34 @@ async def create_qa_llm_service(
         organization_id=workflow_run.workflow.organization_id,
         workflow_configurations=workflow_configurations,
     )
-    if user_configuration.llm is None:
+    if user_configuration.llm is None and user_configuration.extraction_llm is None:
         return None
 
     model_override = (
         qa_data.qa_model if qa_data.qa_model and qa_data.qa_model != "default" else None
     )
-    model = model_override or user_configuration.llm.model
+
+    # Prefer the dedicated extraction/compaction LLM for background post-call tasks when no explicit override is given
+    if not model_override and user_configuration.extraction_llm is not None:
+        llm = create_llm_service(
+            user_configuration.extraction_llm,
+            correlation_id=correlation_id,
+            usage_context=QA_USAGE_CONTEXT,
+        )
+        return llm, user_configuration.extraction_llm.model
+
+    base_llm = user_configuration.llm or user_configuration.extraction_llm
+    if base_llm is None:
+        return None
+
+    model = model_override or base_llm.model
+    config_for_override = (
+        user_configuration
+        if user_configuration.llm is not None
+        else user_configuration.model_copy(update={"llm": user_configuration.extraction_llm})
+    )
     llm = create_llm_service_with_model_override(
-        user_configuration,
+        config_for_override,
         model_override,
         correlation_id=correlation_id,
         usage_context=QA_USAGE_CONTEXT,

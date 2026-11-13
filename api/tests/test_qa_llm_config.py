@@ -328,3 +328,57 @@ async def test_workflow_with_only_extraction_llm_and_no_conversational_llm():
         correlation_id=None,
         usage_context="qa_analysis",
     )
+
+
+@pytest.mark.asyncio
+async def test_workflow_llm_ignores_qa_model_ghost_value_when_extraction_llm_configured():
+    # Conversational LLM is Sarvam, Extraction LLM is OpenAI gpt-4.1-mini.
+    # The QA node had lingering "qa_model": "gpt-4.1-mini" in its JSON from before.
+    # It must use the extraction_llm and NOT attempt to override Sarvam with gpt-4.1-mini!
+    config = EffectiveAIModelConfiguration(
+        llm=OpenAILLMConfiguration(api_key="sarvam-key", model="sarvam-105b-conversations"),
+        extraction_llm=OpenAILLMConfiguration(api_key="openai-key", model="gpt-4.1-mini"),
+    )
+    run = _workflow_run()
+    service = object()
+    factory = Mock(return_value=service)
+
+    with (
+        patch(_CONFIG_FN, AsyncMock(return_value=config)),
+        patch("api.services.workflow.qa.llm_config.create_llm_service", factory),
+    ):
+        result = await create_qa_llm_service(
+            _qa(qa_use_workflow_llm=True, qa_model="gpt-4.1-mini"),
+            run,
+        )
+
+    assert result == (service, "gpt-4.1-mini")
+    factory.assert_called_once_with(
+        config.extraction_llm,
+        correlation_id=None,
+        usage_context="qa_analysis",
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_qa_llm_service_with_none_qa_data_for_pci():
+    # PCI invokes create_qa_llm_service with qa_data=None
+    config = EffectiveAIModelConfiguration(
+        extraction_llm=OpenAILLMConfiguration(api_key="openai-key", model="gpt-4.1-mini"),
+    )
+    run = _workflow_run()
+    service = object()
+    factory = Mock(return_value=service)
+
+    with (
+        patch(_CONFIG_FN, AsyncMock(return_value=config)),
+        patch("api.services.workflow.qa.llm_config.create_llm_service", factory),
+    ):
+        result = await create_qa_llm_service(None, run)
+
+    assert result == (service, "gpt-4.1-mini")
+    factory.assert_called_once_with(
+        config.extraction_llm,
+        correlation_id=None,
+        usage_context="qa_analysis",
+    )

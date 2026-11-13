@@ -57,9 +57,8 @@ async def run_post_call_intelligence(
         logger.info(f"Skipping PCI for run {workflow_run.id}: no_transcript (empty)")
         return {"_error": "skipped", "reason": "no_transcript"}
 
-    # Resolve workflow/org LLM config directly using central factory
-    qa_data = QANodeData(qa_use_workflow_llm=True)
-    resolved_llm = await create_qa_llm_service(qa_data, workflow_run)
+    # Resolve workflow/org LLM config directly using central factory (Intelligence LLM)
+    resolved_llm = await create_qa_llm_service(None, workflow_run)
     if not resolved_llm:
         logger.warning(f"Skipping PCI for run {workflow_run.id}: no_api_key")
         return {"_error": "error", "reason": "no_api_key"}

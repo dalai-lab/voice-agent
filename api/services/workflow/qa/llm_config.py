@@ -18,7 +18,7 @@ QA_USAGE_CONTEXT = "qa_analysis"
 
 
 async def create_qa_llm_service(
-    qa_data: QANodeData, workflow_run: WorkflowRunModel | None
+    qa_data: QANodeData | None = None, workflow_run: WorkflowRunModel | None = None
 ) -> tuple[Any, str] | None:
     """Create the LLM service used for QA analysis.
 
@@ -30,7 +30,7 @@ async def create_qa_llm_service(
         getattr(workflow_run, "initial_context", None)
     )
 
-    if not qa_data.qa_use_workflow_llm:
+    if qa_data is not None and not qa_data.qa_use_workflow_llm:
         provider = qa_data.qa_provider or "openai"
         model = qa_data.qa_model or "default"
         api_key = qa_data.qa_api_key
@@ -67,12 +67,8 @@ async def create_qa_llm_service(
     if user_configuration.llm is None and user_configuration.extraction_llm is None:
         return None
 
-    model_override = (
-        qa_data.qa_model if qa_data.qa_model and qa_data.qa_model != "default" else None
-    )
-
-    # Prefer the dedicated extraction/compaction LLM for background post-call tasks when no explicit override is given
-    if not model_override and user_configuration.extraction_llm is not None:
+    # Always prefer the dedicated intelligence / extraction LLM for background post-call tasks
+    if user_configuration.extraction_llm is not None:
         llm = create_llm_service(
             user_configuration.extraction_llm,
             correlation_id=correlation_id,
@@ -80,10 +76,13 @@ async def create_qa_llm_service(
         )
         return llm, user_configuration.extraction_llm.model
 
-    base_llm = user_configuration.llm or user_configuration.extraction_llm
+    base_llm = user_configuration.llm
     if base_llm is None:
         return None
 
+    model_override = (
+        qa_data.qa_model if qa_data and qa_data.qa_model and qa_data.qa_model != "default" else None
+    )
     model = model_override or base_llm.model
     config_for_override = (
         user_configuration

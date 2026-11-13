@@ -89,6 +89,10 @@ async def duplicate_workflow(
         if source_def.workflow_configurations
         else None
     )
+    source_pcs = (
+        getattr(source_def, "post_call_schema", None)
+        or getattr(source, "post_call_schema", None)
+    )
 
     # 5a. Copy custom ambient noise file if present
     if source_wc:
@@ -109,13 +113,14 @@ async def duplicate_workflow(
             except Exception as e:
                 logger.error(f"Error copying ambient noise file: {e}")
 
-    if source_tcv or source_wc:
+    if source_tcv or source_wc or source_pcs:
         new_workflow = await db_client.update_workflow(
             workflow_id=new_workflow.id,
             name=None,
             workflow_definition=None,
             template_context_variables=copy.deepcopy(source_tcv),
             workflow_configurations=source_wc,
+            post_call_schema=source_pcs,
             organization_id=organization_id,
         )
 

@@ -524,6 +524,7 @@ async def create_workflow(
         "current_definition_id": workflow.current_definition_id,
         "template_context_variables": workflow.template_context_variables,
         "call_disposition_codes": workflow.call_disposition_codes,
+        "post_call_schema": workflow.post_call_schema or [],
         "workflow_configurations": mask_workflow_configurations(
             workflow.workflow_configurations
         ),
@@ -624,6 +625,7 @@ async def create_workflow_from_template(
             "current_definition_id": workflow.current_definition_id,
             "template_context_variables": workflow.template_context_variables,
             "call_disposition_codes": workflow.call_disposition_codes,
+            "post_call_schema": workflow.post_call_schema or [],
             "workflow_configurations": mask_workflow_configurations(
                 workflow.workflow_configurations
             ),
@@ -788,6 +790,11 @@ async def get_workflow(
         template_vars = published.template_context_variables
 
     active_def = draft or workflow.released_definition
+    post_call_schema = (
+        active_def.post_call_schema
+        if active_def and hasattr(active_def, "post_call_schema") and active_def.post_call_schema is not None
+        else (workflow.post_call_schema or [])
+    )
     return {
         "id": workflow.id,
         "name": workflow.name,
@@ -797,6 +804,7 @@ async def get_workflow(
         "current_definition_id": workflow.current_definition_id,
         "template_context_variables": template_vars,
         "call_disposition_codes": workflow.call_disposition_codes,
+        "post_call_schema": post_call_schema,
         "workflow_configurations": mask_workflow_configurations(workflow_configs),
         "enable_dtmf": workflow.enable_dtmf,
         "version_number": active_def.version_number if active_def else None,
@@ -995,6 +1003,7 @@ async def update_workflow_status(
             "current_definition_id": workflow.current_definition_id,
             "template_context_variables": workflow.template_context_variables,
             "call_disposition_codes": workflow.call_disposition_codes,
+            "post_call_schema": workflow.post_call_schema or [],
             "workflow_configurations": mask_workflow_configurations(
                 workflow.workflow_configurations
             ),
@@ -1309,6 +1318,11 @@ async def update_workflow(
 
         # Include version info from the active definition (draft or published)
         active_def = draft or workflow.released_definition
+        post_call_schema = (
+            active_def.post_call_schema
+            if active_def and hasattr(active_def, "post_call_schema") and active_def.post_call_schema is not None
+            else (workflow.post_call_schema or [])
+        )
         return {
             "id": workflow.id,
             "name": workflow.name,
@@ -1318,6 +1332,7 @@ async def update_workflow(
             "current_definition_id": workflow.current_definition_id,
             "template_context_variables": template_vars,
             "call_disposition_codes": workflow.call_disposition_codes,
+            "post_call_schema": post_call_schema,
             "workflow_configurations": mask_workflow_configurations(workflow_configs),
             "enable_dtmf": workflow.enable_dtmf,
             "version_number": active_def.version_number if active_def else None,
@@ -1366,6 +1381,7 @@ async def duplicate_workflow_endpoint(
             "current_definition_id": workflow.current_definition_id,
             "template_context_variables": workflow.template_context_variables,
             "call_disposition_codes": workflow.call_disposition_codes,
+            "post_call_schema": workflow.post_call_schema or [],
             "workflow_configurations": mask_workflow_configurations(
                 workflow.workflow_configurations
             ),
@@ -1705,6 +1721,7 @@ async def duplicate_workflow_template(
         "current_definition_id": workflow.current_definition_id,
         "template_context_variables": workflow.template_context_variables,
         "call_disposition_codes": workflow.call_disposition_codes,
+        "post_call_schema": workflow.post_call_schema or [],
         "workflow_configurations": mask_workflow_configurations(
             workflow.workflow_configurations
         ),

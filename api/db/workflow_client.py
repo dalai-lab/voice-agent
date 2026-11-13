@@ -201,6 +201,7 @@ class WorkflowClient(BaseDBClient):
             workflow.workflow_definition = draft.workflow_json
             workflow.workflow_configurations = draft.workflow_configurations
             workflow.template_context_variables = draft.template_context_variables
+            workflow.post_call_schema = draft.post_call_schema
 
             try:
                 await session.commit()
@@ -278,6 +279,7 @@ class WorkflowClient(BaseDBClient):
                 workflow_json=source.workflow_json,
                 workflow_configurations=source.workflow_configurations,
                 template_context_variables=source.template_context_variables,
+                post_call_schema=source.post_call_schema if hasattr(source, "post_call_schema") and source.post_call_schema is not None else [],
                 status="draft",
                 version_number=next_version,
                 is_current=False,

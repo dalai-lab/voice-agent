@@ -2339,10 +2339,7 @@ function WorkflowSettingsInner({
                             {activeSection === "pci" && (
                                 <PostCallIntelligenceSection
                                     postCallSchema={postCallSchema}
-                                    onSave={async (newSchema) => {
-                                        await savePostCallSchema(newSchema);
-                                        setWorkflow((prev) => (prev ? { ...prev, post_call_schema: newSchema } : prev));
-                                    }}
+                                    onSave={savePostCallSchema}
                                 />
                             )}
 

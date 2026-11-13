@@ -62,10 +62,17 @@ Be specific about what counts as a pass or a valid score. Include the exact beha
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | Enabled | On | Toggle to disable QA without removing the node |
-| Use Workflow's LLM | Off | When on, uses the same LLM configured for the workflow instead of the default QA model |
+| Use Workflow's LLM | On | When on (default), automatically routes to the workflow's configured Intelligence LLM (saving voice LLM tokens). When toggled off, reveals custom provider, model, and API key fields. |
 | Minimum Call Duration (seconds) | 15 | Calls shorter than this are skipped |
 | Include Voicemail Calls | Off | When off, voicemail calls are skipped |
 | Sample Rate (%) | 100 | Run QA on a percentage of calls rather than all of them |
+
+## Which LLM Does QA Use?
+
+The QA node decouples post-call evaluation from the live conversational voice engine:
+
+* **Use Workflow's LLM = On (Default):** The QA pass automatically uses the workflow's configured **Intelligence LLM** (`extraction_llm`, e.g. `gpt-4o-mini`, `llama-3.3-70b`), falling back to the Conversational LLM if no dedicated Intelligence LLM is configured. This prevents post-call evaluation from burning expensive real-time voice tokens or running into rate limits.
+* **Use Workflow's LLM = Off:** Toggling this switch off reveals direct LLM configuration inputs (`QA LLM Provider`, `QA Model`, `API Key`, and optional `Azure Endpoint`). Use this whenever you want to evaluate calls using a completely isolated provider or account (such as auditing with Anthropic Claude while your voice agent runs on Sarvam or OpenAI).
 
 ## Viewing QA Results
 

@@ -17,9 +17,10 @@ import { getDispositionBadge } from "@/lib/dispositionLabels";
 
 interface NodeJourneySectionProps {
     gatheredContext: Record<string, unknown> | null | undefined;
+    extractedData?: Record<string, unknown> | null | undefined;
 }
 
-export function NodeJourneySection({ gatheredContext }: NodeJourneySectionProps) {
+export function NodeJourneySection({ gatheredContext, extractedData }: NodeJourneySectionProps) {
     const [viewMode, setViewMode] = useState<"visual" | "json">("visual");
     const [copied, setCopied] = useState(false);
 
@@ -54,13 +55,26 @@ export function NodeJourneySection({ gatheredContext }: NodeJourneySectionProps)
             cleanKey.includes("calltags") ||
             cleanKey.includes("traceurl") ||
             cleanKey === "extractedvariables" ||
-            cleanKey === "extracteddata"
+            cleanKey === "extracteddata" ||
+            cleanKey === "provider" ||
+            cleanKey === "callid" ||
+            cleanKey === "isretrycall" ||
+            cleanKey === "retryreason"
         ) {
             return false;
         }
         if (val && typeof val === "object" && !Array.isArray(val)) {
             const childKeys = Object.keys(val);
             if (childKeys.length > 0 && childKeys.some(ck => ck in (gatheredContext as any))) {
+                return false;
+            }
+        }
+        // Deduplicate: If already displayed in Extracted Variables / Post-Call Intelligence grid, do not repeat
+        if (extractedData && typeof extractedData === "object") {
+            const isAlreadyExtracted = Object.keys(extractedData).some(
+                (ek) => ek.toLowerCase().replace(/[^a-z0-9]/g, "") === cleanKey
+            );
+            if (isAlreadyExtracted) {
                 return false;
             }
         }

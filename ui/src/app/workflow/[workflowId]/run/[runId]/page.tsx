@@ -1033,10 +1033,11 @@ export default function WorkflowRunPage() {
                                     callDisposition={workflowRun?.gathered_context?.call_disposition as string | null}
                                     mappedDisposition={workflowRun?.gathered_context?.mapped_call_disposition as string | null}
                                     isCompleted={workflowRun?.is_completed}
+                                    isPostCallIntelligence={Boolean(postCallSchema && postCallSchema.length > 0)}
                                 />
                             )}
 
-                            {/* Domain A: Post-Call Intelligence (Dynamic Extracted Business Fields) */}
+                            {/* Domain A: Post-Call Intelligence / Extracted Variables (Dynamic Extracted Business Fields) */}
                             <UniversalIntelligenceGrid
                                 extractedData={workflowRun?.extracted_data}
                                 schema={postCallSchema}
@@ -1050,7 +1051,10 @@ export default function WorkflowRunPage() {
 
                             {/* Domain C: In-Call Traversal & Context (Node Journey & Turn Variables) */}
                             {workflowRun?.gathered_context && Object.keys(workflowRun.gathered_context).length > 0 && (
-                                <NodeJourneySection gatheredContext={workflowRun.gathered_context} />
+                                <NodeJourneySection
+                                    gatheredContext={workflowRun.gathered_context}
+                                    extractedData={workflowRun?.extracted_data}
+                                />
                             )}
 
                             {/* Domain D: Initial Session Context (Technical Inbound Telemetry) */}

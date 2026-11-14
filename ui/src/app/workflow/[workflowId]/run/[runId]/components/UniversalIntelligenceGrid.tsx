@@ -18,26 +18,37 @@ interface UniversalIntelligenceGridProps {
     extractedData: Record<string, unknown> | null | undefined;
     schema?: Array<{ name: string; type?: string; description?: string }> | null;
     excludeSummary?: boolean;
+    title?: string;
 }
 
 export function UniversalIntelligenceGrid({
     extractedData,
     schema,
     excludeSummary = true,
+    title,
 }: UniversalIntelligenceGridProps) {
     const [viewMode, setViewMode] = useState<"cards" | "json">("cards");
     const [copiedAll, setCopiedAll] = useState(false);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+    const hasExplicitSchema = Boolean(schema && Array.isArray(schema) && schema.length > 0);
+    const sectionTitle = title || (hasExplicitSchema ? "Post-Call Intelligence" : "Extracted Variables");
+
     if (!extractedData || Object.keys(extractedData).length === 0) {
         return (
             <div className="rounded-xl border border-border/70 bg-card/60 p-6 text-center space-y-2">
-                <Sparkles className="h-7 w-7 text-muted-foreground/40 mx-auto" />
+                {hasExplicitSchema ? (
+                    <Sparkles className="h-7 w-7 text-muted-foreground/40 mx-auto" />
+                ) : (
+                    <LayoutGrid className="h-7 w-7 text-muted-foreground/40 mx-auto" />
+                )}
                 <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                    No Post-Call Intelligence Extracted
+                    {hasExplicitSchema ? "No Post-Call Intelligence Extracted" : "No Extracted Variables"}
                 </h4>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    No variables have been extracted for this call yet or extraction is disabled in workflow settings.
+                    {hasExplicitSchema
+                        ? "No variables have been extracted for this call yet or extraction is disabled in workflow settings."
+                        : "No variables were extracted during this call."}
                 </p>
             </div>
         );
@@ -85,11 +96,15 @@ export function UniversalIntelligenceGrid({
             {/* Header Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3">
                 <div className="flex items-center gap-2">
-                    <span className="flex items-center justify-center h-6 w-6 rounded-md bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
-                        <Sparkles className="h-3.5 w-3.5" />
+                    <span className={`flex items-center justify-center h-6 w-6 rounded-md border ${
+                        hasExplicitSchema
+                            ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20"
+                            : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                    }`}>
+                        {hasExplicitSchema ? <Sparkles className="h-3.5 w-3.5" /> : <LayoutGrid className="h-3.5 w-3.5" />}
                     </span>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                        Post-Call Intelligence
+                        {sectionTitle}
                     </h3>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary text-muted-foreground border border-border/50">
                         {filteredEntries.length} {filteredEntries.length === 1 ? "field" : "fields"}

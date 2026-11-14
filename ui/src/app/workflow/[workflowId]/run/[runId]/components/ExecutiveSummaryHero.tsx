@@ -11,6 +11,7 @@ interface ExecutiveSummaryHeroProps {
     callDisposition?: string | null;
     mappedDisposition?: string | null;
     isCompleted?: boolean;
+    isPostCallIntelligence?: boolean;
 }
 
 export function ExecutiveSummaryHero({
@@ -18,6 +19,7 @@ export function ExecutiveSummaryHero({
     callDisposition,
     mappedDisposition,
     isCompleted = true,
+    isPostCallIntelligence = false,
 }: ExecutiveSummaryHeroProps) {
     const [copied, setCopied] = useState(false);
 
@@ -47,7 +49,9 @@ export function ExecutiveSummaryHero({
                             Executive Call Summary
                         </h3>
                         <p className="text-[11px] text-muted-foreground font-normal">
-                            Synthesized by the Intelligence LLM across all call turns
+                            {isPostCallIntelligence
+                                ? "Synthesized by the Intelligence LLM across all call turns"
+                                : "Captured from conversation flow"}
                         </p>
                     </div>
                 </div>

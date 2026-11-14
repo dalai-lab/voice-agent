@@ -32,6 +32,7 @@ class WorkflowRunResponseSchema(BaseModel):
     logs: dict[str, Any] | None = None
     annotations: dict[str, Any] | None = None
     extracted_data: dict[str, Any] | None = None
+    post_call_data: dict[str, Any] | None = None
     duration_seconds: int | None = None
     disposition: str | None = None
     phone_number: str | None = None

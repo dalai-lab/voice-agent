@@ -752,12 +752,14 @@ function GeneralSection({
                                     >
                                         <div className="flex items-center justify-between w-full mb-1">
                                             <span className="font-semibold text-xs text-foreground">{preset.label}</span>
-                                            <Badge
-                                                variant={key === "sensitive" ? "success" : key === "balanced" ? "secondary" : "outline"}
-                                                className="text-[10px] px-1.5 py-0 h-4"
-                                            >
-                                                {preset.badge}
-                                            </Badge>
+                                            {preset.badge ? (
+                                                <Badge
+                                                    variant={key === "balanced" ? "secondary" : "outline"}
+                                                    className="text-[10px] px-1.5 py-0 h-4"
+                                                >
+                                                    {preset.badge}
+                                                </Badge>
+                                            ) : null}
                                         </div>
                                         <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
                                             {preset.description}

@@ -18,9 +18,14 @@ import { getDispositionBadge } from "@/lib/dispositionLabels";
 interface NodeJourneySectionProps {
     gatheredContext: Record<string, unknown> | null | undefined;
     extractedData?: Record<string, unknown> | null | undefined;
+    showTurnVariables?: boolean;
 }
 
-export function NodeJourneySection({ gatheredContext, extractedData }: NodeJourneySectionProps) {
+export function NodeJourneySection({
+    gatheredContext,
+    extractedData,
+    showTurnVariables = false,
+}: NodeJourneySectionProps) {
     const [viewMode, setViewMode] = useState<"visual" | "json">("visual");
     const [copied, setCopied] = useState(false);
 
@@ -206,8 +211,8 @@ export function NodeJourneySection({ gatheredContext, extractedData }: NodeJourn
                         </div>
                     )}
 
-                    {/* Turn-Level Variables Grid */}
-                    {otherContextEntries.length > 0 && (
+                    {/* Turn-Level Variables Grid (Optional) */}
+                    {showTurnVariables && otherContextEntries.length > 0 && (
                         <div className="space-y-2 pt-2 border-t border-border/30">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
                                 Turn Variables Collected

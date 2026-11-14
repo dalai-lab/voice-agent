@@ -244,6 +244,7 @@ def build_workflow_run_payload(
             getattr(run, "extracted_data", None),
             getattr(run, "gathered_context", None),
         ),
+        "post_call_data": _parse_optional_dict(getattr(run, "extracted_data", None)) or None,
         "duration_seconds": duration_seconds,
         "disposition": str(disposition) if disposition is not None else None,
         "phone_number": str(phone_number) if phone_number is not None else None,

@@ -68,6 +68,7 @@ interface WorkflowRunResponse {
     logs: WorkflowRunLogs | null;
     annotations: Record<string, unknown> | null;
     extracted_data: Record<string, unknown> | null;
+    post_call_data?: Record<string, unknown> | null;
 }
 
 const RUN_SHELL_HEIGHT_CLASS = "h-[calc(100svh-49px)] md:h-[100svh] min-h-[calc(100svh-49px)] md:min-h-[100svh] max-h-[calc(100svh-49px)] md:max-h-[100svh]";
@@ -902,15 +903,109 @@ export default function WorkflowRunPage() {
     }
     else if (showRunDetailsView) {
         const { callerNumber, calledNumber } = resolveRunNumbers(workflowRun);
-        const summaryKey = workflowRun?.extracted_data
-            ? Object.keys(workflowRun.extracted_data).find((k) => {
+
+        const isPostCallConfigured = Boolean(
+            postCallSchema && Array.isArray(postCallSchema) && postCallSchema.length > 0
+        );
+
+        // 1. Post-Call Intelligence Data (True PCI from schema / post_call_data)
+        const postCallData = (() => {
+            if (!isPostCallConfigured && !workflowRun?.post_call_data) {
+                return null;
+            }
+            if (workflowRun?.post_call_data && Object.keys(workflowRun.post_call_data).length > 0) {
+                return workflowRun.post_call_data;
+            }
+            if (isPostCallConfigured && workflowRun?.extracted_data) {
+                const schemaNames = new Set(
+                    postCallSchema!.map((s) => s.name.toLowerCase().replace(/[^a-z0-9]/g, ''))
+                );
+                const result: Record<string, unknown> = {};
+                for (const [key, val] of Object.entries(workflowRun.extracted_data)) {
+                    const clean = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    if (schemaNames.has(clean)) {
+                        result[key] = val;
+                    }
+                }
+                return Object.keys(result).length > 0 ? result : null;
+            }
+            return null;
+        })();
+        const hasPostCallIntelligence = Boolean(postCallData && Object.keys(postCallData).length > 0);
+
+        // 2. In-Call Extracted Variables (Live Node Variables from gathered_context)
+        const inCallVariables = (() => {
+            const vars: Record<string, unknown> = {};
+            const gathered = workflowRun?.gathered_context;
+
+            if (gathered && typeof gathered === 'object') {
+                const nested = (gathered.extracted_variables || gathered['extracted variables']) as Record<string, unknown> | undefined;
+                if (nested && typeof nested === 'object') {
+                    Object.assign(vars, nested);
+                }
+                for (const [key, val] of Object.entries(gathered)) {
+                    const clean = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    if (
+                        clean.includes('nodesvisited') ||
+                        clean.includes('calldisposition') ||
+                        clean.includes('mappedcalldisposition') ||
+                        clean.includes('calltags') ||
+                        clean.includes('traceurl') ||
+                        clean === 'extractedvariables' ||
+                        clean === 'extracteddata' ||
+                        clean === 'provider' ||
+                        clean === 'callid' ||
+                        clean === 'isretrycall' ||
+                        clean === 'retryreason'
+                    ) {
+                        continue;
+                    }
+                    if (postCallData) {
+                        const isPciKey = Object.keys(postCallData).some(
+                            (pk) => pk.toLowerCase().replace(/[^a-z0-9]/g, '') === clean
+                        );
+                        if (isPciKey) continue;
+                    }
+                    if (val && typeof val === 'object' && !Array.isArray(val)) {
+                        continue;
+                    }
+                    vars[key] = val;
+                }
+            }
+
+            // Fallback for calls where gathered_context is not structured as nested map
+            if (Object.keys(vars).length === 0 && workflowRun?.extracted_data && !hasPostCallIntelligence) {
+                for (const [key, val] of Object.entries(workflowRun.extracted_data)) {
+                    const clean = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    if (
+                        clean.includes('node') ||
+                        clean.includes('visited') ||
+                        clean === 'extractedvariables' ||
+                        clean === 'extracteddata' ||
+                        clean === 'provider' ||
+                        clean === 'callid'
+                    ) {
+                        continue;
+                    }
+                    vars[key] = val;
+                }
+            }
+
+            return Object.keys(vars).length > 0 ? vars : null;
+        })();
+        const hasExtractionVariables = Boolean(inCallVariables && Object.keys(inCallVariables).length > 0);
+
+        // 3. Executive Summary (prioritize PCI summary, then in-call summary)
+        const summarySource = (hasPostCallIntelligence ? postCallData : null) || inCallVariables || workflowRun?.extracted_data;
+        const summaryKey = summarySource
+            ? Object.keys(summarySource).find((k) => {
                   const lower = k.toLowerCase();
                   return lower.includes('summary') || lower.includes('overview') || lower.includes('notes');
               })
             : undefined;
         const summaryText =
-            summaryKey && typeof workflowRun?.extracted_data?.[summaryKey] === 'string'
-                ? String(workflowRun.extracted_data[summaryKey])
+            summaryKey && typeof summarySource?.[summaryKey] === 'string'
+                ? String(summarySource[summaryKey])
                 : null;
 
         returnValue = (
@@ -1033,31 +1128,42 @@ export default function WorkflowRunPage() {
                                     callDisposition={workflowRun?.gathered_context?.call_disposition as string | null}
                                     mappedDisposition={workflowRun?.gathered_context?.mapped_call_disposition as string | null}
                                     isCompleted={workflowRun?.is_completed}
-                                    isPostCallIntelligence={Boolean(postCallSchema && postCallSchema.length > 0)}
+                                    isPostCallIntelligence={hasPostCallIntelligence}
                                 />
                             )}
 
-                            {/* Domain A: Post-Call Intelligence / Extracted Variables (Dynamic Extracted Business Fields) */}
-                            <UniversalIntelligenceGrid
-                                extractedData={workflowRun?.extracted_data}
-                                schema={postCallSchema}
-                                excludeSummary={!!summaryText}
-                            />
+                            {/* Section 1: Post-Call Intelligence (SHOW ONLY IF PRESENT) */}
+                            {hasPostCallIntelligence && postCallData && (
+                                <UniversalIntelligenceGrid
+                                    extractedData={postCallData}
+                                    schema={postCallSchema}
+                                    title="Post-Call Intelligence"
+                                    variant="pci"
+                                    excludeSummary={!!summaryText}
+                                />
+                            )}
 
-                            {/* Domain B: QA & Compliance Evaluation (Audit & Scores) */}
+                            {/* Section 2: Extracted Variables (SHOW ONLY IF PRESENT) */}
+                            {hasExtractionVariables && inCallVariables && (
+                                <UniversalIntelligenceGrid
+                                    extractedData={inCallVariables}
+                                    title="Extracted Variables"
+                                    variant="variables"
+                                    excludeSummary={!hasPostCallIntelligence && !!summaryText}
+                                />
+                            )}
+
+                            {/* Section 3: QA & Compliance Evaluation (SHOW ONLY IF PRESENT) */}
                             {workflowRun?.annotations && Object.keys(workflowRun.annotations).length > 0 && (
                                 <QaScorecardSection annotations={workflowRun.annotations} />
                             )}
 
-                            {/* Domain C: In-Call Traversal & Context (Node Journey & Turn Variables) */}
+                            {/* Section 4: In-Call Traversal & Context (Node Journey, Disposition & Tags) */}
                             {workflowRun?.gathered_context && Object.keys(workflowRun.gathered_context).length > 0 && (
-                                <NodeJourneySection
-                                    gatheredContext={workflowRun.gathered_context}
-                                    extractedData={workflowRun?.extracted_data}
-                                />
+                                <NodeJourneySection gatheredContext={workflowRun.gathered_context} />
                             )}
 
-                            {/* Domain D: Initial Session Context (Technical Inbound Telemetry) */}
+                            {/* Section 5: Initial Session Context */}
                             <BusinessJsonViewer
                                 title="Initial Session Context"
                                 context={workflowRun?.initial_context ?? null}

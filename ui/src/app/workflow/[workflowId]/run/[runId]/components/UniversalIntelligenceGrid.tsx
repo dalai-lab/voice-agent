@@ -6,6 +6,7 @@ import {
     CheckCheck,
     Code,
     Copy,
+    Database,
     LayoutGrid,
     Sparkles,
 } from "lucide-react";
@@ -19,6 +20,7 @@ interface UniversalIntelligenceGridProps {
     schema?: Array<{ name: string; type?: string; description?: string }> | null;
     excludeSummary?: boolean;
     title?: string;
+    variant?: "pci" | "variables";
 }
 
 export function UniversalIntelligenceGrid({
@@ -26,32 +28,17 @@ export function UniversalIntelligenceGrid({
     schema,
     excludeSummary = true,
     title,
+    variant,
 }: UniversalIntelligenceGridProps) {
     const [viewMode, setViewMode] = useState<"cards" | "json">("cards");
     const [copiedAll, setCopiedAll] = useState(false);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-    const hasExplicitSchema = Boolean(schema && Array.isArray(schema) && schema.length > 0);
-    const sectionTitle = title || (hasExplicitSchema ? "Post-Call Intelligence" : "Extracted Variables");
+    const isPci = variant === "pci" || Boolean(schema && Array.isArray(schema) && schema.length > 0);
+    const sectionTitle = title || (isPci ? "Post-Call Intelligence" : "Extracted Variables");
 
     if (!extractedData || Object.keys(extractedData).length === 0) {
-        return (
-            <div className="rounded-xl border border-border/70 bg-card/60 p-6 text-center space-y-2">
-                {hasExplicitSchema ? (
-                    <Sparkles className="h-7 w-7 text-muted-foreground/40 mx-auto" />
-                ) : (
-                    <LayoutGrid className="h-7 w-7 text-muted-foreground/40 mx-auto" />
-                )}
-                <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                    {hasExplicitSchema ? "No Post-Call Intelligence Extracted" : "No Extracted Variables"}
-                </h4>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    {hasExplicitSchema
-                        ? "No variables have been extracted for this call yet or extraction is disabled in workflow settings."
-                        : "No variables were extracted during this call."}
-                </p>
-            </div>
-        );
+        return null;
     }
 
     const filteredEntries = Object.entries(extractedData).filter(([key, val]) => {
@@ -69,6 +56,10 @@ export function UniversalIntelligenceGrid({
         }
         return true;
     });
+
+    if (filteredEntries.length === 0) {
+        return null;
+    }
 
     const handleCopyAll = async () => {
         try {
@@ -97,11 +88,11 @@ export function UniversalIntelligenceGrid({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3">
                 <div className="flex items-center gap-2">
                     <span className={`flex items-center justify-center h-6 w-6 rounded-md border ${
-                        hasExplicitSchema
+                        isPci
                             ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20"
                             : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                     }`}>
-                        {hasExplicitSchema ? <Sparkles className="h-3.5 w-3.5" /> : <LayoutGrid className="h-3.5 w-3.5" />}
+                        {isPci ? <Sparkles className="h-3.5 w-3.5" /> : <Database className="h-3.5 w-3.5" />}
                     </span>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
                         {sectionTitle}

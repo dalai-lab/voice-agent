@@ -22,11 +22,11 @@ export type TurnStartStrategy = NonNullable<GeneratedWorkflowConfigurationDefaul
 export const DEFAULT_TURN_START_MIN_WORDS = 3;
 export const DEFAULT_PROVISIONAL_VAD_PAUSE_SECS = 1.5;
 
-export const DEFAULT_VAD_MIN_VOLUME = 0.20;
-export const DEFAULT_VAD_CONFIDENCE = 0.50;
+export const DEFAULT_VAD_MIN_VOLUME = 0.35;
+export const DEFAULT_VAD_CONFIDENCE = 0.65;
 export const DEFAULT_VAD_STOP_SECS = 0.25;
-export const DEFAULT_USER_TURN_STOP_TIMEOUT = 3.5;
-export const DEFAULT_TURN_SILENCE_TIMEOUT_SECS = 0.8;
+export const DEFAULT_USER_TURN_STOP_TIMEOUT = 4.5;
+export const DEFAULT_TURN_SILENCE_TIMEOUT_SECS = 0.9;
 
 export type VoiceSensitivityPreset = "sensitive" | "balanced" | "noisy" | "custom";
 
@@ -44,7 +44,7 @@ export const VOICE_SENSITIVITY_PRESETS: Record<Exclude<VoiceSensitivityPreset, "
     sensitive: {
         label: "High Sensitivity",
         description: "Catches soft whispers, quiet 'yes/no' answers, and phone murmurs. Best for surveys and quick confirmations.",
-        badge: "Recommended",
+        badge: "",
         vad_min_volume: 0.20,
         vad_confidence: 0.50,
         turn_silence_timeout_secs: 0.7,
@@ -82,7 +82,7 @@ export function detectVoiceSensitivityPreset(
         turnSilenceTimeoutSecs === undefined ||
         userTurnStopTimeout === undefined
     ) {
-        return "sensitive";
+        return "balanced";
     }
 
     for (const [key, preset] of Object.entries(VOICE_SENSITIVITY_PRESETS) as [Exclude<VoiceSensitivityPreset, "custom">, VoiceSensitivityPresetConfig][]) {
@@ -94,6 +94,14 @@ export function detectVoiceSensitivityPreset(
         ) {
             return key;
         }
+    }
+
+    if (
+        Math.abs(0.35 - vadMinVolume) < 0.001 &&
+        Math.abs(0.65 - vadConfidence) < 0.001 &&
+        Math.abs(4.5 - userTurnStopTimeout) < 0.001
+    ) {
+        return "balanced";
     }
 
     if (

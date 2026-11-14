@@ -28,6 +28,7 @@ export function WorkflowExecutions({ workflowId, searchParams }: WorkflowExecuti
     const [totalCount, setTotalCount] = useState(0);
     const [isExecutingFilters, setIsExecutingFilters] = useState(false);
     const [configuredAttributes, setConfiguredAttributes] = useState<FilterAttribute[]>(availableAttributes);
+    const [postCallSchema, setPostCallSchema] = useState<Array<{ name: string; type?: string; description?: string }> | null>(null);
 
     // Sort state (initialized from URL)
     const [sortBy, setSortBy] = useState<string | null>(() => {
@@ -59,6 +60,9 @@ export function WorkflowExecutions({ workflowId, searchParams }: WorkflowExecuti
             });
 
             const workflow = response.data;
+            if (workflow?.post_call_schema && Array.isArray(workflow.post_call_schema)) {
+                setPostCallSchema(workflow.post_call_schema as any[]);
+            }
             const codes = workflow?.call_disposition_codes?.disposition_codes;
             if (codes && codes.length > 0) {
                 setConfiguredAttributes(prev => prev.map(attr => {
@@ -227,6 +231,7 @@ export function WorkflowExecutions({ workflowId, searchParams }: WorkflowExecuti
                 sortOrder={sortOrder}
                 onSort={handleSort}
                 workflowId={workflowId}
+                postCallSchema={postCallSchema}
                 onReload={handleReload}
             />
         </div>

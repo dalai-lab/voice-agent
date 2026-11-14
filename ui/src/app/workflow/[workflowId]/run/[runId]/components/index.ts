@@ -3,3 +3,7 @@ export * from './AudioControls';
 export * from './ConnectionStatus';
 export * from './ContextDisplay';
 export * from './WorkflowConfigErrorDialog';
+export * from './ExecutiveSummaryHero';
+export * from './UniversalIntelligenceGrid';
+export * from './QaScorecardSection';
+export * from './NodeJourneySection';

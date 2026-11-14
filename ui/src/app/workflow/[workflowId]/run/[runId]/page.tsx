@@ -39,6 +39,12 @@ import { formatDateTime } from '@/lib/dateTime';
 import { downloadFile, getSignedUrl } from '@/lib/files';
 import { cn } from '@/lib/utils';
 import { useTalkarCustomer } from '@/context/TalkarCustomerContext';
+import {
+    ExecutiveSummaryHero,
+    UniversalIntelligenceGrid,
+    QaScorecardSection,
+    NodeJourneySection,
+} from './components';
 
 interface WorkflowRunResponse {
     mode: string;
@@ -735,6 +741,7 @@ export default function WorkflowRunPage() {
     const organizationTimezone = useOrganizationTimezone();
     const [workflowRun, setWorkflowRun] = useState<WorkflowRunResponse | null>(null);
     const [workflowName, setWorkflowName] = useState<string | null>(null);
+    const [postCallSchema, setPostCallSchema] = useState<Array<{ name: string; type?: string; description?: string }> | null>(null);
     const customizeButtonRef = useRef<HTMLButtonElement>(null);
 
     const { isTalkarCustomer, isAdminBypass } = useTalkarCustomer();
@@ -774,6 +781,9 @@ export default function WorkflowRunPage() {
                 ]);
 
                 setWorkflowName(workflowResponse.data?.name ?? null);
+                if (workflowResponse.data?.post_call_schema && Array.isArray(workflowResponse.data.post_call_schema)) {
+                    setPostCallSchema(workflowResponse.data.post_call_schema as any[]);
+                }
                 const runData = {
                     mode: runResponse.data?.mode ?? '',
                     created_at: runResponse.data?.created_at ?? null,
@@ -838,6 +848,17 @@ export default function WorkflowRunPage() {
         );
     }
     else if (showRunDetailsView) {
+        const summaryKey = workflowRun?.extracted_data
+            ? Object.keys(workflowRun.extracted_data).find((k) => {
+                  const lower = k.toLowerCase();
+                  return lower.includes('summary') || lower.includes('overview') || lower.includes('notes');
+              })
+            : undefined;
+        const summaryText =
+            summaryKey && typeof workflowRun?.extracted_data?.[summaryKey] === 'string'
+                ? String(workflowRun.extracted_data[summaryKey])
+                : null;
+
         returnValue = (
             <div className={`flex ${RUN_SHELL_HEIGHT_CLASS} min-h-0 w-full overflow-hidden bg-background`}>
                 <div className="min-w-0 flex-1 overflow-y-auto">
@@ -942,30 +963,39 @@ export default function WorkflowRunPage() {
                         />
 
                         <div className="space-y-6">
-                            <BusinessJsonViewer
-                                title="Gathered Call Context"
-                                context={workflowRun?.gathered_context ?? null}
-                                isAdmin={isAdmin}
-                            />
-                            {workflowRun?.extracted_data && Object.keys(workflowRun.extracted_data).length > 0 && (
-                                <BusinessJsonViewer
-                                    title="Post-Call Intelligence"
-                                    context={workflowRun.extracted_data as Record<string, string | number | boolean | object>}
-                                    isAdmin={isAdmin}
+                            {/* Executive Summary Hero Banner */}
+                            {summaryText && (
+                                <ExecutiveSummaryHero
+                                    summary={summaryText}
+                                    callDisposition={workflowRun?.gathered_context?.call_disposition as string | null}
+                                    mappedDisposition={workflowRun?.gathered_context?.mapped_call_disposition as string | null}
+                                    isCompleted={workflowRun?.is_completed}
                                 />
                             )}
+
+                            {/* Domain A: Post-Call Intelligence (Dynamic Extracted Business Fields) */}
+                            <UniversalIntelligenceGrid
+                                extractedData={workflowRun?.extracted_data}
+                                schema={postCallSchema}
+                                excludeSummary={!!summaryText}
+                            />
+
+                            {/* Domain B: QA & Compliance Evaluation (Audit & Scores) */}
+                            {workflowRun?.annotations && Object.keys(workflowRun.annotations).length > 0 && (
+                                <QaScorecardSection annotations={workflowRun.annotations} />
+                            )}
+
+                            {/* Domain C: In-Call Traversal & Context (Node Journey & Turn Variables) */}
+                            {workflowRun?.gathered_context && Object.keys(workflowRun.gathered_context).length > 0 && (
+                                <NodeJourneySection gatheredContext={workflowRun.gathered_context} />
+                            )}
+
+                            {/* Domain D: Initial Session Context (Technical Inbound Telemetry) */}
                             <BusinessJsonViewer
                                 title="Initial Session Context"
                                 context={workflowRun?.initial_context ?? null}
                                 isAdmin={isAdmin}
                             />
-                            {workflowRun?.annotations && Object.keys(workflowRun.annotations).length > 0 && (
-                                <BusinessJsonViewer
-                                    title="QA & Evaluation Results"
-                                    context={workflowRun.annotations as Record<string, string | number | boolean | object>}
-                                    isAdmin={isAdmin}
-                                />
-                            )}
                         </div>
                     </div>
                 </div>

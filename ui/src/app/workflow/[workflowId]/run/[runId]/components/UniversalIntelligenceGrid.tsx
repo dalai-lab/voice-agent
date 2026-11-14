@@ -32,22 +32,29 @@ export function UniversalIntelligenceGrid({
     if (!extractedData || Object.keys(extractedData).length === 0) {
         return (
             <div className="rounded-xl border border-border/70 bg-card/60 p-6 text-center space-y-2">
-                <Brain className="h-7 w-7 text-muted-foreground/40 mx-auto" />
+                <Sparkles className="h-7 w-7 text-muted-foreground/40 mx-auto" />
                 <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                    No Post-Call Intelligence
+                    No Extracted Variables
                 </h4>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    Post-call intelligence has not extracted data for this call yet or is disabled in workflow settings.
+                    No variables have been extracted for this call yet or extraction is disabled in workflow settings.
                 </p>
             </div>
         );
     }
 
-    const filteredEntries = Object.entries(extractedData).filter(([key]) => {
-        const lower = key.toLowerCase();
-        if (lower.includes("node") || lower.includes("visited")) return false;
-        if (excludeSummary && (lower.includes("summary") || lower.includes("overview") || lower.includes("notes"))) {
+    const filteredEntries = Object.entries(extractedData).filter(([key, val]) => {
+        const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (cleanKey.includes("node") || cleanKey.includes("visited")) return false;
+        if (cleanKey === "extractedvariables" || cleanKey === "extracteddata") return false;
+        if (excludeSummary && (cleanKey.includes("summary") || cleanKey.includes("overview") || cleanKey.includes("notes"))) {
             return false;
+        }
+        if (val && typeof val === "object" && !Array.isArray(val)) {
+            const childKeys = Object.keys(val);
+            if (childKeys.length > 0 && childKeys.some(ck => ck in extractedData)) {
+                return false;
+            }
         }
         return true;
     });
@@ -79,10 +86,10 @@ export function UniversalIntelligenceGrid({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3">
                 <div className="flex items-center gap-2">
                     <span className="flex items-center justify-center h-6 w-6 rounded-md bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
-                        <Brain className="h-3.5 w-3.5" />
+                        <Sparkles className="h-3.5 w-3.5" />
                     </span>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                        Post-Call Intelligence
+                        Extracted Variables
                     </h3>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary text-muted-foreground border border-border/50">
                         {filteredEntries.length} {filteredEntries.length === 1 ? "field" : "fields"}

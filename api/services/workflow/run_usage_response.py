@@ -78,6 +78,11 @@ def extract_public_extracted_data(
     if explicit:
         merged.update(explicit)
 
+    # Strip redundant nested container keys if present so sub-cards containing raw nested maps are omitted
+    merged.pop("extracted_variables", None)
+    merged.pop("extracted variables", None)
+    merged.pop("extracted_data", None)
+
     return merged or None
 
 

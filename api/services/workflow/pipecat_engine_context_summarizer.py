@@ -8,6 +8,7 @@ from api.services.pipecat.tracing_config import ensure_tracing
 from loguru import logger
 from opentelemetry import trace
 from pipecat.frames.frames import LLMContextSummaryRequestFrame
+from pipecat.metrics.metrics import LLMTokenUsage, LLMUsageMetricsData
 from pipecat.utils.context.llm_context_summarization import (
     LLMContextSummarizationUtil,
     LLMContextSummaryConfig,
@@ -116,8 +117,9 @@ class ContextSummarizationManager:
             )
 
             config = self._config
+            node_id = getattr(current_node, "id", getattr(current_node, "name", "unknown"))
             request_frame = LLMContextSummaryRequestFrame(
-                request_id=f"node-transition-{current_node.id}",
+                request_id=f"node-transition-{node_id}",
                 context=context,
                 min_messages_to_keep=config.min_messages_after_summary,
                 target_context_tokens=config.target_context_tokens,
@@ -126,12 +128,27 @@ class ContextSummarizationManager:
             )
 
             # Capture parent OTel context before the await
-            parent_ctx = self._engine._get_otel_context()
+            parent_ctx = (
+                self._engine._get_otel_context()
+                if hasattr(self._engine, "_get_otel_context")
+                else None
+            )
 
-            summary_text, last_index = await asyncio.wait_for(
+            gen_result = await asyncio.wait_for(
                 llm._generate_summary(request_frame),
                 timeout=config.summarization_timeout,
             )
+
+            token_usage = None
+            if isinstance(gen_result, tuple):
+                if len(gen_result) >= 3:
+                    summary_text, last_index, token_usage = gen_result[0], gen_result[1], gen_result[2]
+                else:
+                    summary_text, last_index = gen_result[0], gen_result[1]
+                    token_usage = getattr(llm, "_last_summary_token_usage", None)
+            else:
+                summary_text = str(gen_result)
+                last_index = -1
 
             if not summary_text or not summary_text.strip() or last_index < 0:
                 logger.warning(
@@ -139,9 +156,37 @@ class ContextSummarizationManager:
                 )
                 return
 
+            raw_model = (
+                getattr(getattr(llm, "_settings", None), "model", None)
+                or getattr(getattr(llm, "settings", None), "model", None)
+                or getattr(llm, "model_name", None)
+                or getattr(llm, "model", None)
+                or getattr(llm, "_model_name", None)
+                or getattr(llm, "_model", None)
+            )
+            model_name = raw_model if isinstance(raw_model, str) else "unknown"
+
+            # Record compaction token usage in pipeline_metrics_aggregator
+            aggregator = getattr(self._engine, "_pipeline_metrics_aggregator", None) or getattr(
+                self._engine, "pipeline_metrics_aggregator", None
+            )
+            if aggregator is not None and token_usage is not None:
+                try:
+                    if isinstance(token_usage, (LLMTokenUsage, dict)):
+                        usage_data = LLMUsageMetricsData(
+                            processor="context_compaction:compaction",
+                            model=model_name,
+                            value=token_usage,
+                        )
+                        if hasattr(aggregator, "_handle_llm_usage_metrics"):
+                            res = aggregator._handle_llm_usage_metrics(usage_data)
+                            if asyncio.iscoroutine(res):
+                                await res
+                except Exception as metric_err:
+                    logger.warning(f"Failed to record compaction LLM usage metrics: {metric_err}")
+
             # Trace the LLM call — mirror what _generate_summary sends to
             # run_inference: system prompt + formatted transcript as user msg.
-            model_name = getattr(llm, "model_name", "unknown")
             if ensure_tracing():
                 summarize_result = (
                     LLMContextSummarizationUtil.get_messages_to_summarize(

@@ -7,7 +7,7 @@ import SpinLoader from "@/components/SpinLoader";
 /**
  * Backward compatibility redirect:
  * Intelligence data has been merged directly into the Runs console.
- * Redirects legacy /workflow/[workflowId]/intelligence visits to /workflow/[workflowId]/runs?view=intelligence.
+ * Redirects legacy /workflow/[workflowId]/intelligence visits to /workflow/[workflowId]/runs.
  */
 export default function IntelligenceDashboardRedirectPage() {
     const params = useParams();
@@ -16,7 +16,7 @@ export default function IntelligenceDashboardRedirectPage() {
 
     useEffect(() => {
         if (workflowId) {
-            router.replace(`/workflow/${workflowId}/runs?view=intelligence`);
+            router.replace(`/workflow/${workflowId}/runs`);
         }
     }, [workflowId, router]);
 
@@ -24,7 +24,7 @@ export default function IntelligenceDashboardRedirectPage() {
         <div className="flex h-screen w-full items-center justify-center bg-background">
             <div className="flex flex-col items-center gap-3">
                 <SpinLoader />
-                <p className="text-xs text-muted-foreground">Redirecting to Call Runs & Intelligence...</p>
+                <p className="text-xs text-muted-foreground">Redirecting to Call History...</p>
             </div>
         </div>
     );

@@ -187,7 +187,7 @@ function extractUsage(
     let uiLlmPrompt = 0, uiLlmCompletion = 0, uiLlmCached = 0, uiLlmProvider = "";
     if (ui?.llm) {
         Object.entries(ui.llm).forEach(([key, val]: [string, any]) => {
-            if (key.startsWith("QAAnalysis")) return;
+            if (key.startsWith("QAAnalysis") || key.startsWith("PostCallIntelligence")) return;
             uiLlmPrompt += num(val?.prompt_tokens);
             uiLlmCompletion += num(val?.completion_tokens);
             uiLlmCached += num(val?.cache_read_input_tokens) + num(val?.cache_creation_input_tokens) + num(val?.cached_tokens);

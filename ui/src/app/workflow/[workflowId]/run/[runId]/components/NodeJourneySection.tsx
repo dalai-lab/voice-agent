@@ -45,15 +45,26 @@ export function NodeJourneySection({ gatheredContext }: NodeJourneySectionProps)
     const callTags: string[] = Array.isArray(rawTags) ? rawTags.map(String) : [];
 
     // Other in-call context variables
-    const otherContextEntries = Object.entries(gatheredContext).filter(([key]) => {
-        const lower = key.toLowerCase();
-        return (
-            !lower.includes("nodes_visited") &&
-            !lower.includes("call_disposition") &&
-            !lower.includes("mapped_call_disposition") &&
-            !lower.includes("call_tags") &&
-            !lower.includes("trace_url")
-        );
+    const otherContextEntries = Object.entries(gatheredContext).filter(([key, val]) => {
+        const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (
+            cleanKey.includes("nodesvisited") ||
+            cleanKey.includes("calldisposition") ||
+            cleanKey.includes("mappedcalldisposition") ||
+            cleanKey.includes("calltags") ||
+            cleanKey.includes("traceurl") ||
+            cleanKey === "extractedvariables" ||
+            cleanKey === "extracteddata"
+        ) {
+            return false;
+        }
+        if (val && typeof val === "object" && !Array.isArray(val)) {
+            const childKeys = Object.keys(val);
+            if (childKeys.length > 0 && childKeys.some(ck => ck in (gatheredContext as any))) {
+                return false;
+            }
+        }
+        return true;
     });
 
     const handleCopy = async () => {
@@ -90,11 +101,10 @@ export function NodeJourneySection({ gatheredContext }: NodeJourneySectionProps)
                         <button
                             type="button"
                             onClick={() => setViewMode("visual")}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
-                                viewMode === "visual"
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${viewMode === "visual"
                                     ? "bg-background text-foreground shadow-2xs"
                                     : "text-muted-foreground hover:text-foreground"
-                            }`}
+                                }`}
                         >
                             <Layers className="h-3 w-3" />
                             <span>Visual Path</span>
@@ -102,11 +112,10 @@ export function NodeJourneySection({ gatheredContext }: NodeJourneySectionProps)
                         <button
                             type="button"
                             onClick={() => setViewMode("json")}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
-                                viewMode === "json"
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${viewMode === "json"
                                     ? "bg-background text-foreground shadow-2xs"
                                     : "text-muted-foreground hover:text-foreground"
-                            }`}
+                                }`}
                         >
                             <Code className="h-3 w-3" />
                             <span>Raw Context</span>

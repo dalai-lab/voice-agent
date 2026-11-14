@@ -98,24 +98,27 @@ async def create_qa_llm_service(
     return llm, model
 
 
-def accumulate_token_usage(total: dict, response) -> None:
-    """Add token counts from an LLM response to the running total dict."""
-    if not response.usage:
+def accumulate_token_usage(total: dict, usage_or_response: Any) -> None:
+    """Add token counts from an LLM response or LLMTokenUsage to the running total dict."""
+    if not usage_or_response:
         return
-    total["prompt_tokens"] = total.get("prompt_tokens", 0) + (
-        response.usage.prompt_tokens or 0
-    )
-    total["completion_tokens"] = total.get("completion_tokens", 0) + (
-        response.usage.completion_tokens or 0
-    )
-    total["total_tokens"] = total.get("total_tokens", 0) + (
-        response.usage.total_tokens or 0
-    )
-    total["cache_read_input_tokens"] = total.get("cache_read_input_tokens", 0) + (
-        getattr(response.usage, "cache_read_input_tokens", 0) or 0
-    )
-    cache_creation = getattr(response.usage, "cache_creation_input_tokens", None)
-    if cache_creation is not None:
-        total["cache_creation_input_tokens"] = (
-            total.get("cache_creation_input_tokens") or 0
-        ) + cache_creation
+    usage = getattr(usage_or_response, "usage", None) or usage_or_response
+    if isinstance(usage, dict):
+        p_tok = usage.get("prompt_tokens", 0) or 0
+        c_tok = usage.get("completion_tokens", 0) or 0
+        t_tok = usage.get("total_tokens", 0) or (p_tok + c_tok)
+        cr_tok = usage.get("cache_read_input_tokens", 0) or 0
+        cc_tok = usage.get("cache_creation_input_tokens", 0) or 0
+    else:
+        p_tok = getattr(usage, "prompt_tokens", 0) or 0
+        c_tok = getattr(usage, "completion_tokens", 0) or 0
+        t_tok = getattr(usage, "total_tokens", 0) or (p_tok + c_tok)
+        cr_tok = getattr(usage, "cache_read_input_tokens", 0) or 0
+        cc_tok = getattr(usage, "cache_creation_input_tokens", 0) or 0
+
+    total["prompt_tokens"] = total.get("prompt_tokens", 0) + p_tok
+    total["completion_tokens"] = total.get("completion_tokens", 0) + c_tok
+    total["total_tokens"] = total.get("total_tokens", 0) + t_tok
+    total["cache_read_input_tokens"] = total.get("cache_read_input_tokens", 0) + cr_tok
+    if cc_tok:
+        total["cache_creation_input_tokens"] = total.get("cache_creation_input_tokens", 0) + cc_tok

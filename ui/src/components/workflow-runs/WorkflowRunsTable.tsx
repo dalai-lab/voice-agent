@@ -12,8 +12,6 @@ import {
     Globe,
     Phone,
     RefreshCw,
-    SlidersHorizontal,
-    Sparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
@@ -24,8 +22,6 @@ import { FilterBuilder } from "@/components/filters/FilterBuilder";
 import { MediaPreviewButton, MediaPreviewDialog } from "@/components/MediaPreviewDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
     Table,
     TableBody,
@@ -40,7 +36,7 @@ import { formatDateTime } from "@/lib/dateTime";
 import { ActiveFilter, FilterAttribute } from "@/types/filters";
 import { RunUsagePills } from "@/components/RunUsagePills";
 import { useTalkarCustomer } from "@/context/TalkarCustomerContext";
-import { UniversalPciCell, PciRowDrawer } from "./pci";
+import { PciRowDrawer } from "./pci";
 
 export interface WorkflowRunsTableProps {
     // Data
@@ -208,71 +204,6 @@ export function WorkflowRunsTable({
     const [activeTab, setActiveTab] = useState<'all' | 'completed' | 'in_progress' | 'telephony' | 'web'>('all');
     const [expandedRowIds, setExpandedRowIds] = useState<Set<number>>(new Set());
     const organizationTimezone = useOrganizationTimezone();
-
-    // Discover available PCI keys
-    const availablePciKeys = React.useMemo(() => {
-        if (postCallSchema && Array.isArray(postCallSchema) && postCallSchema.length > 0) {
-            return postCallSchema.map((s) => s.name);
-        }
-        const discovered = new Set<string>();
-        runs.forEach((r) => {
-            if (r.extracted_data && typeof r.extracted_data === 'object') {
-                Object.keys(r.extracted_data).forEach((k) => {
-                    const lower = k.toLowerCase();
-                    if (!lower.includes('node') && !lower.includes('visited')) {
-                        discovered.add(k);
-                    }
-                });
-            }
-        });
-        return Array.from(discovered);
-    }, [postCallSchema, runs]);
-
-    const hasPci = availablePciKeys.length > 0;
-    const [viewMode, setViewMode] = useState<'intelligence' | 'telephony'>(() => {
-        if (defaultView) return defaultView;
-        return hasPci ? 'intelligence' : 'telephony';
-    });
-
-    React.useEffect(() => {
-        if (hasPci && !defaultView) {
-            setViewMode('intelligence');
-        }
-    }, [hasPci, defaultView]);
-
-    const storageKey = workflowId ? `talkar_runs_cols_${workflowId}` : 'talkar_runs_cols_global';
-    const [visiblePciColumns, setVisiblePciColumns] = useState<string[]>(() => {
-        if (typeof window !== 'undefined') {
-            try {
-                const saved = localStorage.getItem(storageKey);
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        return parsed;
-                    }
-                }
-            } catch {
-                // ignore
-            }
-        }
-        return availablePciKeys;
-    });
-
-    React.useEffect(() => {
-        if (availablePciKeys.length > 0 && visiblePciColumns.length === 0) {
-            setVisiblePciColumns(availablePciKeys);
-        }
-    }, [availablePciKeys, visiblePciColumns.length]);
-
-    const togglePciColumn = (col: string) => {
-        setVisiblePciColumns((prev) => {
-            const next = prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col];
-            try {
-                localStorage.setItem(storageKey, JSON.stringify(next));
-            } catch {}
-            return next;
-        });
-    };
 
     const toggleRowExpand = (e: React.MouseEvent, runId: number) => {
         e.stopPropagation();
@@ -460,94 +391,22 @@ export function WorkflowRunsTable({
                                         key={tab.id}
                                         type="button"
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
-                                            isActive
+                                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${isActive
                                                 ? "bg-background text-foreground font-semibold shadow-xs border border-border/70"
                                                 : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                                        }`}
+                                            }`}
                                     >
                                         <span>{tab.label}</span>
-                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium tabular-nums ${
-                                            isActive
+                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium tabular-nums ${isActive
                                                 ? "bg-muted text-foreground font-semibold"
                                                 : "bg-muted/60 text-muted-foreground"
-                                        }`}>
+                                            }`}>
                                             {tab.count}
                                         </span>
                                     </button>
                                 );
                             })}
                         </div>
-
-                        {/* View Switcher & Column Customization */}
-                        {hasPci && (
-                            <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1 p-1 bg-muted/30 border border-border/60 rounded-xl">
-                                    <button
-                                        type="button"
-                                        onClick={() => setViewMode('intelligence')}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                                            viewMode === 'intelligence'
-                                                ? "bg-background text-foreground font-semibold shadow-xs border border-border/70"
-                                                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                                        }`}
-                                    >
-                                        <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-                                        <span>Intelligence View</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setViewMode('telephony')}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                                            viewMode === 'telephony'
-                                                ? "bg-background text-foreground font-semibold shadow-xs border border-border/70"
-                                                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                                        }`}
-                                    >
-                                        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                                        <span>Telephony View</span>
-                                    </button>
-                                </div>
-
-                                {viewMode === 'intelligence' && (
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-8.5 px-2.5 rounded-lg border-border/70 gap-1.5 text-xs font-medium shadow-2xs"
-                                            >
-                                                <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-                                                <span>Columns ({visiblePciColumns.length}/{availablePciKeys.length})</span>
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent align="end" className="w-56 p-3 space-y-2 bg-background border-border/60 shadow-lg z-50">
-                                            <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
-                                                <span className="text-xs font-semibold text-foreground">Visible Columns</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setVisiblePciColumns(availablePciKeys)}
-                                                    className="text-[10px] text-primary hover:underline font-medium cursor-pointer"
-                                                >
-                                                    Reset All
-                                                </button>
-                                            </div>
-                                            <div className="space-y-1.5 max-h-52 overflow-y-auto pt-1">
-                                                {availablePciKeys.map((col) => (
-                                                    <label key={col} className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted/40 p-1 rounded">
-                                                        <Checkbox
-                                                            checked={visiblePciColumns.includes(col)}
-                                                            onCheckedChange={() => togglePciColumn(col)}
-                                                        />
-                                                        <span className="truncate">{col.replace(/_/g, ' ')}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </PopoverContent>
-                                    </Popover>
-                                )}
-                            </div>
-                        )}
                     </div>
 
                     {/* Framed Modern Table Container */}
@@ -558,73 +417,39 @@ export function WorkflowRunsTable({
                                     <TableRow className="bg-muted/30 border-b border-border/70 hover:bg-transparent">
                                         <TableHead className="w-8 py-3.5 px-2 text-center"></TableHead>
                                         <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 w-14">ID</TableHead>
-                                        {viewMode === 'intelligence' ? (
-                                            <>
-                                                <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[90px]">Time</TableHead>
-                                                <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[130px]">Phone Number</TableHead>
-                                                <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 w-24">Status</TableHead>
-                                                <TableHead
-                                                    className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 cursor-pointer hover:bg-accent/40 select-none whitespace-nowrap w-24"
-                                                    onClick={() => onSort?.('duration')}
-                                                >
-                                                    <div className="flex items-center gap-1">
-                                                        Duration
-                                                        {sortBy === 'duration' ? (
-                                                            sortOrder === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
-                                                        ) : (
-                                                            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/60" />
-                                                        )}
-                                                    </div>
-                                                </TableHead>
-                                                <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[130px]">Disposition</TableHead>
-
-                                                {/* Dynamic Post-Call Intelligence Columns */}
-                                                {visiblePciColumns.map((col) => (
-                                                    <TableHead
-                                                        key={col}
-                                                        className="font-semibold text-xs text-indigo-600 dark:text-indigo-400 py-3.5 px-3.5 whitespace-nowrap min-w-[140px] uppercase text-[11px] tracking-wider"
-                                                    >
-                                                        {col.replace(/_/g, ' ')}
-                                                    </TableHead>
-                                                ))}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[130px]">
-                                                    Phone Number
-                                                </TableHead>
-                                                <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[130px]">
-                                                    Called Number
-                                                </TableHead>
-                                                {!workflowId && (
-                                                    <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 min-w-[160px]">
-                                                        Agent
-                                                    </TableHead>
-                                                )}
-                                                <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 w-28">Status</TableHead>
-                                                <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[100px]">Time</TableHead>
-                                                <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 w-24">Type</TableHead>
-                                                <TableHead
-                                                    className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 cursor-pointer hover:bg-accent/40 select-none whitespace-nowrap w-24"
-                                                    onClick={() => onSort?.('duration')}
-                                                >
-                                                    <div className="flex items-center gap-1">
-                                                        Duration
-                                                        {sortBy === 'duration' ? (
-                                                            sortOrder === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
-                                                        ) : (
-                                                            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/60" />
-                                                        )}
-                                                    </div>
-                                                </TableHead>
-                                                <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[140px]">Disposition</TableHead>
-
-                                                {/* Usage Column: Hidden per user preference (DO NOT REMOVE) */}
-                                                <TableHead className={showUsageColumn ? "font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[180px]" : "hidden"}>
-                                                    Usage
-                                                </TableHead>
-                                            </>
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[130px]">
+                                            Phone Number
+                                        </TableHead>
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[130px]">
+                                            Called Number
+                                        </TableHead>
+                                        {!workflowId && (
+                                            <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 min-w-[160px]">
+                                                Agent
+                                            </TableHead>
                                         )}
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 w-28">Status</TableHead>
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[100px]">Time</TableHead>
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 w-24">Type</TableHead>
+                                        <TableHead
+                                            className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 cursor-pointer hover:bg-accent/40 select-none whitespace-nowrap w-24"
+                                            onClick={() => onSort?.('duration')}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                Duration
+                                                {sortBy === 'duration' ? (
+                                                    sortOrder === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+                                                ) : (
+                                                    <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/60" />
+                                                )}
+                                            </div>
+                                        </TableHead>
+                                        <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[140px]">Disposition</TableHead>
+
+                                        {/* Usage Column: Hidden per user preference (DO NOT REMOVE) */}
+                                        <TableHead className={showUsageColumn ? "font-semibold text-xs text-muted-foreground py-3.5 px-3.5 whitespace-nowrap min-w-[180px]" : "hidden"}>
+                                            Usage
+                                        </TableHead>
                                         <TableHead className="font-semibold text-xs text-muted-foreground py-3.5 px-3.5 text-right pr-4 w-24 whitespace-nowrap">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -702,257 +527,172 @@ export function WorkflowRunsTable({
                                                                     #{run.id}
                                                                 </TableCell>
 
-                                                                {viewMode === 'intelligence' ? (
-                                                                    <>
-                                                                        {/* Time */}
-                                                                        <TableCell
-                                                                            className="text-[13px] text-muted-foreground whitespace-nowrap py-3 px-3.5 tabular-nums"
-                                                                            title={formatDateTime(run.created_at, organizationTimezone)}
+                                                                {/* Phone Number (Caller / From) */}
+                                                                <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                    {callerNumber ? (
+                                                                        <span className="text-[13px] font-medium text-foreground tabular-nums select-all">
+                                                                            {callerNumber}
+                                                                        </span>
+                                                                    ) : isWebMode ? (
+                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border/40">
+                                                                            <Globe className="h-3 w-3 text-sky-500" />
+                                                                            Web User
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-xs text-muted-foreground/40 font-normal">—</span>
+                                                                    )}
+                                                                </TableCell>
+
+                                                                {/* Called Number (Destination / To) */}
+                                                                <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                    {calledNumber ? (
+                                                                        <span className="text-[13px] font-normal text-muted-foreground tabular-nums select-all">
+                                                                            {calledNumber}
+                                                                        </span>
+                                                                    ) : isWebMode ? (
+                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/30 text-muted-foreground/80 border border-border/30">
+                                                                            <Globe className="h-3 w-3 text-muted-foreground/60" />
+                                                                            Web Agent
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-xs text-muted-foreground/40 font-normal">—</span>
+                                                                    )}
+                                                                </TableCell>
+
+                                                                {/* Agent Name */}
+                                                                {!workflowId && (
+                                                                    <TableCell className="py-3 px-3.5 max-w-[220px]">
+                                                                        <span
+                                                                            className="text-[13px] font-medium text-foreground truncate block hover:text-primary transition-colors"
+                                                                            title={(run as any).workflow_name || `Agent #${run.workflow_id}`}
                                                                         >
-                                                                            {formatTimeOnly(run.created_at)}
-                                                                        </TableCell>
-
-                                                                        {/* Phone Number (Caller / From) */}
-                                                                        <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                            {callerNumber ? (
-                                                                                <span className="text-[13px] font-medium text-foreground tabular-nums select-all">
-                                                                                    {callerNumber}
-                                                                                </span>
-                                                                            ) : isWebMode ? (
-                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border/40">
-                                                                                    <Globe className="h-3 w-3 text-sky-500" />
-                                                                                    Web User
-                                                                                </span>
-                                                                            ) : (
-                                                                                <span className="text-xs text-muted-foreground/40 font-normal">—</span>
-                                                                            )}
-                                                                        </TableCell>
-
-                                                                        {/* Status */}
-                                                                        <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                            {run.is_completed ? (
-                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                                                                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                                                                    Completed
-                                                                                </span>
-                                                                            ) : (
-                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                                                                                    <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
-                                                                                    In Progress
-                                                                                </span>
-                                                                            )}
-                                                                        </TableCell>
-
-                                                                        {/* Duration */}
-                                                                        <TableCell className="text-[13px] font-medium text-foreground whitespace-nowrap py-3 px-3.5 tabular-nums">
-                                                                            {formatCallDuration(durationSecs)}
-                                                                        </TableCell>
-
-                                                                        {/* Disposition */}
-                                                                        <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                            {(() => {
-                                                                                const rawDisp =
-                                                                                    (run.gathered_context?.mapped_call_disposition as string | undefined) ||
-                                                                                    ((run as any).disposition as string | undefined) ||
-                                                                                    (run.gathered_context?.call_disposition as string | undefined) ||
-                                                                                    (run.gathered_context?.disposition as string | undefined);
-                                                                                if (rawDisp) {
-                                                                                    const { label: dispLabel, className: dispClass } = getDispositionBadge(rawDisp);
-                                                                                    return (
-                                                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs ${dispClass}`}>
-                                                                                            {dispLabel}
-                                                                                        </span>
-                                                                                    );
-                                                                                }
-                                                                                return <span className="text-xs text-muted-foreground/40 font-normal">—</span>;
-                                                                            })()}
-                                                                        </TableCell>
-
-                                                                        {/* Dynamic Post-Call Intelligence Cells */}
-                                                                        {visiblePciColumns.map((col) => {
-                                                                            const fieldDef = postCallSchema?.find((s) => s.name === col);
-                                                                            const val = run.extracted_data?.[col];
-                                                                            return (
-                                                                                <TableCell key={col} className="py-3 px-3.5 whitespace-nowrap">
-                                                                                    <UniversalPciCell
-                                                                                        fieldKey={col}
-                                                                                        value={val}
-                                                                                        fieldType={fieldDef?.type}
-                                                                                    />
-                                                                                </TableCell>
-                                                                            );
-                                                                        })}
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        {/* Phone Number (Caller / From) */}
-                                                                        <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                            {callerNumber ? (
-                                                                                <span className="text-[13px] font-medium text-foreground tabular-nums select-all">
-                                                                                    {callerNumber}
-                                                                                </span>
-                                                                            ) : isWebMode ? (
-                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border/40">
-                                                                                    <Globe className="h-3 w-3 text-sky-500" />
-                                                                                    Web User
-                                                                                </span>
-                                                                            ) : (
-                                                                                <span className="text-xs text-muted-foreground/40 font-normal">—</span>
-                                                                            )}
-                                                                        </TableCell>
-
-                                                                        {/* Called Number (Destination / To) */}
-                                                                        <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                            {calledNumber ? (
-                                                                                <span className="text-[13px] font-normal text-muted-foreground tabular-nums select-all">
-                                                                                    {calledNumber}
-                                                                                </span>
-                                                                            ) : isWebMode ? (
-                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/30 text-muted-foreground/80 border border-border/30">
-                                                                                    <Globe className="h-3 w-3 text-muted-foreground/60" />
-                                                                                    Web Agent
-                                                                                </span>
-                                                                            ) : (
-                                                                                <span className="text-xs text-muted-foreground/40 font-normal">—</span>
-                                                                            )}
-                                                                        </TableCell>
-
-                                                                        {/* Agent Name */}
-                                                                        {!workflowId && (
-                                                                            <TableCell className="py-3 px-3.5 max-w-[220px]">
-                                                                                <span
-                                                                                    className="text-[13px] font-medium text-foreground truncate block hover:text-primary transition-colors"
-                                                                                    title={(run as any).workflow_name || `Agent #${run.workflow_id}`}
-                                                                                >
-                                                                                    {(run as any).workflow_name || `Agent #${run.workflow_id}`}
-                                                                                </span>
-                                                                            </TableCell>
-                                                                        )}
-
-                                                                        {/* Status */}
-                                                                        <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                            {run.is_completed ? (
-                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                                                                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                                                                    Completed
-                                                                                </span>
-                                                                            ) : (
-                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                                                                                    <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
-                                                                                    In Progress
-                                                                                </span>
-                                                                            )}
-                                                                        </TableCell>
-
-                                                                        {/* Time */}
-                                                                        <TableCell
-                                                                            className="text-[13px] text-muted-foreground whitespace-nowrap py-3 px-3.5 tabular-nums"
-                                                                            title={formatDateTime(run.created_at, organizationTimezone)}
-                                                                        >
-                                                                            {formatTimeOnly(run.created_at)}
-                                                                        </TableCell>
-
-                                                                        {/* Call Type */}
-                                                                        <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                                                <CallTypeCell mode={run.mode} callType={run.call_type} />
-                                                                                {(() => {
-                                                                                    const initCtx = run.initial_context as Record<string, any> | undefined;
-                                                                                    const isRetry = initCtx?.is_retry;
-                                                                                    const attempt = initCtx?.retry_attempt;
-                                                                                    const reason = initCtx?.retry_reason;
-                                                                                    if (isRetry || attempt) {
-                                                                                        return (
-                                                                                            <span
-                                                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-                                                                                                title={reason ? `Retry #${attempt} due to ${reason}` : `Retry #${attempt}`}
-                                                                                        >
-                                                                                            Retry #{attempt || 1}
-                                                                                            {reason && <span className="font-normal opacity-80">({reason})</span>}
-                                                                                        </span>
-                                                                                    );
-                                                                                }
-                                                                                return null;
-                                                                            })()}
-                                                                        </div>
+                                                                            {(run as any).workflow_name || `Agent #${run.workflow_id}`}
+                                                                        </span>
                                                                     </TableCell>
+                                                                )}
 
-                                                                    {/* Duration */}
-                                                                    <TableCell className="text-[13px] font-medium text-foreground whitespace-nowrap py-3 px-3.5 tabular-nums">
-                                                                        {formatCallDuration(durationSecs)}
-                                                                    </TableCell>
+                                                                {/* Status */}
+                                                                <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                    {run.is_completed ? (
+                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                                            Completed
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+                                                                            <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
+                                                                            In Progress
+                                                                        </span>
+                                                                    )}
+                                                                </TableCell>
 
-                                                                    {/* Disposition */}
-                                                                    <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                {/* Time */}
+                                                                <TableCell
+                                                                    className="text-[13px] text-muted-foreground whitespace-nowrap py-3 px-3.5 tabular-nums"
+                                                                    title={formatDateTime(run.created_at, organizationTimezone)}
+                                                                >
+                                                                    {formatTimeOnly(run.created_at)}
+                                                                </TableCell>
+
+                                                                {/* Call Type */}
+                                                                <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                        <CallTypeCell mode={run.mode} callType={run.call_type} />
                                                                         {(() => {
-                                                                            const rawDisp =
-                                                                                (run.gathered_context?.mapped_call_disposition as string | undefined) ||
-                                                                                ((run as any).disposition as string | undefined) ||
-                                                                                (run.gathered_context?.call_disposition as string | undefined) ||
-                                                                                (run.gathered_context?.disposition as string | undefined);
-                                                                            if (rawDisp) {
-                                                                                const { label: dispLabel, className: dispClass } = getDispositionBadge(rawDisp);
+                                                                            const initCtx = run.initial_context as Record<string, any> | undefined;
+                                                                            const isRetry = initCtx?.is_retry;
+                                                                            const attempt = initCtx?.retry_attempt;
+                                                                            const reason = initCtx?.retry_reason;
+                                                                            if (isRetry || attempt) {
                                                                                 return (
-                                                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs ${dispClass}`}>
-                                                                                        {dispLabel}
+                                                                                    <span
+                                                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                                                                        title={reason ? `Retry #${attempt} due to ${reason}` : `Retry #${attempt}`}
+                                                                                    >
+                                                                                        Retry #{attempt || 1}
+                                                                                        {reason && <span className="font-normal opacity-80">({reason})</span>}
                                                                                     </span>
                                                                                 );
                                                                             }
-                                                                            return <span className="text-xs text-muted-foreground/40 font-normal">—</span>;
+                                                                            return null;
                                                                         })()}
-                                                                    </TableCell>
+                                                                    </div>
+                                                                </TableCell>
 
-                                                                    {/* Usage Cell: Hidden per user preference (DO NOT REMOVE) */}
-                                                                    <TableCell className={showUsageColumn ? "py-3 px-3.5" : "hidden"}>
-                                                                        <RunUsagePills
-                                                                            usageInfo={run.usage_info}
-                                                                            costInfo={run.cost_info}
-                                                                            logs={(run as any).logs}
-                                                                            showEmpty
-                                                                        />
-                                                                    </TableCell>
-                                                                </>
-                                                            )}
+                                                                {/* Duration */}
+                                                                <TableCell className="text-[13px] font-medium text-foreground whitespace-nowrap py-3 px-3.5 tabular-nums">
+                                                                    {formatCallDuration(durationSecs)}
+                                                                </TableCell>
 
-                                                            {/* Actions */}
-                                                            <TableCell className="text-right pr-4 py-3 px-3.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                                                                <div className="inline-flex items-center gap-1 justify-end">
-                                                                    <MediaPreviewButton
-                                                                        recordingUrl={run.recording_url}
-                                                                        transcriptUrl={run.transcript_url}
-                                                                        runId={run.id}
-                                                                        onOpenPreview={mediaPreview.openPreview}
-                                                                        onSelect={setSelectedRowId}
+                                                                {/* Disposition */}
+                                                                <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                    {(() => {
+                                                                        const rawDisp =
+                                                                            (run.gathered_context?.mapped_call_disposition as string | undefined) ||
+                                                                            ((run as any).disposition as string | undefined) ||
+                                                                            (run.gathered_context?.call_disposition as string | undefined) ||
+                                                                            (run.gathered_context?.disposition as string | undefined);
+                                                                        if (rawDisp) {
+                                                                            const { label: dispLabel, className: dispClass } = getDispositionBadge(rawDisp);
+                                                                            return (
+                                                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs ${dispClass}`}>
+                                                                                    {dispLabel}
+                                                                                </span>
+                                                                            );
+                                                                        }
+                                                                        return <span className="text-xs text-muted-foreground/40 font-normal">—</span>;
+                                                                    })()}
+                                                                </TableCell>
+
+                                                                {/* Usage Cell: Hidden per user preference (DO NOT REMOVE) */}
+                                                                <TableCell className={showUsageColumn ? "py-3 px-3.5" : "hidden"}>
+                                                                    <RunUsagePills
+                                                                        usageInfo={run.usage_info}
+                                                                        costInfo={run.cost_info}
+                                                                        logs={(run as any).logs}
+                                                                        showEmpty
                                                                     />
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
-                                                                        onClick={() => router.push(`/workflow/${run.workflow_id}/run/${run.id}`)}
-                                                                        title="View Call Details"
-                                                                    >
-                                                                        <ArrowRight className="h-3.5 w-3.5" />
-                                                                    </Button>
-                                                                </div>
-                                                            </TableCell>
-                                                        </TableRow>
+                                                                </TableCell>
 
-                                                        {/* Expandable Quick-Look Row Drawer */}
-                                                        {isExpanded && (
-                                                            <TableRow className="hover:bg-transparent bg-muted/10 border-b border-border/60">
-                                                                <TableCell colSpan={40} className="p-0">
-                                                                    <PciRowDrawer run={run} schema={postCallSchema} />
+                                                                {/* Actions */}
+                                                                <TableCell className="text-right pr-4 py-3 px-3.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                                    <div className="inline-flex items-center gap-1 justify-end">
+                                                                        <MediaPreviewButton
+                                                                            recordingUrl={run.recording_url}
+                                                                            transcriptUrl={run.transcript_url}
+                                                                            runId={run.id}
+                                                                            onOpenPreview={mediaPreview.openPreview}
+                                                                            onSelect={setSelectedRowId}
+                                                                        />
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                                                                            onClick={() => router.push(`/workflow/${run.workflow_id}/run/${run.id}`)}
+                                                                            title="View Call Details"
+                                                                        >
+                                                                            <ArrowRight className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    </div>
                                                                 </TableCell>
                                                             </TableRow>
-                                                        )}
-                                                    </React.Fragment>
-                                                );
-                                            })}
-                                        </React.Fragment>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
+
+                                                            {/* Expandable Quick-Look Row Drawer */}
+                                                            {isExpanded && (
+                                                                <TableRow className="hover:bg-transparent bg-muted/10 border-b border-border/60">
+                                                                    <TableCell colSpan={40} className="p-0">
+                                                                        <PciRowDrawer run={run} schema={postCallSchema} />
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            )}
+                                                        </React.Fragment>
+                                                    );
+                                                })}
+                                            </React.Fragment>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
                         </div>
                     </div>
 

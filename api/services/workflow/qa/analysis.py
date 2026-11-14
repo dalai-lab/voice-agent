@@ -11,7 +11,10 @@ from api.services.workflow.qa.conversation import (
     format_transcript,
     split_events_by_node,
 )
-from api.services.workflow.qa.llm_config import create_qa_llm_service
+from api.services.workflow.qa.llm_config import (
+    accumulate_token_usage,
+    create_qa_llm_service,
+)
 from api.services.workflow.qa.metrics import compute_call_metrics
 from api.services.workflow.qa.node_summary import (
     CONVERSATION_SUMMARY_SYSTEM_PROMPT,
@@ -29,11 +32,16 @@ from pipecat.processors.aggregators.llm_context import LLMContext
 
 async def _run_llm_inference(
     llm, messages: list[dict], system_prompt: str
-) -> str | None:
-    """Run a one-shot LLM inference using the pipecat service."""
+) -> tuple[str | None, Any | None]:
+    """Run a one-shot LLM inference using the pipecat service returning (raw_response, token_usage)."""
     context = LLMContext()
     context.set_messages(messages)
-    return await llm.run_inference(context, system_instruction=system_prompt)
+    if hasattr(llm, "run_inference_with_usage"):
+        return await llm.run_inference_with_usage(context, system_instruction=system_prompt)
+    res = await llm.run_inference(context, system_instruction=system_prompt)
+    if isinstance(res, tuple):
+        return res
+    return res, None
 
 
 async def _generate_conversation_summary(
@@ -42,6 +50,7 @@ async def _generate_conversation_summary(
     transcript: str,
     parent_ctx,
     node_name: str,
+    accumulated_tokens: dict | None = None,
 ) -> str:
     """Generate a summary of the conversation so far (before the current node).
 
@@ -52,10 +61,12 @@ async def _generate_conversation_summary(
     ]
 
     try:
-        summary = (
-            await _run_llm_inference(llm, messages, CONVERSATION_SUMMARY_SYSTEM_PROMPT)
-            or ""
+        raw_res, token_usage = await _run_llm_inference(
+            llm, messages, CONVERSATION_SUMMARY_SYSTEM_PROMPT
         )
+        if accumulated_tokens is not None and token_usage is not None:
+            accumulate_token_usage(accumulated_tokens, token_usage)
+        summary = raw_res or ""
 
         span_name = f"conversation-summary-before-{node_name}"
         add_qa_span_to_trace(
@@ -130,6 +141,7 @@ async def run_per_node_qa_analysis(
 
     node_results: dict[str, Any] = {}
     prior_conversation: list[dict] = []  # Running accumulation of all prior nodes
+    accumulated_tokens: dict[str, int] = {}
 
     for idx, (node_id, node_name, node_events) in enumerate(node_splits):
         # Build this node's conversation and transcript
@@ -154,6 +166,7 @@ async def run_per_node_qa_analysis(
                 prior_transcript,
                 parent_ctx,
                 node_name,
+                accumulated_tokens,
             )
 
         # Substitute placeholders in the user's system prompt
@@ -171,7 +184,9 @@ async def run_per_node_qa_analysis(
 
         # Call QA LLM
         try:
-            raw_response = await _run_llm_inference(llm, messages, system_content)
+            raw_response, token_usage = await _run_llm_inference(llm, messages, system_content)
+            if token_usage is not None:
+                accumulate_token_usage(accumulated_tokens, token_usage)
         except Exception as e:
             logger.error(
                 f"QA LLM call failed for node '{node_name}' on run {workflow_run_id}: {e}"
@@ -226,6 +241,7 @@ async def run_per_node_qa_analysis(
     return {
         "node_results": node_results,
         "model": model,
+        "token_usage": accumulated_tokens if accumulated_tokens else None,
     }
 
 
@@ -281,8 +297,11 @@ async def _run_whole_call_qa_analysis(
         {"role": "user", "content": f"## Transcript\n{transcript}"},
     ]
 
+    accumulated_tokens: dict[str, int] = {}
     try:
-        raw_response = await _run_llm_inference(llm, messages, system_content)
+        raw_response, token_usage = await _run_llm_inference(llm, messages, system_content)
+        if token_usage is not None:
+            accumulate_token_usage(accumulated_tokens, token_usage)
     except Exception as e:
         logger.error(f"QA LLM call failed for run {workflow_run_id}: {e}")
         return {"error": str(e), "node_results": {}}
@@ -322,4 +341,5 @@ async def _run_whole_call_qa_analysis(
     return {
         "node_results": {"whole_call": node_result},
         "model": model,
+        "token_usage": accumulated_tokens if accumulated_tokens else None,
     }

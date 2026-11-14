@@ -7,3 +7,4 @@ export * from './ExecutiveSummaryHero';
 export * from './UniversalIntelligenceGrid';
 export * from './QaScorecardSection';
 export * from './NodeJourneySection';
+export * from './CallRoutingBanner';

@@ -44,10 +44,15 @@ import {
     UniversalIntelligenceGrid,
     QaScorecardSection,
     NodeJourneySection,
+    CallRoutingBanner,
 } from './components';
 
 interface WorkflowRunResponse {
     mode: string;
+    call_type?: string | null;
+    phone_number?: string | null;
+    called_number?: string | null;
+    caller_number?: string | null;
     created_at: string | null;
     is_completed: boolean;
     transcript_url: string | null;
@@ -431,7 +436,7 @@ function SplitTracksSection({
 
         const playbackAudios = getPlaybackAudios(playbackMode);
         const { duration } = getAudioTimelineState(playbackAudios);
-        
+
         if (duration > 0) {
             const newTime = percentage * duration;
             if (userAudioRef.current) userAudioRef.current.currentTime = newTime;
@@ -541,7 +546,7 @@ function SplitTracksSection({
                 >
                     {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
                 </button>
-                <div 
+                <div
                     ref={timelineRef}
                     className={cn(
                         "relative h-24 min-w-0 flex-1 overflow-hidden rounded-lg border border-border/75 bg-secondary/15 transition-colors",
@@ -651,9 +656,10 @@ function BusinessJsonViewer({
     }
 
     const entries = Object.entries(context).filter(([key]) => {
+        const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (cleanKey === 'extractedvariables' || cleanKey === 'extracteddata') return false;
         if (!isAdmin) {
-            const lower = key.toLowerCase();
-            if (lower.includes('node') || lower.includes('visited')) return false;
+            if (cleanKey.includes('node') || cleanKey.includes('visited')) return false;
         }
         return true;
     });
@@ -734,6 +740,49 @@ function BusinessJsonViewer({
 }
 
 
+function resolveRunNumbers(run: WorkflowRunResponse | null) {
+    if (!run) return { callerNumber: null, calledNumber: null };
+    const isOutbound = run.call_type === 'outbound';
+    const init = (run.initial_context || {}) as Record<string, any>;
+    const gathered = (run.gathered_context || {}) as Record<string, any>;
+
+    let caller: any =
+        run.caller_number ||
+        init.caller_number ||
+        init.from_number ||
+        init.from;
+
+    if (!caller && !isOutbound) {
+        caller =
+            gathered.customer_phone_number ||
+            gathered.caller_number ||
+            init.phone_number ||
+            run.phone_number;
+    }
+    if (!caller) {
+        caller = run.phone_number || init.phone_number || null;
+    }
+
+    let called: any =
+        run.called_number ||
+        init.called_number ||
+        init.to_number ||
+        init.to;
+
+    if (!called && isOutbound) {
+        called =
+            gathered.customer_phone_number ||
+            gathered.called_number ||
+            init.phone_number ||
+            run.phone_number;
+    }
+
+    return {
+        callerNumber: caller && typeof caller === 'string' && caller.trim() ? caller.trim() : null,
+        calledNumber: called && typeof called === 'string' && called.trim() ? called.trim() : null,
+    };
+}
+
 export default function WorkflowRunPage() {
     const params = useParams();
     const [isLoading, setIsLoading] = useState(true);
@@ -784,8 +833,12 @@ export default function WorkflowRunPage() {
                 if (workflowResponse.data?.post_call_schema && Array.isArray(workflowResponse.data.post_call_schema)) {
                     setPostCallSchema(workflowResponse.data.post_call_schema as any[]);
                 }
-                const runData = {
+                const runData: WorkflowRunResponse = {
                     mode: runResponse.data?.mode ?? '',
+                    call_type: runResponse.data?.call_type ?? null,
+                    phone_number: (runResponse.data as any)?.phone_number ?? null,
+                    called_number: (runResponse.data as any)?.called_number ?? null,
+                    caller_number: (runResponse.data as any)?.caller_number ?? null,
                     created_at: runResponse.data?.created_at ?? null,
                     is_completed: runResponse.data?.is_completed ?? false,
                     transcript_url: runResponse.data?.transcript_url ?? null,
@@ -848,11 +901,12 @@ export default function WorkflowRunPage() {
         );
     }
     else if (showRunDetailsView) {
+        const { callerNumber, calledNumber } = resolveRunNumbers(workflowRun);
         const summaryKey = workflowRun?.extracted_data
             ? Object.keys(workflowRun.extracted_data).find((k) => {
-                  const lower = k.toLowerCase();
-                  return lower.includes('summary') || lower.includes('overview') || lower.includes('notes');
-              })
+                const lower = k.toLowerCase();
+                return lower.includes('summary') || lower.includes('overview') || lower.includes('notes');
+            })
             : undefined;
         const summaryText =
             summaryKey && typeof workflowRun?.extracted_data?.[summaryKey] === 'string'
@@ -946,6 +1000,15 @@ export default function WorkflowRunPage() {
                                 </a>
                             )}
                         </div>
+
+                        {/* Visual Call Direction Banner: Caller ──(Called)──> Destination */}
+                        <CallRoutingBanner
+                            callerNumber={callerNumber}
+                            calledNumber={calledNumber}
+                            callType={workflowRun?.call_type}
+                            mode={workflowRun?.mode}
+                            agentName={workflowName}
+                        />
 
                         {/* Audio visualizer section or custom loader */}
                         {!isTextChatRun && hasSplitTracks && (

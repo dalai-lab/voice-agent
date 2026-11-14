@@ -52,7 +52,19 @@ export function PciRowDrawer({ run, schema }: PciRowDrawerProps) {
 
     // Remaining business variables
     const otherEntries = Object.entries(extracted).filter(
-        ([key]) => key !== summaryKey && !key.toLowerCase().includes("node")
+        ([key, val]) => {
+            if (key === summaryKey) return false;
+            const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+            if (cleanKey.includes("node") || cleanKey.includes("visited")) return false;
+            if (cleanKey === "extractedvariables" || cleanKey === "extracteddata") return false;
+            if (val && typeof val === "object" && !Array.isArray(val)) {
+                const childKeys = Object.keys(val);
+                if (childKeys.length > 0 && childKeys.some(ck => ck in extracted)) {
+                    return false;
+                }
+            }
+            return true;
+        }
     );
 
     const handleCopySummary = async (e: React.MouseEvent) => {

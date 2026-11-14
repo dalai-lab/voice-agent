@@ -63,7 +63,7 @@ async def run_post_call_intelligence(
         logger.warning(f"Skipping PCI for run {workflow_run.id}: no_api_key")
         return {"_error": "error", "reason": "no_api_key"}
     
-    llm, _ = resolved_llm
+    llm, model = resolved_llm
 
     # Build system prompt with schema
     schema_json = json.dumps(post_call_schema, indent=2)
@@ -81,8 +81,19 @@ async def run_post_call_intelligence(
     context = LLMContext()
     context.set_messages(messages)
 
+    raw_response = None
+    token_usage = None
     try:
-        raw_response = await llm.run_inference(context, system_instruction=system_prompt)
+        if hasattr(llm, "run_inference_with_usage"):
+            raw_response, token_usage = await llm.run_inference_with_usage(
+                context, system_instruction=system_prompt
+            )
+        else:
+            res = await llm.run_inference(context, system_instruction=system_prompt)
+            if isinstance(res, tuple):
+                raw_response, token_usage = res
+            else:
+                raw_response = res
     except Exception as e:
         logger.error(f"PCI LLM call failed for run {workflow_run.id}: {e}")
         return {"_error": "error", "reason": str(e)}
@@ -94,7 +105,15 @@ async def run_post_call_intelligence(
         )
         parsed = {}
 
-    # TODO: Update usage_info with token costs if possible (requires hooking into LLM usage callback)
-    # For now we rely on the overall workflow run usage accumulation.
+    # Attach token usage and model metadata so post-call integrations can record usage
+    if token_usage:
+        parsed["_token_usage"] = {
+            "prompt_tokens": getattr(token_usage, "prompt_tokens", 0) or 0,
+            "completion_tokens": getattr(token_usage, "completion_tokens", 0) or 0,
+            "total_tokens": getattr(token_usage, "total_tokens", 0) or 0,
+            "cache_read_input_tokens": getattr(token_usage, "cache_read_input_tokens", 0) or 0,
+            "cache_creation_input_tokens": getattr(token_usage, "cache_creation_input_tokens", 0) or 0,
+        }
+        parsed["_model"] = model
 
     return parsed

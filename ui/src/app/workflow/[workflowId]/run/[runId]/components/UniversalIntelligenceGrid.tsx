@@ -34,7 +34,7 @@ export function UniversalIntelligenceGrid({
             <div className="rounded-xl border border-border/70 bg-card/60 p-6 text-center space-y-2">
                 <Sparkles className="h-7 w-7 text-muted-foreground/40 mx-auto" />
                 <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                    No Extracted Variables
+                    No Post-Call Intelligence Extracted
                 </h4>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                     No variables have been extracted for this call yet or extraction is disabled in workflow settings.
@@ -89,7 +89,7 @@ export function UniversalIntelligenceGrid({
                         <Sparkles className="h-3.5 w-3.5" />
                     </span>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                        Extracted Variables
+                        Post-Call Intelligence
                     </h3>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary text-muted-foreground border border-border/50">
                         {filteredEntries.length} {filteredEntries.length === 1 ? "field" : "fields"}

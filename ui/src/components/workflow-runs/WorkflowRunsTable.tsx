@@ -391,16 +391,18 @@ export function WorkflowRunsTable({
                                         key={tab.id}
                                         type="button"
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${isActive
+                                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
+                                            isActive
                                                 ? "bg-background text-foreground font-semibold shadow-xs border border-border/70"
                                                 : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                                            }`}
+                                        }`}
                                     >
                                         <span>{tab.label}</span>
-                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium tabular-nums ${isActive
+                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium tabular-nums ${
+                                            isActive
                                                 ? "bg-muted text-foreground font-semibold"
                                                 : "bg-muted/60 text-muted-foreground"
-                                            }`}>
+                                        }`}>
                                             {tab.count}
                                         </span>
                                     </button>
@@ -528,171 +530,171 @@ export function WorkflowRunsTable({
                                                                 </TableCell>
 
                                                                 {/* Phone Number (Caller / From) */}
-                                                                <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                    {callerNumber ? (
-                                                                        <span className="text-[13px] font-medium text-foreground tabular-nums select-all">
-                                                                            {callerNumber}
-                                                                        </span>
-                                                                    ) : isWebMode ? (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border/40">
-                                                                            <Globe className="h-3 w-3 text-sky-500" />
-                                                                            Web User
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="text-xs text-muted-foreground/40 font-normal">—</span>
-                                                                    )}
-                                                                </TableCell>
+                                                                        <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                            {callerNumber ? (
+                                                                                <span className="text-[13px] font-medium text-foreground tabular-nums select-all">
+                                                                                    {callerNumber}
+                                                                                </span>
+                                                                            ) : isWebMode ? (
+                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border/40">
+                                                                                    <Globe className="h-3 w-3 text-sky-500" />
+                                                                                    Web User
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-xs text-muted-foreground/40 font-normal">—</span>
+                                                                            )}
+                                                                        </TableCell>
 
-                                                                {/* Called Number (Destination / To) */}
-                                                                <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                    {calledNumber ? (
-                                                                        <span className="text-[13px] font-normal text-muted-foreground tabular-nums select-all">
-                                                                            {calledNumber}
-                                                                        </span>
-                                                                    ) : isWebMode ? (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/30 text-muted-foreground/80 border border-border/30">
-                                                                            <Globe className="h-3 w-3 text-muted-foreground/60" />
-                                                                            Web Agent
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="text-xs text-muted-foreground/40 font-normal">—</span>
-                                                                    )}
-                                                                </TableCell>
+                                                                        {/* Called Number (Destination / To) */}
+                                                                        <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                            {calledNumber ? (
+                                                                                <span className="text-[13px] font-normal text-muted-foreground tabular-nums select-all">
+                                                                                    {calledNumber}
+                                                                                </span>
+                                                                            ) : isWebMode ? (
+                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/30 text-muted-foreground/80 border border-border/30">
+                                                                                    <Globe className="h-3 w-3 text-muted-foreground/60" />
+                                                                                    Web Agent
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-xs text-muted-foreground/40 font-normal">—</span>
+                                                                            )}
+                                                                        </TableCell>
 
-                                                                {/* Agent Name */}
-                                                                {!workflowId && (
-                                                                    <TableCell className="py-3 px-3.5 max-w-[220px]">
-                                                                        <span
-                                                                            className="text-[13px] font-medium text-foreground truncate block hover:text-primary transition-colors"
-                                                                            title={(run as any).workflow_name || `Agent #${run.workflow_id}`}
+                                                                        {/* Agent Name */}
+                                                                        {!workflowId && (
+                                                                            <TableCell className="py-3 px-3.5 max-w-[220px]">
+                                                                                <span
+                                                                                    className="text-[13px] font-medium text-foreground truncate block hover:text-primary transition-colors"
+                                                                                    title={(run as any).workflow_name || `Agent #${run.workflow_id}`}
+                                                                                >
+                                                                                    {(run as any).workflow_name || `Agent #${run.workflow_id}`}
+                                                                                </span>
+                                                                            </TableCell>
+                                                                        )}
+
+                                                                        {/* Status */}
+                                                                        <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                            {run.is_completed ? (
+                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                                                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                                                    Completed
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+                                                                                    <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
+                                                                                    In Progress
+                                                                                </span>
+                                                                            )}
+                                                                        </TableCell>
+
+                                                                        {/* Time */}
+                                                                        <TableCell
+                                                                            className="text-[13px] text-muted-foreground whitespace-nowrap py-3 px-3.5 tabular-nums"
+                                                                            title={formatDateTime(run.created_at, organizationTimezone)}
                                                                         >
-                                                                            {(run as any).workflow_name || `Agent #${run.workflow_id}`}
-                                                                        </span>
+                                                                            {formatTimeOnly(run.created_at)}
+                                                                        </TableCell>
+
+                                                                        {/* Call Type */}
+                                                                        <TableCell className="py-3 px-3.5 whitespace-nowrap">
+                                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                                <CallTypeCell mode={run.mode} callType={run.call_type} />
+                                                                                {(() => {
+                                                                                    const initCtx = run.initial_context as Record<string, any> | undefined;
+                                                                                    const isRetry = initCtx?.is_retry;
+                                                                                    const attempt = initCtx?.retry_attempt;
+                                                                                    const reason = initCtx?.retry_reason;
+                                                                                    if (isRetry || attempt) {
+                                                                                        return (
+                                                                                            <span
+                                                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                                                                                title={reason ? `Retry #${attempt} due to ${reason}` : `Retry #${attempt}`}
+                                                                                        >
+                                                                                            Retry #{attempt || 1}
+                                                                                            {reason && <span className="font-normal opacity-80">({reason})</span>}
+                                                                                        </span>
+                                                                                    );
+                                                                                }
+                                                                                return null;
+                                                                            })()}
+                                                                        </div>
                                                                     </TableCell>
-                                                                )}
 
-                                                                {/* Status */}
-                                                                <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                    {run.is_completed ? (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                                                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                                                            Completed
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                                                                            <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
-                                                                            In Progress
-                                                                        </span>
-                                                                    )}
-                                                                </TableCell>
+                                                                    {/* Duration */}
+                                                                    <TableCell className="text-[13px] font-medium text-foreground whitespace-nowrap py-3 px-3.5 tabular-nums">
+                                                                        {formatCallDuration(durationSecs)}
+                                                                    </TableCell>
 
-                                                                {/* Time */}
-                                                                <TableCell
-                                                                    className="text-[13px] text-muted-foreground whitespace-nowrap py-3 px-3.5 tabular-nums"
-                                                                    title={formatDateTime(run.created_at, organizationTimezone)}
-                                                                >
-                                                                    {formatTimeOnly(run.created_at)}
-                                                                </TableCell>
-
-                                                                {/* Call Type */}
-                                                                <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                                        <CallTypeCell mode={run.mode} callType={run.call_type} />
+                                                                    {/* Disposition */}
+                                                                    <TableCell className="py-3 px-3.5 whitespace-nowrap">
                                                                         {(() => {
-                                                                            const initCtx = run.initial_context as Record<string, any> | undefined;
-                                                                            const isRetry = initCtx?.is_retry;
-                                                                            const attempt = initCtx?.retry_attempt;
-                                                                            const reason = initCtx?.retry_reason;
-                                                                            if (isRetry || attempt) {
+                                                                            const rawDisp =
+                                                                                (run.gathered_context?.mapped_call_disposition as string | undefined) ||
+                                                                                ((run as any).disposition as string | undefined) ||
+                                                                                (run.gathered_context?.call_disposition as string | undefined) ||
+                                                                                (run.gathered_context?.disposition as string | undefined);
+                                                                            if (rawDisp) {
+                                                                                const { label: dispLabel, className: dispClass } = getDispositionBadge(rawDisp);
                                                                                 return (
-                                                                                    <span
-                                                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-                                                                                        title={reason ? `Retry #${attempt} due to ${reason}` : `Retry #${attempt}`}
-                                                                                    >
-                                                                                        Retry #{attempt || 1}
-                                                                                        {reason && <span className="font-normal opacity-80">({reason})</span>}
+                                                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs ${dispClass}`}>
+                                                                                        {dispLabel}
                                                                                     </span>
                                                                                 );
                                                                             }
-                                                                            return null;
+                                                                            return <span className="text-xs text-muted-foreground/40 font-normal">—</span>;
                                                                         })()}
-                                                                    </div>
-                                                                </TableCell>
+                                                                    </TableCell>
 
-                                                                {/* Duration */}
-                                                                <TableCell className="text-[13px] font-medium text-foreground whitespace-nowrap py-3 px-3.5 tabular-nums">
-                                                                    {formatCallDuration(durationSecs)}
-                                                                </TableCell>
-
-                                                                {/* Disposition */}
-                                                                <TableCell className="py-3 px-3.5 whitespace-nowrap">
-                                                                    {(() => {
-                                                                        const rawDisp =
-                                                                            (run.gathered_context?.mapped_call_disposition as string | undefined) ||
-                                                                            ((run as any).disposition as string | undefined) ||
-                                                                            (run.gathered_context?.call_disposition as string | undefined) ||
-                                                                            (run.gathered_context?.disposition as string | undefined);
-                                                                        if (rawDisp) {
-                                                                            const { label: dispLabel, className: dispClass } = getDispositionBadge(rawDisp);
-                                                                            return (
-                                                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap shadow-2xs ${dispClass}`}>
-                                                                                    {dispLabel}
-                                                                                </span>
-                                                                            );
-                                                                        }
-                                                                        return <span className="text-xs text-muted-foreground/40 font-normal">—</span>;
-                                                                    })()}
-                                                                </TableCell>
-
-                                                                {/* Usage Cell: Hidden per user preference (DO NOT REMOVE) */}
-                                                                <TableCell className={showUsageColumn ? "py-3 px-3.5" : "hidden"}>
-                                                                    <RunUsagePills
-                                                                        usageInfo={run.usage_info}
-                                                                        costInfo={run.cost_info}
-                                                                        logs={(run as any).logs}
-                                                                        showEmpty
-                                                                    />
-                                                                </TableCell>
-
-                                                                {/* Actions */}
-                                                                <TableCell className="text-right pr-4 py-3 px-3.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                                                                    <div className="inline-flex items-center gap-1 justify-end">
-                                                                        <MediaPreviewButton
-                                                                            recordingUrl={run.recording_url}
-                                                                            transcriptUrl={run.transcript_url}
-                                                                            runId={run.id}
-                                                                            onOpenPreview={mediaPreview.openPreview}
-                                                                            onSelect={setSelectedRowId}
+                                                                    {/* Usage Cell: Hidden per user preference (DO NOT REMOVE) */}
+                                                                    <TableCell className={showUsageColumn ? "py-3 px-3.5" : "hidden"}>
+                                                                        <RunUsagePills
+                                                                            usageInfo={run.usage_info}
+                                                                            costInfo={run.cost_info}
+                                                                            logs={(run as any).logs}
+                                                                            showEmpty
                                                                         />
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
-                                                                            onClick={() => router.push(`/workflow/${run.workflow_id}/run/${run.id}`)}
-                                                                            title="View Call Details"
-                                                                        >
-                                                                            <ArrowRight className="h-3.5 w-3.5" />
-                                                                        </Button>
-                                                                    </div>
+                                                                    </TableCell>
+
+                                                            {/* Actions */}
+                                                            <TableCell className="text-right pr-4 py-3 px-3.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                                <div className="inline-flex items-center gap-1 justify-end">
+                                                                    <MediaPreviewButton
+                                                                        recordingUrl={run.recording_url}
+                                                                        transcriptUrl={run.transcript_url}
+                                                                        runId={run.id}
+                                                                        onOpenPreview={mediaPreview.openPreview}
+                                                                        onSelect={setSelectedRowId}
+                                                                    />
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                                                                        onClick={() => router.push(`/workflow/${run.workflow_id}/run/${run.id}`)}
+                                                                        title="View Call Details"
+                                                                    >
+                                                                        <ArrowRight className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+
+                                                        {/* Expandable Quick-Look Row Drawer */}
+                                                        {isExpanded && (
+                                                            <TableRow className="hover:bg-transparent bg-muted/10 border-b border-border/60">
+                                                                <TableCell colSpan={40} className="p-0">
+                                                                    <PciRowDrawer run={run} schema={postCallSchema} />
                                                                 </TableCell>
                                                             </TableRow>
-
-                                                            {/* Expandable Quick-Look Row Drawer */}
-                                                            {isExpanded && (
-                                                                <TableRow className="hover:bg-transparent bg-muted/10 border-b border-border/60">
-                                                                    <TableCell colSpan={40} className="p-0">
-                                                                        <PciRowDrawer run={run} schema={postCallSchema} />
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                            )}
-                                                        </React.Fragment>
-                                                    );
-                                                })}
-                                            </React.Fragment>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
+                                                        )}
+                                                    </React.Fragment>
+                                                );
+                                            })}
+                                        </React.Fragment>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
                         </div>
                     </div>
 

@@ -36,9 +36,10 @@ The guide tool is the authoritative source for prompt-authoring craft (global gu
 
 ## Platform Operations & Management
 
-### Telephony Phone Numbers & Inbound Routing
+### Telephony Phone Numbers, Inbound Routing & Outbound Calls
 1. `list_phone_numbers` — list active DIDs and carrier phone numbers provisioned for your organization, along with the assigned inbound agent.
 2. `update_phone_number_routing` — attach or detach an agent workflow to a phone number. Automatically synchronizes inbound webhooks with upstream carriers (Plivo, Twilio) and supports setting default caller ID.
+3. `initiate_call` — place a live outbound voice call to any phone number using an agent workflow, with support for custom initial context variables, caller-ID selection, and draft vs published execution.
 
 ### Wallet & Billing
 1. `get_wallet_balance` — check talk-time wallet balance in Rupees, auto-recharge settings, plan tier, and remaining call minutes.

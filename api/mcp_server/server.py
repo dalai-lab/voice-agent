@@ -20,6 +20,7 @@ from api.mcp_server.tools.get_workflow_code import get_workflow_code
 from api.mcp_server.tools.node_types import get_node_type, list_node_types
 from api.mcp_server.tools.save_workflow import save_workflow
 from api.mcp_server.tools.telephony import (
+    initiate_call,
     list_phone_numbers,
     update_phone_number_routing,
 )
@@ -84,5 +85,6 @@ for _tool in (
     update_phone_number_routing,
     update_campaign_status,
     update_workflow_settings,
+    initiate_call,
 ):
     mcp.tool(_tool, annotations=_MUTATING_TOOL_ANNOTATIONS)

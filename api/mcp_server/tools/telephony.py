@@ -11,6 +11,7 @@ from api.db import db_client
 from api.mcp_server.auth import authenticate_mcp_request
 from api.mcp_server.tracing import traced_tool
 from api.routes.organization import _sync_inbound_for_phone_number
+from api.mcp_server.tools.initiate_call import initiate_call
 
 
 def _error_result(code: str, message: str, **extra: Any) -> dict[str, Any]:

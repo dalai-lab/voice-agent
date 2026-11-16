@@ -21,6 +21,7 @@ from api.services.workflow.run_usage_response import (
     has_recording_track,
     resolve_call_duration_seconds,
 )
+from api.utils.recording_artifacts import get_recording_storage_key
 
 _TRANSCRIPT_LINE_RE = re.compile(
     r"^(?:\[(.*?)\]\s*)?(user|assistant)(?:\s*\[keypad\])?:\s*(.*)$",
@@ -139,9 +140,22 @@ async def get_call_details(
     if not org_id:
         return _error_result("not_found", "No organization selected")
 
-    run = await db_client.get_workflow_run(run_id, organization_id=org_id)
-    if not run:
+    async with db_client.async_session() as session:
+        query = (
+            select(WorkflowRunModel, WorkflowModel.name)
+            .join(WorkflowModel, WorkflowRunModel.workflow_id == WorkflowModel.id)
+            .where(
+                WorkflowRunModel.id == run_id,
+                WorkflowModel.organization_id == org_id,
+            )
+        )
+        result = await session.execute(query)
+        row = result.first()
+
+    if not row:
         return _error_result("not_found", f"Call run {run_id} not found in your organization")
+
+    run, wf_name = row
 
     initial = run.initial_context if isinstance(run.initial_context, dict) else {}
     gathered = run.gathered_context if isinstance(run.gathered_context, dict) else {}
@@ -161,9 +175,14 @@ async def get_call_details(
     # Audio Recording URL resolution
     recording_url = None
     try:
-        backend_fs = get_storage_for_backend(run.storage_backend)
-        if run.recording_url:
-            recording_url = await backend_fs.aget_signed_url(run.recording_url, expiration=7200)
+        backend_fs = (
+            get_storage_for_backend(run.storage_backend)
+            if run.storage_backend
+            else storage_fs
+        )
+        rec_key = run.recording_url or get_recording_storage_key(run.extra, "mixed")
+        if rec_key:
+            recording_url = await backend_fs.aget_signed_url(rec_key, expiration=7200)
     except Exception as e:
         logger.warning(f"Could not generate recording URL for run {run_id}: {e}")
 
@@ -171,7 +190,11 @@ async def get_call_details(
     turns: list[dict[str, str]] = []
     if run.transcript_url:
         try:
-            backend_fs = get_storage_for_backend(run.storage_backend)
+            backend_fs = (
+                get_storage_for_backend(run.storage_backend)
+                if run.storage_backend
+                else storage_fs
+            )
             signed_url = await backend_fs.aget_signed_url(
                 run.transcript_url, expiration=300, use_internal_endpoint=True
             )
@@ -205,10 +228,6 @@ async def get_call_details(
     capped_turns = turns[:max_turns] if truncated else turns
 
     extracted_vars = extract_public_extracted_data(run.extracted_data, run.gathered_context)
-
-    wf_name = None
-    if run.workflow:
-        wf_name = run.workflow.name
 
     return {
         "success": True,

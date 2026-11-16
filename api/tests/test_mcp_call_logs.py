@@ -59,9 +59,18 @@ async def test_list_call_logs_success(authed_user: MagicMock):
 
 @pytest.mark.asyncio
 async def test_get_call_details_not_found(authed_user: MagicMock):
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.first.return_value = None
+    mock_session.execute = AsyncMock(return_value=mock_result)
+
+    mock_ctx = MagicMock()
+    mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
     with (
         patch("api.mcp_server.tools.call_logs.authenticate_mcp_request", AsyncMock(return_value=authed_user)),
-        patch("api.mcp_server.tools.call_logs.db_client.get_workflow_run", AsyncMock(return_value=None)),
+        patch("api.mcp_server.tools.call_logs.db_client.async_session", return_value=mock_ctx),
     ):
         result = await get_call_details(run_id=999)
 
@@ -76,7 +85,6 @@ async def test_get_call_details_success(authed_user: MagicMock):
         id=103,
         workflow_id=5,
         name="Care Run 103",
-        workflow=SimpleNamespace(name="Customer Care"),
         call_type="inbound",
         initial_context={"caller_number": "+15551234567", "called_number": "+15559876543"},
         gathered_context={"call_disposition": "completed"},
@@ -90,9 +98,18 @@ async def test_get_call_details_success(authed_user: MagicMock):
         extra={},
     )
 
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.first.return_value = (mock_run, "Customer Care")
+    mock_session.execute = AsyncMock(return_value=mock_result)
+
+    mock_ctx = MagicMock()
+    mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_ctx.__aexit__ = AsyncMock(return_value=None)
+
     with (
         patch("api.mcp_server.tools.call_logs.authenticate_mcp_request", AsyncMock(return_value=authed_user)),
-        patch("api.mcp_server.tools.call_logs.db_client.get_workflow_run", AsyncMock(return_value=mock_run)),
+        patch("api.mcp_server.tools.call_logs.db_client.async_session", return_value=mock_ctx),
     ):
         result = await get_call_details(run_id=103)
 

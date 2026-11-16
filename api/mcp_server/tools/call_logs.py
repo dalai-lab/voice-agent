@@ -43,8 +43,9 @@ async def list_call_logs(
 ) -> list[dict[str, Any]]:
     """Search and filter past voice calls placed or received by your organization.
 
-    Returns call duration, status, caller/called phone numbers, and flags
-    indicating whether recordings and transcripts are available.
+    Returns call duration, status, mode (e.g. telephony carrier vs WebRTC),
+    caller/called phone numbers, and flags indicating whether recordings and
+    transcripts are available. Optional `call_type` filter: "all", "inbound", "outbound", "web".
     """
     user = await authenticate_mcp_request()
     org_id = user.selected_organization_id
@@ -64,7 +65,13 @@ async def list_call_logs(
         if workflow_id is not None:
             query = query.where(WorkflowRunModel.workflow_id == workflow_id)
         if call_type and call_type.lower() != "all":
-            query = query.where(WorkflowRunModel.call_type == call_type.lower())
+            clow = call_type.lower()
+            if clow in ("web", "webrtc"):
+                query = query.where(WorkflowRunModel.mode.in_(["smallwebrtc", "webrtc", "textchat"]))
+            elif clow == "phone":
+                query = query.where(~WorkflowRunModel.mode.in_(["smallwebrtc", "webrtc", "textchat"]))
+            else:
+                query = query.where(WorkflowRunModel.call_type == clow)
         if phone_number:
             clean_num = re.sub(r"[\s\-()]", "", phone_number.strip())
             query = query.where(
@@ -103,12 +110,15 @@ async def list_call_logs(
             or has_recording_track(run.extra, "bot")
         )
 
+        is_web = getattr(run, "mode", None) in ("smallwebrtc", "webrtc", "textchat")
         runs_list.append(
             {
                 "run_id": run.id,
                 "workflow_id": run.workflow_id,
                 "workflow_name": wf_name,
                 "call_type": run.call_type,
+                "mode": getattr(run, "mode", None),
+                "is_web_call": is_web,
                 "caller_number": str(caller) if caller else None,
                 "called_number": str(called) if called else None,
                 "duration_seconds": duration,
@@ -229,12 +239,16 @@ async def get_call_details(
 
     extracted_vars = extract_public_extracted_data(run.extracted_data, run.gathered_context)
 
+    is_web = getattr(run, "mode", None) in ("smallwebrtc", "webrtc", "textchat")
+
     return {
         "success": True,
         "run_id": run.id,
         "workflow_id": run.workflow_id,
         "workflow_name": wf_name or run.name,
         "call_type": run.call_type,
+        "mode": getattr(run, "mode", None),
+        "is_web_call": is_web,
         "caller_number": str(caller) if caller else None,
         "called_number": str(called) if called else None,
         "duration_seconds": duration,

@@ -21,6 +21,7 @@ async def test_list_call_logs_success(authed_user: MagicMock):
         id=101,
         workflow_id=5,
         call_type="inbound",
+        mode="plivo",
         initial_context={"caller_number": "+15551234567", "called_number": "+15559876543"},
         gathered_context={"call_disposition": "completed"},
         usage_info={"call_duration_seconds": 120},
@@ -53,6 +54,8 @@ async def test_list_call_logs_success(authed_user: MagicMock):
     assert call["workflow_name"] == "Customer Care"
     assert call["duration_seconds"] == 120
     assert call["disposition"] == "completed"
+    assert call["mode"] == "plivo"
+    assert call["is_web_call"] is False
     assert call["has_recording"] is True
     assert call["has_transcript"] is True
 
@@ -85,8 +88,9 @@ async def test_get_call_details_success(authed_user: MagicMock):
         id=103,
         workflow_id=5,
         name="Care Run 103",
-        call_type="inbound",
-        initial_context={"caller_number": "+15551234567", "called_number": "+15559876543"},
+        call_type="outbound",
+        mode="smallwebrtc",
+        initial_context={},
         gathered_context={"call_disposition": "completed"},
         extracted_data={"order_id": "ORD-999"},
         usage_info={"call_duration_seconds": 90},
@@ -116,6 +120,8 @@ async def test_get_call_details_success(authed_user: MagicMock):
     assert result["success"] is True
     assert result["run_id"] == 103
     assert result["workflow_name"] == "Customer Care"
+    assert result["mode"] == "smallwebrtc"
+    assert result["is_web_call"] is True
     assert result["duration_seconds"] == 90
-    assert result["caller_number"] == "+15551234567"
+    assert result["caller_number"] is None
     assert result["extracted_variables"]["order_id"] == "ORD-999"

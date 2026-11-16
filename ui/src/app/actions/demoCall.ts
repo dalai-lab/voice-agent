@@ -352,9 +352,11 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
             } : {})
         };
 
-        // Pre-register order in Logistics CRM (logistics.talkar.in) so payment checkout & QR code work seamlessly
+        // Logistics Use Case: Pre-register order AND trigger call via Logistics CRM
+        // so that the CRM records talkarRunId, streams the call, and synchronizes extractions automatically!
         if (useCase === "logistics") {
             try {
+                // 1. Pre-register order in Logistics CRM
                 await fetch("https://logistics.talkar.in/api/orders", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -368,8 +370,36 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
                         deliveryTimeSlot: "4 PM to 7 PM",
                     }),
                 });
+
+                // 2. Trigger the call directly through the Logistics CRM endpoint
+                const crmCallRes = await fetch(
+                    `https://logistics.talkar.in/api/orders/${randomLogisticsOrderId}/trigger-call`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ phone: formattedPhone }),
+                    }
+                );
+
+                if (crmCallRes.ok) {
+                    const crmCallData = await crmCallRes.json();
+                    const runId = crmCallData.callDetails?.runId || crmCallData.order?.talkarRunId;
+                    if (runId) {
+                        return {
+                            success: true,
+                            message: "Call initiated successfully.",
+                            workflowRunId: runId as number,
+                        };
+                    }
+                } else {
+                    console.warn(
+                        "[DemoCall] CRM trigger-call returned status",
+                        crmCallRes.status,
+                        "- falling back to direct workflow trigger"
+                    );
+                }
             } catch (crmErr) {
-                console.warn("[DemoCall] Failed to sync order to logistics CRM:", crmErr);
+                console.warn("[DemoCall] Failed to trigger call via logistics CRM, falling back:", crmErr);
             }
         }
 

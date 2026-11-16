@@ -419,8 +419,17 @@ export async function pollDemoCallResult(
 
         const data = await response.json();
 
+        const hasExtraction =
+            data.extracted_data &&
+            typeof data.extracted_data === "object" &&
+            Object.keys(data.extracted_data).length > 0;
+
         if (!data.is_completed) {
-            return { ready: false, call_disposition: data.call_disposition ?? undefined };
+            return {
+                ready: false,
+                extractedData: hasExtraction ? data.extracted_data : undefined,
+                call_disposition: data.call_disposition ?? undefined,
+            };
         }
 
         return {

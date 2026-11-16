@@ -183,6 +183,7 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
     candidate_score: "Candidate Fit Score",
   },
   logistics: {
+    who_answered: "Call Answered By",
     availability: "Recipient Availability",
     receiver_name: "Receiver Name",
     landmark: "Nearby Landmark",
@@ -192,10 +193,39 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
 };
 
 // ---------------------------------------------------------------------------
-// Sub-Components: Formatted Value Renderer
+// Helpers: Robust Field Value Resolver & Formatted Value Renderer
 // ---------------------------------------------------------------------------
+function getFieldValue(data: any, key: string) {
+  if (!data || typeof data !== "object") return null;
+  if (data[key] !== undefined && data[key] !== null) return data[key];
+
+  // Try underscore <-> space
+  const spaced = key.replace(/_/g, " ");
+  if (data[spaced] !== undefined && data[spaced] !== null) return data[spaced];
+
+  const underscored = key.replace(/ /g, "_");
+  if (data[underscored] !== undefined && data[underscored] !== null) return data[underscored];
+
+  // Normalized alphanumeric match (ignores spaces, underscores, dashes, and casing)
+  const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  for (const [k, v] of Object.entries(data)) {
+    if (k.toLowerCase().replace(/[^a-z0-9]/g, "") === normKey) {
+      if (v !== undefined && v !== null) return v;
+    }
+  }
+
+  return null;
+}
+
 function FormattedValue({ value, labelKey }: { value: any; labelKey: string }) {
-  if (value === null || value === undefined || value === "" || value === "null") {
+  if (
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    value === "null" ||
+    value === "not_given" ||
+    value === "not given"
+  ) {
     return <span className="text-xs text-slate-500 font-medium">—</span>;
   }
 
@@ -207,6 +237,101 @@ function FormattedValue({ value, labelKey }: { value: any; labelKey: string }) {
         }`}
       >
         {value ? "✓ Yes" : "✕ No"}
+      </span>
+    );
+  }
+
+  const str = String(value).trim();
+  const lowerStr = str.toLowerCase();
+
+  // Boolean-like strings
+  if (lowerStr === "yes" || lowerStr === "true") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+        ✓ Yes
+      </span>
+    );
+  }
+  if (lowerStr === "no" || lowerStr === "false") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-slate-800 text-slate-400">
+        ✕ No
+      </span>
+    );
+  }
+
+  // Common status badges
+  if (
+    lowerStr === "confirmed" ||
+    lowerStr.includes("link requested") ||
+    lowerStr.includes("link_requested") ||
+    lowerStr === "cod confirmed" ||
+    lowerStr === "cod_confirmed" ||
+    lowerStr === "booked"
+  ) {
+    let badgeText = "✓ Confirmed";
+    if (lowerStr.includes("link")) badgeText = "✓ Link Requested";
+    if (lowerStr.includes("cod")) badgeText = "✓ COD Confirmed";
+    if (lowerStr === "booked") badgeText = "✓ Booked";
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+        {badgeText}
+      </span>
+    );
+  }
+
+  if (
+    lowerStr.includes("declined") ||
+    lowerStr.includes("keep_cod") ||
+    lowerStr.includes("keep cod") ||
+    lowerStr.includes("cod pending") ||
+    lowerStr.includes("cod_pending")
+  ) {
+    let badgeText = "COD at Delivery";
+    if (lowerStr.includes("pending")) badgeText = "COD Pending Payment";
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25">
+        {badgeText}
+      </span>
+    );
+  }
+
+  if (lowerStr === "someone else" || lowerStr === "someone_else") {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
+        Someone Else
+      </span>
+    );
+  }
+
+  if (lowerStr === "self" || lowerStr === "available") {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+        {lowerStr === "available" ? "✓ Available" : "Self (Available)"}
+      </span>
+    );
+  }
+
+  if (lowerStr === "customer") {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+        ✓ Customer
+      </span>
+    );
+  }
+
+  if (lowerStr === "reschedule" || lowerStr === "rescheduled" || lowerStr.includes("reschedule")) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-sky-500/15 text-sky-300 border border-sky-500/25">
+        Reschedule Requested
+      </span>
+    );
+  }
+
+  if (lowerStr === "cancelled" || lowerStr === "canceled") {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-rose-500/15 text-rose-300 border border-rose-500/25">
+        ✕ Cancelled
       </span>
     );
   }
@@ -240,10 +365,9 @@ function FormattedValue({ value, labelKey }: { value: any; labelKey: string }) {
     );
   }
 
-  const str = String(value);
   if (labelKey === "sentiment") {
-    const isPos = str.toLowerCase().includes("pos");
-    const isNeg = str.toLowerCase().includes("neg");
+    const isPos = lowerStr.includes("pos");
+    const isNeg = lowerStr.includes("neg");
     return (
       <span
         className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold border ${
@@ -281,11 +405,42 @@ function CallCompletedCard({
   const persona = PERSONAS[useCase] || PERSONAS.hotel;
   const labels = FIELD_LABELS[useCase] || FIELD_LABELS.hotel;
 
-  const allEntries = Object.entries(labels).map(([key, label]) => {
-    const val = data?.[key];
+  const primaryKeys = new Set(Object.keys(labels));
+  const primaryEntries = Object.entries(labels).map(([key, label]) => {
+    let val = getFieldValue(data, key);
+    if (val === "not_given" || val === "not given" || val === "unknown") {
+      val = null;
+    }
     const hasValue = val !== null && val !== undefined && val !== "" && val !== "null";
     return { key, label, val, hasValue };
   });
+
+  // Include any extra fields returned by Talkar that have values
+  const extraEntries: { key: string; label: string; val: any; hasValue: boolean }[] = [];
+  if (data && typeof data === "object") {
+    for (const [rawK, rawV] of Object.entries(data)) {
+      if (rawK.startsWith("_")) continue;
+      const normK = rawK.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const isAlreadyInPrimary = Array.from(primaryKeys).some(
+        (pk) => pk.toLowerCase().replace(/[^a-z0-9]/g, "") === normK
+      );
+      if (!isAlreadyInPrimary) {
+        let val = rawV;
+        if (val === "not_given" || val === "not given" || val === "unknown") {
+          val = null;
+        }
+        const hasValue = val !== null && val !== undefined && val !== "" && val !== "null";
+        if (hasValue) {
+          const niceLabel = rawK
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+          extraEntries.push({ key: rawK, label: niceLabel, val, hasValue: true });
+        }
+      }
+    }
+  }
+
+  const allEntries = [...primaryEntries, ...extraEntries];
 
   const capturedCount = allEntries.filter((e) => e.hasValue).length;
 
@@ -677,6 +832,38 @@ export function DemoCallForm() {
         setTurnIds(arr.map((t) => t.id));
       };
 
+      // Background poller to fetch official extraction results from Talkar backend
+      const fetchOfficialExtraction = (targetRunId: number) => {
+        let attempts = 0;
+        const maxAttempts = 10;
+        const checkOnce = async () => {
+          try {
+            const res = await pollDemoCallResult(targetRunId);
+            if (res.extractedData && Object.keys(res.extractedData).length > 0) {
+              setExtractedData((prev: any) => ({
+                ...(prev || {}),
+                ...res.extractedData,
+              }));
+              if (res.ready) return true;
+            }
+          } catch (e) {
+            console.error("[DemoCall] Failed to fetch official extraction:", e);
+          }
+          return false;
+        };
+
+        checkOnce().then((done) => {
+          if (done) return;
+          const officialPollTimer = setInterval(async () => {
+            attempts++;
+            const isDone = await checkOnce();
+            if (isDone || attempts >= maxAttempts) {
+              clearInterval(officialPollTimer);
+            }
+          }, 1400);
+        });
+      };
+
       es.onmessage = (evt) => {
         if (!evt.data) return;
         const msg = JSON.parse(evt.data);
@@ -695,20 +882,13 @@ export function DemoCallForm() {
             clearInterval(durationTimerRef.current);
             durationTimerRef.current = null;
           }
-          if (finalLinesRef.length > 0) {
-            runLiveExtraction([...finalLinesRef], useCase)
-              .then((fields) => {
-                if (fields && Object.keys(fields).length > 0) setExtractedData(fields);
-              })
-              .catch(console.error)
-              .finally(() => {
-                setCallingState("done");
-                setExtractedData((prev: any) => prev || liveFields);
-              });
-          } else {
-            setCallingState("done");
-            setExtractedData(liveFields);
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
           }
+          setCallingState("done");
+          setExtractedData((prev: any) => prev || liveFields);
+          fetchOfficialExtraction(runId);
           return;
         }
 
@@ -769,7 +949,8 @@ export function DemoCallForm() {
         }
         if (callingState !== "done") {
           setCallingState("done");
-          setExtractedData(liveFields);
+          setExtractedData((prev: any) => prev || liveFields);
+          fetchOfficialExtraction(runId);
         }
       };
 
@@ -778,8 +959,39 @@ export function DemoCallForm() {
           const poll = await pollDemoCallResult(runId);
           const disposition = poll.call_disposition;
 
+          if (poll.extractedData && Object.keys(poll.extractedData).length > 0) {
+            setExtractedData((prev: any) => ({
+              ...(prev || {}),
+              ...poll.extractedData,
+            }));
+          }
+
+          if (poll.ready || disposition === "completed" || disposition === "normal_clearing") {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+            if (durationTimerRef.current) {
+              clearInterval(durationTimerRef.current);
+              durationTimerRef.current = null;
+            }
+            if (sseRef.current) {
+              sseRef.current.close();
+              sseRef.current = null;
+            }
+            setCallingState("done");
+            if (poll.extractedData && Object.keys(poll.extractedData).length > 0) {
+              setExtractedData((prev: any) => ({
+                ...(prev || {}),
+                ...poll.extractedData,
+              }));
+            } else {
+              fetchOfficialExtraction(runId);
+            }
+            return;
+          }
+
           if (disposition === "busy") {
             clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
             clearTimers();
             setCallingState("error");
             setErrorMessage(
@@ -787,6 +999,7 @@ export function DemoCallForm() {
             );
           } else if (disposition === "no_answer") {
             clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
             clearTimers();
             setCallingState("error");
             setErrorMessage(
@@ -794,12 +1007,13 @@ export function DemoCallForm() {
             );
           } else if (disposition === "failed") {
             clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
             clearTimers();
             // Auto-retry silently for pure telephony failures (no limit consumed)
             handleInitiateCall(undefined, true);
           }
         } catch { /* ignore */ }
-      }, 4000);
+      }, 3000);
     } catch (err: any) {
       setCallingState("error");
       setErrorMessage(err?.message || "Unexpected error. Please try again.");
@@ -809,9 +1023,17 @@ export function DemoCallForm() {
   const currentPersona = PERSONAS[useCase] || PERSONAS.hotel;
   const currentLabels = FIELD_LABELS[useCase] || FIELD_LABELS.hotel;
   const allFieldKeys = Object.keys(currentLabels);
-  const capturedFieldsCount = Object.entries(liveFields).filter(
-    ([k, v]) => k !== "_citations" && v !== null && v !== undefined && v !== ""
-  ).length;
+  const capturedFieldsCount = allFieldKeys.filter((key) => {
+    const val = getFieldValue(liveFields, key);
+    return (
+      val !== null &&
+      val !== undefined &&
+      val !== "" &&
+      val !== "null" &&
+      val !== "not_given" &&
+      val !== "not given"
+    );
+  }).length;
 
   const industryOptions = [
     { id: "hotel", label: "Hotel Bookings", icon: Hotel },
@@ -862,7 +1084,7 @@ export function DemoCallForm() {
         )}
 
         {/* COMPLETED STATE */}
-        {!isMaintenance && callingState === "done" && extractedData && (
+        {!isMaintenance && callingState === "done" && (
           <motion.div
             key="done"
             initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -872,7 +1094,7 @@ export function DemoCallForm() {
             className="w-full flex justify-center"
           >
             <CallCompletedCard
-              data={extractedData}
+              data={extractedData || liveFields || {}}
               useCase={useCase}
               durationSec={callDuration}
               turnCount={turnCount || liveTurns.length}
@@ -1015,8 +1237,14 @@ export function DemoCallForm() {
                   <AnimatePresence>
                     {allFieldKeys.map((key) => {
                       const label = currentLabels[key] || key;
-                      const val = liveFields[key];
-                      const hasValue = val !== null && val !== undefined && val !== "";
+                      const val = getFieldValue(liveFields, key);
+                      const hasValue =
+                        val !== null &&
+                        val !== undefined &&
+                        val !== "" &&
+                        val !== "null" &&
+                        val !== "not_given" &&
+                        val !== "not given";
                       const isRecentlyUpdated = (recentFieldKeys[key] || 0) > Date.now();
                       return (
                         <motion.div

@@ -155,8 +155,8 @@ async function checkRateLimit(ip: string): Promise<boolean> {
         // Filter out timestamps older than RATE_LIMIT_HOURS (24)
         const recentCalls = history.filter(t => (now - t) / (1000 * 60 * 60) < RATE_LIMIT_HOURS);
 
-        if (recentCalls.length >= 2) {
-            return false; // Rate limited (max 2 calls per day)
+        if (recentCalls.length >= 50) {
+            return false; // Rate limited (max 50 calls per day)
         }
 
         // Update timestamps for this IP
@@ -193,7 +193,8 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
 
         const isRetry = formData.get("isRetry") === "true";
 
-        // Check Rate Limit (Bypass if IP is unknown for local testing, though unlikely in prod)
+        // Demo Rate Limit: Commented out for demo testing (limit raised to 50 when active)
+        /*
         if (ip !== "unknown-ip" && !isRetry) {
             const allowed = await checkRateLimit(ip);
             if (!allowed) {
@@ -203,6 +204,7 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
                 };
             }
         }
+        */
 
         // Check if workflow exists for the use case
         const workflowId = WORKFLOW_MAP[useCase];

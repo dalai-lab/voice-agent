@@ -302,18 +302,46 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
         ];
         const randomItem = sampleProducts[Math.floor(Math.random() * sampleProducts.length)];
         const randomOrderId = `DLV-${Math.floor(100000 + Math.random() * 900000)}`;
+        const randomBookingId = `GH-${Math.floor(1000 + Math.random() * 9000)}`;
+        const randomTicketId = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
 
         const initialContext: Record<string, any> = {
             first_name: firstName,
             customer_name: name,
             source: "landing_page_demo",
-            ...(useCase === "recruiter" && jobDescription ? { job_description: jobDescription } : {}),
-            ...(useCase === "recruiter" && resumeSummary ? { resume: resumeSummary } : {}),
+            ...(useCase === "hotel" ? {
+                booking_id: randomBookingId,
+                check_in_date: "this Friday",
+                room_type: "Deluxe King Suite"
+            } : {}),
+            ...(useCase === "medical" ? {
+                doctor_name: "Dr. Sharma",
+                appointment_time: "tomorrow at 3:30 PM",
+                department: "General Consultation"
+            } : {}),
+            ...(useCase === "sales" ? {
+                inquiry_topic: "AI Voice Workflows"
+            } : {}),
+            ...(useCase === "service" ? {
+                ticket_id: randomTicketId,
+                service_type: "AC Cooling & Maintenance",
+                dispatch_slot: "tomorrow between 2 PM and 5 PM"
+            } : {}),
+            ...(useCase === "real_estate" ? {
+                property_name: "Skyline Heights 2-Bedroom Luxury Residence",
+                location: "Downtown",
+                budget_hint: "₹85 Lakhs"
+            } : {}),
+            ...(useCase === "recruiter" ? {
+                role_title: "Senior Full-Stack Engineer",
+                job_description: jobDescription || "Senior Full-Stack Engineer (React, Node.js, TypeScript, Cloud Architecture)",
+                ...(resumeSummary ? { resume: resumeSummary } : {})
+            } : {}),
             ...(useCase === "logistics" ? {
                 order_id: randomOrderId,
                 item: randomItem,
                 company_name: "Delhivery",
-                agent_name: "Aarav",
+                agent_name: "Ananya",
                 slot: "4 PM to 7 PM",
                 is_cod: "true",
                 prepaid_discount_percent: "10",
@@ -410,73 +438,64 @@ export async function pollDemoCallResult(
 // Live Extraction during SSE — smart domain-aware prompts
 // ---------------------------------------------------------------------------
 const EXTRACTION_PROMPTS: Record<string, string> = {
-  hotel: `You are extracting structured data from a HOTEL RESERVATION call between a hotel front desk agent and a caller.
+  hotel: `You are extracting structured data from a LUXURY HOTEL PRE-ARRIVAL CONCIERGE call between concierge Sarah and a guest.
 
 Extract these fields (return null if not yet mentioned):
-- caller_name: The caller's full name as stated. e.g. "John Smith"
-- wants_to_book: true if they express intent to make a reservation, false otherwise.
-- inquiry_type: Normalize to one of: "Room Booking", "Availability Check", "Price Inquiry", "Amenities", "Cancellation", "Complaint", "Other".
-- check_in_date: Normalize to a readable string like "March 15" or "next Friday". Do NOT copy filler words.
-- check_out_date: Same format as check_in_date.
-- guests_count: Number of guests as an integer. e.g. 2
-- room_preference: MUST be one of: "Single", "Double", "Twin", "Suite", "Deluxe", "Family Room". Infer from context — do NOT use the caller's literal phrasing if it doesn't match a room type.
-- sentiment: "Positive", "Neutral", or "Negative" based on caller's tone.
-- interest_score: Integer 1-10 rating of how likely they are to book.`,
+- arrival_time: Estimated arrival time stated by the guest. e.g. "3:00 PM", "Around 4 PM", "Evening".
+- room_preference: Specific preferences requested. e.g. "High floor", "King bed", "Quiet room", "Ocean view".
+- guests_count: Number of guests staying as an integer. e.g. 1, 2.
+- dinner_reservation: "Requested", "Declined", or null.
+- booking_status: One of: "Confirmed", "Rescheduled", "Cancelled".`,
 
-  medical: `You are extracting structured data from a MEDICAL INTAKE call between a clinic coordinator and a patient.
+  medical: `You are extracting structured data from a CLINIC PRE-CONSULTATION INTAKE call between coordinator Emma and a patient.
 
 Extract these fields (return null if not yet mentioned):
 - patient_name: The patient's full name. e.g. "Priya Sharma"
-- patient_type: "New Patient" or "Existing Patient" based on context.
-- call_reason: Brief normalized reason. e.g. "Fever and headache", "Annual checkup".
-- symptoms_mentioned: Comma-separated list of specific symptoms. e.g. "fever, headache, sore throat".
-- preferred_date_time: When they want the appointment. e.g. "Monday afternoon".
-- action_taken: What the agent did. e.g. "Appointment scheduled", "Referred to specialist".
-- urgency_level: "Low", "Medium", or "High" — infer from symptoms and tone.`,
+- attendance_status: "Confirmed (Tomorrow 3:30 PM)", "Reschedule Requested", or "Cancelled".
+- symptoms_mentioned: Primary symptoms described by the patient. e.g. "Fever and persistent cough".
+- urgency_level: "Low", "Medium", or "High" — infer from symptoms and tone.
+- action_taken: Final resolution e.g. "Appointment Confirmed", "Reschedule Requested", or "Cancelled".`,
 
-  sales: `You are extracting structured data from a B2B SALES call between a sales rep and a prospect.
+  sales: `You are extracting structured data from a B2B SAAS CALLBACK between sales specialist Jordan and a prospect.
 
 Extract these fields (return null if not yet mentioned):
 - prospect_name: The prospect's full name. e.g. "Michael Torres"
-- company_size: Normalize to: "1-10", "11-50", "51-200", "201-1000", "1000+". Infer from context.
-- primary_pain_point: Their core business problem in 3-6 words. e.g. "Manual data entry overhead".
-- timeline: When they want to buy/implement. e.g. "Q1 2025", "Within 3 months".
-- demo_booked: true if they agreed to a demo/meeting, false otherwise.
-- lead_score: Integer 1-10. Score based on: budget authority (2pts), need expressed (3pts), timeline urgency (3pts), engagement quality (2pts).
-- sentiment: "Excited", "Interested", "Skeptical", "Neutral", or "Negative".`,
+- company_size: Team size. Normalize to: "1-10", "11-50", "51-200", "200+".
+- primary_pain_point: Their core business problem in 3-6 words. e.g. "Manual customer callback bottleneck".
+- timeline: When they want to deploy. e.g. "This month", "Next quarter", "Exploring".
+- demo_booked: true if they agreed to a 15-minute live demo, false otherwise.
+- lead_score: Integer 1-10 based on team size, expressed need, and urgency.`,
 
-  service: `You are extracting structured data from a HOME SERVICES dispatch call between a coordinator and a customer.
+  service: `You are extracting structured data from a HOME SERVICES DISPATCH call between coordinator Casey and a customer.
 
 Extract these fields (return null if not yet mentioned):
 - customer_name: The customer's full name. e.g. "Sarah Johnson"
-- service_category: Normalize to: "Plumbing", "Electrical", "HVAC / AC", "Carpentry", "Painting", "Pest Control", "Cleaning", "Appliance Repair", "Other".
-- issue_description: Concise problem description. Max 8 words. e.g. "Kitchen sink blocked".
-- service_address: Their full address if mentioned.
-- preferred_schedule: When they want the service. e.g. "Tomorrow morning".
-- urgency_level: "Low" (routine), "Medium" (inconvenient), "High" (emergency).
-- job_status: "New Request", "Scheduled", "In Progress", "Completed", or "Follow-up Needed".`,
+- service_category: The service type. e.g. "AC Cooling & Maintenance", "Plumbing".
+- issue_description: Concise problem description. e.g. "Water leaking under AC unit".
+- service_address: Their address, apartment number, or landmark. e.g. "Flat 402, near Apollo Pharmacy".
+- urgency_level: "Standard" or "Emergency".
+- job_status: "Booked", "Rescheduled", or "Cancelled".`,
 
-  real_estate: `You are extracting structured data from a REAL ESTATE inquiry call between a property advisor and a client.
+  real_estate: `You are extracting structured data from a REAL ESTATE BROCHURE FOLLOW-UP call between property advisor Kabir and a client.
 
 Extract these fields (return null if not yet mentioned):
 - client_name: The client's full name. e.g. "Arnav Mehta"
-- client_intent: MUST be exactly one of: "Buying", "Selling", "Renting", "unknown".
-- property_preference: Normalize to: "1BHK Apartment", "2BHK Apartment", "3BHK Apartment", "Villa", "Studio", "Commercial Space", "Plot/Land". Do NOT copy phrases like "quiet room".
-- budget_range: Format as a clean range e.g. "₹20L - ₹30L" or "$500k - $700k". Infer currency from context.
-- timeline: e.g. "Immediately", "Within 1 month", "By end of year".
+- client_intent: One of: "Buying (Self-Use)", "Investment", "Renting".
+- property_preference: Property or unit type discussed. e.g. "2-Bedroom Luxury Residence".
+- budget_range: Format as a clean range e.g. "₹80L - ₹90L" or "$650k - $750k".
+- timeline: e.g. "Immediate", "Within 2 months", "Next quarter".
 - pre_approved_status: "Pre-approved", "In progress", "Not yet", or "Not Discussed".
-- lead_outcome: One of: "Hot Lead", "Warm Lead", "Nurture Lead", "Not Interested", "Converted".`,
+- lead_outcome: "Private Showing Scheduled", "Consultation Booked", or "Nurture Lead".`,
 
-  recruiter: `You are extracting structured data from a RECRUITER SCREENING call between a talent screener and a job candidate.
+  recruiter: `You are extracting structured data from a RECRUITER SCREENING call between talent screener Alex and a job candidate.
 
 Extract these fields (return null if not yet mentioned):
 - candidate_name: The candidate's full name. e.g. "Rahul Verma"
-- experience_level: Normalize to: "Fresher (0-1 yrs)", "Junior (1-3 yrs)", "Mid-level (3-6 yrs)", "Senior (6-10 yrs)", "Lead/Principal (10+ yrs)".
-- key_skills: Top 3-5 skills as a comma-separated string. e.g. "React, Node.js, TypeScript".
-- salary_expectations: Format as e.g. "₹12 LPA", "$95,000/yr". Include currency from context.
-- notice_period: e.g. "Immediate", "30 days", "60 days", "3 months".
-- communication_skills: "Poor", "Average", "Good", or "Excellent".
-- candidate_score: Integer 1-10 based on: skill match (4pts), experience relevance (3pts), communication (2pts), enthusiasm (1pt).`,
+- experience_level: Normalize to: "Fresher (0-1 yrs)", "Junior (1-3 yrs)", "Mid-level (3-6 yrs)", "Senior (6-10 yrs)", "Lead (10+ yrs)".
+- key_skills: Top 3-5 technical skills discussed as a comma-separated string. e.g. "React, Node.js, TypeScript".
+- salary_expectations: Format as e.g. "₹18 LPA", "$120,000/yr". Include currency from context.
+- notice_period: e.g. "Immediate", "30 days", "60 days", "90 days".
+- candidate_score: Integer 1-10 based on skill match, experience relevance, and communication.`,
 
   logistics: `You are extracting structured data from an E-COMMERCE / LOGISTICS DELIVERY CONFIRMATION call between a delivery coordinator and a customer.
 

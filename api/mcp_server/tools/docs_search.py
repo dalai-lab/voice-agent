@@ -13,9 +13,13 @@ sync with the published docs rather than indexing every file under ``docs/``.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
+import urllib.error
+import urllib.parse
+import urllib.request
 from collections import Counter
 from dataclasses import dataclass, replace
 from functools import lru_cache
@@ -24,6 +28,7 @@ from typing import Any
 
 import yaml
 from fastapi import HTTPException
+from loguru import logger
 
 from api.mcp_server.auth import authenticate_mcp_request
 from api.mcp_server.tracing import traced_tool
@@ -31,6 +36,244 @@ from api.mcp_server.tracing import traced_tool
 DOCS_SEARCH_MAX_LIMIT = 25
 DOCS_LIST_MAX_DEPTH = 3
 _ROOT_SECTION_PATH = "__root__"
+
+TALKAR_DOCS_BASE_URL = os.environ.get("TALKAR_DOCS_URL", "https://docs.talkar.in").rstrip("/")
+
+def _is_remote_docs_enabled() -> bool:
+    """True if live remote docs fetching from docs.talkar.in is enabled."""
+    if os.environ.get("DOGRAH_DOCS_PATH"):
+        return False
+    return bool(TALKAR_DOCS_BASE_URL)
+
+async def _search_remote_docs(query: str, limit: int) -> list[dict] | None:
+    """Query live FlexSearch on docs.talkar.in and return normalized MCP entries."""
+    try:
+        encoded = urllib.parse.quote(query.strip())
+        url = f"{TALKAR_DOCS_BASE_URL}/api/search?query={encoded}"
+
+        def _fetch() -> list[dict]:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Talkar-MCP/1.0", "Accept": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        raw_results = await asyncio.to_thread(_fetch)
+        if not isinstance(raw_results, list):
+            return None
+
+        capped_limit = min(limit, DOCS_SEARCH_MAX_LIMIT)
+        seen_keys: set[tuple[str, str | None]] = set()
+        formatted: list[dict] = []
+
+        for item in raw_results:
+            if not isinstance(item, dict):
+                continue
+            item_url = item.get("url", "")
+            raw_path = item_url.split("#")[0].replace("/docs/", "").strip("/")
+            section_slug = item_url.split("#")[1] if "#" in item_url else None
+            clean_path = raw_path if raw_path else "docs"
+
+            dedup_key = (clean_path, section_slug)
+            if dedup_key in seen_keys:
+                continue
+            seen_keys.add(dedup_key)
+
+            breadcrumbs = " > ".join(item.get("breadcrumbs", [])) or "Docs"
+            content = str(item.get("content", "")).strip()
+
+            entry: dict[str, Any] = {
+                "kind": "page",
+                "path": clean_path,
+                "title": content if item.get("type") == "page" else (item.get("breadcrumbs", [""])[-1] or clean_path),
+                "breadcrumb": breadcrumbs,
+                "llm_hint": content,
+            }
+            if section_slug:
+                entry["section_slug"] = section_slug
+
+            formatted.append(_compact_dict(entry))
+            if len(formatted) >= capped_limit:
+                break
+
+        return formatted
+    except Exception as exc:
+        logger.warning(f"[MCP Docs] Remote search to {TALKAR_DOCS_BASE_URL} failed ({exc}); falling back to local docs.")
+        return None
+
+async def _read_remote_doc(path: str, section: str | None = None) -> dict | None:
+    """Fetch live markdown page from docs.talkar.in."""
+    try:
+        clean_path = path.strip("/").replace("docs/", "").strip("/")
+        if not clean_path or clean_path == "docs" or clean_path == "index":
+            doc_url = f"{TALKAR_DOCS_BASE_URL}/llms.mdx/docs/content.md"
+        else:
+            doc_url = f"{TALKAR_DOCS_BASE_URL}/llms.mdx/docs/{clean_path}/content.md"
+
+        def _fetch() -> str:
+            req = urllib.request.Request(
+                doc_url,
+                headers={"User-Agent": "Talkar-MCP/1.0", "Accept": "text/markdown"},
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                return resp.read().decode("utf-8")
+
+        raw_md = await asyncio.to_thread(_fetch)
+        if not raw_md:
+            return None
+
+        # Title from first heading
+        lines = raw_md.split("\n")
+        title = clean_path
+        for line in lines:
+            if line.startswith("# "):
+                title = line.lstrip("# ").split(" (")[0].split(" [#")[0].strip()
+                break
+
+        sections: list[dict[str, str]] = []
+        section_contents: dict[str, str] = {}
+        current_slug: str | None = None
+        current_lines: list[str] = []
+
+        for line in lines:
+            match = re.match(r"^(#{1,6})\s+(.*?)(?:\s+\[#(.*?)\])?\s*$", line)
+            if match:
+                if current_slug and current_lines:
+                    section_contents[current_slug] = "\n".join(current_lines).strip()
+                sec_title = match.group(2).strip()
+                sec_slug = match.group(3) or _slugify(sec_title)
+                sections.append({"title": sec_title, "slug": sec_slug})
+                current_slug = sec_slug
+                current_lines = [line]
+            elif current_slug:
+                current_lines.append(line)
+
+        if current_slug and current_lines:
+            section_contents[current_slug] = "\n".join(current_lines).strip()
+
+        active_content = raw_md
+        active_sec_title: str | None = None
+        active_sec_slug: str | None = None
+
+        if section is not None:
+            target = section.strip().lower()
+            found = False
+            for s in sections:
+                if s["slug"].lower() == target or s["title"].lower() == target:
+                    active_sec_title = s["title"]
+                    active_sec_slug = s["slug"]
+                    active_content = section_contents.get(s["slug"], active_content)
+                    found = True
+                    break
+            if not found:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Unknown section {section!r} for docs page {path!r}",
+                )
+
+        return _compact_dict({
+            "path": clean_path,
+            "title": title,
+            "breadcrumb": f"Docs > {title}",
+            "llm_hint": f"Talkar documentation for {title}",
+            "section_title": active_sec_title,
+            "section_slug": active_sec_slug,
+            "content": active_content,
+            "sections": sections,
+        })
+    except HTTPException:
+        raise
+    except urllib.error.HTTPError as he:
+        if he.code == 404:
+            raise HTTPException(status_code=404, detail=f"Unknown docs page: {path!r}")
+        logger.warning(f"[MCP Docs] Remote read HTTP error ({he}); falling back.")
+        return None
+    except Exception as exc:
+        logger.warning(f"[MCP Docs] Remote read error ({exc}); falling back.")
+        return None
+
+async def _list_remote_docs(path: str | None = None, depth: int = 1) -> list[dict] | None:
+    """Fetch live navigation tree from docs.talkar.in/llms.txt."""
+    try:
+        url = f"{TALKAR_DOCS_BASE_URL}/llms.txt"
+
+        def _fetch() -> str:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Talkar-MCP/1.0", "Accept": "text/plain"},
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                return resp.read().decode("utf-8")
+
+        text = await asyncio.to_thread(_fetch)
+        if not text:
+            return None
+
+        categories: dict[str, list[dict]] = {}
+        category_titles: dict[str, str] = {}
+        current_cat_title = "General"
+        current_cat_slug = "general"
+        categories[current_cat_slug] = []
+        category_titles[current_cat_slug] = current_cat_title
+
+        for line in text.split("\n"):
+            line_s = line.strip()
+            if not line_s or line_s.startswith("#"):
+                continue
+            if line.startswith("- ") and not line.startswith("- ["):
+                current_cat_title = line[2:].strip()
+                current_cat_slug = _slugify(current_cat_title)
+                categories[current_cat_slug] = []
+                category_titles[current_cat_slug] = current_cat_title
+            elif line_s.startswith("- ["):
+                match = re.match(r"-\s*\[(.*?)\]\((.*?)\):\s*(.*)", line_s)
+                if match:
+                    doc_title, doc_url, doc_desc = match.groups()
+                    clean_doc_path = doc_url.replace("/docs/", "").strip("/")
+                    categories[current_cat_slug].append({
+                        "kind": "page",
+                        "path": clean_doc_path if clean_doc_path else "docs",
+                        "title": doc_title,
+                        "breadcrumb": f"Docs > {current_cat_title}",
+                        "llm_hint": doc_desc,
+                    })
+
+        if path is None:
+            results: list[dict] = []
+            for slug, items in categories.items():
+                if not items:
+                    continue
+                results.append(_compact_dict({
+                    "kind": "section",
+                    "path": slug,
+                    "title": category_titles.get(slug, slug),
+                    "breadcrumb": "Docs",
+                    "llm_hint": f"Browse {len(items)} docs in this section.",
+                    "has_children": True,
+                    "child_count": len(items),
+                    "page_count": len(items),
+                }))
+                if depth > 1:
+                    results.extend(items)
+            return results
+
+        norm_path = _slugify(path.strip("/"))
+        if norm_path in categories:
+            return categories[norm_path]
+
+        # Check if requested a specific page directly
+        for items in categories.values():
+            for item in items:
+                if item["path"] == path.strip("/"):
+                    return [item]
+
+        raise HTTPException(status_code=404, detail=f"Unknown docs section: {path!r}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning(f"[MCP Docs] Remote list error ({exc}); falling back.")
+        return None
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_]+")
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
@@ -627,6 +870,11 @@ async def list_docs(path: str | None = None, depth: int = 1) -> list[dict]:
     if depth < 1 or depth > DOCS_LIST_MAX_DEPTH:
         raise ValueError(f"`depth` must be between 1 and {DOCS_LIST_MAX_DEPTH}.")
 
+    if _is_remote_docs_enabled():
+        remote_list = await _list_remote_docs(path, depth)
+        if remote_list is not None:
+            return remote_list
+
     index = _docs_index()
     if not index.sections_by_path:
         return []
@@ -650,6 +898,11 @@ async def read_doc(path: str, section: str | None = None) -> dict:
 
     if not isinstance(path, str) or not path.strip():
         raise ValueError("`path` must be a non-empty string.")
+
+    if _is_remote_docs_enabled():
+        remote_doc = await _read_remote_doc(path, section)
+        if remote_doc is not None:
+            return remote_doc
 
     page = _get_page_or_404(path)
     active_section = None
@@ -682,6 +935,11 @@ async def search_docs(query: str, limit: int = 5) -> list[dict]:
         raise ValueError(
             "`query` must contain at least one non-stopword alphanumeric term."
         )
+
+    if _is_remote_docs_enabled():
+        remote_search = await _search_remote_docs(query, limit)
+        if remote_search is not None:
+            return remote_search
 
     index = _docs_index()
     if not index.pages_by_path:

@@ -119,7 +119,7 @@ const WORKFLOW_MAP: Record<string, string> = {
     service: "cb75c339-e0de-46a5-a3b8-843fe5189241",
     real_estate: "6b92b43d-8251-4b48-97f8-8a0bc643ac31",
     recruiter: "4bb689a2-f139-4b40-af2a-e0eb8c9c502f",
-    logistics: "1d7e3a01-c7fa-4dee-b5bf-67a952abe9e3"
+    logistics: "57c36bde-c63b-4852-a915-c77bc86187cd"
 };
 
 interface RateLimitData {
@@ -340,7 +340,7 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
             ...(useCase === "logistics" ? {
                 order_id: randomOrderId,
                 item: randomItem,
-                company_name: "Delhivery",
+                company_name: "Talkar Logistics",
                 agent_name: "Ananya",
                 slot: "4 PM to 7 PM",
                 is_cod: "true",

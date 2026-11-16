@@ -50,19 +50,16 @@ Each node represents a step in the conversation.
 
 ## Node data fields
 
-### Common fields (all node types)
+### Conversational Node fields (`startCall`, `agentNode`, `endCall`)
 
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `name` | string | required | Display name for the node |
-| `prompt` | string | required* | LLM system prompt. *Not required for `trigger`, `webhook`, `qa` nodes |
-| `allow_interrupt` | boolean | `false` | Allow the caller to interrupt the agent mid-speech |
-| `wait_for_user_response` | boolean | `false` | Pause and wait for caller input before continuing |
-| `wait_for_user_response_timeout` | number | `null` | Seconds to wait for input before timing out |
-| `detect_voicemail` | boolean | `false` | Detect and handle voicemail on outbound calls |
-| `delayed_start` | boolean | `false` | Delay execution of this node |
-| `delayed_start_duration` | number | `null` | Delay in seconds |
+| `prompt` | string | required* | LLM system prompt. *Not required for `trigger`, `webhook`, `qa`, `paygent`, `tuner` nodes |
+| `allow_interrupt` | boolean | `true` (`false` on `startCall`) | Allow the caller to interrupt the agent mid-speech (forced `false` on `endCall`) |
 | `add_global_prompt` | boolean | `true` | Merge the `globalNode` prompt into this node's prompt |
+| `delayed_start` | boolean | `false` | (`startCall` only) Delay initial greeting playback after call answer |
+| `delayed_start_duration` | number | `2.0` | (`startCall` only) Delay in seconds (`0.1` to `10.0`) |
 
 ### agentNode — data extraction
 

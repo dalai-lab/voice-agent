@@ -61,6 +61,38 @@ class TelephonyPhoneNumberClient(BaseDBClient):
             )
             return [(row, name) for row, name in result.all()]
 
+    async def list_phone_numbers_for_org(
+        self, organization_id: int, include_inactive: bool = False
+    ) -> list[tuple[TelephonyPhoneNumberModel, str | None, str | None]]:
+        """List all phone numbers belonging to an organization across all telephony configurations.
+
+        Returns tuples of (phone_number_model, inbound_workflow_name, provider_name).
+        """
+        async with self.async_session() as session:
+            stmt = (
+                select(
+                    TelephonyPhoneNumberModel,
+                    WorkflowModel.name,
+                    TelephonyConfigurationModel.provider,
+                )
+                .join(
+                    TelephonyConfigurationModel,
+                    TelephonyConfigurationModel.id
+                    == TelephonyPhoneNumberModel.telephony_configuration_id,
+                )
+                .join(
+                    WorkflowModel,
+                    WorkflowModel.id == TelephonyPhoneNumberModel.inbound_workflow_id,
+                    isouter=True,
+                )
+                .where(TelephonyPhoneNumberModel.organization_id == organization_id)
+            )
+            if not include_inactive:
+                stmt = stmt.where(TelephonyPhoneNumberModel.is_active.is_(True))
+            stmt = stmt.order_by(TelephonyPhoneNumberModel.created_at)
+            result = await session.execute(stmt)
+            return [(row[0], row[1], row[2]) for row in result.all()]
+
     async def list_active_normalized_addresses_for_config(
         self, telephony_configuration_id: int
     ) -> list[str]:

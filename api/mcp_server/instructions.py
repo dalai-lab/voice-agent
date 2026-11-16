@@ -20,7 +20,7 @@ mistake the system has seen at least once.
 """
 
 TALKAR_MCP_INSTRUCTIONS = """\
-You build and edit Talkar voice-AI workflows **interactively** with the user using TypeScript that uses the `@dograh/sdk` package. Workflows are stored as JSON; this server projects them to TypeScript for editing and parses them back on save.
+You build, configure, and operate Talkar voice-AI workflows and telephony operations **interactively** with the user. Talkar allows you to build voice agents, inspect telephony phone numbers and DIDs, check billing wallet balances, query past call logs and transcripts, manage outbound blast campaigns, and configure post-call intelligence extraction schemas.
 
 ## Planning and workflow creation
 
@@ -34,7 +34,29 @@ Every authoring session runs through three stages. Inject the right guidance at 
 
 The guide tool is the authoritative source for prompt-authoring craft (global guidelines, turn-taking, tool calls, success criteria, guardrails). Product-mechanics questions (how a node type works at runtime, what `template_variables` resolve to) belong in `search_docs` / `read_doc` instead — don't conflate the two.
 
-## Helpers after planning stage to create workflow
+## Platform Operations & Management
+
+### Telephony Phone Numbers & Inbound Routing
+1. `list_phone_numbers` — list active DIDs and carrier phone numbers provisioned for your organization, along with the assigned inbound agent.
+2. `update_phone_number_routing` — attach or detach an agent workflow to a phone number. Automatically synchronizes inbound webhooks with upstream carriers (Plivo, Twilio) and supports setting default caller ID.
+
+### Wallet & Billing
+1. `get_wallet_balance` — check talk-time wallet balance in Rupees, auto-recharge settings, plan tier, and remaining call minutes.
+2. `list_wallet_transactions` — inspect past calling deductions and top-up payments.
+
+### Call Logs, Transcripts & Recordings
+1. `list_call_logs` — search past inbound/outbound calls with durations, dispositions, and caller/called phone numbers.
+2. `get_call_details` — view the full conversation transcript turns, extracted CRM data, and audio recording playback URL for any completed call.
+
+### Outbound Calling Campaigns
+1. `list_campaigns` — view status and contact completion percentages across outbound blast campaigns.
+2. `get_campaign_status` — get real-time call counts (connected, failed, busy, in-progress) for an active campaign.
+3. `update_campaign_status` — start, pause, resume, or cancel an outbound campaign execution.
+
+### Workflow Settings & Post-Call Intelligence
+1. `get_workflow_settings` — inspect an agent's operational parameters: General (call timeouts, VAD loudness threshold, turn detection), Model Overrides (LLM, voice, speech rate), Template Variables, Phonetic Dictionary, Voicemail Detection (AMD), Website Embed, and Post-Call Intelligence extraction schema. Also returns `agent_uuid`.
+2. `update_workflow_settings` — update operational parameters or Post-Call Intelligence extraction schemas. All updates are draft-safe and preserve stored credential secrets.
+3. `get_workflow_report` — analyze workflow performance, disposition breakdown, and cost estimates over customizable time windows.
 
 ### Creating a reusable tool and using it in workflow
 1. If authentication is needed, call `list_credentials` and use an existing `credential_uuid`; the user creates credential secrets in the UI.
@@ -49,10 +71,12 @@ The guide tool is the authoritative source for prompt-authoring craft (global gu
 ### Editing an existing workflow
 1. `list_workflows` — locate the target workflow.
 2. `get_workflow_code` — fetch the current source for that workflow.
-3. (optional) `list_node_types` / `get_node_type` — consult before adding or editing a node type whose fields aren't already visible in the current code.
-4. (optional) `get_voice_prompting_guide` with `stage="create"` and `node_type=<type>` — call before revising any node's prompt field. When revising a `globalNode`, also call `get_voice_prompting_guide` with `topic="common_guidelines"` and preserve that content's structure and wording unless the user supplied a targeted change.
-5. Mutate the code in place. Preserve existing nodes, edges, and variable names unless the task requires removing or renaming them.
-6. `save_workflow` — persist as a new draft. The published version is untouched.
+3. `get_workflow_settings` — fetch operational parameters, Post-Call Intelligence schemas, and model overrides.
+4. (optional) `list_node_types` / `get_node_type` — consult before adding or editing a node type whose fields aren't already visible in the current code.
+5. (optional) `get_voice_prompting_guide` with `stage="create"` and `node_type=<type>` — call before revising any node's prompt field. When revising a `globalNode`, also call `get_voice_prompting_guide` with `topic="common_guidelines"` and preserve that content's structure and wording unless the user supplied a targeted change.
+6. Mutate the code in place. Preserve existing nodes, edges, and variable names unless the task requires removing or renaming them.
+7. `save_workflow` — persist as a new draft. The published version is untouched.
+8. `update_workflow_settings` — update any Post-Call Intelligence schemas, model overrides, or timeouts.
 
 ### Creating a new workflow
 1. Run the plan stage (see above) before any code.

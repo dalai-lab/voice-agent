@@ -16,6 +16,7 @@ def authed_user() -> MagicMock:
 def _workflow() -> SimpleNamespace:
     return SimpleNamespace(
         id=7,
+        workflow_uuid="uuid-7",
         name="Support Agent",
         status="active",
         released_definition=SimpleNamespace(
@@ -58,6 +59,7 @@ async def test_get_workflow_returns_draft_sdk_view(authed_user: MagicMock):
 
     assert result == {
         "id": 7,
+        "agent_uuid": "uuid-7",
         "name": "Support Agent",
         "status": "active",
         "version": "draft",

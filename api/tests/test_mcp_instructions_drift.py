@@ -24,8 +24,15 @@ import pytest
 
 from api.mcp_server import instructions as instructions_module
 from api.mcp_server.server import mcp
-from api.mcp_server.tools import create_workflow as create_workflow_module
-from api.mcp_server.tools import save_workflow as save_workflow_module
+from api.mcp_server.tools import (
+    call_logs as call_logs_module,
+    campaigns as campaigns_module,
+    create_workflow as create_workflow_module,
+    save_workflow as save_workflow_module,
+    telephony as telephony_module,
+    wallet as wallet_module,
+    workflow_settings as workflow_settings_module,
+)
 
 # Every registered MCP tool name starts with one of these verbs. A
 # backticked snake_case token in the guide whose leading word is a verb is
@@ -98,6 +105,11 @@ async def test_guide_only_references_registered_tools():
     [
         ("save_workflow", save_workflow_module),
         ("create_workflow", create_workflow_module),
+        ("update_phone_number_routing", telephony_module),
+        ("update_campaign_status", campaigns_module),
+        ("update_workflow_settings", workflow_settings_module),
+        ("get_wallet_balance", wallet_module),
+        ("get_call_details", call_logs_module),
     ],
 )
 async def test_tool_documents_every_error_code_it_returns(tool_name, module):

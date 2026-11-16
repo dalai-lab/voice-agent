@@ -37,7 +37,7 @@ async def get_workflow(workflow_id: int) -> dict:
     """Fetch a single agent by id, projected into the SDK code view.
 
     Output shape:
-        {"id": int, "name": str, "status": str, "version": "draft" | "published" | "legacy", "version_number": int | None, "code": "<TS source>"}
+        {"id": int, "agent_uuid": str, "name": str, "status": str, "version": "draft" | "published" | "legacy", "version_number": int | None, "code": "<TS source>"}
     """
     user = await authenticate_mcp_request()
     workflow = await db_client.get_workflow(
@@ -53,6 +53,7 @@ async def get_workflow(workflow_id: int) -> dict:
 
     return {
         "id": workflow.id,
+        "agent_uuid": getattr(workflow, "workflow_uuid", None),
         "name": view["name"],
         "status": workflow.status,
         "version": view["version"],

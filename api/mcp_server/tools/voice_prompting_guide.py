@@ -33,7 +33,7 @@ async def get_voice_prompting_guide(
     topic: str | None = None,
     node_type: str | None = None,
 ) -> dict[str, Any]:
-    """Fetch staged voice-prompting guidance for authoring Dograh workflows.
+    """Fetch staged voice-prompting guidance for authoring Talkar workflows.
 
     Call this BEFORE composing or revising any prompt field on a node. The
     guide is the authoritative source for prompt-authoring craft (global

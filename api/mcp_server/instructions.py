@@ -19,8 +19,8 @@ Extend based on real LLM failures — every bullet below ideally maps to a
 mistake the system has seen at least once.
 """
 
-DOGRAH_MCP_INSTRUCTIONS = """\
-You build and edit Dograh voice-AI workflows **interactively** with the user using TypeScript that uses the `@dograh/sdk` package. Workflows are stored as JSON; this server projects them to TypeScript for editing and parses them back on save.
+TALKAR_MCP_INSTRUCTIONS = """\
+You build and edit Talkar voice-AI workflows **interactively** with the user using TypeScript that uses the `@dograh/sdk` package. Workflows are stored as JSON; this server projects them to TypeScript for editing and parses them back on save.
 
 ## Planning and workflow creation
 
@@ -42,7 +42,7 @@ The guide tool is the authoritative source for prompt-authoring craft (global gu
 3. Use the returned `tool_uuid` in workflow node `tool_uuids`, then call `create_workflow` for a new workflow or `save_workflow` when editing an existing workflow.
 
 ### Reading documentation
-1. `search_docs` — use first for keyword or acronym lookup when the user is asking how Dograh works or how to configure something.
+1. `search_docs` — use first for keyword or acronym lookup when the user is asking how Talkar works or how to configure something.
 2. `read_doc` — fetch the full page once one result looks likely. Prefer this over reasoning from search summaries alone.
 3. `list_docs` — use when the user wants to browse a topic area or when search terms are too vague. Call it with no arguments for the top-level sections; returned section paths feed back into `list_docs`, returned page paths feed into `read_doc`.
 
@@ -119,3 +119,6 @@ A failed `save_workflow` / `create_workflow` returns a result with `saved`/`crea
 - Omit `position`; the server reconciles positions against the previous saved workflow and lays out new nodes automatically.
 - Add nodes in call-flow order (start → intermediate → end) so the generated code reads top-to-bottom, with all edges after all nodes.
 """
+
+# Backwards compatibility alias
+DOGRAH_MCP_INSTRUCTIONS = TALKAR_MCP_INSTRUCTIONS

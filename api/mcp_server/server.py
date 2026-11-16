@@ -1,7 +1,7 @@
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from api.mcp_server.instructions import DOGRAH_MCP_INSTRUCTIONS
+from api.mcp_server.instructions import DOGRAH_MCP_INSTRUCTIONS, TALKAR_MCP_INSTRUCTIONS
 from api.mcp_server.tools.catalog import (
     list_credentials,
     list_documents,
@@ -17,39 +17,44 @@ from api.mcp_server.tools.tool_creation import create_tool
 from api.mcp_server.tools.voice_prompting_guide import get_voice_prompting_guide
 from api.mcp_server.tools.workflows import get_workflow, list_workflows
 
-mcp = FastMCP("dograh", instructions=DOGRAH_MCP_INSTRUCTIONS)
+mcp = FastMCP("talkar", instructions=TALKAR_MCP_INSTRUCTIONS)
 
+_READ_ONLY_TOOL_ANNOTATIONS = ToolAnnotations(
+    readOnlyHint=True,
+    idempotentHint=True,
+    destructiveHint=False,
+    openWorldHint=False,
+)
+
+_MUTATING_TOOL_ANNOTATIONS = ToolAnnotations(
+    readOnlyHint=False,
+    idempotentHint=False,
+    destructiveHint=False,
+    openWorldHint=False,
+)
+
+# Read-only discovery, inspection, docs, and prompting guide tools
 for _tool in (
-    create_workflow,
-    create_tool,
+    get_voice_prompting_guide,
+    list_docs,
+    read_doc,
+    search_docs,
+    list_node_types,
     get_node_type,
+    list_workflows,
     get_workflow,
     get_workflow_code,
     list_credentials,
     list_documents,
-    list_node_types,
     list_recordings,
     list_tools,
-    list_workflows,
-    save_workflow,
 ):
-    mcp.tool(_tool)
+    mcp.tool(_tool, annotations=_READ_ONLY_TOOL_ANNOTATIONS)
 
-_GUIDE_TOOL_ANNOTATIONS = ToolAnnotations(
-    readOnlyHint=True,
-    idempotentHint=True,
-    destructiveHint=False,
-    openWorldHint=False,
-)
-
-mcp.tool(get_voice_prompting_guide, annotations=_GUIDE_TOOL_ANNOTATIONS)
-
-_DOCS_TOOL_ANNOTATIONS = ToolAnnotations(
-    readOnlyHint=True,
-    idempotentHint=True,
-    destructiveHint=False,
-    openWorldHint=False,
-)
-
-for _tool in (list_docs, read_doc, search_docs):
-    mcp.tool(_tool, annotations=_DOCS_TOOL_ANNOTATIONS)
+# Mutating workflow creation and tool management tools
+for _tool in (
+    create_workflow,
+    save_workflow,
+    create_tool,
+):
+    mcp.tool(_tool, annotations=_MUTATING_TOOL_ANNOTATIONS)

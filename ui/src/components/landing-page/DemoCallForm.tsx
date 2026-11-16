@@ -19,6 +19,7 @@ import {
   Upload,
   Clock,
   RefreshCw,
+  Truck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -118,6 +119,19 @@ const PERSONAS: Record<string, Persona> = {
     ctaText: "Streamline Candidate Screening",
     accent: "indigo",
   },
+  logistics: {
+    id: "logistics",
+    name: "Aarav",
+    role: "Delivery Coordinator",
+    company: "Delhivery Express",
+    description: "Confirms delivery availability, receiver details, address landmarks, and prepaid offers.",
+    greeting: "Hello, this is Aarav from Delhivery regarding your package delivery.",
+    inCallHint: "Confirm whether you'll be available to receive your order or need a reschedule.",
+    callingInstruction: "Please answer Aarav's call and stay on this screen to watch delivery confirmation captured live.",
+    connectedInstruction: "Confirm your availability and delivery instructions to see notes stream live.",
+    ctaText: "Automate Logistics & COD Verification",
+    accent: "rose",
+  },
 };
 
 const FIELD_LABELS: Record<string, Record<string, string>> = {
@@ -176,6 +190,13 @@ const FIELD_LABELS: Record<string, Record<string, string>> = {
     notice_period: "Notice Period",
     communication_skills: "Communication Score",
     candidate_score: "Candidate Fit Score",
+  },
+  logistics: {
+    availability: "Recipient Availability",
+    receiver_name: "Receiver Name",
+    landmark: "Nearby Landmark",
+    prepaid_offer_status: "COD / Prepaid Choice",
+    dispatch_status: "Dispatch Decision",
   },
 };
 
@@ -304,7 +325,7 @@ function CallCompletedCard({
         <div className="flex items-center gap-2">
           <div className="px-3 py-1 rounded-xl bg-white/10 backdrop-blur-2xl border border-white/20 text-right shadow-sm">
             <div className="text-[10px] uppercase font-semibold text-slate-400">Time</div>
-            <div className="text-xs font-bold text-white tabular-nums">{formatTime(durationSec || 30)}</div>
+            <div className="text-xs font-bold text-white tabular-nums">{formatTime(durationSec || 0)}</div>
           </div>
           <div className="px-3 py-1 rounded-xl bg-white/10 backdrop-blur-2xl border border-white/20 text-right shadow-sm">
             <div className="text-[10px] uppercase font-semibold text-slate-400">Turns</div>
@@ -497,9 +518,18 @@ export function DemoCallForm() {
     if (callingState === "connected") {
       setCallDuration(0);
       durationTimerRef.current = setInterval(() => setCallDuration((prev) => prev + 1), 1000);
-    } else if (callingState !== "done") {
-      if (durationTimerRef.current) { clearInterval(durationTimerRef.current); durationTimerRef.current = null; }
+    } else {
+      if (durationTimerRef.current) {
+        clearInterval(durationTimerRef.current);
+        durationTimerRef.current = null;
+      }
     }
+    return () => {
+      if (durationTimerRef.current) {
+        clearInterval(durationTimerRef.current);
+        durationTimerRef.current = null;
+      }
+    };
   }, [callingState]);
 
   // Auto-scroll transcript
@@ -670,6 +700,10 @@ export function DemoCallForm() {
         if (msg.type === "ended") {
           es.close();
           sseRef.current = null;
+          if (durationTimerRef.current) {
+            clearInterval(durationTimerRef.current);
+            durationTimerRef.current = null;
+          }
           if (finalLinesRef.length > 0) {
             runLiveExtraction([...finalLinesRef], useCase)
               .then((fields) => {
@@ -738,6 +772,10 @@ export function DemoCallForm() {
       es.onerror = () => {
         es.close();
         sseRef.current = null;
+        if (durationTimerRef.current) {
+          clearInterval(durationTimerRef.current);
+          durationTimerRef.current = null;
+        }
         if (callingState !== "done") {
           setCallingState("done");
           setExtractedData(liveFields);
@@ -791,6 +829,7 @@ export function DemoCallForm() {
     { id: "service", label: "Service Dispatch", icon: Wrench },
     { id: "real_estate", label: "Real Estate", icon: Home },
     { id: "recruiter", label: "Hiring & Screening", icon: Users },
+    { id: "logistics", label: "Logistics & Delivery", icon: Truck },
   ];
 
   return (

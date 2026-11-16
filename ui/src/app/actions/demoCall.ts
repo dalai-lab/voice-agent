@@ -118,7 +118,8 @@ const WORKFLOW_MAP: Record<string, string> = {
     sales: "8f1b5a75-ee5b-47eb-9d2e-f22dad2c3157",
     service: "cb75c339-e0de-46a5-a3b8-843fe5189241",
     real_estate: "6b92b43d-8251-4b48-97f8-8a0bc643ac31",
-    recruiter: "4bb689a2-f139-4b40-af2a-e0eb8c9c502f"
+    recruiter: "4bb689a2-f139-4b40-af2a-e0eb8c9c502f",
+    logistics: "1d7e3a01-c7fa-4dee-b5bf-67a952abe9e3"
 };
 
 interface RateLimitData {
@@ -291,6 +292,35 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
         
         console.log(`[DemoCall] Initiating call to ${formattedPhone} for useCase: ${useCase}, IP: ${ip}`);
 
+        const sampleProducts = [
+            "Nike Air Running Shoes",
+            "boAt Rockerz Bluetooth Headphones",
+            "Noise ColorFit Smartwatch",
+            "Puma Sports Backpack",
+            "Sony Wireless Earbuds",
+            "Levi's Denim Jacket",
+        ];
+        const randomItem = sampleProducts[Math.floor(Math.random() * sampleProducts.length)];
+        const randomOrderId = `DLV-${Math.floor(100000 + Math.random() * 900000)}`;
+
+        const initialContext: Record<string, any> = {
+            first_name: firstName,
+            customer_name: name,
+            source: "landing_page_demo",
+            ...(useCase === "recruiter" && jobDescription ? { job_description: jobDescription } : {}),
+            ...(useCase === "recruiter" && resumeSummary ? { resume: resumeSummary } : {}),
+            ...(useCase === "logistics" ? {
+                order_id: randomOrderId,
+                item: randomItem,
+                company_name: "Delhivery",
+                agent_name: "Aarav",
+                slot: "4 PM to 7 PM",
+                is_cod: "true",
+                prepaid_discount_percent: "10",
+                called_number: formattedPhone,
+            } : {})
+        };
+
         const response = await fetch(url, {
             method: "POST",
             headers: {
@@ -299,13 +329,7 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
             },
             body: JSON.stringify({
                 phone_number: formattedPhone,
-                initial_context: {
-                    first_name: firstName,
-                    customer_name: name,
-                    source: "landing_page_demo",
-                    ...(useCase === "recruiter" && jobDescription ? { job_description: jobDescription } : {}),
-                    ...(useCase === "recruiter" && resumeSummary ? { resume: resumeSummary } : {})
-                }
+                initial_context: initialContext
             })
         });
 
@@ -453,6 +477,15 @@ Extract these fields (return null if not yet mentioned):
 - notice_period: e.g. "Immediate", "30 days", "60 days", "3 months".
 - communication_skills: "Poor", "Average", "Good", or "Excellent".
 - candidate_score: Integer 1-10 based on: skill match (4pts), experience relevance (3pts), communication (2pts), enthusiasm (1pt).`,
+
+  logistics: `You are extracting structured data from an E-COMMERCE / LOGISTICS DELIVERY CONFIRMATION call between a delivery coordinator and a customer.
+
+Extract these fields (return null if not yet mentioned):
+- availability: One of: "Self (Available)", "Someone Else", "Reschedule Requested", or "Not Available".
+- receiver_name: Name of the person receiving the parcel if mentioned (or "Self"), or null.
+- landmark: Specific delivery landmark or gate/building instructions (e.g. "Near Apollo Pharmacy", "Leave at security gate").
+- prepaid_offer_status: One of: "Link Requested (Prepaid)", "Declined (Keep COD)", "Not Sure", or null.
+- dispatch_status: One of: "Confirmed", "Reschedule", "Exception / Cancelled", or null.`,
 };
 
 export async function runLiveExtraction(transcriptLines: string[], useCase: string) {

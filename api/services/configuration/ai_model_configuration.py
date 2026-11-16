@@ -382,10 +382,13 @@ def _merge_service_secret_fields(incoming: dict, existing: dict):
         if incoming_secret is None:
             incoming[secret_field] = existing_secret
         elif contains_masked_key(incoming_secret):
-            incoming[secret_field] = resolve_masked_api_keys(
+            resolved = resolve_masked_api_keys(
                 incoming_secret,
                 existing_secret,
             )
+            if contains_masked_key(resolved):
+                resolved = existing_secret
+            incoming[secret_field] = resolved
 
 
 def _raise_if_masked_secret(value):

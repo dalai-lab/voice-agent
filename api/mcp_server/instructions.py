@@ -78,6 +78,7 @@ The guide tool is the authoritative source for prompt-authoring craft (global gu
 6. Mutate the code in place. Preserve existing nodes, edges, and variable names unless the task requires removing or renaming them.
 7. `save_workflow` — persist as a new draft. The published version is untouched.
 8. `update_workflow_settings` — update any Post-Call Intelligence schemas, model overrides, or timeouts.
+9. `publish_workflow` — promote the draft version to live production traffic when changes are ready.
 
 ### Creating a new workflow
 1. Run the plan stage (see above) before any code.

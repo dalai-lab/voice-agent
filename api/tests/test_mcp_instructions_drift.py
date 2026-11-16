@@ -29,6 +29,7 @@ from api.mcp_server.tools import (
     campaigns as campaigns_module,
     create_workflow as create_workflow_module,
     initiate_call as initiate_call_module,
+    publish_workflow as publish_workflow_module,
     save_workflow as save_workflow_module,
     telephony as telephony_module,
     wallet as wallet_module,
@@ -54,6 +55,7 @@ _TOOL_VERB_PREFIXES = frozenset(
         "add",
         "remove",
         "set",
+        "publish",
     }
 )
 
@@ -105,6 +107,7 @@ async def test_guide_only_references_registered_tools():
     "tool_name, module",
     [
         ("save_workflow", save_workflow_module),
+        ("publish_workflow", publish_workflow_module),
         ("create_workflow", create_workflow_module),
         ("update_phone_number_routing", telephony_module),
         ("initiate_call", initiate_call_module),

@@ -14,6 +14,12 @@ from api.db import db_client
 from api.db.models import WorkflowDefinitionModel, WorkflowModel, WorkflowRunModel
 from api.mcp_server.auth import authenticate_mcp_request
 from api.mcp_server.tracing import traced_tool
+from api.schemas.ai_model_configuration import OrganizationAIModelConfigurationV2
+from api.services.configuration.ai_model_configuration import (
+    WORKFLOW_MODEL_CONFIGURATION_V2_OVERRIDE_KEY,
+    get_resolved_ai_model_configuration,
+    merge_ai_model_configuration_v2_secrets,
+)
 from api.services.configuration.masking import mask_workflow_configurations
 from api.services.configuration.merge import merge_workflow_configuration_secrets
 from api.services.workflow.run_usage_response import resolve_call_duration_seconds
@@ -132,7 +138,7 @@ async def update_workflow_settings(
 
     All updates are draft-safe: they fork or update the editable draft version,
     leaving published production traffic untouched. To promote draft changes to live calls,
-    publish the agent in the UI or call `save_workflow`.
+    call `publish_workflow` or publish the agent in the UI.
 
     On failure, returns `saved: false`, a machine-readable `error_code`,
     and a human-readable `error`. Possible `error_code` values:
@@ -283,11 +289,55 @@ async def update_workflow_settings(
         merged_configs["embed"] = website_embed
 
     if model_overrides is not None:
-        # Merge secrets safely so incoming asterisks (******) do not overwrite real API keys
-        merged_configs = merge_workflow_configuration_secrets(
-            {**merged_configs, "model_overrides": model_overrides},
-            existing_configs,
+        is_v2 = isinstance(model_overrides, dict) and (
+            model_overrides.get("version") == 2
+            or "byok" in model_overrides
+            or "hosted" in model_overrides
+            or model_overrides.get("mode") in ("byok", "hosted", "dograh")
         )
+        if is_v2:
+            try:
+                incoming_v2 = OrganizationAIModelConfigurationV2.model_validate(model_overrides)
+                existing_v2_raw = existing_configs.get(WORKFLOW_MODEL_CONFIGURATION_V2_OVERRIDE_KEY)
+                existing_v2 = (
+                    OrganizationAIModelConfigurationV2.model_validate(existing_v2_raw)
+                    if existing_v2_raw
+                    else None
+                )
+                merged_v2 = merge_ai_model_configuration_v2_secrets(incoming_v2, existing_v2)
+                if existing_v2 is None:
+                    try:
+                        resolved_config = await get_resolved_ai_model_configuration(
+                            organization_id=org_id,
+                        )
+                        if resolved_config and resolved_config.organization_configuration:
+                            merged_v2 = merge_ai_model_configuration_v2_secrets(
+                                merged_v2,
+                                resolved_config.organization_configuration,
+                            )
+                    except Exception:
+                        pass
+                merged_configs[WORKFLOW_MODEL_CONFIGURATION_V2_OVERRIDE_KEY] = merged_v2.model_dump(
+                    mode="json", exclude_none=True
+                )
+                merged_configs.pop("model_overrides", None)
+            except Exception as e:
+                return _error_result(
+                    "validation_error",
+                    f"Invalid v2 model override configuration: {e}",
+                )
+        elif model_overrides:
+            # Legacy v1 model_overrides: merge secrets safely
+            merged_configs = merge_workflow_configuration_secrets(
+                {**merged_configs, "model_overrides": model_overrides},
+                existing_configs,
+            )
+            # Clear any stale v2 override so it doesn't shadow the legacy override
+            merged_configs.pop(WORKFLOW_MODEL_CONFIGURATION_V2_OVERRIDE_KEY, None)
+        else:
+            # Empty dict means clear overrides
+            merged_configs.pop("model_overrides", None)
+            merged_configs.pop(WORKFLOW_MODEL_CONFIGURATION_V2_OVERRIDE_KEY, None)
 
     merged_template_vars = (
         template_context_variables

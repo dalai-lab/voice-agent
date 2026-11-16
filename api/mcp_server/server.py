@@ -18,6 +18,7 @@ from api.mcp_server.tools.create_workflow import create_workflow
 from api.mcp_server.tools.docs_search import list_docs, read_doc, search_docs
 from api.mcp_server.tools.get_workflow_code import get_workflow_code
 from api.mcp_server.tools.node_types import get_node_type, list_node_types
+from api.mcp_server.tools.publish_workflow import publish_workflow
 from api.mcp_server.tools.save_workflow import save_workflow
 from api.mcp_server.tools.telephony import (
     initiate_call,
@@ -77,10 +78,11 @@ for _tool in (
 ):
     mcp.tool(_tool, annotations=_READ_ONLY_TOOL_ANNOTATIONS)
 
-# Mutating workflow creation, tool management, routing, campaigns, and settings tools
+# Mutating workflow creation, tool management, routing, campaigns, settings, and publishing tools
 for _tool in (
     create_workflow,
     save_workflow,
+    publish_workflow,
     create_tool,
     update_phone_number_routing,
     update_campaign_status,

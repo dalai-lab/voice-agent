@@ -302,6 +302,7 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
         ];
         const randomItem = sampleProducts[Math.floor(Math.random() * sampleProducts.length)];
         const randomOrderId = `DLV-${Math.floor(100000 + Math.random() * 900000)}`;
+        const randomLogisticsOrderId = `ORD-LOG-${Math.floor(1000 + Math.random() * 9000)}`;
         const randomBookingId = `GH-${Math.floor(1000 + Math.random() * 9000)}`;
         const randomTicketId = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -338,16 +339,37 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
                 ...(resumeSummary ? { resume: resumeSummary } : {})
             } : {}),
             ...(useCase === "logistics" ? {
-                order_id: randomOrderId,
+                order_id: randomLogisticsOrderId,
                 item: randomItem,
                 company_name: "Talkar Logistics",
                 agent_name: "Ananya",
                 slot: "4 PM to 7 PM",
                 is_cod: "true",
-                prepaid_discount_percent: "10",
+                prepaid_discount_percent: "1",
                 called_number: formattedPhone,
             } : {})
         };
+
+        // Pre-register order in Logistics CRM (logistics.talkar.in) so payment checkout & QR code work seamlessly
+        if (useCase === "logistics") {
+            try {
+                await fetch("https://logistics.talkar.in/api/orders", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        orderNumber: randomLogisticsOrderId,
+                        customerName: name,
+                        customerPhone: formattedPhone,
+                        deliveryAddress: "B-42, Sector 5, Main Road",
+                        amount: 499,
+                        expectedDeliveryDate: "Today",
+                        deliveryTimeSlot: "4 PM to 7 PM",
+                    }),
+                });
+            } catch (crmErr) {
+                console.warn("[DemoCall] Failed to sync order to logistics CRM:", crmErr);
+            }
+        }
 
         const response = await fetch(url, {
             method: "POST",

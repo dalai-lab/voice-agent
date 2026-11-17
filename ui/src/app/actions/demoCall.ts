@@ -368,6 +368,8 @@ export async function initiateDemoCall(prevState: any, formData: FormData) {
                         amount: 499,
                         expectedDeliveryDate: "Today",
                         deliveryTimeSlot: "4 PM to 7 PM",
+                        paymentType: "COD",
+                        paymentStatus: "PENDING",
                     }),
                 });
 

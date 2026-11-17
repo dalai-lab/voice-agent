@@ -1306,7 +1306,7 @@ export function DemoCallForm() {
               <div>
                 <h2 className="text-sm text-white font-bold tracking-tight">Test a Live AI Phone Call</h2>
                 <p className="text-xs text-gray-400 font-normal mt-0.5">
-                  Enter your number and pick a scenario to get an instant test call.
+                  Enter your number and pick an agent to get an instant test call.
                 </p>
               </div>
             </div>
@@ -1349,9 +1349,9 @@ export function DemoCallForm() {
                   </div>
                 </div>
 
-                {/* Scenario */}
+                {/* Agent */}
                 <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-white/90 block">Choose a Scenario</label>
+                  <label className="text-xs font-semibold text-white/90 block">Choose an Agent</label>
                   <div className="grid grid-cols-2 gap-2">
                     {industryOptions.map((item) => {
                       const Icon = item.icon;

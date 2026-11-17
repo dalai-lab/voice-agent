@@ -191,7 +191,7 @@ export const Navbar: React.FC = () => {
             {/* Physical invisible hover bridge connecting the trigger button to the menu */}
             <div className="absolute -top-3 left-0 right-0 h-4 bg-transparent pointer-events-auto" />
             <div className="w-[330px] p-1.5 rounded-2xl bg-[#0c0d10] border border-white/15 shadow-2xl shadow-black relative z-[101]">
-              <div className="space-y-0.5 max-h-[380px] overflow-y-auto no-scrollbar">
+              <div className="space-y-0.5 max-h-[calc(100vh-120px)] overflow-y-auto no-scrollbar">
                 {AGENTS.map((agent) => {
                   const Icon = agent.icon;
                   if (agent.isLive) {

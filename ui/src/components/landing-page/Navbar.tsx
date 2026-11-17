@@ -84,6 +84,21 @@ export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const router = useRouter();
 
+  const [isAgentsOpen, setIsAgentsOpen] = React.useState(false);
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setIsAgentsOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setIsAgentsOpen(false);
+    }, 180);
+  };
+
   const displayIdentity = user?.displayName || (user as any)?.primaryEmail || "";
   const userInitials =
     displayIdentity
@@ -130,24 +145,37 @@ export const Navbar: React.FC = () => {
       </div>
 
       <div className="hidden md:flex items-center space-x-7 text-sm font-medium text-gray-300">
-        <a className="hover:text-white transition-colors" href="#how-it-works">The Problem</a>
-        <a className="hover:text-white transition-colors" href="#capabilities">Solution</a>
-
-        {/* Agents Dropdown */}
-        <div className="relative group">
-          <button className="flex items-center gap-1.5 hover:text-white transition-colors py-2 cursor-pointer focus:outline-none">
-            <span>Agents</span>
-            <ChevronDown className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-180 text-gray-400 group-hover:text-white" />
+        {/* Agents Dropdown (First) */}
+        <div
+          className="relative py-2 -my-2 group"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <button
+            type="button"
+            onClick={() => setIsAgentsOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer focus:outline-none"
+          >
+            <span className={isAgentsOpen ? "text-white" : ""}>Agents</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 transition-transform duration-200 text-gray-400 group-hover:text-white ${
+                isAgentsOpen ? "rotate-180 text-white" : "group-hover:rotate-180"
+              }`}
+            />
           </button>
 
-          {/* Submenu Dropdown */}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none group-hover:pointer-events-auto z-50">
-            <div className="w-[340px] p-2 rounded-2xl bg-[#121316]/95 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-black/80 space-y-1">
-              <div className="px-3 py-2 text-[11px] font-semibold tracking-wider uppercase text-gray-400 border-b border-white/10">
-                <span>Specialized Industry Agents</span>
-              </div>
-
-              <div className="pt-1 space-y-1 max-h-[380px] overflow-y-auto no-scrollbar">
+          {/* Submenu Dropdown with robust hover corridor */}
+          <div
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            className={`absolute top-full left-0 md:-left-3 pt-2 transition-all duration-150 z-50 before:content-[''] before:absolute before:-top-3 before:left-0 before:right-0 before:h-5 ${
+              isAgentsOpen
+                ? "opacity-100 visible translate-y-0 pointer-events-auto"
+                : "opacity-0 invisible -translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:pointer-events-auto"
+            }`}
+          >
+            <div className="w-[330px] p-1.5 rounded-2xl bg-[#0c0d10] border border-white/15 shadow-2xl shadow-black">
+              <div className="space-y-0.5 max-h-[380px] overflow-y-auto no-scrollbar">
                 {AGENTS.map((agent) => {
                   const Icon = agent.icon;
                   if (agent.isLive) {
@@ -159,13 +187,13 @@ export const Navbar: React.FC = () => {
                         rel="noopener noreferrer"
                         className="group/item flex items-start gap-3 p-2.5 rounded-xl hover:bg-white/10 border border-transparent hover:border-white/10 transition-all cursor-pointer"
                       >
-                        <div className="p-2 rounded-lg bg-white/5 text-gray-300 group-hover/item:text-white transition-colors mt-0.5">
+                        <div className="p-2 rounded-lg bg-white/5 text-gray-300 group-hover/item:text-white group-hover/item:bg-white/10 transition-colors mt-0.5 shrink-0">
                           <Icon className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0 text-left">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 justify-between">
                             <span className="text-xs font-semibold text-white tracking-tight">{agent.name}</span>
-                            <ExternalLink className="w-3 h-3 text-gray-400 group-hover/item:text-white ml-auto" />
+                            <ExternalLink className="w-3 h-3 text-gray-400 group-hover/item:text-white ml-auto shrink-0" />
                           </div>
                           <p className="text-[11px] text-gray-400 line-clamp-1 mt-0.5">{agent.description}</p>
                         </div>
@@ -176,19 +204,19 @@ export const Navbar: React.FC = () => {
                   return (
                     <div
                       key={agent.id}
-                      className="group/item relative flex items-start gap-3 p-2.5 rounded-xl hover:bg-white/5 border border-transparent transition-all cursor-not-allowed select-none"
+                      className="group/item flex items-start gap-3 p-2.5 rounded-xl hover:bg-white/10 border border-transparent hover:border-white/10 transition-all cursor-pointer select-none"
                     >
-                      <div className="p-2 rounded-lg bg-white/5 text-gray-400 mt-0.5">
+                      <div className="p-2 rounded-lg bg-white/5 text-gray-300 group-hover/item:text-white group-hover/item:bg-white/10 transition-colors mt-0.5 shrink-0">
                         <Icon className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0 text-left">
                         <div className="flex items-center gap-1.5 justify-between">
-                          <span className="text-xs font-semibold text-gray-300">{agent.name}</span>
-                          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-white/5 text-gray-400 border border-white/10 group-hover/item:bg-orange-500/10 group-hover/item:text-orange-300 group-hover/item:border-orange-500/30 transition-colors">
+                          <span className="text-xs font-semibold text-white tracking-tight">{agent.name}</span>
+                          <span className="opacity-0 group-hover/item:opacity-100 transition-opacity duration-150 px-2 py-0.5 rounded-full text-[9px] font-medium bg-white/15 text-white border border-white/20 whitespace-nowrap ml-auto shrink-0">
                             Coming Soon
                           </span>
                         </div>
-                        <p className="text-[11px] text-gray-500 line-clamp-1 mt-0.5">{agent.description}</p>
+                        <p className="text-[11px] text-gray-400 line-clamp-1 mt-0.5">{agent.description}</p>
                       </div>
                     </div>
                   );
@@ -198,6 +226,8 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
+        <a className="hover:text-white transition-colors" href="#how-it-works">The Problem</a>
+        <a className="hover:text-white transition-colors" href="#capabilities">Solution</a>
         <a className="hover:text-white transition-colors" href="#homebase">Enterprise</a>
         <a className="hover:text-white transition-colors" href="#results">Results</a>
         <a className="hover:text-white transition-colors" href="#faq">FAQ's</a>

@@ -14,7 +14,9 @@ export const HeroSection: React.FC = () => {
       <VoiceWaveCanvas />
 
       {/* Navigation */}
-      <Navbar />
+      <div className="relative z-50">
+        <Navbar />
+      </div>
 
       {/* Hero Content Grid (Talkar Wordings & Arts + Voxera Theme) */}
       <div className="flex-grow container mx-auto px-6 py-8 z-10 flex items-center justify-center">

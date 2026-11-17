@@ -86,6 +86,7 @@ export const Navbar: React.FC = () => {
 
   const [isAgentsOpen, setIsAgentsOpen] = React.useState(false);
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const agentsRef = React.useRef<HTMLDivElement | null>(null);
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -96,8 +97,20 @@ export const Navbar: React.FC = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       setIsAgentsOpen(false);
-    }, 180);
+    }, 350);
   };
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (agentsRef.current && !agentsRef.current.contains(event.target as Node)) {
+        setIsAgentsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const displayIdentity = user?.displayName || (user as any)?.primaryEmail || "";
   const userInitials =
@@ -121,7 +134,7 @@ export const Navbar: React.FC = () => {
   );
 
   return (
-    <nav className="container mx-auto px-6 py-6 flex items-center justify-between z-10 relative">
+    <nav className="container mx-auto px-6 py-6 flex items-center justify-between z-50 relative">
       <div className="flex items-center gap-3 cursor-pointer">
         <svg version="1.1" viewBox="0 0 300 97.83" className="h-8 w-auto text-white" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -147,6 +160,7 @@ export const Navbar: React.FC = () => {
       <div className="hidden md:flex items-center space-x-7 text-sm font-medium text-gray-300">
         {/* Agents Dropdown (First) */}
         <div
+          ref={agentsRef}
           className="relative py-2 -my-2 group"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -168,13 +182,15 @@ export const Navbar: React.FC = () => {
           <div
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
-            className={`absolute top-full left-0 md:-left-3 pt-2 transition-all duration-150 z-50 before:content-[''] before:absolute before:-top-3 before:left-0 before:right-0 before:h-5 ${
+            className={`absolute top-full left-0 md:-left-3 pt-2 transition-all duration-150 z-[100] ${
               isAgentsOpen
                 ? "opacity-100 visible translate-y-0 pointer-events-auto"
                 : "opacity-0 invisible -translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:pointer-events-auto"
             }`}
           >
-            <div className="w-[330px] p-1.5 rounded-2xl bg-[#0c0d10] border border-white/15 shadow-2xl shadow-black">
+            {/* Physical invisible hover bridge connecting the trigger button to the menu */}
+            <div className="absolute -top-3 left-0 right-0 h-4 bg-transparent pointer-events-auto" />
+            <div className="w-[330px] p-1.5 rounded-2xl bg-[#0c0d10] border border-white/15 shadow-2xl shadow-black relative z-[101]">
               <div className="space-y-0.5 max-h-[380px] overflow-y-auto no-scrollbar">
                 {AGENTS.map((agent) => {
                   const Icon = agent.icon;

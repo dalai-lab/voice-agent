@@ -1111,7 +1111,7 @@ export function DemoCallForm() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12, scale: 0.98 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-[540px] h-[540px] max-h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between"
+            className="w-full max-w-[540px] h-auto min-h-[480px] lg:h-[540px] lg:max-h-[540px] lg:aspect-square mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between"
           >
             <div className="flex-1 min-h-0 h-full flex gap-3 items-stretch">
               {/* Left: Transcript */}
@@ -1300,7 +1300,7 @@ export function DemoCallForm() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12, scale: 0.98 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-[540px] h-[540px] aspect-square max-w-full mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between"
+            className="w-full max-w-[540px] h-auto min-h-[480px] lg:h-[540px] lg:aspect-square mx-auto bg-transparent border-0 shadow-none flex flex-col justify-between"
           >
             <div className="flex justify-between items-center pb-3 shrink-0">
               <div>

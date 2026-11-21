@@ -3,6 +3,7 @@ import React from 'react';
 export const WhyTalkarSection: React.FC = () => {
   return (
     <section className="relative w-full py-24 px-6 md:px-12 lg:px-16 bg-[#FFFFFF] text-slate-900 border-t border-slate-200 font-sans" id="why-talkar">
+      <div id="results" className="scroll-mt-24 pointer-events-none" />
       <div className="max-w-7xl mx-auto flex flex-col items-center">
         
         {/* Section Header Tag */}

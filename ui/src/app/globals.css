@@ -380,8 +380,10 @@
     background-color: #090A0F;
     position: relative;
     background-image: 
-        linear-gradient(135deg, rgba(255, 85, 0, 0.14) 0%, transparent 48%),
-        linear-gradient(225deg, rgba(225, 29, 72, 0.14) 0%, transparent 52%);
+        radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255, 85, 0, 0.18), transparent 70%),
+        radial-gradient(ellipse 70% 60% at 90% 40%, rgba(225, 29, 72, 0.15), transparent 60%),
+        radial-gradient(ellipse 70% 60% at 10% 40%, rgba(255, 85, 0, 0.12), transparent 60%),
+        radial-gradient(ellipse 80% 40% at 50% 90%, rgba(255, 85, 0, 0.06), transparent 70%);
 }
 
 #voiceWaveCanvas {

@@ -13,6 +13,10 @@ from api.errors.failure import (
 from api.services.configuration.options import (
     DEEPGRAM_FLUX_MODELS,
     DEEPGRAM_FLUX_MULTILINGUAL_LANGUAGE_OPTIONS,
+    SARVAM_V2_VOICES,
+    SARVAM_V3_VOICES,
+    SARVAM_V4_VOICES,
+    SARVAM_V4_DEFAULT_VOICE_MAP,
 )
 from api.services.configuration.registry import ServiceProviders
 from api.services.pipecat.gemini_json_schema_adapter import (
@@ -1377,17 +1381,30 @@ def create_tts_service(
         pipecat_language = language_mapping.get(language, Language.HI)
 
         raw_voice = (getattr(user_config.tts, "voice", None) or "").strip().lower()
+        tts_model = (getattr(user_config.tts, "model", "") or "bulbul:v2").strip()
         if not raw_voice:
-            tts_model = getattr(user_config.tts, "model", "") or ""
             if "v4" in tts_model:
                 voice = "shubh_enhi_ads"
             elif "v3" in tts_model:
                 voice = "shubh"
             else:
                 voice = "anushka"
+        elif "v4" in tts_model:
+            if raw_voice in SARVAM_V4_VOICES:
+                voice = raw_voice
+            elif raw_voice in SARVAM_V4_DEFAULT_VOICE_MAP:
+                voice = SARVAM_V4_DEFAULT_VOICE_MAP[raw_voice]
+            else:
+                matched = next((v for v in SARVAM_V4_VOICES if v.startswith(f"{raw_voice}_")), None)
+                voice = matched if matched else raw_voice
+        elif "v3" in tts_model:
+            if raw_voice in SARVAM_V3_VOICES:
+                voice = raw_voice
+            else:
+                prefix = raw_voice.split("_")[0]
+                voice = prefix if prefix in SARVAM_V3_VOICES else raw_voice
         else:
             voice = raw_voice
-        tts_model = user_config.tts.model
         speed = _extract_clean_setting(user_config.tts, "speed", float)
         settings_kwargs: dict[str, Any] = {
             "model": tts_model,

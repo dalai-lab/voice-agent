@@ -253,6 +253,78 @@ class TestSarvamTTSServiceFactory:
         kwargs = mock_service.call_args.kwargs
         assert kwargs["settings"].voice == "shubh"
 
+    def test_create_sarvam_tts_service_maps_ritu_for_v4(self):
+        user_config = SimpleNamespace(
+            tts=SimpleNamespace(
+                provider=ServiceProviders.SARVAM.value,
+                api_key="test-key",
+                model="bulbul:v4-flash",
+                voice="ritu",
+                language="hi-IN",
+                speed=1.0,
+            )
+        )
+        audio_config = AudioConfig(
+            transport_in_sample_rate=16000, transport_out_sample_rate=16000
+        )
+
+        with patch(
+            "api.services.pipecat.service_factory.SarvamTTSService"
+        ) as mock_service:
+            create_tts_service(user_config, audio_config)
+
+        kwargs = mock_service.call_args.kwargs
+        assert kwargs["settings"].voice == "ritu_hi_customer"
+        assert kwargs["settings"].model == "bulbul:v4-flash"
+
+    def test_create_sarvam_tts_service_maps_aarti_for_v4(self):
+        user_config = SimpleNamespace(
+            tts=SimpleNamespace(
+                provider=ServiceProviders.SARVAM.value,
+                api_key="test-key",
+                model="bulbul:v4-flash",
+                voice="aarti",
+                language="hi-IN",
+                speed=1.0,
+            )
+        )
+        audio_config = AudioConfig(
+            transport_in_sample_rate=16000, transport_out_sample_rate=16000
+        )
+
+        with patch(
+            "api.services.pipecat.service_factory.SarvamTTSService"
+        ) as mock_service:
+            create_tts_service(user_config, audio_config)
+
+        kwargs = mock_service.call_args.kwargs
+        assert kwargs["settings"].voice == "aarti_hi_customer"
+        assert kwargs["settings"].model == "bulbul:v4-flash"
+
+    def test_create_sarvam_tts_service_maps_v4_voice_to_v3_when_downgraded(self):
+        user_config = SimpleNamespace(
+            tts=SimpleNamespace(
+                provider=ServiceProviders.SARVAM.value,
+                api_key="test-key",
+                model="bulbul:v3",
+                voice="ritu_hi_customer",
+                language="hi-IN",
+                speed=1.0,
+            )
+        )
+        audio_config = AudioConfig(
+            transport_in_sample_rate=16000, transport_out_sample_rate=16000
+        )
+
+        with patch(
+            "api.services.pipecat.service_factory.SarvamTTSService"
+        ) as mock_service:
+            create_tts_service(user_config, audio_config)
+
+        kwargs = mock_service.call_args.kwargs
+        assert kwargs["settings"].voice == "ritu"
+        assert kwargs["settings"].model == "bulbul:v3"
+
 
 class TestSarvamDirectServiceInstantiation:
     @pytest.mark.parametrize("model", ["sarvam-30b", "sarvam-105b", "sarvam-105b-conversations"])

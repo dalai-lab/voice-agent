@@ -59,6 +59,13 @@ The guide tool is the authoritative source for prompt-authoring craft (global gu
 2. `update_workflow_settings` — update operational parameters or Post-Call Intelligence extraction schemas. All updates are draft-safe and preserve stored credential secrets.
 3. `get_workflow_report` — analyze workflow performance, disposition breakdown, and cost estimates over customizable time windows.
 
+### Knowledge Base Documents
+1. `list_documents` — discover existing documents with their `document_uuid`, filename, and chunk count.
+2. `create_knowledge_base_document` — ingest text or Markdown directly into the Knowledge Base. Automatically persists to storage and enqueues background vector chunking and embeddings.
+3. `get_document_status` — check ingestion status and chunk count for an uploaded document.
+4. `delete_knowledge_base_document` — soft-delete a document and deactivate its chunks.
+5. In workflows, attach documents by referencing their UUIDs in `document_uuids: ["<uuid>"]` on `agentNode` or `startCall`. At runtime, the voice engine automatically binds `retrieve_from_knowledge_base` to query attached documents.
+
 ### Creating a reusable tool and using it in workflow
 1. If authentication is needed, call `list_credentials` and use an existing `credential_uuid`; the user creates credential secrets in the UI.
 2. Build a typed tool definition and call `create_tool`. The request schema is authoritative for allowed tool categories and config fields.

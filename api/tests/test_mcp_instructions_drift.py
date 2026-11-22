@@ -29,6 +29,7 @@ from api.mcp_server.tools import (
     campaigns as campaigns_module,
     create_workflow as create_workflow_module,
     initiate_call as initiate_call_module,
+    knowledge_base as knowledge_base_module,
     publish_workflow as publish_workflow_module,
     save_workflow as save_workflow_module,
     telephony as telephony_module,
@@ -115,6 +116,7 @@ async def test_guide_only_references_registered_tools():
         ("update_workflow_settings", workflow_settings_module),
         ("get_wallet_balance", wallet_module),
         ("get_call_details", call_logs_module),
+        ("create_knowledge_base_document", knowledge_base_module),
     ],
 )
 async def test_tool_documents_every_error_code_it_returns(tool_name, module):

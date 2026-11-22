@@ -17,6 +17,11 @@ from api.mcp_server.tools.catalog import (
 from api.mcp_server.tools.create_workflow import create_workflow
 from api.mcp_server.tools.docs_search import list_docs, read_doc, search_docs
 from api.mcp_server.tools.get_workflow_code import get_workflow_code
+from api.mcp_server.tools.knowledge_base import (
+    create_knowledge_base_document,
+    delete_knowledge_base_document,
+    get_document_status,
+)
 from api.mcp_server.tools.node_types import get_node_type, list_node_types
 from api.mcp_server.tools.publish_workflow import publish_workflow
 from api.mcp_server.tools.save_workflow import save_workflow
@@ -64,6 +69,7 @@ for _tool in (
     get_workflow_code,
     list_credentials,
     list_documents,
+    get_document_status,
     list_recordings,
     list_tools,
     list_phone_numbers,
@@ -84,6 +90,8 @@ for _tool in (
     save_workflow,
     publish_workflow,
     create_tool,
+    create_knowledge_base_document,
+    delete_knowledge_base_document,
     update_phone_number_routing,
     update_campaign_status,
     update_workflow_settings,

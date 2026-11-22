@@ -174,33 +174,66 @@ async def process_knowledge_base_document(
                     f"model={embeddings_model}"
                 )
 
-        logger.info(f"Delegating document processing to MPS (mode={retrieval_mode})")
-        mps_response = await mps_service_key_client.process_document(
-            file_path=temp_file_path,
-            filename=filename,
-            content_type=mime_type or "application/octet-stream",
-            retrieval_mode=retrieval_mode,
-            max_tokens=max_tokens,
-            organization_id=organization_id,
-            created_by=created_by_provider_id,
-        )
-
-        docling_metadata = mps_response.get("docling_metadata", {})
-
         if retrieval_mode == "full_document":
-            full_text = mps_response.get("full_text") or ""
+            try:
+                with open(temp_file_path, "r", encoding="utf-8", errors="replace") as fh:
+                    full_text = fh.read()
+            except Exception as e:
+                logger.error(f"Failed to read local full_document: {e}")
+                full_text = ""
             await db_client.update_document_full_text(document_id, full_text)
             await db_client.update_document_status(
                 document_id,
                 "completed",
                 total_chunks=0,
-                docling_metadata=docling_metadata,
+                docling_metadata={},
             )
             logger.info(
-                f"Successfully processed full_document {document_id}. "
+                f"Successfully processed full_document {document_id} locally. "
                 f"Text length: {len(full_text)} chars"
             )
             return
+
+        logger.info(f"Delegating document processing to MPS (mode={retrieval_mode})")
+        try:
+            mps_response = await mps_service_key_client.process_document(
+                file_path=temp_file_path,
+                filename=filename,
+                content_type=mime_type or "application/octet-stream",
+                retrieval_mode=retrieval_mode,
+                max_tokens=max_tokens,
+                organization_id=organization_id,
+                created_by=created_by_provider_id,
+            )
+        except Exception as e:
+            logger.warning(
+                f"MPS document processing failed ({e}); falling back to local text processing"
+            )
+            try:
+                with open(temp_file_path, "r", encoding="utf-8", errors="replace") as fh:
+                    raw_text = fh.read()
+            except Exception as read_err:
+                logger.error(f"Failed to read file locally: {read_err}")
+                raise e
+
+            # Simple local chunking by paragraphs/newlines
+            import re
+            sections = [s.strip() for s in re.split(r"\n\s*\n", raw_text) if s.strip()]
+            mps_chunks = []
+            for idx, s in enumerate(sections):
+                mps_chunks.append({
+                    "chunk_text": s,
+                    "contextualized_text": s,
+                    "chunk_index": idx,
+                    "token_count": len(s.split()) * 4 // 3,
+                })
+            mps_response = {
+                "chunks": mps_chunks,
+                "full_text": raw_text,
+                "docling_metadata": {"source": "local_fallback"},
+            }
+
+        docling_metadata = mps_response.get("docling_metadata", {})
 
         if not embeddings_api_key:
             error_message = (

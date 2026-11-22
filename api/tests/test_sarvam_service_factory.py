@@ -184,31 +184,6 @@ class TestSarvamTTSServiceFactory:
         kwargs = mock_service.call_args.kwargs
         assert kwargs["settings"].voice == "rehan"
 
-    def test_create_sarvam_tts_service_maps_aarti_voice(self):
-        user_config = SimpleNamespace(
-            tts=SimpleNamespace(
-                provider=ServiceProviders.SARVAM.value,
-                api_key="test-key",
-                model="bulbul:v2",
-                voice="aarti",
-                language="od-IN",
-                speed=1.0,
-            )
-        )
-        audio_config = AudioConfig(
-            transport_in_sample_rate=16000, transport_out_sample_rate=16000
-        )
-
-        with patch(
-            "api.services.pipecat.service_factory.SarvamTTSService"
-        ) as mock_service:
-            create_tts_service(user_config, audio_config)
-
-        kwargs = mock_service.call_args.kwargs
-        assert kwargs["settings"].voice == "aarti_hi_customer"
-        assert kwargs["settings"].model == "bulbul:v4-flash"
-        assert kwargs["settings"].language == Language.OR
-
     def test_create_sarvam_tts_service_defaults_blank_voice_id(self):
         user_config = SimpleNamespace(
             tts=SimpleNamespace(

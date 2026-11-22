@@ -51,7 +51,6 @@ SARVAM_V3_VOICES = (
 )
 # bulbul:v4-flash supports 200+ persona voice IDs (<name>_<lang>_<style>) as well as all classic voices
 SARVAM_V4_VOICES = (
-    "aarti_hi_customer",
     "shubh_enhi_ads",
     "shubh_enhi_conversational",
     "ritu_enhi_conversational",

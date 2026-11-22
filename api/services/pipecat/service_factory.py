@@ -1377,17 +1377,22 @@ def create_tts_service(
         pipecat_language = language_mapping.get(language, Language.HI)
 
         raw_voice = (getattr(user_config.tts, "voice", None) or "").strip().lower()
+        tts_model = getattr(user_config.tts, "model", "") or ""
         if not raw_voice:
-            tts_model = getattr(user_config.tts, "model", "") or ""
             if "v4" in tts_model:
                 voice = "shubh_enhi_ads"
             elif "v3" in tts_model:
                 voice = "shubh"
             else:
                 voice = "anushka"
+        elif raw_voice in ("aarti", "aarti_hi_customer"):
+            voice = "aarti_hi_customer"
+            if "v4" not in tts_model:
+                tts_model = "bulbul:v4-flash"
         else:
             voice = raw_voice
-        tts_model = user_config.tts.model
+        if not tts_model:
+            tts_model = getattr(user_config.tts, "model", "bulbul:v2")
         speed = _extract_clean_setting(user_config.tts, "speed", float)
         settings_kwargs: dict[str, Any] = {
             "model": tts_model,

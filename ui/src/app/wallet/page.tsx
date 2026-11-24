@@ -294,6 +294,9 @@ export default function WalletPage() {
         fetch(`${TALKAR}/billing/transactions/by-org/${dograhOrgId}?limit=100`)
           .then(r => r.json())
           .then(data => setTransactions(data.transactions || []));
+        fetch(`${TALKAR}/invoices/by-org/${dograhOrgId}`)
+          .then(r => r.ok ? r.json() : { invoices: [] })
+          .then(data => setInvoices(data.invoices || []));
       };
 
       if (isMock) {

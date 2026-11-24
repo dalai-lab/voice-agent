@@ -69,6 +69,7 @@ export default function WalletPage() {
   const [usage, setUsage] = useState<any>(null);
   
   const [topupAmount, setTopupAmount] = useState<string>(String(PLAN_MINIMUMS[plan] ?? 6000));
+  const [buyerGstin, setBuyerGstin] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [autoRechargeEnabled, setAutoRechargeEnabled] = useState(false);
@@ -118,6 +119,7 @@ export default function WalletPage() {
       setUsage(usageData);
       setInvoices(invoiceData.invoices || []);
       if (statusData?.status) setCustomerStatus(statusData.status);
+      if (statusData?.gstin) setBuyerGstin(statusData.gstin);
       
       setAutoRechargeEnabled(walletData.auto_recharge_enabled);
       setThreshold(String((walletData.auto_recharge_threshold_paise || 100000) / 100));
@@ -224,6 +226,8 @@ export default function WalletPage() {
 
   const currentMinuteRate = subscription?.per_minute_rate_paise ? subscription.per_minute_rate_paise / 100 : (currentPlan === "pro" ? 18 : 6);
   const parsedTopupAmount = parseInt(topupAmount) || 0;
+  const parsedTaxAmount = Math.round(parsedTopupAmount * 0.18);
+  const parsedTotalPayableAmount = parsedTopupAmount + parsedTaxAmount;
   const estimatedMinutes = parsedTopupAmount > 0 && currentMinuteRate > 0 ? Math.floor(parsedTopupAmount / currentMinuteRate) : 0;
 
   const handleTopup = async (isMock = false, isLiveTest = false) => {
@@ -235,12 +239,22 @@ export default function WalletPage() {
       return;
     }
     
+    const isGstinInvalid = buyerGstin.trim().length > 0 && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(buyerGstin.trim());
+    if (isGstinInvalid) {
+      alert("Please enter a valid 15-character Indian GSTIN (e.g. 27AABCU9603R1ZM) or leave it blank.");
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const orderRes = await fetch(`${TALKAR}/billing/topup/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dograh_org_id: dograhOrgId, amount_rupees: amount })
+        body: JSON.stringify({ 
+          dograh_org_id: dograhOrgId, 
+          amount_rupees: amount,
+          buyer_gstin: buyerGstin.trim().toUpperCase() || undefined
+        })
       });
       const order = await orderRes.json();
       
@@ -314,7 +328,7 @@ export default function WalletPage() {
         amount: order.amount_paise,
         currency: order.currency,
         name: "Talkar AI Voice",
-        description: `Wallet top-up of ₹${amount.toLocaleString()}`,
+        description: `Wallet top-up (₹${amount.toLocaleString('en-IN')} base + 18% GST)`,
         order_id: order.razorpay_order_id,
         handler: async (response: any) => {
           const confirmRes = await fetch(`${TALKAR}/billing/confirm-topup`, {
@@ -513,6 +527,7 @@ export default function WalletPage() {
         description: "Zero-charge authorization for automated reloads",
         order_id: session.razorpay_order_id,
         recurring: "1",
+        ...(session.max_amount_paise ? { max_amount: session.max_amount_paise } : {}),
         handler: async (response: any) => {
           const confirmRes = await fetch(`${TALKAR}/billing/confirm-add-card`, {
             method: "POST",
@@ -940,6 +955,52 @@ export default function WalletPage() {
             )}
           </div>
 
+          {/* Optional GSTIN Input for B2B ITC */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground">GSTIN for Input Tax Credit (Optional)</label>
+              <span className="text-[10px] text-muted-foreground/70">15-char B2B GSTIN</span>
+            </div>
+            <Input
+              type="text"
+              value={buyerGstin}
+              onChange={(e) => setBuyerGstin(e.target.value.toUpperCase())}
+              placeholder="e.g. 20AAACB1234A1Z5"
+              maxLength={15}
+              className="h-10 rounded-lg text-xs uppercase bg-background border-border font-mono tracking-wider"
+            />
+            {buyerGstin.trim().length > 0 && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(buyerGstin.trim()) && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                Please enter a valid 15-character Indian GSTIN (e.g. 20AAACB1234A1Z5) or leave blank.
+              </p>
+            )}
+          </div>
+
+          {/* Order Summary Breakdown (Option A B2B Tax-Exclusive) */}
+          {parsedTopupAmount > 0 && (
+            <div className="rounded-xl border border-border/80 bg-muted/30 p-4 space-y-2.5">
+              <div className="flex justify-between items-center text-xs text-muted-foreground">
+                <span>Wallet Credits (Base Amount):</span>
+                <span className="font-semibold text-foreground">₹{parsedTopupAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span>GST (18% - ITC Claimable)</span>
+                  <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded font-medium">B2B Eligible</span>
+                </span>
+                <span className="font-semibold text-foreground">₹{parsedTaxAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="h-px w-full bg-border/60 my-1" />
+              <div className="flex justify-between items-center text-sm font-bold">
+                <span>Total Payable (incl. GST):</span>
+                <span className="text-foreground font-black text-base">₹{parsedTotalPayableAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground/80 pt-1 leading-relaxed">
+                ₹{parsedTopupAmount.toLocaleString('en-IN')} will be credited directly to your workspace wallet. A compliant GST tax invoice will be issued immediately upon payment.
+              </p>
+            </div>
+          )}
+
           {/* Estimated Talk Time Banner */}
           {estimatedMinutes > 0 && (
             <div className="rounded-lg bg-muted/40 border border-border/50 p-3 flex items-center justify-between text-xs">
@@ -954,14 +1015,19 @@ export default function WalletPage() {
           <div className="pt-2 flex flex-col sm:flex-row gap-3">
             <Button
               onClick={() => handleTopup(false)}
-              disabled={!topupAmount || parseInt(topupAmount) < minTopup || isProcessing}
+              disabled={
+                !topupAmount ||
+                parseInt(topupAmount) < minTopup ||
+                isProcessing ||
+                (buyerGstin.trim().length > 0 && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(buyerGstin.trim()))
+              }
               className="w-full sm:flex-1 h-10 rounded-lg text-xs font-semibold bg-foreground text-background hover:bg-foreground/90 shadow-xs"
             >
               {isProcessing
                 ? "Opening Checkout..."
                 : isActivationNeeded
-                ? `Pay ₹${parsedTopupAmount > 0 ? parsedTopupAmount.toLocaleString() : "0"} & Activate Workspace`
-                : `Pay ₹${parsedTopupAmount > 0 ? parsedTopupAmount.toLocaleString() : "0"} Securely`}
+                ? `Pay ₹${parsedTotalPayableAmount > 0 ? parsedTotalPayableAmount.toLocaleString('en-IN') : "0"} & Activate Workspace`
+                : `Pay ₹${parsedTotalPayableAmount > 0 ? parsedTotalPayableAmount.toLocaleString('en-IN') : "0"} Securely (Credits ₹${parsedTopupAmount.toLocaleString('en-IN')})`}
             </Button>
           </div>
         </div>

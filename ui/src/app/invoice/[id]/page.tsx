@@ -64,9 +64,35 @@ export default function InvoicePage() {
     window.print();
   };
 
-  const amountRupees = (invoice.amount_paise / 100).toFixed(2);
-  const taxAmount = (invoice.amount_paise / 100 * 0.18).toFixed(2); // Mock 18% GST for visual
-  const subtotal = (invoice.amount_paise / 100 - parseFloat(taxAmount)).toFixed(2);
+  const fin = invoice.financials || {};
+  const meta = invoice.tax_metadata || {};
+  const seller = invoice.seller || {};
+  const buyer = invoice.buyer || invoice.customer || {};
+
+  const totalPaise = fin.total_paise ?? invoice.total_paise ?? invoice.amount_paise ?? 0;
+  const subtotalPaise = fin.subtotal_paise ?? invoice.subtotal_paise ?? Math.round(totalPaise / 1.18);
+  const taxPaise = fin.tax_paise ?? invoice.tax_paise ?? (totalPaise - subtotalPaise);
+  const cgstPaise = fin.cgst_paise ?? invoice.cgst_paise ?? 0;
+  const sgstPaise = fin.sgst_paise ?? invoice.sgst_paise ?? 0;
+  const igstPaise = fin.igst_paise ?? invoice.igst_paise ?? 0;
+
+  const totalRupees = (totalPaise / 100).toFixed(2);
+  const subtotalRupees = (subtotalPaise / 100).toFixed(2);
+  const taxRupees = (taxPaise / 100).toFixed(2);
+  const cgstRupees = (cgstPaise / 100).toFixed(2);
+  const sgstRupees = (sgstPaise / 100).toFixed(2);
+  const igstRupees = (igstPaise / 100).toFixed(2);
+
+  const isIntraState = cgstPaise > 0 || sgstPaise > 0;
+  const isInternalDebit = invoice.invoice_type === "internal_debit_note";
+  const sacCode = meta.sac_code || invoice.sac_code || "998313";
+  const placeOfSupply = meta.place_of_supply || invoice.place_of_supply || "20-Jharkhand";
+
+  const invoiceTitle = invoice.invoice_type === "credit_note"
+    ? "CREDIT NOTE"
+    : invoice.invoice_type === "internal_debit_note"
+    ? "DEBIT NOTE"
+    : "TAX INVOICE";
 
   return (
     <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans sm:py-12 print:py-0 print:bg-white">
@@ -118,86 +144,130 @@ export default function InvoicePage() {
                   </g>
                 </svg>
               </div>
-              <div className="text-sm text-zinc-500 leading-relaxed max-w-[250px]">
-                <strong className="text-zinc-700">4THORBIT BUSINESS SOLUTIONS PVT LTD</strong><br />
-                CIN: U74999JH2022PTC018848<br />
-                C/O Bundeshwari Devi, PN Bose Compound<br />
-                Lalpur, Ranchi, Jharkhand 834001<br />
-                it@4thorbit.in
+              <div className="text-sm text-zinc-500 leading-relaxed max-w-[280px]">
+                <strong className="text-zinc-800 font-semibold">{seller.company_name || "4THORBIT BUSINESS SOLUTIONS PVT LTD"}</strong><br />
+                <span className="text-xs">CIN: {seller.cin || "U74999JH2022PTC018848"}</span><br />
+                <span className="text-xs font-mono font-semibold text-zinc-700">GSTIN: {seller.gstin || "20AAACB1234A1Z5"}</span><br />
+                <span className="text-xs">PAN: {seller.pan || "AAACB1234A"}</span><br />
+                <span className="text-xs">{seller.address || "C/O Bundeshwari Devi, PN Bose Compound, Lalpur, Ranchi, Jharkhand 834001"}</span><br />
+                <span className="text-xs">{seller.email || "it@4thorbit.in"}</span>
               </div>
             </div>
             <div className="text-left sm:text-right">
-              <h2 className="text-4xl font-extrabold tracking-tight text-zinc-200 mb-2 print:text-zinc-300">INVOICE</h2>
-              <p className="text-lg font-bold text-zinc-800">{invoice.invoice_number}</p>
-              <div className="mt-4 inline-flex px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold uppercase tracking-widest rounded-full border border-emerald-200/60 print:border-emerald-500">
-                {invoice.status}
+              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-300 mb-1 print:text-zinc-400">{invoiceTitle}</h2>
+              <p className="text-base sm:text-lg font-bold text-zinc-900 font-mono">{invoice.invoice_number}</p>
+              <div className="mt-3 inline-flex px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold uppercase tracking-wider rounded-full border border-emerald-200/60 print:border-emerald-500">
+                {invoice.status || "PAID"}
               </div>
             </div>
           </div>
 
           {/* Grid Information */}
-          <div className="grid sm:grid-cols-2 gap-10 mb-12">
+          <div className="grid sm:grid-cols-2 gap-10 mb-10">
             <div>
-              <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Billed To</h3>
-              <p className="text-sm font-bold text-zinc-900">{invoice.customer?.company_name}</p>
-              <p className="text-sm text-zinc-600 mt-1">{invoice.customer?.contact_name}</p>
-              <p className="text-sm text-zinc-600">{invoice.customer?.contact_email}</p>
+              <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2.5">Billed To (Buyer)</h3>
+              <p className="text-sm font-bold text-zinc-900">{buyer.company_name || "Valued Customer"}</p>
+              {buyer.contact_name && <p className="text-xs text-zinc-600 mt-0.5">{buyer.contact_name}</p>}
+              {buyer.contact_email && <p className="text-xs text-zinc-600">{buyer.contact_email}</p>}
+              {buyer.billing_address && <p className="text-xs text-zinc-500 mt-1 max-w-[280px] leading-relaxed">{buyer.billing_address}</p>}
+              {buyer.gstin ? (
+                <div className="mt-2 text-xs font-mono font-semibold text-zinc-800">
+                  GSTIN: <span className="text-emerald-700 font-bold">{buyer.gstin}</span>
+                </div>
+              ) : (
+                <p className="text-[11px] text-zinc-400 mt-1.5 italic">Unregistered Buyer (Consumer)</p>
+              )}
             </div>
             <div className="sm:text-right">
-              <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Invoice Details</h3>
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between sm:justify-end gap-12">
+              <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2.5">Statutory Invoice Details</h3>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex justify-between sm:justify-end gap-8">
                   <span className="text-zinc-500">Date Issued:</span>
-                  <span className="font-semibold text-zinc-900">{new Date(invoice.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                  <span className="font-semibold text-zinc-900">{new Date(invoice.created_at).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                 </div>
-                <div className="flex justify-between sm:justify-end gap-12">
-                  <span className="text-zinc-500">Total Amount:</span>
-                  <span className="font-semibold text-zinc-900">₹{amountRupees}</span>
+                <div className="flex justify-between sm:justify-end gap-8">
+                  <span className="text-zinc-500">Place of Supply:</span>
+                  <span className="font-semibold text-zinc-900">{placeOfSupply}</span>
+                </div>
+                <div className="flex justify-between sm:justify-end gap-8">
+                  <span className="text-zinc-500">Service Accounting Code (SAC):</span>
+                  <span className="font-semibold text-zinc-900 font-mono">{sacCode}</span>
+                </div>
+                <div className="flex justify-between sm:justify-end gap-8">
+                  <span className="text-zinc-500">Reverse Charge:</span>
+                  <span className="font-semibold text-zinc-900">No</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Line Items */}
-          <div className="mb-12 rounded-xl overflow-hidden border border-zinc-200 print:border-zinc-300">
-            <table className="w-full text-left text-sm">
+          <div className="mb-10 rounded-xl overflow-hidden border border-zinc-200 print:border-zinc-300">
+            <table className="w-full text-left text-xs">
               <thead className="bg-zinc-50 print:bg-zinc-100 border-b border-zinc-200">
                 <tr>
-                  <th className="py-4 px-5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Description</th>
-                  <th className="py-4 px-5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">Qty</th>
-                  <th className="py-4 px-5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">Price</th>
-                  <th className="py-4 px-5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">Total</th>
+                  <th className="py-3.5 px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Description of Service</th>
+                  <th className="py-3.5 px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">SAC</th>
+                  <th className="py-3.5 px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">Qty</th>
+                  <th className="py-3.5 px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">Rate</th>
+                  <th className="py-3.5 px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">Taxable Value</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 <tr className="bg-white">
-                  <td className="py-5 px-5">
-                    <p className="font-semibold text-zinc-900">Wallet Top-up</p>
-                    <p className="text-xs text-zinc-500 mt-1">Credits added to Talkar platform for voice AI calls.</p>
+                  <td className="py-4 px-4">
+                    <p className="font-semibold text-zinc-900">
+                      {isInternalDebit ? "Telephony DID Phone Number Monthly Lease" : "Talkar Voice AI Platform Credits"}
+                    </p>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">
+                      {isInternalDebit ? "Dedicated DID virtual phone line subscription." : "Prepaid voice AI call minute and processing credits."}
+                    </p>
                   </td>
-                  <td className="py-5 px-5 text-right font-medium text-zinc-700">1</td>
-                  <td className="py-5 px-5 text-right font-medium text-zinc-700">₹{subtotal}</td>
-                  <td className="py-5 px-5 text-right font-bold text-zinc-900">₹{subtotal}</td>
+                  <td className="py-4 px-4 text-center font-mono text-zinc-600">{sacCode}</td>
+                  <td className="py-4 px-4 text-right font-medium text-zinc-700">1</td>
+                  <td className="py-4 px-4 text-right font-medium text-zinc-700">₹{subtotalRupees}</td>
+                  <td className="py-4 px-4 text-right font-bold text-zinc-900">₹{subtotalRupees}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          {/* Totals */}
-          <div className="flex justify-end mb-16">
-            <div className="w-full max-w-xs space-y-3 text-sm">
+          {/* Tax Summary & Totals */}
+          <div className="flex justify-end mb-12">
+            <div className="w-full max-w-sm space-y-2 text-xs">
               <div className="flex justify-between px-2 text-zinc-600">
-                <span>Subtotal</span>
-                <span className="font-medium">₹{subtotal}</span>
+                <span>Taxable Amount (Subtotal)</span>
+                <span className="font-semibold text-zinc-900">₹{subtotalRupees}</span>
               </div>
-              <div className="flex justify-between px-2 text-zinc-600">
-                <span>GST (18%)</span>
-                <span className="font-medium">₹{taxAmount}</span>
-              </div>
-              <div className="h-px w-full bg-zinc-200 my-4" />
+              {isIntraState ? (
+                <>
+                  <div className="flex justify-between px-2 text-zinc-600">
+                    <span>CGST (9.0%)</span>
+                    <span className="font-medium text-zinc-800">₹{cgstRupees}</span>
+                  </div>
+                  <div className="flex justify-between px-2 text-zinc-600">
+                    <span>SGST (9.0%)</span>
+                    <span className="font-medium text-zinc-800">₹{sgstRupees}</span>
+                  </div>
+                </>
+              ) : taxPaise > 0 ? (
+                <div className="flex justify-between px-2 text-zinc-600">
+                  <span>IGST (18.0%)</span>
+                  <span className="font-medium text-zinc-800">₹{igstRupees}</span>
+                </div>
+              ) : (
+                <div className="flex justify-between px-2 text-zinc-500">
+                  <span>GST (0% - SEZ / Internal)</span>
+                  <span className="font-medium text-zinc-600">₹0.00</span>
+                </div>
+              )}
+              <div className="h-px w-full bg-zinc-200 my-2" />
               <div className="flex justify-between px-2 items-center">
-                <span className="text-base font-bold text-zinc-900">Total Paid</span>
-                <span className="text-xl font-black" style={{ color: "#fe6905" }}>₹{amountRupees}</span>
+                <div>
+                  <span className="text-sm font-bold text-zinc-900">Total Invoice Amount</span>
+                  <p className="text-[10px] text-zinc-400">Total payable including taxes</p>
+                </div>
+                <span className="text-lg font-black text-foreground" style={{ color: "#fe6905" }}>₹{totalRupees}</span>
               </div>
             </div>
           </div>

@@ -61,15 +61,12 @@ import {
     DEFAULT_VAD_MIN_VOLUME,
     DEFAULT_VAD_STOP_SECS,
     DEFAULT_VOICEMAIL_DETECTION_CONFIGURATION,
-    detectVoiceSensitivityPreset,
     type ExternalPBXFieldMapping,
     getPacingLabel,
     resolveWorkflowConfigurations,
     TURN_START_STRATEGY_OPTIONS,
     type TurnStartStrategy,
     type TurnStopStrategy,
-    VOICE_SENSITIVITY_PRESETS,
-    type VoiceSensitivityPreset,
     type VoicemailDetectionConfiguration,
     type WorkflowConfigurations,
 } from "@/types/workflow-configurations";
@@ -335,14 +332,6 @@ function GeneralSection({
         workflowConfigurations.boost_affirmations ?? true
     );
     const [advancedAcousticsOpen, setAdvancedAcousticsOpen] = useState(false);
-    const [sensitivityPreset, setSensitivityPreset] = useState<VoiceSensitivityPreset>(() =>
-        detectVoiceSensitivityPreset(
-            workflowConfigurations.vad_min_volume,
-            workflowConfigurations.vad_confidence,
-            workflowConfigurations.turn_silence_timeout_secs,
-            workflowConfigurations.user_turn_stop_timeout
-        )
-    );
     const [contextCompactionEnabled, setContextCompactionEnabled] = useState(
         workflowConfigurations.context_compaction_enabled,
     );
@@ -704,70 +693,8 @@ function GeneralSection({
                     <div>
                         <h3 className="text-sm font-medium">Turn Detection</h3>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                            Configure voice sensitivity, conversational pacing, and speech end detection.
+                            Configure conversational pacing and speech end detection.
                         </p>
-                    </div>
-
-                    {/* Presets */}
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <Label className="text-xs font-medium flex items-center gap-1.5">
-                                Voice Sensitivity & Pacing Presets
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs">
-                                        Quickly configure voice detection sensitivity and pause timeouts for common phone call environments.
-                                    </TooltipContent>
-                                </Tooltip>
-                            </Label>
-                            {sensitivityPreset === "custom" && (
-                                <Badge variant="outline" className="text-[10px] text-muted-foreground border-dashed">
-                                    Custom Tuned
-                                </Badge>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                            {(Object.entries(VOICE_SENSITIVITY_PRESETS) as [Exclude<VoiceSensitivityPreset, "custom">, typeof VOICE_SENSITIVITY_PRESETS[keyof typeof VOICE_SENSITIVITY_PRESETS]][]).map(([key, preset]) => {
-                                const isSelected = sensitivityPreset === key;
-                                return (
-                                    <button
-                                        key={key}
-                                        type="button"
-                                        onClick={() => {
-                                            setSensitivityPreset(key);
-                                            setVadMinVolume(preset.vad_min_volume);
-                                            setVadConfidence(preset.vad_confidence);
-                                            setTurnSilenceTimeoutSecs(preset.turn_silence_timeout_secs);
-                                            setUserTurnStopTimeout(preset.user_turn_stop_timeout);
-                                        }}
-                                        className={cn(
-                                            "flex flex-col text-left p-3 rounded-lg border transition-all text-xs cursor-pointer",
-                                            isSelected
-                                                ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/20"
-                                                : "border-border hover:border-muted-foreground/30 hover:bg-muted/30"
-                                        )}
-                                    >
-                                        <div className="flex items-center justify-between w-full mb-1">
-                                            <span className="font-semibold text-xs text-foreground">{preset.label}</span>
-                                            {preset.badge ? (
-                                                <Badge
-                                                    variant={key === "balanced" ? "secondary" : "outline"}
-                                                    className="text-[10px] px-1.5 py-0 h-4"
-                                                >
-                                                    {preset.badge}
-                                                </Badge>
-                                            ) : null}
-                                        </div>
-                                        <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
-                                            {preset.description}
-                                        </p>
-                                    </button>
-                                );
-                            })}
-                        </div>
                     </div>
 
                     {/* Conversational Pacing Slider */}
@@ -798,7 +725,6 @@ function GeneralSection({
                             onChange={(e) => {
                                 const val = parseFloat(e.target.value);
                                 setTurnSilenceTimeoutSecs(val);
-                                setSensitivityPreset("custom");
                             }}
                             className="w-full accent-primary h-2 bg-muted rounded-lg cursor-pointer"
                         />
@@ -809,65 +735,26 @@ function GeneralSection({
                         </div>
                     </div>
 
-                    {/* Safety Watchdog Timeout & Detection Strategy */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="user_turn_stop_timeout" className="text-xs font-medium flex items-center gap-1.5">
-                                    Safety Watchdog Timeout
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-xs">
-                                            Hard ceiling timeout (seconds). Forces the agent to reply if the speech recognizer hangs or fails to emit an end-of-speech token (e.g. on quiet 1-word responses or line static).
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </Label>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    id="user_turn_stop_timeout"
-                                    type="number"
-                                    step="0.5"
-                                    min="1.0"
-                                    max="15.0"
-                                    value={userTurnStopTimeout}
-                                    onChange={(e) => {
-                                        const val = parseFloat(e.target.value);
-                                        if (!isNaN(val) && val >= 1.0 && val <= 15.0) {
-                                            setUserTurnStopTimeout(val);
-                                            setSensitivityPreset("custom");
-                                        }
-                                    }}
-                                />
-                                <span className="text-xs text-muted-foreground shrink-0">sec</span>
-                            </div>
-                            <p className="text-[11px] text-muted-foreground">
-                                Prevents dead air when callers say short words (1.0s–15.0s).
-                            </p>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="turn_stop_strategy" className="text-xs font-medium">Detection Strategy</Label>
-                            <Select
-                                value={turnStopStrategy}
-                                onValueChange={(value: TurnStopStrategy) => setTurnStopStrategy(value)}
-                            >
-                                <SelectTrigger id="turn_stop_strategy">
-                                    <SelectValue placeholder="Select strategy" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="transcription">Transcription-based</SelectItem>
-                                    <SelectItem value="turn_analyzer">Smart Turn Analyzer</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <p className="text-[11px] text-muted-foreground">
-                                {turnStopStrategy === "transcription"
-                                    ? "Ends turn when transcription indicates completion."
-                                    : "Uses ML model to detect semantic end of turn."}
-                            </p>
-                        </div>
+                    {/* Detection Strategy */}
+                    <div className="space-y-2">
+                        <Label htmlFor="turn_stop_strategy" className="text-xs font-medium">Detection Strategy</Label>
+                        <Select
+                            value={turnStopStrategy}
+                            onValueChange={(value: TurnStopStrategy) => setTurnStopStrategy(value)}
+                        >
+                            <SelectTrigger id="turn_stop_strategy">
+                                <SelectValue placeholder="Select strategy" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="transcription">Transcription-based</SelectItem>
+                                <SelectItem value="turn_analyzer">Smart Turn Analyzer</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p className="text-[11px] text-muted-foreground">
+                            {turnStopStrategy === "transcription"
+                                ? "Ends turn when transcription indicates completion."
+                                : "Uses ML model to detect semantic end of turn."}
+                        </p>
                     </div>
 
                     {turnStopStrategy === "turn_analyzer" && (
@@ -929,7 +816,7 @@ function GeneralSection({
                             >
                                 <span className="flex items-center gap-1.5">
                                     <ChevronRight className={cn("h-4 w-4 transition-transform text-muted-foreground", advancedAcousticsOpen && "rotate-90")} />
-                                    Advanced Acoustic Controls (Silero VAD)
+                                    Advanced Acoustic Controls (Silero VAD & Watchdog)
                                 </span>
                                 <span className="text-[11px] text-muted-foreground">
                                     {advancedAcousticsOpen ? "Hide" : "Customize"}
@@ -937,7 +824,43 @@ function GeneralSection({
                             </button>
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-4 pt-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="user_turn_stop_timeout" className="text-xs font-medium flex items-center gap-1.5">
+                                        Safety Watchdog Timeout
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-xs">
+                                                Hard ceiling timeout (seconds). Forces the agent to reply if the speech recognizer hangs or fails to emit an end-of-speech token (e.g. on quiet 1-word responses or line static).
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        id="user_turn_stop_timeout"
+                                        type="number"
+                                        step="0.5"
+                                        min="1.0"
+                                        max="15.0"
+                                        value={userTurnStopTimeout}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            if (!isNaN(val) && val >= 1.0 && val <= 15.0) {
+                                                setUserTurnStopTimeout(val);
+                                            }
+                                        }}
+                                    />
+                                    <span className="text-xs text-muted-foreground shrink-0">sec</span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">
+                                    Prevents dead air when callers say short words (1.0s–15.0s).
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                                 <div className="space-y-1.5">
                                     <div className="flex items-center gap-1">
                                         <Label htmlFor="vad_min_volume" className="text-xs">
@@ -963,7 +886,6 @@ function GeneralSection({
                                             const val = parseFloat(e.target.value);
                                             if (!isNaN(val)) {
                                                 setVadMinVolume(val);
-                                                setSensitivityPreset("custom");
                                             }
                                         }}
                                     />
@@ -995,7 +917,6 @@ function GeneralSection({
                                             const val = parseFloat(e.target.value);
                                             if (!isNaN(val)) {
                                                 setVadConfidence(val);
-                                                setSensitivityPreset("custom");
                                             }
                                         }}
                                     />
@@ -2276,11 +2197,10 @@ function WorkflowSettingsInner({
                                 <button
                                     key={item.id}
                                     onClick={() => setActiveSection(item.id)}
-                                    className={`w-full flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer ${
-                                        activeSection === item.id
-                                            ? "bg-foreground/[0.04] text-foreground dark:bg-foreground/[0.06]"
-                                            : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.01]"
-                                    }`}
+                                    className={`w-full flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer ${activeSection === item.id
+                                        ? "bg-foreground/[0.04] text-foreground dark:bg-foreground/[0.06]"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.01]"
+                                        }`}
                                 >
                                     <div className="flex items-center gap-2">
                                         <Icon className="h-4 w-4 shrink-0" />

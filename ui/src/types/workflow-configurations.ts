@@ -23,10 +23,10 @@ export const DEFAULT_TURN_START_MIN_WORDS = 3;
 export const DEFAULT_PROVISIONAL_VAD_PAUSE_SECS = 1.5;
 
 export const DEFAULT_VAD_MIN_VOLUME = 0.35;
-export const DEFAULT_VAD_CONFIDENCE = 0.65;
+export const DEFAULT_VAD_CONFIDENCE = 0.70;
 export const DEFAULT_VAD_STOP_SECS = 0.25;
-export const DEFAULT_USER_TURN_STOP_TIMEOUT = 4.5;
-export const DEFAULT_TURN_SILENCE_TIMEOUT_SECS = 0.9;
+export const DEFAULT_USER_TURN_STOP_TIMEOUT = 2.0;
+export const DEFAULT_TURN_SILENCE_TIMEOUT_SECS = 0.75;
 
 export type VoiceSensitivityPreset = "sensitive" | "balanced" | "noisy" | "custom";
 

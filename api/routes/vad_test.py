@@ -6,7 +6,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from pipecat.audio.vad.silero import SileroOnnxModel
 
-router = APIRouter(prefix="/vad-test")
+router = APIRouter(prefix="/ws/vad-test")
 
 # Lazy-loaded single instance of the Silero ONNX model
 _silero_model: SileroOnnxModel | None = None

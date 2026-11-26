@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Mic, MicOff, Volume2, Activity, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { resolveBrowserBackendUrl } from "@/lib/apiClient";
 
 interface LiveVadTesterProps {
     vadMinVolume: number;
@@ -25,7 +26,7 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
     const wsRef = useRef<WebSocket | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
-    const processorRef = useRef<ScriptProcessorNode | null>(null);
+    const workletNodeRef = useRef<AudioWorkletNode | null>(null);
 
     // Sync active threshold configs over WebSocket whenever slider props change
     useEffect(() => {
@@ -42,11 +43,11 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
     }, [vadMinVolume, vadConfidence, sampleRate]);
 
     const stopTesting = useCallback(() => {
-        if (processorRef.current) {
+        if (workletNodeRef.current) {
             try {
-                processorRef.current.disconnect();
+                workletNodeRef.current.disconnect();
             } catch (_) {}
-            processorRef.current = null;
+            workletNodeRef.current = null;
         }
         if (audioContextRef.current) {
             try {
@@ -75,8 +76,11 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
         setErrorMsg(null);
         try {
             // 1. Establish WebSocket connection to backend Silero VAD tester
-            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-            const wsUrl = `${protocol}//${window.location.host}/api/vad-test/stream`;
+            // Must go through /api/v1/ws/vad-test/stream so Traefik/reverse proxy routes it to the FastAPI API
+            const baseUrl = resolveBrowserBackendUrl();
+            const wsBase = baseUrl.replace(/^http/, "ws");
+            const wsUrl = `${wsBase}/api/v1/ws/vad-test/stream`;
+
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
 
@@ -105,7 +109,8 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
                 }
             };
 
-            ws.onerror = () => {
+            ws.onerror = (e) => {
+                console.error("VAD WebSocket error", e);
                 setErrorMsg("Could not connect to VAD streaming server.");
                 stopTesting();
             };
@@ -120,15 +125,14 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
             });
             mediaStreamRef.current = stream;
 
-            // 3. Setup AudioContext and downsample to 8kHz / 16kHz
+            // 3. Setup AudioContext with modern AudioWorkletNode (replaces deprecated ScriptProcessorNode)
             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
             audioContextRef.current = audioCtx;
             const source = audioCtx.createMediaStreamSource(stream);
 
-            // Using ScriptProcessorNode for chunk capture
-            const bufferSize = 2048;
-            const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
-            processorRef.current = processor;
+            await audioCtx.audioWorklet.addModule("/audio-capture-processor.js");
+            const workletNode = new AudioWorkletNode(audioCtx, "audio-capture-processor");
+            workletNodeRef.current = workletNode;
 
             const inputSampleRate = audioCtx.sampleRate;
             const targetSampleRate = sampleRate; // 8000 or 16000
@@ -136,10 +140,10 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
 
             let downsampleBuffer: number[] = [];
 
-            processor.onaudioprocess = (e) => {
+            workletNode.port.onmessage = (event) => {
                 if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
 
-                const inputData = e.inputBuffer.getChannelData(0);
+                const inputData: Float32Array = event.data;
 
                 // Simple linear resampling to targetSampleRate
                 const ratio = inputSampleRate / targetSampleRate;
@@ -155,7 +159,6 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
                     const chunk = downsampleBuffer.slice(0, requiredSamples);
                     downsampleBuffer = downsampleBuffer.slice(requiredSamples);
 
-                    // Convert float [-1.0, 1.0] to int16 PCM bytes
                     const pcmData = new Int16Array(chunk.length);
                     for (let j = 0; j < chunk.length; j++) {
                         const s = Math.max(-1, Math.min(1, chunk[j]));
@@ -166,8 +169,8 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
                 }
             };
 
-            source.connect(processor);
-            processor.connect(audioCtx.destination);
+            source.connect(workletNode);
+            workletNode.connect(audioCtx.destination);
             setIsTesting(true);
         } catch (err: any) {
             console.error("Failed to start mic test:", err);

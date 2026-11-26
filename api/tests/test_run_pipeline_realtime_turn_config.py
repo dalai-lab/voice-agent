@@ -290,10 +290,10 @@ def test_workflow_config_can_override_user_turn_stop_timeout():
 def test_resolve_vad_params_defaults_and_override():
     from api.services.pipecat.run_pipeline import _resolve_vad_params
 
-    # Default values
+    # Default values updated to tuned production defaults (0.35 volume, 0.70 confidence)
     default_vad = _resolve_vad_params({})
-    assert default_vad.min_volume == 0.20
-    assert default_vad.confidence == 0.50
+    assert default_vad.min_volume == 0.35
+    assert default_vad.confidence == 0.70
     assert default_vad.stop_secs == 0.25
 
     # Workflow overrides
@@ -303,6 +303,32 @@ def test_resolve_vad_params_defaults_and_override():
     assert custom_vad.min_volume == 0.15
     assert custom_vad.confidence == 0.40
     assert custom_vad.stop_secs == 0.35
+
+
+def test_non_realtime_allow_transcription_fallback_toggle():
+    from pipecat.turns.user_start.transcription_user_turn_start_strategy import (
+        TranscriptionUserTurnStartStrategy,
+    )
+    from pipecat.turns.user_start.vad_user_turn_start_strategy import (
+        VADUserTurnStartStrategy,
+    )
+
+    # When fallback is allowed (default True), both transcription and VAD are installed
+    default_strategies = _create_non_realtime_user_turn_start_strategies(
+        {},
+        uses_external_turns=False,
+    )
+    assert len(default_strategies) == 2
+    assert isinstance(default_strategies[0], TranscriptionUserTurnStartStrategy)
+    assert isinstance(default_strategies[1], VADUserTurnStartStrategy)
+
+    # When fallback is disabled (Strict Acoustic Mode), ONLY VAD strategy is installed!
+    strict_strategies = _create_non_realtime_user_turn_start_strategies(
+        {"allow_transcription_fallback": False},
+        uses_external_turns=False,
+    )
+    assert len(strict_strategies) == 1
+    assert isinstance(strict_strategies[0], VADUserTurnStartStrategy)
 
 
 def test_turn_silence_timeout_custom_secs():

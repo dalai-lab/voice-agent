@@ -4,6 +4,7 @@ import contextlib
 from api.db import db_client
 from api.enums import WorkflowRunMode
 from api.schemas.workflow_configurations import (
+    DEFAULT_ALLOW_TRANSCRIPTION_FALLBACK,
     DEFAULT_EXTERNAL_TURN_USER_STOP_TIMEOUT,
     DEFAULT_MAX_CALL_DURATION_SECONDS,
     DEFAULT_MAX_USER_IDLE_TIMEOUT_SECONDS,
@@ -221,18 +222,25 @@ def _create_non_realtime_user_turn_start_strategies(
     turn_start_strategy = run_configs.get(
         "turn_start_strategy", DEFAULT_TURN_START_STRATEGY
     )
+    allow_transcription_fallback = bool(
+        run_configs.get(
+            "allow_transcription_fallback", DEFAULT_ALLOW_TRANSCRIPTION_FALLBACK
+        )
+    )
 
     if turn_start_strategy == "min_words":
         return [
             MinWordsUserTurnStartStrategy(
-                min_words=_resolve_turn_start_min_words(run_configs)
+                min_words=_resolve_turn_start_min_words(run_configs),
+                allow_transcription_fallback=allow_transcription_fallback,
             )
         ]
 
     if turn_start_strategy == "provisional_vad":
         return [
             ProvisionalVADUserTurnStartStrategy(
-                pause_secs=_resolve_provisional_vad_pause_secs(run_configs)
+                pause_secs=_resolve_provisional_vad_pause_secs(run_configs),
+                allow_transcription_fallback=allow_transcription_fallback,
             ),
         ]
 
@@ -243,7 +251,10 @@ def _create_non_realtime_user_turn_start_strategies(
         # confirms a real turn.
         return [ExternalUserTurnStartStrategy(enable_interruptions=True)]
 
-    return [TranscriptionUserTurnStartStrategy(), VADUserTurnStartStrategy()]
+    if allow_transcription_fallback:
+        return [TranscriptionUserTurnStartStrategy(), VADUserTurnStartStrategy()]
+
+    return [VADUserTurnStartStrategy()]
 
 
 def _create_non_realtime_user_turn_stop_strategies(
@@ -1126,12 +1137,19 @@ async def _run_pipeline_impl(
         uses_external_turns=uses_external_turns,
     )
 
+    allow_transcription_fallback = bool(
+        run_configs.get(
+            "allow_transcription_fallback", DEFAULT_ALLOW_TRANSCRIPTION_FALLBACK
+        )
+    )
+
     user_params = LLMUserAggregatorParams(
         user_turn_strategies=user_turn_strategies,
         user_mute_strategies=user_mute_strategies,
         user_turn_stop_timeout=user_turn_stop_timeout,
         user_idle_timeout=max_user_idle_timeout,
         vad_analyzer=user_vad_analyzer,
+        allow_transcription_fallback=allow_transcription_fallback,
     )
     context_aggregator = LLMContextAggregatorPair(
         context,

@@ -7511,6 +7511,12 @@ export type WorkflowConfigurationDefaults = {
      * Inject acoustic keyterm boosts for short affirmations ('yes', 'no', 'yeah', 'correct').
      */
     boost_affirmations?: boolean;
+    /**
+     * Allow Transcription Fallback
+     *
+     * When true, allows speech-to-text transcriptions to start user turns if Silero VAD missed speech onset. When false, user turns can only start from local acoustic VAD detection.
+     */
+    allow_transcription_fallback?: boolean;
     [key: string]: unknown;
 };
 

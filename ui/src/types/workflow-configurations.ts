@@ -27,6 +27,7 @@ export const DEFAULT_VAD_CONFIDENCE = 0.70;
 export const DEFAULT_VAD_STOP_SECS = 0.25;
 export const DEFAULT_USER_TURN_STOP_TIMEOUT = 2.0;
 export const DEFAULT_TURN_SILENCE_TIMEOUT_SECS = 0.75;
+export const DEFAULT_ALLOW_TRANSCRIPTION_FALLBACK = true;
 
 export type VoiceSensitivityPreset = "sensitive" | "balanced" | "noisy" | "custom";
 
@@ -230,6 +231,7 @@ type WorkflowConfigurationBase = Omit<
     | "user_turn_stop_timeout"
     | "turn_silence_timeout_secs"
     | "boost_affirmations"
+    | "allow_transcription_fallback"
 >;
 
 export type WorkflowConfigurations = WorkflowConfigurationBase & {
@@ -257,6 +259,7 @@ export type WorkflowConfigurations = WorkflowConfigurationBase & {
     user_turn_stop_timeout: number;      // Safety turn watchdog timeout (1.0 to 15.0 seconds)
     turn_silence_timeout_secs: number;   // Post-speech pause before bot responds (0.3 to 3.0 seconds)
     boost_affirmations: boolean;         // Bias STT towards short confirmations ('yes', 'no', etc.)
+    allow_transcription_fallback?: boolean; // When true, STT rescues quiet speech. When false, strict acoustic mode.
     [key: string]: unknown;  // Allow additional properties for future configurations
 };
 
@@ -284,6 +287,7 @@ const FALLBACK_WORKFLOW_CONFIGURATIONS: WorkflowConfigurations = {
     user_turn_stop_timeout: DEFAULT_USER_TURN_STOP_TIMEOUT,
     turn_silence_timeout_secs: DEFAULT_TURN_SILENCE_TIMEOUT_SECS,
     boost_affirmations: true,
+    allow_transcription_fallback: true,
 };
 
 export function resolveWorkflowConfigurations(

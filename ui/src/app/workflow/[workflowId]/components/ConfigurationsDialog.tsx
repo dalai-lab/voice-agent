@@ -94,6 +94,9 @@ export const ConfigurationsDialog = ({
     const [boostAffirmations, setBoostAffirmations] = useState<boolean>(
         resolvedWorkflowConfigurations.boost_affirmations
     );
+    const [allowTranscriptionFallback, setAllowTranscriptionFallback] = useState<boolean>(
+        resolvedWorkflowConfigurations.allow_transcription_fallback ?? true
+    );
     const [advancedAcousticsOpen, setAdvancedAcousticsOpen] = useState(false);
     const [sensitivityPreset, setSensitivityPreset] = useState<VoiceSensitivityPreset>(() =>
         detectVoiceSensitivityPreset(
@@ -144,6 +147,7 @@ export const ConfigurationsDialog = ({
                 user_turn_stop_timeout: userTurnStopTimeout,
                 turn_silence_timeout_secs: turnSilenceTimeoutSecs,
                 boost_affirmations: boostAffirmations,
+                allow_transcription_fallback: allowTranscriptionFallback,
                 transcript_configuration: resolvedWorkflowConfigurations.transcript_configuration,
                 context_compaction_enabled: contextCompactionEnabled,
                 cross_node_variable_injection_enabled: crossNodeVariableInjectionEnabled,
@@ -638,6 +642,33 @@ export const ConfigurationsDialog = ({
                                             <span>1.00s</span>
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Allow STT Transcription Fallback Toggle */}
+                                <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/20 mt-3">
+                                    <div className="space-y-0.5 pr-4">
+                                        <div className="flex items-center gap-1.5">
+                                            <Label htmlFor="dialog_allow_transcription_fallback" className="text-xs font-medium cursor-pointer">
+                                                STT Transcription Fallback
+                                            </Label>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                                                </TooltipTrigger>
+                                                <TooltipContent className="max-w-xs">
+                                                    When enabled, if Silero VAD misses quiet speech, incoming speech-to-text words will still rescue and open the turn. When disabled (Strict Acoustic Mode), turns can ONLY be opened by physical Silero VAD detection, completely ignoring background chatter and ghost transcripts.
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            Allow speech-to-text to rescue missed turns if Silero VAD was silent. Disable for strict noise rejection.
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        id="dialog_allow_transcription_fallback"
+                                        checked={allowTranscriptionFallback}
+                                        onCheckedChange={(checked) => setAllowTranscriptionFallback(checked)}
+                                    />
                                 </div>
                             </CollapsibleContent>
                         </Collapsible>

@@ -45,6 +45,8 @@ DEFAULT_TURN_SILENCE_TIMEOUT_SECS: float = 0.75
 MIN_TURN_SILENCE_TIMEOUT_SECS: float = 0.3
 MAX_TURN_SILENCE_TIMEOUT_SECS: float = 3.0
 
+DEFAULT_ALLOW_TRANSCRIPTION_FALLBACK: bool = True
+
 
 class ExternalPBXFieldMapping(BaseModel):
     """Map one gathered-context value to a provider-native field."""
@@ -145,6 +147,10 @@ class WorkflowConfigurationDefaults(BaseModel):
     boost_affirmations: bool = Field(
         default=True,
         description="Inject acoustic keyterm boosts for short affirmations ('yes', 'no', 'yeah', 'correct').",
+    )
+    allow_transcription_fallback: bool = Field(
+        default=DEFAULT_ALLOW_TRANSCRIPTION_FALLBACK,
+        description="When true, allows speech-to-text transcriptions to start user turns if Silero VAD missed speech onset. When false, user turns can only start from local acoustic VAD detection.",
     )
 
 

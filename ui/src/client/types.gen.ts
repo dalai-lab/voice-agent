@@ -7517,6 +7517,30 @@ export type WorkflowConfigurationDefaults = {
      * When true, allows speech-to-text transcriptions to start user turns if Silero VAD missed speech onset. When false, user turns can only start from local acoustic VAD detection.
      */
     allow_transcription_fallback?: boolean;
+    /**
+     * Dynamic Noise Floor
+     *
+     * Automatically track ambient room noise and float volume threshold dynamically.
+     */
+    dynamic_noise_floor?: boolean;
+    /**
+     * Dynamic Noise Floor Margin
+     *
+     * Volume margin float above measured ambient noise floor.
+     */
+    dynamic_noise_floor_margin?: number;
+    /**
+     * Dynamic Noise Floor Min
+     *
+     * Minimum clamp threshold for dynamic noise floor.
+     */
+    dynamic_noise_floor_min?: number;
+    /**
+     * Dynamic Noise Floor Max
+     *
+     * Maximum clamp threshold for dynamic noise floor.
+     */
+    dynamic_noise_floor_max?: number;
     [key: string]: unknown;
 };
 

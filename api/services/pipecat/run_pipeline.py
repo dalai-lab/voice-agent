@@ -17,6 +17,14 @@ from api.schemas.workflow_configurations import (
     DEFAULT_VAD_CONFIDENCE,
     DEFAULT_VAD_MIN_VOLUME,
     DEFAULT_VAD_STOP_SECS,
+    DEFAULT_DYNAMIC_NOISE_FLOOR,
+    DEFAULT_DYNAMIC_NOISE_FLOOR_MARGIN,
+    DEFAULT_DYNAMIC_NOISE_FLOOR_MIN,
+    DEFAULT_DYNAMIC_NOISE_FLOOR_MAX,
+)
+from api.services.pipecat.dynamic_noise_floor import (
+    DynamicNoiseFloorConfig,
+    DynamicNoiseFloorTracker,
 )
 from api.services.call_concurrency import call_concurrency
 from api.services.configuration.registry import ServiceProviders
@@ -179,6 +187,17 @@ def _resolve_vad_params(run_configs: dict) -> VADParams:
     )
 
 
+def _resolve_dynamic_noise_floor_tracker(run_configs: dict) -> DynamicNoiseFloorTracker:
+    config = DynamicNoiseFloorConfig(
+        enabled=bool(run_configs.get("dynamic_noise_floor", DEFAULT_DYNAMIC_NOISE_FLOOR)),
+        static_threshold=float(run_configs.get("vad_min_volume", DEFAULT_VAD_MIN_VOLUME)),
+        margin=float(run_configs.get("dynamic_noise_floor_margin", DEFAULT_DYNAMIC_NOISE_FLOOR_MARGIN)),
+        min_bound=float(run_configs.get("dynamic_noise_floor_min", DEFAULT_DYNAMIC_NOISE_FLOOR_MIN)),
+        max_bound=float(run_configs.get("dynamic_noise_floor_max", DEFAULT_DYNAMIC_NOISE_FLOOR_MAX)),
+    )
+    return DynamicNoiseFloorTracker(config)
+
+
 def _resolve_user_turn_stop_timeout(
     run_configs: dict, *, uses_external_turns: bool
 ) -> float:
@@ -297,7 +316,9 @@ def _create_non_realtime_user_turn_stop_strategies(
 
 
 def _create_realtime_user_turn_config(
-    provider: str, run_configs: dict | None = None
+    provider: str,
+    run_configs: dict | None = None,
+    dynamic_tracker: DynamicNoiseFloorTracker | None = None,
 ):
     """Return user turn strategies and optional local VAD for realtime providers."""
 
@@ -311,6 +332,7 @@ def _create_realtime_user_turn_config(
         )
 
     def local_vad_turn_config(*, enable_interruptions: bool):
+        tracker = dynamic_tracker or _resolve_dynamic_noise_floor_tracker(run_configs or {})
         return (
             UserTurnStrategies(
                 start=[
@@ -318,7 +340,10 @@ def _create_realtime_user_turn_config(
                 ],
                 stop=[SpeechTimeoutUserTurnStopStrategy(wait_for_transcript=False)],
             ),
-            SileroVADAnalyzer(params=_resolve_vad_params(run_configs or {})),
+            SileroVADAnalyzer(
+                params=_resolve_vad_params(run_configs or {}),
+                dynamic_tracker=tracker,
+            ),
         )
 
     if provider in {
@@ -1094,7 +1119,11 @@ async def _run_pipeline_impl(
         FunctionCallUserMuteStrategy(),
         CallbackUserMuteStrategy(should_mute_callback=engine.should_mute_user),
     ]
-    user_vad_analyzer = SileroVADAnalyzer(params=_resolve_vad_params(run_configs))
+    dynamic_noise_tracker = _resolve_dynamic_noise_floor_tracker(run_configs)
+    user_vad_analyzer = SileroVADAnalyzer(
+        params=_resolve_vad_params(run_configs),
+        dynamic_tracker=dynamic_noise_tracker,
+    )
 
     # Configure turn strategies based on STT provider, model, and workflow configuration
     if is_realtime:
@@ -1104,6 +1133,7 @@ async def _run_pipeline_impl(
         user_turn_strategies, user_vad_analyzer = _create_realtime_user_turn_config(
             user_config.realtime.provider,
             run_configs=run_configs,
+            dynamic_tracker=dynamic_noise_tracker,
         )
     else:
         # Some STT services emit their own turn boundaries, so the aggregator
@@ -1165,12 +1195,21 @@ async def _run_pipeline_impl(
         await engine.handle_llm_text_frame(text)
 
     # Create usage metrics aggregator with engine's callback
+    async def _wrapped_dtmf_callback(digit: str):
+        if dynamic_noise_tracker:
+            dynamic_noise_tracker.set_dtmf_active(True)
+        try:
+            await engine.handle_dtmf_event(digit)
+        finally:
+            if dynamic_noise_tracker:
+                dynamic_noise_tracker.set_dtmf_active(False)
+
     pipeline_engine_callback_processor = PipelineEngineCallbacksProcessor(
         max_call_duration_seconds=max_call_duration_seconds,
         max_duration_end_task_callback=engine.create_max_duration_callback(),
         generation_started_callback=engine.create_generation_started_callback(),
         llm_text_frame_callback=_logged_llm_text_frame_callback,
-        dtmf_callback=engine.handle_dtmf_event,
+        dtmf_callback=_wrapped_dtmf_callback,
     )
 
     pipeline_metrics_aggregator = PipelineMetricsAggregator()
@@ -1308,6 +1347,10 @@ async def _run_pipeline_impl(
     transcript_log_coordinator.attach_turn_tracking_observer(
         task.turn_tracking_observer
     )
+    if user_vad_analyzer and getattr(user_vad_analyzer, "dynamic_tracker", None):
+        user_vad_analyzer.dynamic_tracker.attach_turn_tracking_observer(
+            task.turn_tracking_observer
+        )
 
     for runtime_session in integration_runtime_sessions:
         runtime_session.attach(task)
@@ -1397,7 +1440,7 @@ async def _run_pipeline_impl(
                     digit = await dtmf_queue.get()
                     if digit is None:
                         break
-                    await engine.handle_dtmf_event(digit)
+                    await _wrapped_dtmf_callback(digit)
             except asyncio.CancelledError:
                 pass
 

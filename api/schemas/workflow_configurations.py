@@ -47,6 +47,19 @@ MAX_TURN_SILENCE_TIMEOUT_SECS: float = 3.0
 
 DEFAULT_ALLOW_TRANSCRIPTION_FALLBACK: bool = True
 
+DEFAULT_DYNAMIC_NOISE_FLOOR: bool = False
+DEFAULT_DYNAMIC_NOISE_FLOOR_MARGIN: float = 0.15
+MIN_DYNAMIC_NOISE_FLOOR_MARGIN: float = 0.05
+MAX_DYNAMIC_NOISE_FLOOR_MARGIN: float = 0.35
+
+DEFAULT_DYNAMIC_NOISE_FLOOR_MIN: float = 0.15
+MIN_DYNAMIC_NOISE_FLOOR_MIN: float = 0.05
+MAX_DYNAMIC_NOISE_FLOOR_MIN: float = 0.35
+
+DEFAULT_DYNAMIC_NOISE_FLOOR_MAX: float = 0.55
+MIN_DYNAMIC_NOISE_FLOOR_MAX: float = 0.35
+MAX_DYNAMIC_NOISE_FLOOR_MAX: float = 0.75
+
 
 class ExternalPBXFieldMapping(BaseModel):
     """Map one gathered-context value to a provider-native field."""
@@ -151,6 +164,28 @@ class WorkflowConfigurationDefaults(BaseModel):
     allow_transcription_fallback: bool = Field(
         default=DEFAULT_ALLOW_TRANSCRIPTION_FALLBACK,
         description="When true, allows speech-to-text transcriptions to start user turns if Silero VAD missed speech onset. When false, user turns can only start from local acoustic VAD detection.",
+    )
+    dynamic_noise_floor: bool = Field(
+        default=DEFAULT_DYNAMIC_NOISE_FLOOR,
+        description="Enable dynamic noise floor tracking to auto-calibrate voice sensitivity to ambient room acoustics.",
+    )
+    dynamic_noise_floor_margin: float = Field(
+        default=DEFAULT_DYNAMIC_NOISE_FLOOR_MARGIN,
+        ge=MIN_DYNAMIC_NOISE_FLOOR_MARGIN,
+        le=MAX_DYNAMIC_NOISE_FLOOR_MARGIN,
+        description="Floating volume margin added above the measured ambient noise floor.",
+    )
+    dynamic_noise_floor_min: float = Field(
+        default=DEFAULT_DYNAMIC_NOISE_FLOOR_MIN,
+        ge=MIN_DYNAMIC_NOISE_FLOOR_MIN,
+        le=MAX_DYNAMIC_NOISE_FLOOR_MIN,
+        description="Minimum volume threshold clamp in quiet environments.",
+    )
+    dynamic_noise_floor_max: float = Field(
+        default=DEFAULT_DYNAMIC_NOISE_FLOOR_MAX,
+        ge=MIN_DYNAMIC_NOISE_FLOOR_MAX,
+        le=MAX_DYNAMIC_NOISE_FLOOR_MAX,
+        description="Maximum volume threshold clamp in noisy environments.",
     )
 
 

@@ -29,6 +29,11 @@ export const DEFAULT_USER_TURN_STOP_TIMEOUT = 2.0;
 export const DEFAULT_TURN_SILENCE_TIMEOUT_SECS = 0.75;
 export const DEFAULT_ALLOW_TRANSCRIPTION_FALLBACK = true;
 
+export const DEFAULT_DYNAMIC_NOISE_FLOOR = false;
+export const DEFAULT_DYNAMIC_NOISE_FLOOR_MARGIN = 0.15;
+export const DEFAULT_DYNAMIC_NOISE_FLOOR_MIN = 0.15;
+export const DEFAULT_DYNAMIC_NOISE_FLOOR_MAX = 0.55;
+
 export type VoiceSensitivityPreset = "sensitive" | "balanced" | "noisy" | "custom";
 
 export interface VoiceSensitivityPresetConfig {
@@ -232,6 +237,10 @@ type WorkflowConfigurationBase = Omit<
     | "turn_silence_timeout_secs"
     | "boost_affirmations"
     | "allow_transcription_fallback"
+    | "dynamic_noise_floor"
+    | "dynamic_noise_floor_margin"
+    | "dynamic_noise_floor_min"
+    | "dynamic_noise_floor_max"
 >;
 
 export type WorkflowConfigurations = WorkflowConfigurationBase & {
@@ -260,6 +269,10 @@ export type WorkflowConfigurations = WorkflowConfigurationBase & {
     turn_silence_timeout_secs: number;   // Post-speech pause before bot responds (0.3 to 3.0 seconds)
     boost_affirmations: boolean;         // Bias STT towards short confirmations ('yes', 'no', etc.)
     allow_transcription_fallback?: boolean; // When true, STT rescues quiet speech. When false, strict acoustic mode.
+    dynamic_noise_floor?: boolean;       // Automatically float volume threshold above ambient room noise
+    dynamic_noise_floor_margin?: number; // Margin above ambient noise floor (0.05 to 0.40)
+    dynamic_noise_floor_min?: number;    // Absolute minimum threshold clamp (0.05 to 0.40)
+    dynamic_noise_floor_max?: number;    // Absolute maximum threshold clamp (0.30 to 0.80)
     [key: string]: unknown;  // Allow additional properties for future configurations
 };
 
@@ -288,6 +301,10 @@ const FALLBACK_WORKFLOW_CONFIGURATIONS: WorkflowConfigurations = {
     turn_silence_timeout_secs: DEFAULT_TURN_SILENCE_TIMEOUT_SECS,
     boost_affirmations: true,
     allow_transcription_fallback: true,
+    dynamic_noise_floor: DEFAULT_DYNAMIC_NOISE_FLOOR,
+    dynamic_noise_floor_margin: DEFAULT_DYNAMIC_NOISE_FLOOR_MARGIN,
+    dynamic_noise_floor_min: DEFAULT_DYNAMIC_NOISE_FLOOR_MIN,
+    dynamic_noise_floor_max: DEFAULT_DYNAMIC_NOISE_FLOOR_MAX,
 };
 
 export function resolveWorkflowConfigurations(
@@ -378,6 +395,22 @@ export function resolveWorkflowConfigurations(
             configurations?.boost_affirmations
             ?? (defaults as any)?.boost_affirmations
             ?? FALLBACK_WORKFLOW_CONFIGURATIONS.boost_affirmations,
+        dynamic_noise_floor:
+            configurations?.dynamic_noise_floor
+            ?? (defaults as any)?.dynamic_noise_floor
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.dynamic_noise_floor,
+        dynamic_noise_floor_margin:
+            configurations?.dynamic_noise_floor_margin
+            ?? (defaults as any)?.dynamic_noise_floor_margin
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.dynamic_noise_floor_margin,
+        dynamic_noise_floor_min:
+            configurations?.dynamic_noise_floor_min
+            ?? (defaults as any)?.dynamic_noise_floor_min
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.dynamic_noise_floor_min,
+        dynamic_noise_floor_max:
+            configurations?.dynamic_noise_floor_max
+            ?? (defaults as any)?.dynamic_noise_floor_max
+            ?? FALLBACK_WORKFLOW_CONFIGURATIONS.dynamic_noise_floor_max,
         transcript_configuration: {
             ...DEFAULT_TRANSCRIPT_CONFIGURATION,
             ...(defaults?.transcript_configuration as Partial<TranscriptConfiguration> | undefined),

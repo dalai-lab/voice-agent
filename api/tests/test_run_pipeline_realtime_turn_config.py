@@ -31,17 +31,30 @@ from api.services.pipecat.run_pipeline import (
 
 
 def test_gemini_realtime_uses_local_vad_without_local_interruptions():
+    from api.services.pipecat.run_pipeline import _resolve_dynamic_noise_floor_tracker
+
     strategies, vad_analyzer = _create_realtime_user_turn_config(
         ServiceProviders.GOOGLE_REALTIME.value
     )
 
     assert isinstance(vad_analyzer, SileroVADAnalyzer)
+    assert vad_analyzer.dynamic_tracker is not None
+    assert vad_analyzer.dynamic_tracker.config.enabled is False
     assert len(strategies.start) == 1
     assert isinstance(strategies.start[0], VADUserTurnStartStrategy)
     assert strategies.start[0]._enable_interruptions is False
     assert len(strategies.stop) == 1
     assert isinstance(strategies.stop[0], SpeechTimeoutUserTurnStopStrategy)
     assert strategies.stop[0].wait_for_transcript is False
+
+    # Explicit tracker passed into realtime user turn config
+    custom_tracker = _resolve_dynamic_noise_floor_tracker({"dynamic_noise_floor": True})
+    _, custom_vad = _create_realtime_user_turn_config(
+        ServiceProviders.GOOGLE_REALTIME.value,
+        dynamic_tracker=custom_tracker,
+    )
+    assert custom_vad.dynamic_tracker is custom_tracker
+    assert custom_vad.dynamic_tracker.config.enabled is True
 
 
 def test_gemini_vertex_realtime_uses_same_turn_config_as_gemini_live():
@@ -339,3 +352,29 @@ def test_turn_silence_timeout_custom_secs():
     assert len(strategies) == 1
     assert isinstance(strategies[0], SpeechTimeoutUserTurnStopStrategy)
     assert strategies[0]._user_speech_timeout == 1.2
+
+
+def test_resolve_dynamic_noise_floor_tracker_defaults_and_override():
+    from api.services.pipecat.run_pipeline import _resolve_dynamic_noise_floor_tracker
+
+    # Defaults
+    default_tracker = _resolve_dynamic_noise_floor_tracker({})
+    assert default_tracker.config.enabled is False
+    assert default_tracker.config.static_threshold == 0.35
+    assert default_tracker.config.margin == 0.15
+    assert default_tracker.config.min_bound == 0.15
+    assert default_tracker.config.max_bound == 0.55
+
+    # Override
+    override_tracker = _resolve_dynamic_noise_floor_tracker({
+        "dynamic_noise_floor": True,
+        "vad_min_volume": 0.40,
+        "dynamic_noise_floor_margin": 0.20,
+        "dynamic_noise_floor_min": 0.10,
+        "dynamic_noise_floor_max": 0.60,
+    })
+    assert override_tracker.config.enabled is True
+    assert override_tracker.config.static_threshold == 0.40
+    assert override_tracker.config.margin == 0.20
+    assert override_tracker.config.min_bound == 0.10
+    assert override_tracker.config.max_bound == 0.60

@@ -9,18 +9,28 @@ interface LiveVadTesterProps {
     vadMinVolume: number;
     vadConfidence: number;
     sampleRate?: 8000 | 16000;
+    dynamicNoiseFloor?: boolean;
+    dynamicNoiseFloorMargin?: number;
+    dynamicNoiseFloorMin?: number;
+    dynamicNoiseFloorMax?: number;
 }
 
 export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
     vadMinVolume,
     vadConfidence,
     sampleRate = 8000,
+    dynamicNoiseFloor = false,
+    dynamicNoiseFloorMargin,
+    dynamicNoiseFloorMin,
+    dynamicNoiseFloorMax,
 }) => {
     const [isTesting, setIsTesting] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [rawVolume, setRawVolume] = useState(0);
     const [smoothedVolume, setSmoothedVolume] = useState(0);
     const [speechProb, setSpeechProb] = useState(0);
+    const [effectiveThreshold, setEffectiveThreshold] = useState<number | null>(null);
+    const [noiseFloor, setNoiseFloor] = useState<number | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     const wsRef = useRef<WebSocket | null>(null);
@@ -37,10 +47,22 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
                     sample_rate: sampleRate,
                     vad_min_volume: vadMinVolume,
                     vad_confidence: vadConfidence,
+                    dynamic_noise_floor: dynamicNoiseFloor,
+                    dynamic_noise_floor_margin: dynamicNoiseFloorMargin,
+                    dynamic_noise_floor_min: dynamicNoiseFloorMin,
+                    dynamic_noise_floor_max: dynamicNoiseFloorMax,
                 })
             );
         }
-    }, [vadMinVolume, vadConfidence, sampleRate]);
+    }, [
+        vadMinVolume,
+        vadConfidence,
+        sampleRate,
+        dynamicNoiseFloor,
+        dynamicNoiseFloorMargin,
+        dynamicNoiseFloorMin,
+        dynamicNoiseFloorMax,
+    ]);
 
     const stopTesting = useCallback(() => {
         if (workletNodeRef.current) {
@@ -70,6 +92,8 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
         setSpeechProb(0);
         setRawVolume(0);
         setSmoothedVolume(0);
+        setEffectiveThreshold(null);
+        setNoiseFloor(null);
     }, []);
 
     const startTesting = async () => {
@@ -91,6 +115,10 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
                         sample_rate: sampleRate,
                         vad_min_volume: vadMinVolume,
                         vad_confidence: vadConfidence,
+                        dynamic_noise_floor: dynamicNoiseFloor,
+                        dynamic_noise_floor_margin: dynamicNoiseFloorMargin,
+                        dynamic_noise_floor_min: dynamicNoiseFloorMin,
+                        dynamic_noise_floor_max: dynamicNoiseFloorMax,
                     })
                 );
             };
@@ -103,6 +131,12 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
                         setRawVolume(data.raw_volume ?? 0);
                         setSmoothedVolume(data.smoothed_volume ?? 0);
                         setIsSpeaking(data.is_speaking ?? false);
+                        if (data.effective_threshold !== undefined && data.effective_threshold !== null) {
+                            setEffectiveThreshold(data.effective_threshold);
+                        }
+                        if (data.noise_floor !== undefined) {
+                            setNoiseFloor(data.noise_floor);
+                        }
                     }
                 } catch (e) {
                     console.error("VAD ws message parse error", e);
@@ -185,6 +219,8 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
         };
     }, [stopTesting]);
 
+    const activeThreshold = dynamicNoiseFloor && effectiveThreshold !== null ? effectiveThreshold : vadMinVolume;
+
     return (
         <div className="rounded-lg border bg-card/60 p-3.5 space-y-3">
             <div className="flex items-center justify-between">
@@ -251,25 +287,56 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
                         <span className="font-mono text-foreground font-medium">
                             {smoothedVolume.toFixed(2)}{" "}
                             <span className="text-muted-foreground font-normal">
-                                (Threshold: {vadMinVolume.toFixed(2)})
+                                {dynamicNoiseFloor ? (
+                                    <>
+                                        (Dynamic: <span className="text-emerald-500 font-semibold">{activeThreshold.toFixed(2)}</span>
+                                        {noiseFloor !== null ? ` | Floor: ${noiseFloor.toFixed(2)}` : ""})
+                                    </>
+                                ) : (
+                                    `(Threshold: ${vadMinVolume.toFixed(2)})`
+                                )}
                             </span>
                         </span>
                     </div>
                     <div className="relative h-2 w-full bg-muted rounded-full overflow-hidden">
-                        {/* Dynamic cutoff marker based on slider */}
+                        {/* Dynamic cutoff marker based on slider or dynamic noise floor */}
                         <div
-                            className="absolute top-0 bottom-0 w-0.5 bg-foreground z-10"
-                            style={{ left: `${Math.min(100, (vadMinVolume / 0.8) * 100)}%` }}
-                            title={`Volume Cutoff: ${vadMinVolume}`}
+                            className={`absolute top-0 bottom-0 z-10 transition-all duration-100 ${
+                                dynamicNoiseFloor
+                                    ? "w-1 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+                                    : "w-0.5 bg-foreground"
+                            }`}
+                            style={{ left: `${Math.min(100, (activeThreshold / 0.8) * 100)}%` }}
+                            title={dynamicNoiseFloor ? `Dynamic Floating Threshold (Auto): ${activeThreshold.toFixed(2)}` : `Volume Cutoff: ${vadMinVolume}`}
                         />
+                        {/* Ambient Noise Floor marker */}
+                        {dynamicNoiseFloor && noiseFloor !== null && (
+                            <div
+                                className="absolute top-0 bottom-0 w-0.5 bg-sky-400/80 z-10 transition-all duration-100"
+                                style={{ left: `${Math.min(100, (noiseFloor / 0.8) * 100)}%` }}
+                                title={`Ambient Noise Floor: ${noiseFloor.toFixed(2)}`}
+                            />
+                        )}
                         {/* Live volume level */}
                         <div
                             className={`h-full transition-all duration-75 ${
-                                smoothedVolume >= vadMinVolume ? "bg-green-500" : "bg-primary/50"
+                                smoothedVolume >= activeThreshold ? "bg-green-500" : "bg-primary/50"
                             }`}
                             style={{ width: `${Math.min(100, (smoothedVolume / 0.8) * 100)}%` }}
                         />
                     </div>
+                    {dynamicNoiseFloor && (
+                        <div className="flex justify-between items-center text-[10px] text-muted-foreground px-0.5 pt-0.5">
+                            <span className="flex items-center gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-sky-400 inline-block" />
+                                Floor: {noiseFloor !== null ? noiseFloor.toFixed(2) : "calibrating..."}
+                            </span>
+                            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+                                Dynamic Threshold (Auto): {activeThreshold.toFixed(2)}
+                            </span>
+                        </div>
+                    )}
                 </div>
 
                 {/* 2. Silero Neural Probability Bar */}

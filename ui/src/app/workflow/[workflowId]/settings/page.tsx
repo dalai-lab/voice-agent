@@ -335,6 +335,9 @@ function GeneralSection({
     const [allowTranscriptionFallback, setAllowTranscriptionFallback] = useState<boolean>(
         workflowConfigurations.allow_transcription_fallback ?? true
     );
+    const [dynamicNoiseFloor, setDynamicNoiseFloor] = useState<boolean>(
+        workflowConfigurations.dynamic_noise_floor ?? false
+    );
     const [advancedAcousticsOpen, setAdvancedAcousticsOpen] = useState(false);
     const [contextCompactionEnabled, setContextCompactionEnabled] = useState(
         workflowConfigurations.context_compaction_enabled,
@@ -384,6 +387,7 @@ function GeneralSection({
             turnSilenceTimeoutSecs !== workflowConfigurations.turn_silence_timeout_secs ||
             boostAffirmations !== workflowConfigurations.boost_affirmations ||
             allowTranscriptionFallback !== (workflowConfigurations.allow_transcription_fallback ?? true) ||
+            dynamicNoiseFloor !== (workflowConfigurations.dynamic_noise_floor ?? false) ||
             contextCompactionEnabled !== workflowConfigurations.context_compaction_enabled ||
             crossNodeVariableInjectionEnabled !== workflowConfigurations.cross_node_variable_injection_enabled ||
             llmConnectionWarmupEnabled !== workflowConfigurations.llm_connection_warmup_enabled ||
@@ -411,6 +415,7 @@ function GeneralSection({
         turnSilenceTimeoutSecs,
         boostAffirmations,
         allowTranscriptionFallback,
+        dynamicNoiseFloor,
         contextCompactionEnabled,
         crossNodeVariableInjectionEnabled,
         llmConnectionWarmupEnabled,
@@ -502,6 +507,7 @@ function GeneralSection({
                     turn_silence_timeout_secs: turnSilenceTimeoutSecs,
                     boost_affirmations: boostAffirmations,
                     allow_transcription_fallback: allowTranscriptionFallback,
+                    dynamic_noise_floor: dynamicNoiseFloor,
                     context_compaction_enabled: contextCompactionEnabled,
                     cross_node_variable_injection_enabled: crossNodeVariableInjectionEnabled,
                     llm_connection_warmup_enabled: llmConnectionWarmupEnabled,
@@ -814,6 +820,28 @@ function GeneralSection({
                         />
                     </div>
 
+                    {/* Dynamic Noise Floor Baseline Card */}
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
+                        <div className="space-y-0.5 max-w-[80%]">
+                            <div className="flex items-center gap-2">
+                                <Label htmlFor="dynamic_noise_floor" className="text-sm font-medium cursor-pointer">
+                                    Dynamic Noise Floor Baseline
+                                </Label>
+                                <Badge variant="outline" className="text-xs font-normal text-emerald-600 border-emerald-500/30">
+                                    Adaptive VAD
+                                </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Continuously measures ambient room noise and floats the volume threshold. Enables soft speech and quiet affirmations in bedrooms while automatically rejecting loud fans, cars, and office chatter.
+                            </p>
+                        </div>
+                        <Switch
+                            id="dynamic_noise_floor"
+                            checked={dynamicNoiseFloor}
+                            onCheckedChange={setDynamicNoiseFloor}
+                        />
+                    </div>
+
                     {/* Collapsible Advanced Acoustic Controls */}
                     <Collapsible open={advancedAcousticsOpen} onOpenChange={setAdvancedAcousticsOpen} className="border rounded-lg p-3 bg-muted/10 space-y-3">
                         <CollapsibleTrigger asChild>
@@ -871,6 +899,7 @@ function GeneralSection({
                                 <LiveVadTester
                                     vadMinVolume={vadMinVolume}
                                     vadConfidence={vadConfidence}
+                                    dynamicNoiseFloor={dynamicNoiseFloor}
                                     sampleRate={8000}
                                 />
                             </div>

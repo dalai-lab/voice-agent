@@ -7,6 +7,11 @@ from starlette.websockets import WebSocketDisconnect
 from pipecat.audio.utils import calculate_audio_volume, exp_smoothing
 from pipecat.audio.vad.silero import SileroOnnxModel
 
+from api.services.pipecat.dynamic_noise_floor import (
+    DynamicNoiseFloorConfig,
+    DynamicNoiseFloorTracker,
+)
+
 router = APIRouter(prefix="/ws/vad-test")
 
 # Lazy-loaded single instance of the Silero ONNX model
@@ -50,6 +55,9 @@ async def vad_test_websocket(websocket: WebSocket):
     sample_rate = 8000
     vad_min_volume = 0.20
     vad_confidence = 0.50
+    dynamic_noise_floor = False
+    dynamic_tracker: DynamicNoiseFloorTracker | None = None
+    is_speaking = False
 
     # Exponential smoothing factor for volume
     smoothed_volume = 0.0
@@ -68,12 +76,26 @@ async def vad_test_websocket(websocket: WebSocket):
                         sample_rate = int(payload.get("sample_rate", sample_rate))
                         vad_min_volume = float(payload.get("vad_min_volume", vad_min_volume))
                         vad_confidence = float(payload.get("vad_confidence", vad_confidence))
+                        dynamic_noise_floor = bool(payload.get("dynamic_noise_floor", dynamic_noise_floor))
+                        if dynamic_noise_floor:
+                            dynamic_tracker = DynamicNoiseFloorTracker(
+                                DynamicNoiseFloorConfig(
+                                    enabled=True,
+                                    static_threshold=vad_min_volume,
+                                    margin=float(payload.get("dynamic_noise_floor_margin", 0.15)),
+                                    min_bound=float(payload.get("dynamic_noise_floor_min", 0.15)),
+                                    max_bound=float(payload.get("dynamic_noise_floor_max", 0.55)),
+                                )
+                            )
+                        else:
+                            dynamic_tracker = None
                         model.reset_states()
                         await websocket.send_json({
                             "type": "config_ack",
                             "sample_rate": sample_rate,
                             "vad_min_volume": vad_min_volume,
                             "vad_confidence": vad_confidence,
+                            "dynamic_noise_floor": dynamic_noise_floor,
                         })
                 except Exception as parse_err:
                     logger.warning(f"Error parsing VAD test config: {parse_err}")
@@ -113,8 +135,19 @@ async def vad_test_websocket(websocket: WebSocket):
                         speech_prob = 0.0
 
                 # Determine if speech is detected based on active user parameters
+                if dynamic_tracker and dynamic_tracker.config.enabled:
+                    effective_min_volume = dynamic_tracker.update_and_get_threshold(
+                        smoothed_volume=smoothed_volume,
+                        confidence=speech_prob,
+                        vad_state_quiet=not is_speaking,
+                    )
+                    noise_floor_val = dynamic_tracker.current_noise_floor
+                else:
+                    effective_min_volume = vad_min_volume
+                    noise_floor_val = None
+
                 is_speaking = bool(
-                    (smoothed_volume >= vad_min_volume) and (speech_prob >= vad_confidence)
+                    (smoothed_volume >= effective_min_volume) and (speech_prob >= vad_confidence)
                 )
 
                 await websocket.send_json({
@@ -123,6 +156,9 @@ async def vad_test_websocket(websocket: WebSocket):
                     "raw_volume": round(raw_vol, 4),
                     "smoothed_volume": round(smoothed_volume, 4),
                     "is_speaking": is_speaking,
+                    "effective_threshold": round(effective_min_volume, 4),
+                    "noise_floor": round(noise_floor_val, 4) if noise_floor_val is not None else None,
+                    "dynamic_noise_floor": dynamic_noise_floor,
                 })
 
     except WebSocketDisconnect:

@@ -83,6 +83,11 @@ async def get_workflow_settings(workflow_id: int) -> dict[str, Any]:
         "vad_stop_secs": masked_configs.get("vad_stop_secs", 0.25),
         "user_turn_stop_timeout": masked_configs.get("user_turn_stop_timeout", 3.5),
         "boost_affirmations": masked_configs.get("boost_affirmations", True),
+        "allow_transcription_fallback": masked_configs.get("allow_transcription_fallback", True),
+        "dynamic_noise_floor": masked_configs.get("dynamic_noise_floor", False),
+        "dynamic_noise_floor_margin": masked_configs.get("dynamic_noise_floor_margin", 0.15),
+        "dynamic_noise_floor_min": masked_configs.get("dynamic_noise_floor_min", 0.15),
+        "dynamic_noise_floor_max": masked_configs.get("dynamic_noise_floor_max", 0.55),
         "ambient_noise": masked_configs.get("ambient_noise_configuration", {"enabled": False, "volume": 0.3}),
     }
 
@@ -225,6 +230,20 @@ async def update_workflow_settings(
                     "validation_error",
                     f"turn_silence_timeout_secs must be between 0.3 and 3.0 seconds (got {silence})",
                 )
+        if "dynamic_noise_floor" in general and not isinstance(general["dynamic_noise_floor"], bool):
+            return _error_result("validation_error", "dynamic_noise_floor must be a boolean")
+        if "dynamic_noise_floor_margin" in general:
+            margin = general["dynamic_noise_floor_margin"]
+            if not (0.05 <= margin <= 0.35):
+                return _error_result("validation_error", f"dynamic_noise_floor_margin must be between 0.05 and 0.35 (got {margin})")
+        if "dynamic_noise_floor_min" in general:
+            floor_min = general["dynamic_noise_floor_min"]
+            if not (0.05 <= floor_min <= 0.35):
+                return _error_result("validation_error", f"dynamic_noise_floor_min must be between 0.05 and 0.35 (got {floor_min})")
+        if "dynamic_noise_floor_max" in general:
+            floor_max = general["dynamic_noise_floor_max"]
+            if not (0.35 <= floor_max <= 0.75):
+                return _error_result("validation_error", f"dynamic_noise_floor_max must be between 0.35 and 0.75 (got {floor_max})")
         updated_fields.append("general")
 
     # 3. Validate voicemail audio recording if supplied

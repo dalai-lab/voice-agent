@@ -261,5 +261,26 @@ def test_vad_and_turn_settings_null_values_treated_as_unset():
     assert config.user_turn_stop_timeout == DEFAULT_USER_TURN_STOP_TIMEOUT
     assert config.turn_silence_timeout_secs == DEFAULT_TURN_SILENCE_TIMEOUT_SECS
     assert config.boost_affirmations is True
+    assert config.dynamic_noise_floor is False
     # Verify sparse dump drops nulls
     assert config.model_dump(exclude_unset=True) == {}
+
+
+def test_dynamic_noise_floor_defaults_and_bounds():
+    config = WorkflowConfigurationDefaults()
+    assert config.dynamic_noise_floor is False
+    assert config.dynamic_noise_floor_margin == 0.15
+    assert config.dynamic_noise_floor_min == 0.15
+    assert config.dynamic_noise_floor_max == 0.55
+
+    # Accepts overrides
+    custom = WorkflowConfigurationDefaults(
+        dynamic_noise_floor=True,
+        dynamic_noise_floor_margin=0.20,
+        dynamic_noise_floor_min=0.10,
+        dynamic_noise_floor_max=0.60,
+    )
+    assert custom.dynamic_noise_floor is True
+    assert custom.dynamic_noise_floor_margin == 0.20
+    assert custom.dynamic_noise_floor_min == 0.10
+    assert custom.dynamic_noise_floor_max == 0.60

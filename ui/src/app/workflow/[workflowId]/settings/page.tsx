@@ -410,6 +410,7 @@ function GeneralSection({
         userTurnStopTimeout,
         turnSilenceTimeoutSecs,
         boostAffirmations,
+        allowTranscriptionFallback,
         contextCompactionEnabled,
         crossNodeVariableInjectionEnabled,
         llmConnectionWarmupEnabled,

@@ -246,10 +246,10 @@ export const LiveVadTester: React.FC<LiveVadTesterProps> = ({
                 <div className="space-y-1">
                     <div className="flex justify-between text-[11px]">
                         <span className="text-muted-foreground flex items-center gap-1">
-                            <Volume2 className="h-3 w-3" /> RMS Volume:
+                            <Volume2 className="h-3 w-3" /> EBU Loudness (Volume Floor):
                         </span>
                         <span className="font-mono text-foreground font-medium">
-                            {smoothedVolume.toFixed(3)}{" "}
+                            {smoothedVolume.toFixed(2)}{" "}
                             <span className="text-muted-foreground font-normal">
                                 (Threshold: {vadMinVolume.toFixed(2)})
                             </span>

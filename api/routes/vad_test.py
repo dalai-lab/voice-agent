@@ -4,6 +4,7 @@ from fastapi import APIRouter, WebSocket
 from loguru import logger
 from starlette.websockets import WebSocketDisconnect
 
+from pipecat.audio.utils import calculate_audio_volume, exp_smoothing
 from pipecat.audio.vad.silero import SileroOnnxModel
 
 router = APIRouter(prefix="/ws/vad-test")
@@ -88,12 +89,13 @@ async def vad_test_websocket(websocket: WebSocket):
                 audio_int16 = np.frombuffer(raw_bytes, dtype=np.int16)
                 audio_float32 = audio_int16.astype(np.float32) / 32768.0
 
-                # Compute instantaneous RMS volume
-                raw_vol = float(np.sqrt(np.mean(audio_float32 ** 2)))
-                smoothed_volume = (
-                    volume_smoothing_alpha * raw_vol
-                    + (1.0 - volume_smoothing_alpha) * smoothed_volume
-                )
+                # Compute volume using the exact same EBU R128 standard as Pipecat vad_analyzer
+                try:
+                    raw_vol = calculate_audio_volume(raw_bytes, sample_rate)
+                except Exception:
+                    raw_vol = float(np.sqrt(np.mean(audio_float32 ** 2)))
+
+                smoothed_volume = exp_smoothing(raw_vol, smoothed_volume, volume_smoothing_alpha)
 
                 # Silero expects 256 samples for 8kHz, 512 samples for 16kHz
                 required_samples = 256 if sample_rate == 8000 else 512

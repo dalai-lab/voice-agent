@@ -1,10 +1,20 @@
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 if TYPE_CHECKING:
     from pipecat.observers.turn_tracking_observer import TurnTrackingObserver
+
+
+def _to_float(val: Any) -> float:
+    """Coerce float, numpy scalar, numpy ndarray, or tensor to a native Python float."""
+    if hasattr(val, "item"):
+        try:
+            return float(val.item())
+        except Exception:
+            return float(val.flat[0])
+    return float(val)
 
 
 @dataclass
@@ -100,6 +110,9 @@ class DynamicNoiseFloorTracker:
         vad_state_quiet: bool
     ) -> float:
         """Updates baseline if non-speech, and returns the effective volume threshold."""
+        smoothed_volume = _to_float(smoothed_volume)
+        confidence = _to_float(confidence)
+
         if not self.config.enabled:
             return self.config.static_threshold
 

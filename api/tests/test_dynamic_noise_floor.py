@@ -254,3 +254,32 @@ async def test_observer_lifecycle_attachment():
 
     await handlers["on_turn_ended"](mock_obs, 2, 1.5, False)
     assert tracker._user_turn_active is False
+
+
+def test_numpy_array_and_tensor_inputs():
+    """Verify tracker accepts numpy ndarrays and scalars without formatting exceptions."""
+    import numpy as np
+
+    config = DynamicNoiseFloorConfig(enabled=True)
+    tracker = DynamicNoiseFloorTracker(config)
+
+    # Inputs coming directly from ONNX / Pipecat models as numpy arrays
+    vol_arr = np.array([0.72], dtype=np.float32)
+    conf_arr = np.array([0.88], dtype=np.float32)
+
+    # Should execute and format logs cleanly without TypeError
+    thresh = tracker.update_and_get_threshold(
+        smoothed_volume=vol_arr,
+        confidence=conf_arr,
+        vad_state_quiet=False,
+    )
+    assert thresh > 0.0
+
+    # 0-D array input
+    thresh_0d = tracker.update_and_get_threshold(
+        smoothed_volume=np.float32(0.20),
+        confidence=np.array(0.05),
+        vad_state_quiet=True,
+    )
+    assert thresh_0d > 0.0
+

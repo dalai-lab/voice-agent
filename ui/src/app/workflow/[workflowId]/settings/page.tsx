@@ -29,6 +29,7 @@ import { LLMConfigSelector } from "@/components/LLMConfigSelector";
 import SpinLoader from "@/components/SpinLoader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { LiveVadTester } from "@/components/LiveVadTester";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -860,25 +861,38 @@ function GeneralSection({
                                 </p>
                             </div>
 
+                            <div className="pt-2">
+                                <LiveVadTester
+                                    vadMinVolume={vadMinVolume}
+                                    vadConfidence={vadConfidence}
+                                    sampleRate={8000}
+                                />
+                            </div>
+
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                                 <div className="space-y-1.5">
-                                    <div className="flex items-center gap-1">
-                                        <Label htmlFor="vad_min_volume" className="text-xs">
-                                            Volume Floor
-                                        </Label>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-xs">
-                                                RMS volume threshold (0.05 – 0.80). Lower values detect quiet speech and soft whispers over PSTN telephone connections.
-                                            </TooltipContent>
-                                        </Tooltip>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1">
+                                            <Label htmlFor="vad_min_volume" className="text-xs">
+                                                Volume Floor
+                                            </Label>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                                                </TooltipTrigger>
+                                                <TooltipContent className="max-w-xs">
+                                                    RMS volume threshold (0.05 – 0.80). Lower values detect quiet speech and soft whispers over PSTN telephone connections.
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                        <span className="text-[11px] font-mono text-primary font-medium">
+                                            {vadMinVolume.toFixed(2)}
+                                        </span>
                                     </div>
-                                    <Input
+                                    <input
                                         id="vad_min_volume"
-                                        type="number"
-                                        step="0.05"
+                                        type="range"
+                                        step="0.01"
                                         min="0.05"
                                         max="0.80"
                                         value={vadMinVolume}
@@ -888,28 +902,37 @@ function GeneralSection({
                                                 setVadMinVolume(val);
                                             }
                                         }}
+                                        className="w-full accent-primary h-2 bg-muted rounded-lg cursor-pointer"
                                     />
-                                    <p className="text-[10px] text-muted-foreground">Min loudness (0.05–0.80)</p>
+                                    <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
+                                        <span>0.05 (Quiet)</span>
+                                        <span>0.80</span>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <div className="flex items-center gap-1">
-                                        <Label htmlFor="vad_confidence" className="text-xs">
-                                            Neural Confidence
-                                        </Label>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-xs">
-                                                Silero ML probability threshold (0.30 – 0.90). Lower catches faint voice; higher rejects background babble.
-                                            </TooltipContent>
-                                        </Tooltip>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1">
+                                            <Label htmlFor="vad_confidence" className="text-xs">
+                                                Neural Confidence
+                                            </Label>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                                                </TooltipTrigger>
+                                                <TooltipContent className="max-w-xs">
+                                                    Silero ML probability threshold (0.30 – 0.90). Lower catches faint voice; higher rejects background babble.
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                        <span className="text-[11px] font-mono text-primary font-medium">
+                                            {vadConfidence.toFixed(2)}
+                                        </span>
                                     </div>
-                                    <Input
+                                    <input
                                         id="vad_confidence"
-                                        type="number"
-                                        step="0.05"
+                                        type="range"
+                                        step="0.01"
                                         min="0.30"
                                         max="0.90"
                                         value={vadConfidence}
@@ -919,27 +942,36 @@ function GeneralSection({
                                                 setVadConfidence(val);
                                             }
                                         }}
+                                        className="w-full accent-primary h-2 bg-muted rounded-lg cursor-pointer"
                                     />
-                                    <p className="text-[10px] text-muted-foreground">VAD probability (0.30–0.90)</p>
+                                    <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
+                                        <span>0.30 (Sensitive)</span>
+                                        <span>0.90</span>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <div className="flex items-center gap-1">
-                                        <Label htmlFor="vad_stop_secs" className="text-xs">
-                                            VAD Silence Hold
-                                        </Label>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-xs">
-                                                Silence duration before VAD marks speech ended (0.10s – 1.00s). Default: 0.25s.
-                                            </TooltipContent>
-                                        </Tooltip>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1">
+                                            <Label htmlFor="vad_stop_secs" className="text-xs">
+                                                VAD Silence Hold
+                                            </Label>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                                                </TooltipTrigger>
+                                                <TooltipContent className="max-w-xs">
+                                                    Silence duration before VAD marks speech ended (0.10s – 1.00s). Default: 0.25s.
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                        <span className="text-[11px] font-mono text-primary font-medium">
+                                            {vadStopSecs.toFixed(2)}s
+                                        </span>
                                     </div>
-                                    <Input
+                                    <input
                                         id="vad_stop_secs"
-                                        type="number"
+                                        type="range"
                                         step="0.05"
                                         min="0.10"
                                         max="1.00"
@@ -950,8 +982,12 @@ function GeneralSection({
                                                 setVadStopSecs(val);
                                             }
                                         }}
+                                        className="w-full accent-primary h-2 bg-muted rounded-lg cursor-pointer"
                                     />
-                                    <p className="text-[10px] text-muted-foreground">Silence hold (0.10–1.00s)</p>
+                                    <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
+                                        <span>0.10s</span>
+                                        <span>1.00s</span>
+                                    </div>
                                 </div>
                             </div>
                         </CollapsibleContent>

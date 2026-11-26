@@ -32,6 +32,15 @@ class DynamicNoiseFloorTracker:
         self._dtmf_active: bool = False
         self._warmup_frames_remaining: int = 10  # ~300ms initial sniff
         self._last_frame_time: float = time.time()
+        self._last_log_time: float = 0.0
+        self._last_logged_floor: float = self._noise_floor
+        self._speech_logged: bool = False
+
+        if self.config.enabled:
+            logger.info(
+                f"[Dynamic Noise Floor] Initialized: static_threshold={config.static_threshold:.2f}, "
+                f"margin={config.margin:.2f}, bounds=[{config.min_bound:.2f}, {config.max_bound:.2f}]"
+            )
 
     def attach_turn_tracking_observer(self, observer: "TurnTrackingObserver") -> None:
         """Subscribes to pipeline canonical turn events (mirrors TranscriptLogCoordinator)."""
@@ -58,10 +67,27 @@ class DynamicNoiseFloorTracker:
         if not speaking:
             # Egress buffer drain hold: hold freeze for 250ms after bot audio finishes
             self._bot_tail_until = time.time() + self.config.bot_tail_hold_secs
+            if self.config.enabled:
+                logger.debug(
+                    f"[Dynamic Noise Floor] Bot stopped speaking -> baseline hold armed for {self.config.bot_tail_hold_secs}s"
+                )
+        elif self.config.enabled:
+            logger.info(
+                f"[Dynamic Noise Floor] Bot started speaking -> freezing baseline at {self._noise_floor:.3f}"
+            )
 
     def set_user_turn_active(self, active: bool) -> None:
         """Updates user turn state."""
         self._user_turn_active = active
+        if self.config.enabled:
+            if active:
+                logger.info(
+                    f"[Dynamic Noise Floor] User turn started -> freezing baseline at {self._noise_floor:.3f}"
+                )
+            else:
+                logger.debug(
+                    f"[Dynamic Noise Floor] User turn ended -> unfreezing baseline (floor={self._noise_floor:.3f})"
+                )
 
     def set_dtmf_active(self, active: bool) -> None:
         """Called when in-band DTMF key tones are active."""
@@ -122,7 +148,32 @@ class DynamicNoiseFloorTracker:
                     + self.config.alpha_up * smoothed_volume
                 )
 
-        return self._calculate_clamped_threshold()
+        threshold = self._calculate_clamped_threshold()
+
+        if self.config.enabled:
+            # 1. Log intentional speech crossing
+            if smoothed_volume >= threshold and confidence >= 0.20:
+                if not self._speech_logged:
+                    logger.info(
+                        f"[Dynamic Noise Floor] 🗣️ Speech detected: vol={smoothed_volume:.3f} >= "
+                        f"threshold={threshold:.3f} (floor={self._noise_floor:.3f}, silero_conf={confidence:.0%})"
+                    )
+                    self._speech_logged = True
+            else:
+                self._speech_logged = False
+
+            # 2. Throttled periodic or significant floor change log
+            floor_delta = abs(self._noise_floor - self._last_logged_floor)
+            if (now - self._last_log_time >= 2.0) or (floor_delta >= 0.04 and (now - self._last_log_time >= 0.5)):
+                state_str = "Adapting" if can_update else "Frozen"
+                logger.info(
+                    f"[Dynamic Noise Floor] 📊 Noise Floor: {self._noise_floor:.3f} | "
+                    f"Dynamic Threshold: {threshold:.3f} | Input Vol: {smoothed_volume:.3f} [{state_str}]"
+                )
+                self._last_log_time = now
+                self._last_logged_floor = self._noise_floor
+
+        return threshold
 
     def _calculate_clamped_threshold(self) -> float:
         """Calculates floating threshold with dynamic margin compression and hard clamps."""

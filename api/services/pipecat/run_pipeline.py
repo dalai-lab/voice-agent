@@ -195,7 +195,13 @@ def _resolve_dynamic_noise_floor_tracker(run_configs: dict) -> DynamicNoiseFloor
         min_bound=float(run_configs.get("dynamic_noise_floor_min", DEFAULT_DYNAMIC_NOISE_FLOOR_MIN)),
         max_bound=float(run_configs.get("dynamic_noise_floor_max", DEFAULT_DYNAMIC_NOISE_FLOOR_MAX)),
     )
-    return DynamicNoiseFloorTracker(config)
+    tracker = DynamicNoiseFloorTracker(config)
+    if config.enabled:
+        logger.info(
+            f"[Pipeline] Dynamic Noise Floor tracker ACTIVE (static={config.static_threshold:.2f}, "
+            f"margin={config.margin:.2f}, bounds=[{config.min_bound:.2f}, {config.max_bound:.2f}])"
+        )
+    return tracker
 
 
 def _resolve_user_turn_stop_timeout(

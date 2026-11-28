@@ -60,7 +60,9 @@ export interface NumberRangeValue {
 }
 
 export interface RadioValue {
-  status: string;
+  status?: string;
+  mode?: string;
+  value?: string;
 }
 
 export interface NumberValue {

@@ -5,15 +5,15 @@ import { FilterAttribute } from "@/types/filters";
 export const baseFilterAttributes: Record<string, Omit<FilterAttribute, "id">> = {
   dateRange: {
     type: "dateRange",
-    label: "Date and Time Range",
+    label: "Date Range",
     config: {
       maxRangeDays: 30,
-      datePresets: ["today", "yesterday", "last7days", "last30days"],
+      datePresets: ["today", "yesterday", "last7days", "last30days", "thisMonth"],
     },
   },
   dispositionCode: {
     type: "multiSelect",
-    label: "Disposition Code",
+    label: "Call Outcome",
     config: {
       options: [...DISPOSITION_CODES], // Use centralized disposition codes
       searchable: true,
@@ -140,11 +140,11 @@ export function createFilterAttributes(
 
 // Default workflow filter attributes
 export const workflowFilterAttributes = createFilterAttributes([
+  "callerNumber",
   "dateRange",
   "dispositionCode",
   "duration",
   "status",
-  "tokenUsage",
 ]);
 
 // Superadmin filter attributes (includes additional fields)

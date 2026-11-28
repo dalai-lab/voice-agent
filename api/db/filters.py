@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Float, Text, and_, cast, func
+from sqlalchemy import Float, Text, and_, cast, func, or_
 from sqlalchemy.dialects.postgresql import JSONB
 
 from api.db.models import WorkflowRunModel
@@ -52,6 +52,7 @@ ATTRIBUTE_FIELD_MAPPING = {
     "callTags": "gathered_context.call_tags",
     "callerNumber": "initial_context.caller_number",
     "calledNumber": "initial_context.called_number",
+    "mode": "mode",
 }
 
 
@@ -155,12 +156,38 @@ def apply_workflow_run_filters(
                         .in_(codes)
                     )
 
-            elif filter_type == "radio" and field == "is_completed":
-                status = value.get("status")
+            elif field == "is_completed":
+                status = (
+                    value.get("status")
+                    if isinstance(value, dict)
+                    else (value.get("value") if isinstance(value, dict) else value)
+                )
                 if status == "completed":
-                    filter_conditions.append(WorkflowRunModel.is_completed == True)
+                    filter_conditions.append(WorkflowRunModel.is_completed.is_(True))
                 elif status == "in_progress":
-                    filter_conditions.append(WorkflowRunModel.is_completed == False)
+                    filter_conditions.append(WorkflowRunModel.is_completed.is_(False))
+
+            elif field == "mode":
+                mode_val = (
+                    value.get("mode")
+                    if isinstance(value, dict)
+                    else (value.get("value") if isinstance(value, dict) else value)
+                )
+                if mode_val == "web":
+                    filter_conditions.append(
+                        func.lower(WorkflowRunModel.mode).in_(
+                            ["web", "webrtc", "smallwebrtc"]
+                        )
+                    )
+                elif mode_val == "telephony":
+                    filter_conditions.append(
+                        or_(
+                            WorkflowRunModel.mode.is_(None),
+                            ~func.lower(WorkflowRunModel.mode).in_(
+                                ["web", "webrtc", "smallwebrtc"]
+                            ),
+                        )
+                    )
 
             elif (
                 filter_type in ("tags", "multiSelect")

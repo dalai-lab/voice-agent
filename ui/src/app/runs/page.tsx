@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense,useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import { client } from "@/client/client.gen";
 import { WorkflowRunResponseSchema } from "@/client/types.gen";
@@ -25,6 +25,13 @@ function RunsView() {
     const [totalCount, setTotalCount] = useState(0);
     const [isExecutingFilters, setIsExecutingFilters] = useState(false);
     const [configuredAttributes] = useState<FilterAttribute[]>(availableAttributes);
+    const [autoRefresh, setAutoRefresh] = useState(true);
+    const [activeTab, setActiveTab] = useState<'all' | 'completed' | 'in_progress' | 'telephony' | 'web'>('all');
+
+    const loadingRef = useRef(loading);
+    loadingRef.current = loading;
+    const isExecutingFiltersRef = useRef(isExecutingFilters);
+    isExecutingFiltersRef.current = isExecutingFilters;
 
     // Sort state (initialized from URL)
     const [sortBy, setSortBy] = useState<string | null>(() => {
@@ -47,26 +54,61 @@ function RunsView() {
         return decodeFiltersFromURL(searchParams, availableAttributes);
     });
 
+    const getEffectiveFilters = useCallback((filters: ActiveFilter[], tab: string): ActiveFilter[] => {
+        const result = [...filters];
+        if (tab === 'completed') {
+            result.push({
+                attribute: { id: 'status', label: 'Completion Status', type: 'radio', config: {} },
+                value: { status: 'completed' },
+                isValid: true,
+            });
+        } else if (tab === 'in_progress') {
+            result.push({
+                attribute: { id: 'status', label: 'Completion Status', type: 'radio', config: {} },
+                value: { status: 'in_progress' },
+                isValid: true,
+            });
+        } else if (tab === 'telephony') {
+            result.push({
+                attribute: { id: 'mode', label: 'Call Mode', type: 'radio', config: {} },
+                value: { mode: 'telephony' },
+                isValid: true,
+            });
+        } else if (tab === 'web') {
+            result.push({
+                attribute: { id: 'mode', label: 'Call Mode', type: 'radio', config: {} },
+                value: { mode: 'web' },
+                isValid: true,
+            });
+        }
+        return result;
+    }, []);
+
     const fetchWorkflowRuns = useCallback(async (
         page: number,
         filters?: ActiveFilter[],
         sortByParam?: string | null,
-        sortOrderParam?: 'asc' | 'desc'
+        sortOrderParam?: 'asc' | 'desc',
+        isBackground?: boolean,
+        tabParam?: 'all' | 'completed' | 'in_progress' | 'telephony' | 'web'
     ) => {
         if (!isAuthenticated) return;
         try {
-            setLoading(true);
+            if (!isBackground) {
+                setLoading(true);
+            }
+            const currentTab = tabParam ?? activeTab;
+            const effectiveFilters = getEffectiveFilters(filters || appliedFilters, currentTab);
+
             // Prepare filter data for API
-            console.log("FETCHING RUNS WITH FILTERS:", filters);
             let filterParam = undefined;
-            if (filters && filters.length > 0) {
-                const filterData = filters.map(filter => ({
+            if (effectiveFilters && effectiveFilters.length > 0) {
+                const filterData = effectiveFilters.map(filter => ({
                     attribute: filter.attribute.id,
                     type: filter.attribute.type,
                     value: filter.value
                 }));
                 filterParam = JSON.stringify(filterData);
-                console.log("FILTER PARAM JSON:", filterParam);
             }
 
             const response = await client.get<{ runs: WorkflowRunResponseSchema[], total_pages: number, total_count: number, page: number }>({
@@ -81,7 +123,10 @@ function RunsView() {
             });
 
             if (response.error) {
-                throw new Error("Failed to fetch workflow runs");
+                if (!isBackground) {
+                    throw new Error("Failed to fetch workflow runs");
+                }
+                return;
             }
 
             if (response.data) {
@@ -94,11 +139,15 @@ function RunsView() {
             setError(null);
         } catch (err) {
             console.error("Error fetching workflow runs:", err);
-            setError("Failed to load workflow runs");
+            if (!isBackground) {
+                setError("Failed to load workflow runs");
+            }
         } finally {
-            setLoading(false);
+            if (!isBackground) {
+                setLoading(false);
+            }
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, activeTab, appliedFilters, getEffectiveFilters]);
 
     const updatePageInUrl = useCallback((page: number, filters?: ActiveFilter[], sortByParam?: string | null, sortOrderParam?: 'asc' | 'desc') => {
         const params = new URLSearchParams();
@@ -125,6 +174,30 @@ function RunsView() {
     useEffect(() => {
         fetchWorkflowRuns(currentPage, appliedFilters, sortBy, sortOrder);
     }, [currentPage, appliedFilters, fetchWorkflowRuns, sortBy, sortOrder]);
+
+    const handleTabChange = useCallback((newTab: 'all' | 'completed' | 'in_progress' | 'telephony' | 'web') => {
+        setActiveTab(newTab);
+        setCurrentPage(1);
+        fetchWorkflowRuns(1, appliedFilters, sortBy, sortOrder, false, newTab);
+    }, [appliedFilters, sortBy, sortOrder, fetchWorkflowRuns]);
+
+    // Background auto-refresh polling (every 15 seconds while tab is active)
+    useEffect(() => {
+        if (!autoRefresh || !isAuthenticated) return;
+
+        const interval = setInterval(() => {
+            if (
+                typeof document !== 'undefined' &&
+                document.visibilityState === 'visible' &&
+                !loadingRef.current &&
+                !isExecutingFiltersRef.current
+            ) {
+                fetchWorkflowRuns(currentPage, appliedFilters, sortBy, sortOrder, true, activeTab);
+            }
+        }, 15000);
+
+        return () => clearInterval(interval);
+    }, [autoRefresh, isAuthenticated, currentPage, appliedFilters, sortBy, sortOrder, activeTab, fetchWorkflowRuns]);
 
     const handleApplyFilters = useCallback(async () => {
         setIsExecutingFilters(true);
@@ -194,6 +267,10 @@ function RunsView() {
                 sortOrder={sortOrder}
                 onSort={handleSort}
                 onReload={handleReload}
+                autoRefresh={autoRefresh}
+                onAutoRefreshChange={setAutoRefresh}
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
                 title="Call History"
                 subtitle="Real-time communication logs, caller telemetry, and audio recordings across all voice agents"
             />

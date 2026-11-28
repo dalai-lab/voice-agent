@@ -188,7 +188,14 @@ export const decodeFiltersFromURL = (
 export const formatDateRange = (value: DateRangeValue): string => {
   if (!value.from || !value.to) return "No date range selected";
 
-  return `${formatLocalDateTime(value.from)} to ${formatLocalDateTime(value.to)}`;
+  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+  const fromStr = value.from.toLocaleDateString('en-US', options);
+  const toStr = value.to.toLocaleDateString('en-US', options);
+
+  if (fromStr === toStr) {
+    return fromStr;
+  }
+  return `${fromStr} – ${toStr}`;
 };
 
 // Format number range for display
@@ -226,6 +233,10 @@ export const getDatePresetValue = (preset: string): DateRangeValue => {
       const last30DaysStart = new Date(todayStart);
       last30DaysStart.setDate(last30DaysStart.getDate() - 29); // -29 because today is included
       return { from: last30DaysStart, to: todayEnd };
+    }
+    case "thisMonth": {
+      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      return { from: thisMonthStart, to: todayEnd };
     }
     default:
       return { from: null, to: null };

@@ -1,11 +1,10 @@
-import { CalendarIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CalendarIcon, RotateCcw } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { formatLocalDateTime } from "@/lib/dateTime";
 import { getDatePresetValue } from "@/lib/filters";
 import { cn } from "@/lib/utils";
 import { DateRangeValue } from "@/types/filters";
@@ -17,31 +16,30 @@ interface DateRangeFilterProps {
   presets?: string[];
 }
 
+const PRESET_LABELS: Record<string, string> = {
+  today: "Today",
+  yesterday: "Yesterday",
+  last7days: "Last 7 Days",
+  last30days: "Last 30 Days",
+  thisMonth: "This Month",
+};
+
 export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   value,
   onChange,
   error,
-  presets = [],
+  presets = ["today", "yesterday", "last7days", "last30days", "thisMonth"],
 }) => {
   const [isFromOpen, setIsFromOpen] = useState(false);
   const [isToOpen, setIsToOpen] = useState(false);
 
-  // Local state for time inputs - only syncs to parent on blur
-  const [fromTime, setFromTime] = useState(value.from?.toTimeString().slice(0, 5) ?? "");
-  const [toTime, setToTime] = useState(value.to?.toTimeString().slice(0, 5) ?? "");
-
-  // Sync local time state when parent value changes
-  useEffect(() => {
-    setFromTime(value.from?.toTimeString().slice(0, 5) ?? "");
-  }, [value.from]);
-
-  useEffect(() => {
-    setToTime(value.to?.toTimeString().slice(0, 5) ?? "");
-  }, [value.to]);
-
-  const formatDate = (date: Date | null) => {
+  const formatDateDisplay = (date: Date | null) => {
     if (!date) return "Select date";
-    return formatLocalDateTime(date);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
 
   const handlePresetClick = (preset: string) => {
@@ -51,66 +49,75 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
 
   const handleFromChange = (date: Date | undefined) => {
     if (date) {
-      // Keep the time from the existing date if available
-      if (value.from) {
-        date.setHours(value.from.getHours(), value.from.getMinutes());
+      const fromDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+      let toDate = value.to;
+      // If "To" date is before the new "From" date, push it to end of "From" date
+      if (!toDate || toDate < fromDate) {
+        toDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
       }
-      onChange({ ...value, from: date });
+      onChange({ from: fromDate, to: toDate });
     }
     setIsFromOpen(false);
   };
 
   const handleToChange = (date: Date | undefined) => {
     if (date) {
-      // Set to end of day by default
-      date.setHours(23, 59, 59, 999);
-      onChange({ ...value, to: date });
+      const toDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+      let fromDate = value.from;
+      // If "From" date is unset or after "To" date, align it to start of "To" date
+      if (!fromDate || fromDate > toDate) {
+        fromDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+      }
+      onChange({ from: fromDate, to: toDate });
     }
     setIsToOpen(false);
   };
 
-  const handleTimeBlur = (type: 'from' | 'to') => {
-    const timeString = type === 'from' ? fromTime : toTime;
-    const [hours, minutes] = timeString.split(':').map(Number);
-    const date = type === 'from' ? value.from : value.to;
-    if (date && !isNaN(hours) && !isNaN(minutes)) {
-      const newDate = new Date(date);
-      newDate.setHours(hours, minutes);
-      onChange({ ...value, [type]: newDate });
-    }
+  const handleClearDates = () => {
+    onChange({ from: null, to: null });
   };
 
   return (
     <div className="space-y-3">
+      {/* 1-Click Quick Presets */}
       {presets.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {presets.map((preset) => (
-            <Button
-              key={preset}
-              variant="outline"
-              size="sm"
-              onClick={() => handlePresetClick(preset)}
-            >
-              {preset.charAt(0).toUpperCase() + preset.slice(1).replace(/(\d+)/, ' $1 ')}
-            </Button>
-          ))}
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground font-medium">Quick Presets</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {presets.map((preset) => {
+              const label = PRESET_LABELS[preset] || preset;
+              return (
+                <Button
+                  key={preset}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs font-medium rounded-lg hover:bg-accent"
+                  onClick={() => handlePresetClick(preset)}
+                >
+                  {label}
+                </Button>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label>From</Label>
+      {/* Date Pickers */}
+      <div className="grid grid-cols-2 gap-2.5 pt-1">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-foreground">From Date</Label>
           <Popover open={isFromOpen} onOpenChange={setIsFromOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "w-full justify-start text-left font-normal",
+                  "w-full h-8.5 justify-start text-left text-xs font-normal rounded-lg",
                   !value.from && "text-muted-foreground"
                 )}
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {formatDate(value.from)}
+                <CalendarIcon className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                <span className="truncate">{formatDateDisplay(value.from)}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -120,36 +127,23 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
                 onSelect={handleFromChange}
                 initialFocus
               />
-              {value.from && (
-                <div className="p-3 border-t">
-                  <Label htmlFor="from-time">Time</Label>
-                  <input
-                    id="from-time"
-                    type="time"
-                    className="w-full mt-1 px-3 py-2 border rounded-md"
-                    value={fromTime}
-                    onChange={(e) => setFromTime(e.target.value)}
-                    onBlur={() => handleTimeBlur('from')}
-                  />
-                </div>
-              )}
             </PopoverContent>
           </Popover>
         </div>
 
-        <div className="space-y-2">
-          <Label>To</Label>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-foreground">To Date</Label>
           <Popover open={isToOpen} onOpenChange={setIsToOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "w-full justify-start text-left font-normal",
+                  "w-full h-8.5 justify-start text-left text-xs font-normal rounded-lg",
                   !value.to && "text-muted-foreground"
                 )}
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {formatDate(value.to)}
+                <CalendarIcon className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                <span className="truncate">{formatDateDisplay(value.to)}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -158,28 +152,30 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
                 selected={value.to || undefined}
                 onSelect={handleToChange}
                 initialFocus
-                disabled={(date) => value.from ? date < value.from : false}
+                disabled={(date) => (value.from ? date < new Date(value.from.getFullYear(), value.from.getMonth(), value.from.getDate()) : false)}
               />
-              {value.to && (
-                <div className="p-3 border-t">
-                  <Label htmlFor="to-time">Time</Label>
-                  <input
-                    id="to-time"
-                    type="time"
-                    className="w-full mt-1 px-3 py-2 border rounded-md"
-                    value={toTime}
-                    onChange={(e) => setToTime(e.target.value)}
-                    onBlur={() => handleTimeBlur('to')}
-                  />
-                </div>
-              )}
             </PopoverContent>
           </Popover>
         </div>
       </div>
 
+      {(value.from || value.to) && (
+        <div className="flex justify-end pt-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1"
+            onClick={handleClearDates}
+          >
+            <RotateCcw className="h-3 w-3" />
+            Clear dates
+          </Button>
+        </div>
+      )}
+
       {error && (
-        <p className="text-sm text-red-500 mt-1">{error}</p>
+        <p className="text-xs text-rose-500 font-medium mt-1">{error}</p>
       )}
     </div>
   );

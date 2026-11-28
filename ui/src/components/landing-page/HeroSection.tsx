@@ -2,7 +2,7 @@ import React from 'react';
 import { VoiceWaveCanvas } from './VoiceWaveCanvas';
 import { Navbar } from './Navbar';
 import { Calendar, Share2, Cloud } from 'lucide-react';
-import { DemoCallForm } from './DemoCallForm';
+import { HeroVoiceOrb } from './HeroVoiceOrb';
 
 export const HeroSection: React.FC = () => {
   return (
@@ -79,9 +79,9 @@ export const HeroSection: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Demo Call Form */}
+          {/* Right Column: Hero Voice Console (Interactive Voice Orb + Phone Option) */}
           <div className="lg:col-span-5 flex items-center justify-center w-full">
-            <DemoCallForm />
+            <HeroVoiceOrb />
           </div>
 
         </div>

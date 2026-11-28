@@ -29,6 +29,7 @@ export function WorkflowExecutions({ workflowId, searchParams }: WorkflowExecuti
     const [isExecutingFilters, setIsExecutingFilters] = useState(false);
     const [configuredAttributes, setConfiguredAttributes] = useState<FilterAttribute[]>(availableAttributes);
     const [postCallSchema, setPostCallSchema] = useState<Array<{ name: string; type?: string; description?: string }> | null>(null);
+    const [activeTab, setActiveTab] = useState<'all' | 'completed' | 'in_progress' | 'telephony' | 'web'>('all');
 
     // Sort state (initialized from URL)
     const [sortBy, setSortBy] = useState<string | null>(() => {
@@ -87,19 +88,53 @@ export function WorkflowExecutions({ workflowId, searchParams }: WorkflowExecuti
         loadDispositionCodes();
     }, [loadDispositionCodes]);
 
+    const getEffectiveFilters = useCallback((filters: ActiveFilter[], tab: string): ActiveFilter[] => {
+        const result = [...filters];
+        if (tab === 'completed') {
+            result.push({
+                attribute: { id: 'status', label: 'Completion Status', type: 'radio', config: {} },
+                value: { status: 'completed' },
+                isValid: true,
+            });
+        } else if (tab === 'in_progress') {
+            result.push({
+                attribute: { id: 'status', label: 'Completion Status', type: 'radio', config: {} },
+                value: { status: 'in_progress' },
+                isValid: true,
+            });
+        } else if (tab === 'telephony') {
+            result.push({
+                attribute: { id: 'mode', label: 'Call Mode', type: 'radio', config: {} },
+                value: { mode: 'telephony' },
+                isValid: true,
+            });
+        } else if (tab === 'web') {
+            result.push({
+                attribute: { id: 'mode', label: 'Call Mode', type: 'radio', config: {} },
+                value: { mode: 'web' },
+                isValid: true,
+            });
+        }
+        return result;
+    }, []);
+
     const fetchWorkflowRuns = useCallback(async (
         page: number,
         filters?: ActiveFilter[],
         sortByParam?: string | null,
-        sortOrderParam?: 'asc' | 'desc'
+        sortOrderParam?: 'asc' | 'desc',
+        tabParam?: 'all' | 'completed' | 'in_progress' | 'telephony' | 'web'
     ) => {
         if (!isAuthenticated) return;
         try {
             setLoading(true);
+            const currentTab = tabParam ?? activeTab;
+            const effectiveFilters = getEffectiveFilters(filters || appliedFilters, currentTab);
+
             // Prepare filter data for API
             let filterParam = undefined;
-            if (filters && filters.length > 0) {
-                const filterData = filters.map(filter => ({
+            if (effectiveFilters && effectiveFilters.length > 0) {
+                const filterData = effectiveFilters.map(filter => ({
                     attribute: filter.attribute.id,
                     type: filter.attribute.type,
                     value: filter.value
@@ -135,7 +170,7 @@ export function WorkflowExecutions({ workflowId, searchParams }: WorkflowExecuti
         } finally {
             setLoading(false);
         }
-    }, [workflowId, isAuthenticated]);
+    }, [workflowId, isAuthenticated, activeTab, appliedFilters, getEffectiveFilters]);
 
     const updatePageInUrl = useCallback((page: number, filters?: ActiveFilter[], sortByParam?: string | null, sortOrderParam?: 'asc' | 'desc') => {
         const params = new URLSearchParams();
@@ -206,6 +241,12 @@ export function WorkflowExecutions({ workflowId, searchParams }: WorkflowExecuti
         updatePageInUrl(1, appliedFilters, newSortBy, newSortOrder);
     }, [sortBy, sortOrder, updatePageInUrl, appliedFilters]);
 
+    const handleTabChange = useCallback((newTab: 'all' | 'completed' | 'in_progress' | 'telephony' | 'web') => {
+        setActiveTab(newTab);
+        setCurrentPage(1);
+        fetchWorkflowRuns(1, appliedFilters, sortBy, sortOrder, newTab);
+    }, [appliedFilters, sortBy, sortOrder, fetchWorkflowRuns]);
+
     const handleReload = useCallback(() => {
         fetchWorkflowRuns(currentPage, appliedFilters, sortBy, sortOrder);
     }, [fetchWorkflowRuns, currentPage, appliedFilters, sortBy, sortOrder]);
@@ -233,6 +274,8 @@ export function WorkflowExecutions({ workflowId, searchParams }: WorkflowExecuti
                 workflowId={workflowId}
                 postCallSchema={postCallSchema}
                 onReload={handleReload}
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
             />
         </div>
     );

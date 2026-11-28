@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { formatDispositionLabel } from "@/lib/dispositionLabels";
 import { cn } from "@/lib/utils";
 import { MultiSelectValue } from "@/types/filters";
 
@@ -29,10 +30,18 @@ export const MultiSelectFilter: React.FC<MultiSelectFilterProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  const getOptionLabel = (option: string) => {
+    return formatDispositionLabel(option);
+  };
+
   const filteredOptions = searchable
-    ? options.filter(option =>
-        option.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+    ? options.filter((option) => {
+        const label = getOptionLabel(option);
+        return (
+          option.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          label.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      })
     : options;
 
   const handleSelectAll = () => {
@@ -52,8 +61,9 @@ export const MultiSelectFilter: React.FC<MultiSelectFilterProps> = ({
 
   const getDisplayText = () => {
     if (value.codes.length === 0) return "Select options";
-    if (value.codes.length <= 3) return value.codes.join(", ");
-    return `${value.codes.slice(0, 3).join(", ")} +${value.codes.length - 3} more`;
+    const labels = value.codes.map(getOptionLabel);
+    if (labels.length <= 2) return labels.join(", ");
+    return `${labels.slice(0, 2).join(", ")} +${labels.length - 2} more`;
   };
 
   return (
@@ -130,7 +140,7 @@ export const MultiSelectFilter: React.FC<MultiSelectFilterProps> = ({
                       htmlFor={option}
                       className="text-sm font-normal cursor-pointer flex-1"
                     >
-                      {option}
+                      {getOptionLabel(option)}
                     </Label>
                   </div>
                 ))

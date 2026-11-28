@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { formatDispositionLabel } from "@/lib/dispositionLabels";
 import { formatDateRange, formatNumberRange, getDefaultValue, validateFilter } from "@/lib/filters";
 import { ActiveFilter, DateRangeValue, FilterAttribute, FilterTemplate, filterTemplates, FilterValue, MultiSelectValue, NumberRangeValue, NumberValue, RadioValue, TextValue } from "@/types/filters";
 
@@ -183,8 +184,9 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({
       case "multiSelect": {
         const value = filter.value as MultiSelectValue;
         if (value.codes.length === 0) return "No options selected";
-        if (value.codes.length <= 3) return value.codes.join(", ");
-        return `${value.codes.slice(0, 3).join(", ")} +${value.codes.length - 3} more`;
+        const labels = value.codes.map((code) => formatDispositionLabel(code));
+        if (labels.length <= 2) return labels.join(", ");
+        return `${labels.slice(0, 2).join(", ")} +${labels.length - 2} more`;
       }
       case "number": {
         const value = filter.value as NumberValue;
@@ -200,8 +202,9 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({
         return formatNumberRange(filter.value as NumberRangeValue, filter.attribute.config.unit);
       case "radio": {
         const value = filter.value as RadioValue;
-        const option = filter.attribute.config.radioOptions?.find(opt => opt.value === value.status);
-        return option?.label || value.status;
+        const currentVal = value.status || value.mode || value.value;
+        const option = filter.attribute.config.radioOptions?.find(opt => opt.value === currentVal);
+        return option?.label || currentVal || "";
       }
       case "tags": {
         const value = filter.value as MultiSelectValue;

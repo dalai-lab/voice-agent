@@ -67,8 +67,14 @@ export interface WorkflowRunsTableProps {
     // Navigation & Actions
     workflowId?: number;
 
-    // Reload
+    // Reload & Auto-refresh
     onReload?: () => void;
+    autoRefresh?: boolean;
+    onAutoRefreshChange?: (enabled: boolean) => void;
+
+    // Tab state (server-backed or client fallback)
+    activeTab?: 'all' | 'completed' | 'in_progress' | 'telephony' | 'web';
+    onTabChange?: (tab: 'all' | 'completed' | 'in_progress' | 'telephony' | 'web') => void;
 
     // Optional customization
     title?: string;
@@ -190,10 +196,14 @@ export function WorkflowRunsTable({
     onSort,
     workflowId,
     onReload,
+    autoRefresh = true,
+    onAutoRefreshChange,
     title = "Call History",
     subtitle,
     showFilters = true,
     emptyMessage = "No workflow runs found",
+    activeTab: activeTabProp,
+    onTabChange,
     showUsageColumn = false,
     isAdmin: isAdminProp,
     postCallSchema,
@@ -201,7 +211,17 @@ export function WorkflowRunsTable({
 }: WorkflowRunsTableProps) {
     const router = useRouter();
     const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
-    const [activeTab, setActiveTab] = useState<'all' | 'completed' | 'in_progress' | 'telephony' | 'web'>('all');
+    const [internalActiveTab, setInternalActiveTab] = useState<'all' | 'completed' | 'in_progress' | 'telephony' | 'web'>('all');
+    const activeTab = activeTabProp ?? internalActiveTab;
+
+    const handleTabClick = (tabId: 'all' | 'completed' | 'in_progress' | 'telephony' | 'web') => {
+        if (onTabChange) {
+            onTabChange(tabId);
+        } else {
+            setInternalActiveTab(tabId);
+        }
+    };
+
     const [expandedRowIds, setExpandedRowIds] = useState<Set<number>>(new Set());
     const organizationTimezone = useOrganizationTimezone();
 
@@ -218,7 +238,7 @@ export function WorkflowRunsTable({
         });
     };
 
-    // Determine admin status: bypass active OR not a customer
+    // Determine admin status
     const { isTalkarCustomer, isAdminBypass } = useTalkarCustomer();
     const isAdmin = typeof isAdminProp === 'boolean'
         ? isAdminProp
@@ -227,48 +247,13 @@ export function WorkflowRunsTable({
     // Media preview dialog
     const mediaPreview = MediaPreviewDialog();
 
-    // Reset web tab filter for non-admins if active
-    React.useEffect(() => {
-        if (!isAdmin && (activeTab === 'web' || activeTab === 'telephony')) {
-            setActiveTab('all');
-        }
-    }, [isAdmin, activeTab]);
-
     const isWebCall = (run: WorkflowRunResponseSchema): boolean => {
         const mode = (run.mode || '').toLowerCase();
         return mode === 'web' || mode === 'webrtc' || mode === 'smallwebrtc';
     };
 
-    // Non-admins: hide all webcalls completely. Keep for admin.
-    const visibleRuns = React.useMemo(() => {
-        if (isAdmin) return runs;
-        return runs.filter(run => !isWebCall(run));
-    }, [runs, isAdmin]);
-
-    const formatSectionDate = (dateString: string) => {
-        const date = new Date(dateString);
-        const today = new Date();
-        const yesterday = new Date();
-        yesterday.setDate(today.getDate() - 1);
-
-        const isSameDay = (d1: Date, d2: Date) =>
-            d1.getFullYear() === d2.getFullYear() &&
-            d1.getMonth() === d2.getMonth() &&
-            d1.getDate() === d2.getDate();
-
-        if (isSameDay(date, today)) {
-            return `Today, ${date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}`;
-        }
-        if (isSameDay(date, yesterday)) {
-            return `Yesterday, ${date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}`;
-        }
-        return date.toLocaleDateString('en-US', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-        });
-    };
+    // All records returned from server query are preserved
+    const visibleRuns = runs;
 
     const formatTimeOnly = (dateString: string) => {
         return new Date(dateString).toLocaleTimeString('en-US', {
@@ -279,6 +264,7 @@ export function WorkflowRunsTable({
     };
 
     const filteredRuns = React.useMemo(() => {
+        if (onTabChange) return visibleRuns;
         return visibleRuns.filter((run) => {
             if (activeTab === 'completed') return run.is_completed;
             if (activeTab === 'in_progress') return !run.is_completed;
@@ -286,12 +272,33 @@ export function WorkflowRunsTable({
             if (activeTab === 'telephony') return !isWebCall(run);
             return true;
         });
-    }, [visibleRuns, activeTab]);
+    }, [visibleRuns, activeTab, onTabChange]);
 
-    const groupedRuns = (() => {
-        const groups: { dateSection: string; items: typeof visibleRuns }[] = [];
+    const groupedRuns = React.useMemo(() => {
+        const groups: { dateSection: string; items: WorkflowRunResponseSchema[] }[] = [];
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+        const yest = new Date(now);
+        yest.setDate(yest.getDate() - 1);
+        const yestStr = `${yest.getFullYear()}-${yest.getMonth()}-${yest.getDate()}`;
+
         filteredRuns.forEach((run) => {
-            const section = formatSectionDate(run.created_at);
+            const date = new Date(run.created_at);
+            const dStr = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+            let section: string;
+            if (dStr === todayStr) {
+                section = `Today, ${date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+            } else if (dStr === yestStr) {
+                section = `Yesterday, ${date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+            } else {
+                section = date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                });
+            }
+
             const lastGroup = groups[groups.length - 1];
             if (lastGroup && lastGroup.dateSection === section) {
                 lastGroup.items.push(run);
@@ -300,7 +307,7 @@ export function WorkflowRunsTable({
             }
         });
         return groups;
-    })();
+    }, [filteredRuns]);
 
     const handleRowClick = (runId: number, runWorkflowId: number) => {
         router.push(`/workflow/${runWorkflowId}/run/${runId}`);
@@ -325,19 +332,36 @@ export function WorkflowRunsTable({
                                     : `Showing ${visibleRuns.length} calls across active agents`)}
                             </p>
                         </div>
-                        {onReload && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8.5 px-3 rounded-lg border-border/70 hover:bg-muted/80 gap-2 text-xs font-medium shadow-2xs transition-colors self-start sm:self-auto"
-                                onClick={onReload}
-                                disabled={loading}
-                                title="Refresh Call Records"
-                            >
-                                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-                                <span>Refresh</span>
-                            </Button>
-                        )}
+                        <div className="flex items-center gap-2 self-start sm:self-auto">
+                            {onAutoRefreshChange && (
+                                <button
+                                    type="button"
+                                    onClick={() => onAutoRefreshChange(!autoRefresh)}
+                                    className={`inline-flex items-center gap-1.5 h-8.5 px-3 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
+                                        autoRefresh
+                                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                            : "border-border/70 bg-card text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                                    }`}
+                                    title={autoRefresh ? "Auto-update is active (refreshes automatically)" : "Auto-update is paused"}
+                                >
+                                    <span className={`h-2 w-2 rounded-full ${autoRefresh ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+                                    <span>Auto-update {autoRefresh ? "On" : "Off"}</span>
+                                </button>
+                            )}
+                            {onReload && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8.5 px-3 rounded-lg border-border/70 hover:bg-muted/80 gap-2 text-xs font-medium shadow-2xs transition-colors"
+                                    onClick={onReload}
+                                    disabled={loading}
+                                    title="Refresh Call Records"
+                                >
+                                    <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                                    <span>Refresh</span>
+                                </Button>
+                            )}
+                        </div>
                     </div>
                     <FilterBuilder
                         availableAttributes={availableAttributes}
@@ -376,13 +400,31 @@ export function WorkflowRunsTable({
                         <div className="flex items-center gap-1.5 p-1 bg-muted/30 border border-border/60 rounded-xl overflow-x-auto w-fit max-w-full">
                             {(
                                 [
-                                    { id: 'all' as const, label: 'All Calls', count: visibleRuns.length },
-                                    { id: 'completed' as const, label: 'Completed', count: visibleRuns.filter(r => r.is_completed).length },
-                                    { id: 'in_progress' as const, label: 'In Progress', count: visibleRuns.filter(r => !r.is_completed).length },
-                                    ...(isAdmin ? [
-                                        { id: 'telephony' as const, label: 'Telephony', count: visibleRuns.filter(r => !isWebCall(r)).length },
-                                        { id: 'web' as const, label: 'Web Calls', count: visibleRuns.filter(r => isWebCall(r)).length },
-                                    ] : []),
+                                    {
+                                        id: 'all' as const,
+                                        label: 'All Calls',
+                                        count: activeTab === 'all' && totalCount !== undefined ? totalCount : visibleRuns.length,
+                                    },
+                                    {
+                                        id: 'completed' as const,
+                                        label: 'Completed',
+                                        count: activeTab === 'completed' && totalCount !== undefined ? totalCount : visibleRuns.filter(r => r.is_completed).length,
+                                    },
+                                    {
+                                        id: 'in_progress' as const,
+                                        label: 'In Progress',
+                                        count: activeTab === 'in_progress' && totalCount !== undefined ? totalCount : visibleRuns.filter(r => !r.is_completed).length,
+                                    },
+                                    {
+                                        id: 'telephony' as const,
+                                        label: 'Telephony',
+                                        count: activeTab === 'telephony' && totalCount !== undefined ? totalCount : visibleRuns.filter(r => !isWebCall(r)).length,
+                                    },
+                                    {
+                                        id: 'web' as const,
+                                        label: 'Web Calls',
+                                        count: activeTab === 'web' && totalCount !== undefined ? totalCount : visibleRuns.filter(r => isWebCall(r)).length,
+                                    },
                                 ]
                             ).map((tab) => {
                                 const isActive = activeTab === tab.id;
@@ -390,7 +432,7 @@ export function WorkflowRunsTable({
                                     <button
                                         key={tab.id}
                                         type="button"
-                                        onClick={() => setActiveTab(tab.id)}
+                                        onClick={() => handleTabClick(tab.id)}
                                         className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
                                             isActive
                                                 ? "bg-background text-foreground font-semibold shadow-xs border border-border/70"

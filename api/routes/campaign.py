@@ -880,6 +880,13 @@ async def get_campaign_runs(
             "duration",
             "status",
             "tokenUsage",
+            "workflowId",
+            "callerNumber",
+            "calledNumber",
+            "mode",
+            "campaignId",
+            "runId",
+            "callTags",
         }
         for filter_item in filter_criteria:
             attribute = filter_item.get("attribute")

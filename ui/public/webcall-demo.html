@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Talkar — Voice AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Talkar Embed Widget (Headless BYOUI) -->
+  <script src="https://talkar.in/embed/dograh-widget.js?token=emb_bZYegK-7S7oPR68QS3bR_6tDaV_CSRHtIbGRXS4_A6Y&environment=production&apiEndpoint=https://talkar.in" async></script>
+
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #030406;
+      --surface: rgba(255, 255, 255, 0.03);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-hover: rgba(255, 255, 255, 0.16);
+      --text: #f4f4f5;
+      --text-muted: #71717a;
+      --accent: #f26035;
+      --success: #10b981;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Ambient atmospheric glow */
+    .ambient-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(232, 86, 44, 0.24) 0%, rgba(246, 148, 88, 0.12) 40%, rgba(254, 209, 146, 0.04) 65%, transparent 72%);
+      filter: blur(95px);
+      pointer-events: none;
+      z-index: 1;
+      transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .app-viewport {
+      position: relative;
+      z-index: 2;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 32px 28px;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      width: 24px;
+      height: 24px;
+      background: var(--accent);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(254, 105, 5, 0.45);
+    }
+
+    .brand-mark svg {
+      width: 13px;
+      height: 13px;
+      fill: #ffffff;
+    }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Minimal Segmented Controls */
+    .segmented-control {
+      display: inline-flex;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      padding: 3px;
+      border-radius: 9999px;
+      gap: 2px;
+    }
+
+    .segmented-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .segmented-btn:hover {
+      color: #ffffff;
+    }
+
+    .segmented-btn.active {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      backdrop-filter: blur(12px);
+      transition: all 0.3s ease;
+    }
+
+    .status-pill .indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #52525b;
+      transition: all 0.3s ease;
+    }
+
+    .status-pill.is-connecting .indicator {
+      background: #f59e0b;
+      box-shadow: 0 0 10px #f59e0b;
+      animation: pulseConnecting 0.8s infinite alternate;
+    }
+
+    .status-pill.is-connected .indicator {
+      background: var(--success);
+      box-shadow: 0 0 12px var(--success);
+    }
+
+    .status-pill.is-connected {
+      color: #e4e4e7;
+      border-color: rgba(16, 185, 129, 0.3);
+      background: rgba(16, 185, 129, 0.08);
+    }
+
+    @keyframes pulseConnecting {
+      from { opacity: 0.3; }
+      to { opacity: 1; }
+    }
+
+    /* Center Stage: Voice Orb */
+    .orb-stage {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      margin: auto 0;
+    }
+
+    .orb-box {
+      position: relative;
+      width: 290px;
+      height: 290px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .orb-stage:hover .orb-box {
+      transform: scale(1.035);
+    }
+
+    .orb-stage:active .orb-box {
+      transform: scale(0.975);
+    }
+
+    #voice-orb-canvas {
+      width: 280px;
+      height: 280px;
+      display: block;
+    }
+
+    /* Typography below the Orb */
+    .orb-caption {
+      margin-top: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .orb-state-title {
+      font-size: 21px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: #ffffff;
+      transition: color 0.3s ease;
+    }
+
+    .orb-state-subtitle {
+      font-size: 13.5px;
+      font-weight: 400;
+      color: var(--text-muted);
+      letter-spacing: 0.01em;
+      max-width: 380px;
+      line-height: 1.45;
+    }
+
+    .call-duration {
+      font-variant-numeric: tabular-nums;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: none;
+      letter-spacing: 0.05em;
+    }
+
+    /* Minimal Bottom Floating Control Dock */
+    .control-dock {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(18, 18, 22, 0.75);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      border-radius: 9999px;
+      box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+      z-index: 10;
+    }
+
+    .dock-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 46px;
+      padding: 0 24px;
+      border-radius: 9999px;
+      border: 1px solid transparent;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      outline: none;
+    }
+
+    .dock-btn-primary {
+      background: #ffffff;
+      color: #09090b;
+      box-shadow: 0 2px 14px rgba(255, 255, 255, 0.18);
+    }
+
+    .dock-btn-primary:hover {
+      background: #f4f4f5;
+      transform: translateY(-1.5px);
+      box-shadow: 0 4px 20px rgba(255, 255, 255, 0.28);
+    }
+
+    .dock-btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .dock-btn-danger {
+      background: rgba(239, 68, 68, 0.16);
+      border-color: rgba(239, 68, 68, 0.32);
+      color: #f87171;
+    }
+
+    .dock-btn-danger:hover {
+      background: rgba(239, 68, 68, 0.26);
+      border-color: rgba(239, 68, 68, 0.5);
+      color: #fca5a5;
+    }
+
+    .dock-btn-icon {
+      width: 46px;
+      padding: 0;
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--border);
+      color: #a1a1aa;
+    }
+
+    .dock-btn-icon:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+
+    .dock-btn-icon.is-active {
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.35);
+    }
+
+    .dock-btn svg {
+      width: 17px;
+      height: 17px;
+      stroke-width: 2.2;
+    }
+
+    .footer-note {
+      position: absolute;
+      bottom: 14px;
+      font-size: 11px;
+      color: #3f3f46;
+      letter-spacing: 0.03em;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ambient-glow" id="ambient-glow"></div>
+
+  <div class="app-viewport">
+    
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <a href="https://talkar.in" target="_blank" class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+        </div>
+        Talkar
+      </a>
+
+      <div class="top-controls">
+        <!-- Variant Switcher -->
+        <div class="segmented-control" id="variant-control">
+          <button class="segmented-btn active" onclick="setVariant('painted', this)">Painted</button>
+          <button class="segmented-btn" onclick="setVariant('glass', this)">Glass</button>
+          <button class="segmented-btn" onclick="setVariant('silk', this)">Silk</button>
+        </div>
+
+        <!-- Palette Switcher -->
+        <div class="segmented-control" id="palette-control">
+          <button class="segmented-btn active" onclick="setPalette('talkar', this)">Narration Peach</button>
+          <button class="segmented-btn" onclick="setPalette('solis', this)">Warm Terracotta</button>
+          <button class="segmented-btn" onclick="setPalette('sunset', this)">Sunset Plum</button>
+          <button class="segmented-btn" onclick="setPalette('lagoon', this)">Lagoon</button>
+          <button class="segmented-btn" onclick="setPalette('twilight', this)">Twilight</button>
+        </div>
+
+        <div class="status-pill" id="status-pill">
+          <span class="indicator"></span>
+          <span id="status-label">Standby</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Center Stage: Voice Orb -->
+    <main class="orb-stage" onclick="handleOrbClick()">
+      <div class="orb-box">
+        <canvas id="voice-orb-canvas" width="560" height="560"></canvas>
+      </div>
+      
+      <div class="orb-caption">
+        <span class="orb-state-title" id="caption-title">Talk to Talkar</span>
+        <span class="orb-state-subtitle" id="caption-subtitle">Click the orb or button to start speaking</span>
+        <span class="call-duration" id="call-timer">00:00</span>
+      </div>
+    </main>
+
+    <!-- Minimal Floating Dock -->
+    <footer class="control-dock">
+      <button class="dock-btn dock-btn-primary" id="main-dock-btn" onclick="toggleCall()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        <span id="main-btn-text">Start Call</span>
+      </button>
+
+      <button class="dock-btn dock-btn-icon" id="mic-toggle-btn" onclick="toggleMute()" style="display: none;" title="Toggle Mute">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" id="mic-icon"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+      </button>
+    </footer>
+
+    <div class="footer-note">Talkar Managed Voice Engine • Sub-800ms WebRTC Call</div>
+  </div>
+
+  /*!
+   * Voice orb by UV · https://github.com/imuvrays1/voice-orb
+   * Copyright (c) 2026 UV · MIT License (see LICENSE). Keep this notice in copies.
+   */
+  <script>
+    // -------------------------------------------------------------------------
+    // 1. Shaders & Full WebGL2 Fluid Simulation Engine
+    // -------------------------------------------------------------------------
+    const VERTEX_SHADER = `#version 300 es
+    in vec2 aPos;
+    out vec2 vUv;
+    void main() {
+      vUv = aPos * 0.5 + 0.5;
+      gl_Position = vec4(aPos, 0.0, 1.0);
+    }
+    `;
+
+    const FLUID_SIZE = 128;
+    const VELOCITY_KEEP = 0.25;
+    const OFFSET_KEEP = 0.35;
+    const PRESSURE_KEEP = 0.8;
+    const PRESSURE_ITERATIONS = 16;
+    const SPLAT_COUNT = 3;
+    const SPLAT_RING = 0.2;
+    const SPLAT_RADIUS = 0.006;
+    const SPLAT_FORCE = 9.0;
+
+    const FLUID_HEAD = `#version 300 es
+    precision highp float;
+    in vec2 vUv;
+    out vec4 outColor;
+    uniform vec2 uTexel;
+    `;
+
+    const FLUID_SPLAT = `${FLUID_HEAD}
+    uniform sampler2D uVelocity;
+    uniform vec4 uSplats[${SPLAT_COUNT}];
+    uniform float uRadius;
+    void main() {
+      vec2 v = texture(uVelocity, vUv).xy;
+      for (int i = 0; i < ${SPLAT_COUNT}; i++) {
+        vec2 d = vUv - uSplats[i].xy;
+        v += uSplats[i].zw * exp(-dot(d, d) / uRadius);
+      }
+      outColor = vec4(v, 0.0, 1.0);
+    }
+    `;
+
+    const FLUID_ADVECT = `${FLUID_HEAD}
+    uniform sampler2D uVelocity;
+    uniform sampler2D uSource;
+    uniform float uDt;
+    uniform float uKeep;
+    void main() {
+      vec2 back = vUv - uDt * texture(uVelocity, vUv).xy;
+      outColor = texture(uSource, back) * uKeep;
+    }
+    `;
+
+    const FLUID_DIVERGENCE = `${FLUID_HEAD}
+    uniform sampler2D uVelocity;
+    void main() {
+      vec2 c = texture(uVelocity, vUv).xy;
+      float l = texture(uVelocity, vUv - vec2(uTexel.x, 0.0)).x;
+      float r = texture(uVelocity, vUv + vec2(uTexel.x, 0.0)).x;
+      float b = texture(uVelocity, vUv - vec2(0.0, uTexel.y)).y;
+      float t = texture(uVelocity, vUv + vec2(0.0, uTexel.y)).y;
+      if (vUv.x - uTexel.x < 0.0) l = -c.x;
+      if (vUv.x + uTexel.x > 1.0) r = -c.x;
+      if (vUv.y - uTexel.y < 0.0) b = -c.y;
+      if (vUv.y + uTexel.y > 1.0) t = -c.y;
+      outColor = vec4((r - l + t - b) / (2.0 * uTexel.x), 0.0, 0.0, 1.0);
+    }
+    `;
+
+    const FLUID_PRESSURE = `${FLUID_HEAD}
+    uniform sampler2D uPressure;
+    uniform sampler2D uDivergence;
+    void main() {
+      float l = texture(uPressure, vUv - vec2(uTexel.x, 0.0)).x;
+      float r = texture(uPressure, vUv + vec2(uTexel.x, 0.0)).x;
+      float b = texture(uPressure, vUv - vec2(0.0, uTexel.y)).x;
+      float t = texture(uPressure, vUv + vec2(0.0, uTexel.y)).x;
+      float div = texture(uDivergence, vUv).x;
+      outColor = vec4((l + r + b + t - uTexel.x * uTexel.x * div) * 0.25, 0.0, 0.0, 1.0);
+    }
+    `;
+
+    const FLUID_GRADIENT = `${FLUID_HEAD}
+    uniform sampler2D uPressure;
+    uniform sampler2D uVelocity;
+    void main() {
+      float l = texture(uPressure, vUv - vec2(uTexel.x, 0.0)).x;
+      float r = texture(uPressure, vUv + vec2(uTexel.x, 0.0)).x;
+      float b = texture(uPressure, vUv - vec2(0.0, uTexel.y)).x;
+      float t = texture(uPressure, vUv + vec2(0.0, uTexel.y)).x;
+      vec2 v = texture(uVelocity, vUv).xy - vec2(r - l, t - b) / (2.0 * uTexel.x);
+      outColor = vec4(v, 0.0, 1.0);
+    }
+    `;
+
+    const FLUID_SCALE = `${FLUID_HEAD}
+    uniform sampler2D uSource;
+    uniform float uKeep;
+    void main() {
+      outColor = texture(uSource, vUv) * uKeep;
+    }
+    `;
+
+    const FLUID_CARRY = `${FLUID_HEAD}
+    uniform sampler2D uVelocity;
+    uniform sampler2D uOffset;
+    uniform float uDt;
+    uniform float uKeep;
+    void main() {
+      vec2 v = texture(uVelocity, vUv).xy;
+      vec2 d = texture(uOffset, vUv - uDt * v).xy;
+      outColor = vec4((d + v * uDt) * uKeep, 0.0, 1.0);
+    }
+    `;
+
+    class FluidSimulator {
+      constructor(gl) {
+        this.gl = gl;
+        gl.getExtension("EXT_color_buffer_float");
+        this.passes = {};
+        const sources = {
+          splat: FLUID_SPLAT,
+          advect: FLUID_ADVECT,
+          divergence: FLUID_DIVERGENCE,
+          pressure: FLUID_PRESSURE,
+          gradient: FLUID_GRADIENT,
+          scale: FLUID_SCALE,
+          carry: FLUID_CARRY
+        };
+        for (const [k, src] of Object.entries(sources)) {
+          const vs = gl.createShader(gl.VERTEX_SHADER);
+          gl.shaderSource(vs, VERTEX_SHADER); gl.compileShader(vs);
+          const fs = gl.createShader(gl.FRAGMENT_SHADER);
+          gl.shaderSource(fs, src); gl.compileShader(fs);
+          const p = gl.createProgram();
+          gl.attachShader(p, vs); gl.attachShader(p, fs); gl.linkProgram(p);
+          this.passes[k] = { program: p };
+        }
+        this.state = this.createState(0.42);
+      }
+
+      target(internal, format) {
+        const gl = this.gl;
+        const fbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, internal, FLUID_SIZE, FLUID_SIZE, 0, format, gl.HALF_FLOAT, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+        return { texture, fbo };
+      }
+
+      pair(internal, format) {
+        return { read: this.target(internal, format), write: this.target(internal, format) };
+      }
+
+      createState(seed) {
+        const gl = this.gl;
+        return {
+          velocity: this.pair(gl.RG16F, gl.RG),
+          pressure: this.pair(gl.R16F, gl.RED),
+          divergence: this.target(gl.R16F, gl.RED),
+          offset: this.pair(gl.RG16F, gl.RG),
+          phase: seed * 6.2831,
+          quiet: 0
+        };
+      }
+
+      run(name, outTarget, inputs, setUniforms) {
+        const gl = this.gl;
+        const pass = this.passes[name];
+        gl.useProgram(pass.program);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, outTarget.fbo);
+        gl.uniform2f(gl.getUniformLocation(pass.program, "uTexel"), 1 / FLUID_SIZE, 1 / FLUID_SIZE);
+        let unit = 0;
+        for (const [uniform, tex] of Object.entries(inputs)) {
+          gl.activeTexture(gl.TEXTURE0 + unit);
+          gl.bindTexture(gl.TEXTURE_2D, tex);
+          gl.uniform1i(gl.getUniformLocation(pass.program, uniform), unit);
+          unit++;
+        }
+        if (setUniforms) setUniforms(pass.program);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
+
+      swap(pair) {
+        const t = pair.read;
+        pair.read = pair.write;
+        pair.write = t;
+      }
+
+      step(bass, treble, dt, pull) {
+        if (dt <= 0) return;
+        const gl = this.gl;
+        const state = this.state;
+        gl.viewport(0, 0, FLUID_SIZE, FLUID_SIZE);
+        const v = state.velocity;
+
+        state.phase += dt * (0.35 + treble * 1.6);
+        const splats = new Float32Array(SPLAT_COUNT * 4);
+        const force = SPLAT_FORCE * bass * dt * (pull ? -0.8 : 1.0);
+        const sway = Math.PI / 2 + Math.sin(state.phase * 0.9) * 0.9;
+        for (let i = 0; i < SPLAT_COUNT; i++) {
+          const a = state.phase + (i / SPLAT_COUNT) * Math.PI * 2;
+          const dir = a + sway;
+          splats.set([
+            0.5 + Math.cos(a) * SPLAT_RING,
+            0.5 + Math.sin(a) * SPLAT_RING,
+            Math.cos(dir) * force,
+            Math.sin(dir) * force,
+          ], i * 4);
+        }
+
+        this.run("splat", v.write, { uVelocity: v.read.texture }, (p) => {
+          gl.uniform4fv(gl.getUniformLocation(p, "uSplats"), splats);
+          gl.uniform1f(gl.getUniformLocation(p, "uRadius"), SPLAT_RADIUS);
+        });
+        this.swap(v);
+
+        this.run("advect", v.write, { uVelocity: v.read.texture, uSource: v.read.texture }, (p) => {
+          gl.uniform1f(gl.getUniformLocation(p, "uDt"), dt);
+          gl.uniform1f(gl.getUniformLocation(p, "uKeep"), Math.pow(VELOCITY_KEEP, dt));
+        });
+        this.swap(v);
+
+        this.run("divergence", state.divergence, { uVelocity: v.read.texture });
+        const press = state.pressure;
+        this.run("scale", press.write, { uSource: press.read.texture }, (p) => {
+          gl.uniform1f(gl.getUniformLocation(p, "uKeep"), PRESSURE_KEEP);
+        });
+        this.swap(press);
+
+        for (let i = 0; i < PRESSURE_ITERATIONS; i++) {
+          this.run("pressure", press.write, { uPressure: press.read.texture, uDivergence: state.divergence.texture });
+          this.swap(press);
+        }
+
+        this.run("gradient", v.write, { uPressure: press.read.texture, uVelocity: v.read.texture });
+        this.swap(v);
+
+        const o = state.offset;
+        this.run("carry", o.write, { uVelocity: v.read.texture, uOffset: o.read.texture }, (p) => {
+          gl.uniform1f(gl.getUniformLocation(p, "uDt"), dt);
+          gl.uniform1f(gl.getUniformLocation(p, "uKeep"), Math.pow(OFFSET_KEEP, dt));
+        });
+        this.swap(o);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      }
+    }
+
+    // Main Orb Fragment Prelude with Fluid Warp & Sound Waves
+    const PRELUDE = `#version 300 es
+    precision highp float;
+
+    in vec2 vUv;
+    out vec4 outColor;
+
+    uniform vec2 uResolution;
+    uniform float uTime;
+    uniform float uDrift;
+    uniform float uPulse;
+    uniform vec4 uBands;
+    uniform float uLevel;
+    uniform float uInput;
+    uniform float uThink;
+    uniform float uScale;
+    uniform float uDim;
+    uniform float uSeed;
+
+    uniform vec3 uC0;
+    uniform vec3 uC1;
+    uniform vec3 uC2;
+    uniform vec3 uC3;
+
+    uniform float uWarp;
+    uniform float uSphere;
+    uniform float uDetail;
+    uniform float uGrain;
+    uniform float uPulseAmt;
+    uniform float uHighlight;
+    uniform float uExposure;
+    uniform float uSaturation;
+
+    uniform sampler2D uFlow;
+    uniform sampler2D uFlowVelocity;
+    uniform float uFlowAmt;
+    uniform float uFlowDebug;
+
+    const float PI = 3.14159265;
+    const vec3 LIGHT = vec3(-0.45, 0.55, 0.70);
+
+    float hash21(vec2 p) {
+      p = fract(p * vec2(123.34, 456.21));
+      p += dot(p, p + 45.32);
+      return fract(p.x * p.y);
+    }
+
+    float grainHash(vec2 pixel, float frame) {
+      uvec2 q = uvec2(ivec2(pixel)) * uvec2(1597334673u, 3812015801u);
+      uint n = (q.x ^ q.y ^ (uint(frame) * 2654435761u)) * 1597334673u;
+      return float(n) * (1.0 / 4294967295.0);
+    }
+
+    float vnoise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(
+        mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x),
+        mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x),
+        u.y
+      );
+    }
+
+    float fbm(vec2 p) {
+      float v = 0.0;
+      float a = 0.5;
+      mat2 r = mat2(0.8, 0.6, -0.6, 0.8);
+      for (int i = 0; i < 4; i++) {
+        v += a * vnoise(p);
+        p = r * p * 2.03 + 17.1;
+        a *= 0.5;
+      }
+      return v;
+    }
+
+    vec2 flowUv(vec2 p) {
+      return p * 0.5 + 0.5;
+    }
+
+    vec2 carried(vec2 p) {
+      return p - texture(uFlow, flowUv(p)).xy * 2.0 * uFlowAmt;
+    }
+
+    vec2 sphereMap(vec2 p) {
+      float z = sqrt(max(1.0 - dot(p, p), 0.0));
+      return p / (1.0 + uSphere * z);
+    }
+
+    struct Ball {
+      vec2 p;
+      vec2 uv;
+      vec3 n;
+      float r;
+      float mask;
+    };
+
+    Ball ball() {
+      Ball b;
+      b.p = (vUv - 0.5) * 2.0 / uScale;
+      b.r = length(b.p);
+      float aa = max(fwidth(b.r) * 1.25, 1e-4);
+      b.mask = 1.0 - smoothstep(1.0 - aa, 1.0, b.r);
+      float z = sqrt(max(1.0 - b.r * b.r, 0.0));
+      b.n = vec3(b.p, z);
+      b.uv = sphereMap(carried(b.p));
+
+      // Concentric sound wave ripples (low-mid band) & bass breathing
+      float ph = fract(b.r * 1.35 - uPulse);
+      float wave = sin(ph * 2.0 * PI) * smoothstep(0.0, 0.2, ph) * (1.0 - smoothstep(0.55, 1.0, ph));
+      vec2 dir = b.r > 1e-4 ? b.p / b.r : vec2(0.0);
+      b.uv += dir * wave * uBands.y * uPulseAmt * 0.075 * smoothstep(0.05, 0.3, b.r);
+      b.uv *= 1.0 - uBands.x * 0.06;
+      return b;
+    }
+
+    float fbmSoft(vec2 p) {
+      return vnoise(p) * 0.66 + vnoise(p * 2.1 + 17.1) * 0.34;
+    }
+
+    float softLight(vec2 w, vec2 p, float size, float angle, float stretch) {
+      vec2 d = w - p;
+      float c = cos(angle);
+      float s = sin(angle);
+      d = vec2(c * d.x + s * d.y, -s * d.x + c * d.y);
+      d.y *= stretch;
+      return exp(-dot(d, d) * size);
+    }
+
+    vec3 field(vec2 uv, float t) {
+      vec2 s = vec2(uSeed * 13.7, uSeed * 7.3);
+      vec2 q = vec2(
+        fbmSoft(uv * uDetail + s + vec2(0.0, t * 0.11)),
+        fbmSoft(uv * uDetail + s + vec2(5.2, -t * 0.09))
+      ) - 0.5;
+      vec2 w = uv + q * uWarp * 1.3;
+      vec2 q2 = vec2(
+        fbmSoft(w * uDetail * 2.2 + s + vec2(t * 0.07, 3.1)),
+        fbmSoft(w * uDetail * 2.2 + s + vec2(9.2, -t * 0.06))
+      ) - 0.5;
+      w += q2 * uWarp * 0.5;
+
+      float a = uSeed * 6.2831;
+      vec3 col = mix(uC1, uC2, 0.3);
+      col = mix(col, uC0, softLight(w, vec2(cos(t * 0.21 + a), sin(t * 0.17 + a * 1.3)) * 0.55, 2.0, t * 0.05 + a, 1.4) * 0.9);
+      col = mix(col, mix(uC0, uC1, 0.5), softLight(w, vec2(cos(t * 0.15 + a + 1.0), sin(t * 0.19 + a + 2.2)) * 0.45, 4.0, -t * 0.07 + a * 2.0, 2.6) * 0.8);
+      col = mix(col, uC2, softLight(w, vec2(cos(t * 0.17 + a + 2.1), sin(t * 0.21 + a + 1.4)) * 0.5, 2.4, t * 0.04 + 1.1, 1.2) * 0.85);
+      col = mix(col, uC2, softLight(w, vec2(cos(t * 0.25 + a + 3.3), sin(t * 0.13 + a + 4.4)) * 0.4, 6.0, t * 0.09 + a + 0.6, 3.0) * 0.75);
+      col = mix(col, uC3, softLight(w, vec2(cos(t * 0.29 + a + 4.0), sin(t * 0.25 + a + 3.3)) * 0.42, 5.0, -t * 0.06 + 2.0, 1.6) * 0.8);
+      col = mix(col, uC3, softLight(w, vec2(cos(t * 0.19 + a + 5.1), sin(t * 0.23 + a + 0.6)) * 0.35, 11.0, t * 0.08 + a, 2.2) * 0.85);
+      col *= 0.94 + 0.12 * fbmSoft(w * 1.4 + s + t * 0.05);
+      return col;
+    }
+
+    float diffuse(vec3 n) {
+      return clamp(dot(n, normalize(LIGHT)), 0.0, 1.0);
+    }
+
+    vec3 voiceLight(Ball b) {
+      float ph = fract(b.r * 1.35 - uPulse);
+      float ring = smoothstep(0.0, 0.16, ph) * (1.0 - smoothstep(0.16, 0.5, ph));
+      ring *= (1.0 - 0.55 * b.r) * smoothstep(0.05, 0.3, b.r);
+      vec3 c = uC2 * ring * uBands.y * uPulseAmt * 0.16;
+
+      float ang = atan(b.p.y, b.p.x);
+      float aim = uDrift * 0.7 + uSeed * 6.0 - uInput * 1.2;
+      float da = abs(mod(ang - aim + PI, 2.0 * PI) - PI);
+      float arc = exp(-da * da * 2.6) * smoothstep(0.5, 0.9, b.r) * (1.0 - smoothstep(0.94, 1.0, b.r));
+      float drive = clamp(uBands.w * 2.4 + uThink * 0.6 + uInput * 0.8, 0.0, 1.0);
+      c += mix(uC2, uC3, 0.75) * arc * drive * uHighlight * 1.2;
+      return c;
+    }
+
+    vec3 finish(vec3 col) {
+      float g = grainHash(gl_FragCoord.xy, floor(uTime * 24.0)) - 0.5;
+      col += g * uGrain * 0.35;
+      float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col = mix(vec3(l), col, uSaturation * (1.0 - uDim * 0.22));
+      col *= 1.0 + uExposure - uDim * 0.05;
+      return clamp(col, 0.0, 1.0);
+    }
+
+    void emit(vec3 col, float alpha) {
+      if (uFlowDebug > 0.5) {
+        vec2 p = (vUv - 0.5) * 2.0 / uScale;
+        if (uFlowDebug < 1.5) {
+          vec2 v = texture(uFlowVelocity, flowUv(p)).xy;
+          col = vec3(0.5 + v * 2.5, 0.5 + length(v) * 1.5);
+        } else {
+          vec2 g = abs(fract(carried(p) * 5.0) - 0.5);
+          float line = 1.0 - smoothstep(0.0, fwidth(g.x) * 1.5, min(g.x, g.y) - 0.02);
+          col = mix(vec3(0.96), uC0, line);
+        }
+      }
+      outColor = vec4(col * alpha, alpha);
+    }
+    `;
+
+    const SHADERS = {
+      painted: `${PRELUDE}
+      void main() {
+        Ball b = ball();
+        if (b.mask <= 0.0) { outColor = vec4(0.0); return; }
+        vec3 col = field(b.uv, uDrift);
+        col *= mix(0.84, 1.10, diffuse(b.n));
+        float rim = pow(1.0 - b.n.z, 2.2);
+        col = mix(col, uC0, rim * 0.22);
+        vec3 h = normalize(normalize(LIGHT) + vec3(0.0, 0.0, 1.0));
+        col += uC3 * pow(clamp(dot(b.n, h), 0.0, 1.0), 9.0) * 0.16;
+        col += voiceLight(b);
+        emit(finish(col), b.mask);
+      }
+      `,
+      glass: `${PRELUDE}
+      void main() {
+        Ball b = ball();
+        if (b.mask <= 0.0) { outColor = vec4(0.0); return; }
+        float t = uDrift;
+        vec2 refr = b.uv * (1.0 - 0.25 * b.n.z) + b.n.xy * 0.08;
+        vec3 inside = field(refr * 1.1, t * 0.8);
+        inside = mix(inside, uC2, 0.42);
+
+        float n = fbmSoft(b.uv * uDetail * 2.0 + vec2(t * 0.2, -t * 0.15) + uSeed);
+        float threads = pow(1.0 - abs(sin(n * 7.0 + t * 0.5)), 6.0);
+        threads *= 0.18 + uLevel * 0.7 + uThink * 0.25 + uBands.x * 0.3;
+        vec3 col = inside + uC3 * threads * 0.65 * (0.5 + uWarp * 0.5);
+
+        float fres = pow(1.0 - b.n.z, 3.0);
+        col = mix(col, mix(uC2, uC3, 0.6), fres * 0.85);
+        col *= mix(0.84, 1.06, diffuse(b.n));
+
+        vec3 h = normalize(normalize(LIGHT) + vec3(0.0, 0.0, 1.0));
+        float spec = pow(clamp(dot(b.n, h), 0.0, 1.0), 70.0);
+        col += uC3 * spec * 1.05;
+
+        col += voiceLight(b);
+        emit(finish(col), b.mask);
+      }
+      `,
+      silk: `${PRELUDE}
+      void main() {
+        Ball b = ball();
+        if (b.mask <= 0.0) { outColor = vec4(0.0); return; }
+        float t = uDrift;
+        vec2 uv = b.uv * 1.25;
+        vec3 col = field(b.uv, t * 0.6) * 0.92;
+        float amp = 0.16 + uLevel * 0.22 + uBands.x * 0.18;
+        for (int i = 0; i < 4; i++) {
+          float fi = float(i);
+          float y = sin(uv.x * (2.1 + fi * 0.7) + t * (0.9 + fi * 0.25) + fi * 1.7 + uSeed * 6.0)
+                  * amp * (0.65 + 0.35 * sin(t * 0.3 + fi))
+                  + (fi - 1.5) * 0.27;
+          y += (fbm(uv * uDetail + vec2(fi * 3.1, t * 0.1)) - 0.5) * uWarp * 0.5;
+          float d = uv.y - y;
+          float width = 0.06 + 0.06 * uBands.y + 0.02 * fi;
+          float glow = exp(-d * d / (width * width));
+          vec3 rc = i == 0 ? uC2 : (i == 1 ? uC3 : (i == 2 ? mix(uC2, uC3, 0.5) : uC3));
+          vec3 add = rc * glow * (0.38 + 0.45 * uLevel);
+          col = 1.0 - (1.0 - col) * (1.0 - add);
+        }
+        col *= mix(0.78, 1.1, diffuse(b.n));
+        col = mix(col, uC0 * 0.8, pow(1.0 - b.n.z, 2.4) * 0.35);
+        col += voiceLight(b);
+        emit(finish(col), b.mask);
+      }
+      `
+    };
+
+    // Palettes (deep, mid, light, glint)
+    const PALETTES = {
+      talkar: {
+        name: 'ElevenLabs Narration',
+        stops: ["#b82e0d", "#e8562c", "#f69458", "#fed192"],
+        glow: 'radial-gradient(circle, rgba(232, 86, 44, 0.24) 0%, rgba(246, 148, 88, 0.12) 40%, rgba(254, 209, 146, 0.04) 65%, transparent 72%)'
+      },
+      solis: {
+        name: 'Warm Terracotta',
+        stops: ["#c52a0b", "#f36944", "#f89e5f", "#fecb8a"],
+        glow: 'radial-gradient(circle, rgba(243, 105, 68, 0.24) 0%, rgba(248, 158, 95, 0.12) 40%, rgba(254, 203, 138, 0.04) 65%, transparent 72%)'
+      },
+      sunset: {
+        name: 'Sunset Plum',
+        stops: ["#55206e", "#e8566c", "#ffab73", "#ffd000"],
+        glow: 'radial-gradient(circle, rgba(232, 86, 108, 0.22) 0%, rgba(255, 171, 115, 0.12) 45%, transparent 70%)'
+      },
+      lagoon: {
+        name: 'Lagoon',
+        stops: ["#003f86", "#018dff", "#8fd2ff", "#c4fff1"],
+        glow: 'radial-gradient(circle, rgba(1, 141, 255, 0.22) 0%, rgba(143, 210, 255, 0.06) 45%, transparent 70%)'
+      },
+      twilight: {
+        name: 'Twilight',
+        stops: ["#4a3aff", "#8a7fff", "#d2cfff", "#f6c9ff"],
+        glow: 'radial-gradient(circle, rgba(138, 127, 255, 0.22) 0%, rgba(246, 201, 255, 0.06) 45%, transparent 70%)'
+      }
+    };
+
+    function hexToRgb(hex) {
+      const n = parseInt(hex.replace('#', ''), 16);
+      return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255];
+    }
+
+    // Initialize WebGL2 & Programs
+    const canvas = document.getElementById('voice-orb-canvas');
+    const gl = canvas.getContext('webgl2', { 
+      alpha: true, 
+      antialias: true, 
+      premultipliedAlpha: true,
+      powerPreference: 'high-performance'
+    });
+
+    const programs = {};
+    const vs = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vs, VERTEX_SHADER);
+    gl.compileShader(vs);
+
+    for (const [key, src] of Object.entries(SHADERS)) {
+      const fs = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(fs, src);
+      gl.compileShader(fs);
+      const prog = gl.createProgram();
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, fs);
+      gl.linkProgram(prog);
+      programs[key] = prog;
+    }
+
+    const quadBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+
+    // Initialize GPU Fluid Simulator
+    const fluidSim = new FluidSimulator(gl);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+    let activeVariant = 'painted';
+    let activePaletteKey = 'talkar';
+
+    function setVariant(variant, btn) {
+      if (!SHADERS[variant]) return;
+      activeVariant = variant;
+      document.querySelectorAll('#variant-control .segmented-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+    }
+
+    function setPalette(key, btn) {
+      if (!PALETTES[key]) return;
+      activePaletteKey = key;
+      document.querySelectorAll('#palette-control .segmented-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      const ambient = document.getElementById('ambient-glow');
+      ambient.style.background = PALETTES[key].glow;
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. High-Fidelity Audio Engine (Calibrated Bands + Live WebRTC + Simulation)
+    // -------------------------------------------------------------------------
+    let audioCtx = null;
+    let micAnalyser = null;
+    let micData = null;
+    let agentAnalyser = null;
+    let agentData = null;
+
+    const EDGES = [90, 350, 1100, 2800, 7000];
+    const DB_LOW = -95;
+    const DB_HIGH = -20;
+    const PEAK_FALL = 0.05;
+    const FLOOR_RISE = 0.15;
+    const MIN_SPAN = 0.14;
+    const ATTACK = 28;
+    const RELEASE = 8;
+
+    let agentBands = [0, 0, 0, 0];
+    let agentFloor = [1, 1, 1, 1];
+    let agentPeak = [0, 0, 0, 0];
+    let agentEnv = [0, 0, 0, 0];
+    let agentLevel = 0;
+
+    let callerBands = [0, 0, 0, 0];
+    let callerFloor = [1, 1, 1, 1];
+    let callerPeak = [0, 0, 0, 0];
+    let callerEnv = [0, 0, 0, 0];
+    let callerLevel = 0;
+
+    // Simulated Voice Generator (phrase cycles, speech rate, syllables, sibilance)
+    let simTime = 7.31;
+    let simEnv = [0, 0, 0, 0];
+
+    function noise1D(x) {
+      const i = Math.floor(x);
+      const f = x - i;
+      const u = f * f * (3 - 2 * f);
+      const a = (Math.sin(i * 12.9898) * 43758.5453) % 1;
+      const b = (Math.sin((i + 1) * 12.9898) * 43758.5453) % 1;
+      return a + (b - a) * u;
+    }
+
+    function readSimulatedVoice(dt) {
+      simTime += dt;
+      const t = simTime;
+      const cycle = 2.6 + noise1D(Math.floor(t / 2.6)) * 0.8;
+      const phase = (t % cycle) / cycle;
+      const gate = (phase < 0.06 ? phase / 0.06 : 1.0) * (phase > 0.8 ? (1.0 - phase) / 0.2 : 1.0);
+      const rate = 4.6 + noise1D(t * 0.5) * 1.6;
+      const syllable = Math.pow(Math.max(0, Math.sin(t * rate * Math.PI * 2 + noise1D(t) * 2)), 1.6);
+      const stress = 0.65 + 0.35 * noise1D(t * 2.2) * (1.2 - phase);
+      const env = Math.min(1.0, gate * syllable * stress * 2.2);
+      const sibilant = noise1D(t * 6.0) > 0.62 ? 1.0 : 0.25;
+
+      const target = [
+        env * (0.80 + 0.25 * noise1D(t * 3.0)),       // Bass
+        env * (0.85 + 0.20 * noise1D(t * 5.0 + 4.0)), // Low-mid
+        env * (0.50 + 0.35 * noise1D(t * 7.0 + 9.0)), // High-mid
+        env * 0.95 * sibilant                          // Treble sibilant
+      ];
+
+      for (let b = 0; b < 4; b++) {
+        const rateK = target[b] > simEnv[b] ? ATTACK : RELEASE;
+        simEnv[b] += (target[b] - simEnv[b]) * (1 - Math.exp(-dt * rateK));
+      }
+      const lvl = Math.min(1.0, simEnv[0] * 0.32 + simEnv[1] * 0.36 + simEnv[2] * 0.22 + simEnv[3] * 0.1);
+      return { bands: simEnv, level: lvl };
+    }
+
+    async function initUserAudio() {
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        const source = audioCtx.createMediaStreamSource(stream);
+        micAnalyser = audioCtx.createAnalyser();
+        micAnalyser.fftSize = 512;
+        micAnalyser.smoothingTimeConstant = 0.3;
+        source.connect(micAnalyser);
+        micData = new Float32Array(micAnalyser.frequencyBinCount);
+      } catch (err) {
+        console.warn('Microphone permission skipped or unavailable:', err);
+      }
+    }
+
+    // Try hooking WebRTC incoming agent audio element
+    function tryHookAgentAudio() {
+      if (agentAnalyser) return;
+      const audioEl = document.getElementById('dograh-widget-audio') || 
+                      (window.DograhWidget?.getState()?.audioElement);
+      if (audioEl) {
+        try {
+          if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          if (audioEl.srcObject) {
+            const src = audioCtx.createMediaStreamSource(audioEl.srcObject);
+            agentAnalyser = audioCtx.createAnalyser();
+            agentAnalyser.fftSize = 512;
+            agentAnalyser.smoothingTimeConstant = 0.3;
+            src.connect(agentAnalyser);
+            agentData = new Float32Array(agentAnalyser.frequencyBinCount);
+            console.log('Successfully hooked WebRTC agent audio stream');
+          }
+        } catch (e) {
+          console.warn('Cannot hook WebRTC audio directly:', e);
+        }
+      }
+    }
+
+    function processBandSpectrum(analyser, dataArray, floorArr, peakArr, envArr, dt) {
+      analyser.getFloatFrequencyData(dataArray);
+      const hzPerBin = analyser.context.sampleRate / analyser.fftSize;
+      const bRes = [0, 0, 0, 0];
+
+      for (let b = 0; b < 4; b++) {
+        const from = Math.max(1, Math.floor(EDGES[b] / hzPerBin));
+        const to = Math.min(dataArray.length, Math.ceil(EDGES[b + 1] / hzPerBin));
+        let sum = 0;
+        for (let i = from; i < to; i++) {
+          sum += Math.pow(10, dataArray[i] / 10);
+        }
+        const avgPower = sum / Math.max(1, to - from);
+        const db = 10 * Math.log10(Math.max(1e-12, avgPower));
+        const raw = Math.min(1, Math.max(0, (db - DB_LOW) / (DB_HIGH - DB_LOW)));
+
+        floorArr[b] = Math.min(raw, floorArr[b] + dt * FLOOR_RISE);
+        peakArr[b] = Math.max(raw, peakArr[b] - dt * PEAK_FALL);
+        const span = Math.max(MIN_SPAN, peakArr[b] - floorArr[b]);
+        const norm = Math.min(1, Math.max(0, (raw - floorArr[b]) / span));
+
+        const rate = norm > envArr[b] ? ATTACK : RELEASE;
+        envArr[b] += (norm - envArr[b]) * (1 - Math.exp(-dt * rate));
+        bRes[b] = envArr[b];
+      }
+      return bRes;
+    }
+
+    function updateAudio(dt) {
+      tryHookAgentAudio();
+
+      // Read caller mic
+      if (micAnalyser && micData && callState === 'connected') {
+        callerBands = processBandSpectrum(micAnalyser, micData, callerFloor, callerPeak, callerEnv, dt);
+        callerLevel = Math.min(1, callerBands[0] * 0.32 + callerBands[1] * 0.36 + callerBands[2] * 0.22 + callerBands[3] * 0.1);
+      } else {
+        callerLevel = 0;
+        callerBands = [0, 0, 0, 0];
+      }
+
+      // Read agent audio
+      if (agentAnalyser && agentData && callState === 'connected') {
+        agentBands = processBandSpectrum(agentAnalyser, agentData, agentFloor, agentPeak, agentEnv, dt);
+        agentLevel = Math.min(1, agentBands[0] * 0.32 + agentBands[1] * 0.36 + agentBands[2] * 0.22 + agentBands[3] * 0.1);
+      } else if (callState === 'connected' && callerLevel < 0.12) {
+        // Active voice simulation when user isn't talking
+        const sim = readSimulatedVoice(dt);
+        agentBands = sim.bands;
+        agentLevel = sim.level;
+      } else {
+        agentBands = [0, 0, 0, 0];
+        agentLevel = 0;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. State Targets & Animation Loop
+    // -------------------------------------------------------------------------
+    const TARGETS = {
+      ready: { speed: 1.5, think: 0.0, dim: 0.0, scale: 0.96, voice: false, caller: false },
+      connecting: { speed: 2.8, think: 1.0, dim: 0.0, scale: 0.94, voice: false, caller: false },
+      listening: { speed: 1.8, think: 0.0, dim: 0.0, scale: 0.96, voice: false, caller: true },
+      talking: { speed: 3.4, think: 0.0, dim: 0.0, scale: 0.94, voice: true, caller: false },
+      settled: { speed: 0.6, think: 0.0, dim: 0.35, scale: 0.94, voice: false, caller: false }
+    };
+
+    let callState = 'ready'; // ready | connecting | connected
+    let cur = {
+      time: 0,
+      drift: 16.8,
+      pulse: 0,
+      speed: 1.5,
+      think: 0.0,
+      dim: 0.0,
+      scale: 0.96,
+      bands: [0, 0, 0, 0],
+      level: 0,
+      input: 0,
+      talk: 0
+    };
+
+    const SPEED_AFTER = 0.25;
+    const PULSE_FROM = 0.45;
+    const PULSE_TO = 1.1;
+    const DRIFT_RATE = 1.05;
+    const BREATH = 0.06;
+    const LISTEN_GAIN = 0.8;
+
+    function smoothstep(a, b, x) {
+      const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    }
+
+    let lastTime = performance.now();
+
+    function render(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
+      updateAudio(dt);
+
+      // Determine state
+      let stateKey = 'ready';
+      if (callState === 'connecting') stateKey = 'connecting';
+      else if (callState === 'connected') {
+        stateKey = callerLevel > 0.1 ? 'listening' : 'talking';
+      }
+
+      const t = TARGETS[stateKey];
+      const k = 1 - Math.exp(-dt * 4.0);
+      const isTalking = t.voice;
+
+      cur.talk = isTalking ? cur.talk + dt : 0;
+      const speedTarget = (isTalking && cur.talk < SPEED_AFTER) ? cur.speed : t.speed;
+
+      cur.speed += (speedTarget - cur.speed) * k;
+      cur.think += (t.think - cur.think) * k;
+      cur.dim += (t.dim - cur.dim) * k;
+
+      const gain = smoothstep(PULSE_FROM, PULSE_TO, cur.talk);
+      const up = 1 - Math.exp(-dt * ATTACK);
+      const down = 1 - Math.exp(-dt * RELEASE);
+      const follow = (from, to) => from + (to - from) * (to > from ? up : down);
+
+      for (let i = 0; i < 4; i++) {
+        const target = isTalking ? agentBands[i] * gain : (t.caller ? callerBands[i] * LISTEN_GAIN : 0);
+        cur.bands[i] = follow(cur.bands[i], target);
+      }
+      cur.level = follow(cur.level, isTalking ? agentLevel * gain : 0);
+      cur.input = follow(cur.input, t.caller ? callerLevel : 0);
+
+      // Step GPU Fluid Simulator (bass pushes fluid, treble sways direction, caller pulls inward)
+      const fluidBass = isTalking ? cur.bands[0] : (t.caller ? cur.bands[0] * 0.7 : 0);
+      const fluidTreble = cur.bands[3];
+      const pullInward = t.caller;
+      fluidSim.step(fluidBass, fluidTreble, dt, pullInward);
+
+      // Update clocks
+      cur.time += dt;
+      cur.drift += dt * (DRIFT_RATE * cur.speed + 2.5 * cur.level + 1.2 * cur.input);
+      cur.pulse += dt * (0.22 * cur.speed + 1.8 * cur.bands[1]);
+
+      const breathe = Math.sin(cur.time * 2.4) * 0.012 * cur.think;
+      const targetScale = t.scale - cur.input * 0.05 + cur.level * BREATH + breathe;
+      cur.scale += (targetScale - cur.scale) * (1 - Math.exp(-dt * 9.0));
+
+      // Draw active variant
+      const prog = programs[activeVariant] || programs.painted;
+      gl.useProgram(prog);
+
+      gl.viewport(0, 0, 560, 560);
+      const aPos = gl.getAttribLocation(prog, 'aPos');
+      gl.enableVertexAttribArray(aPos);
+      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+      const pal = PALETTES[activePaletteKey] || PALETTES.talkar;
+      const c0 = hexToRgb(pal.stops[0]);
+      const c1 = hexToRgb(pal.stops[1]);
+      const c2 = hexToRgb(pal.stops[2]);
+      const c3 = hexToRgb(pal.stops[3]);
+
+      gl.uniform2f(gl.getUniformLocation(prog, "uResolution"), 560, 560);
+      gl.uniform1f(gl.getUniformLocation(prog, "uTime"), cur.time);
+      gl.uniform1f(gl.getUniformLocation(prog, "uDrift"), cur.drift);
+      gl.uniform1f(gl.getUniformLocation(prog, "uPulse"), cur.pulse);
+      gl.uniform4f(gl.getUniformLocation(prog, "uBands"), cur.bands[0], cur.bands[1], cur.bands[2], cur.bands[3]);
+      gl.uniform1f(gl.getUniformLocation(prog, "uLevel"), cur.level);
+      gl.uniform1f(gl.getUniformLocation(prog, "uInput"), cur.input);
+      gl.uniform1f(gl.getUniformLocation(prog, "uThink"), cur.think);
+      gl.uniform1f(gl.getUniformLocation(prog, "uScale"), cur.scale);
+      gl.uniform1f(gl.getUniformLocation(prog, "uDim"), cur.dim);
+      gl.uniform1f(gl.getUniformLocation(prog, "uSeed"), 0.42);
+
+      gl.uniform3f(gl.getUniformLocation(prog, "uC0"), c0[0], c0[1], c0[2]);
+      gl.uniform3f(gl.getUniformLocation(prog, "uC1"), c1[0], c1[1], c1[2]);
+      gl.uniform3f(gl.getUniformLocation(prog, "uC2"), c2[0], c2[1], c2[2]);
+      gl.uniform3f(gl.getUniformLocation(prog, "uC3"), c3[0], c3[1], c3[2]);
+
+      gl.uniform1f(gl.getUniformLocation(prog, "uWarp"), 0.85);
+      gl.uniform1f(gl.getUniformLocation(prog, "uSphere"), 0.85);
+      gl.uniform1f(gl.getUniformLocation(prog, "uDetail"), 1.1);
+      gl.uniform1f(gl.getUniformLocation(prog, "uGrain"), 0.22);
+      gl.uniform1f(gl.getUniformLocation(prog, "uPulseAmt"), 0.7);
+      gl.uniform1f(gl.getUniformLocation(prog, "uHighlight"), 0.8);
+      gl.uniform1f(gl.getUniformLocation(prog, "uExposure"), 0.0);
+      gl.uniform1f(gl.getUniformLocation(prog, "uSaturation"), 1.0);
+
+      // Bind GPU Fluid Textures
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, fluidSim.state.offset.read.texture);
+      gl.uniform1i(gl.getUniformLocation(prog, "uFlow"), 0);
+
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, fluidSim.state.velocity.read.texture);
+      gl.uniform1i(gl.getUniformLocation(prog, "uFlowVelocity"), 1);
+
+      gl.uniform1f(gl.getUniformLocation(prog, "uFlowAmt"), 0.85);
+      gl.uniform1f(gl.getUniformLocation(prog, "uFlowDebug"), 0.0);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+      requestAnimationFrame(render);
+    }
+
+    requestAnimationFrame(render);
+
+    // -------------------------------------------------------------------------
+    // 4. Call State & UI Controls
+    // -------------------------------------------------------------------------
+    let callTimerInterval = null;
+    let callDurationSecs = 0;
+    let isMuted = false;
+
+    function setCallState(state) {
+      callState = state;
+
+      const pill = document.getElementById('status-pill');
+      const label = document.getElementById('status-label');
+      const title = document.getElementById('caption-title');
+      const sub = document.getElementById('caption-subtitle');
+      const timer = document.getElementById('call-timer');
+      const mainBtn = document.getElementById('main-dock-btn');
+      const btnText = document.getElementById('main-btn-text');
+      const micBtn = document.getElementById('mic-toggle-btn');
+
+      pill.className = 'status-pill';
+
+      if (state === 'connecting') {
+        pill.classList.add('is-connecting');
+        label.textContent = 'Connecting...';
+        title.textContent = 'Connecting';
+        sub.textContent = 'Establishing secure low-latency WebRTC session';
+        mainBtn.disabled = true;
+        btnText.textContent = 'Connecting...';
+        micBtn.style.display = 'none';
+        timer.style.display = 'none';
+        stopTimer();
+      } else if (state === 'connected') {
+        pill.classList.add('is-connected');
+        label.textContent = 'Live Session';
+        title.textContent = 'Listening...';
+        sub.textContent = 'Speak naturally in English, Hindi, or Hinglish';
+        mainBtn.disabled = false;
+        mainBtn.className = 'dock-btn dock-btn-danger';
+        btnText.textContent = 'End Call';
+        micBtn.style.display = 'inline-flex';
+        timer.style.display = 'block';
+        startTimer();
+        initUserAudio();
+      } else {
+        label.textContent = 'Standby';
+        title.textContent = 'Talk to Talkar';
+        sub.textContent = 'Click the orb or button to start speaking';
+        mainBtn.disabled = false;
+        mainBtn.className = 'dock-btn dock-btn-primary';
+        btnText.textContent = 'Start Call';
+        micBtn.style.display = 'none';
+        timer.style.display = 'none';
+        stopTimer();
+      }
+    }
+
+    function startTimer() {
+      stopTimer();
+      callDurationSecs = 0;
+      const el = document.getElementById('call-timer');
+      el.textContent = '00:00';
+      callTimerInterval = setInterval(() => {
+        callDurationSecs++;
+        const mins = String(Math.floor(callDurationSecs / 60)).padStart(2, '0');
+        const secs = String(callDurationSecs % 60).padStart(2, '0');
+        el.textContent = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (callTimerInterval) {
+        clearInterval(callTimerInterval);
+        callTimerInterval = null;
+      }
+    }
+
+    function toggleCall() {
+      if (!window.DograhWidget) {
+        alert('Initializing voice engine, please wait a moment...');
+        return;
+      }
+
+      if (callState === 'connected' || callState === 'connecting') {
+        window.DograhWidget.end();
+      } else {
+        setCallState('connecting');
+        window.DograhWidget.start().catch((err) => {
+          console.error('Call failed:', err);
+          setCallState('ready');
+        });
+      }
+    }
+
+    function handleOrbClick() {
+      toggleCall();
+    }
+
+    function toggleMute() {
+      const micBtn = document.getElementById('mic-toggle-btn');
+      isMuted = !isMuted;
+      micBtn.classList.toggle('is-active', isMuted);
+      
+      if (window.DograhWidget?.getState()?.stream) {
+        window.DograhWidget.getState().stream.getAudioTracks().forEach(track => {
+          track.enabled = !isMuted;
+        });
+      }
+    }
+
+    function bindWidget() {
+      if (window.DograhWidget) {
+        window.DograhWidget.onStatusChange((status) => {
+          console.log('[Talkar Widget State]:', status);
+          if (status === 'connected') setCallState('connected');
+          else if (status === 'connecting') setCallState('connecting');
+          else setCallState('ready');
+        });
+        window.DograhWidget.onCallEnd(() => setCallState('ready'));
+        window.DograhWidget.onError((err) => {
+          console.error('[Talkar Error]:', err);
+          setCallState('ready');
+        });
+      } else {
+        setTimeout(bindWidget, 250);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', bindWidget);
+  </script>
+</body>
+</html>
